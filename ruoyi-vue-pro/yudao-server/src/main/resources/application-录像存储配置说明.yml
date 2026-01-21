@@ -1,0 +1,183 @@
+# =====================================================
+# IoT 摄像头录像存储配置
+# =====================================================
+# 
+# ⚠️ 注意：这是临时配置方案！
+# 
+# 【当前实现】：yml硬编码配置（临时方案，快速验证功能）
+# 【正确实现】：应使用基础设施模块的FileService
+# 
+# 正确的架构方式：
+# 1. 在管理后台"基础设施 → 文件管理 → 文件配置"中配置
+# 2. 配置信息存储在 infra_file_config 表
+# 3. 代码中注入 FileService
+# 4. 使用 fileService.createFile() 上传文件
+# 5. 文件记录自动保存到 infra_file 表
+# 
+# 当前使用yml配置的原因：
+# - Gateway层录像功能还未完全实现
+# - 先快速验证业务流程
+# - 后续优化时再统一切换到FileService
+# 
+# 详细说明请参考：
+# - 正确的文件存储集成方案.md
+# - 文件存储实施说明-当前阶段.md
+# - FileService集成-快速参考.md
+# 
+# =====================================================
+# 
+# 本配置关联基础设施模块的文件存储功能
+# 录像文件通过ZLMediaKit保存，路径规则由本配置定义
+#
+# =====================================================
+
+iot:
+  recording:
+    # 录像文件存储目录（相对路径或绝对路径）
+    # 
+    # 规则：
+    # - 相对路径：相对于ZLMediaKit的工作目录
+    # - 绝对路径：直接使用指定的完整路径
+    # 
+    # 示例：
+    # - /recordings                          → Linux绝对路径
+    # - D:/recordings                        → Windows绝对路径
+    # - recordings                           → 相对路径
+    # 
+    # 默认值：/recordings
+    directory: /recordings
+    
+    # 录像文件URL前缀（HTTP访问地址）
+    # 
+    # 用途：
+    # - 前端通过此URL访问录像文件
+    # - 配合ZLMediaKit的HTTP服务地址
+    # 
+    # 格式：http://{ZLMediaKit服务器IP}:{HTTP端口}/recordings
+    # 
+    # 示例：
+    # - http://192.168.1.246:8080/recordings
+    # - http://localhost:8080/recordings
+    # 
+    # 注意：
+    # - 端口号需要与ZLMediaKit配置的http.port一致
+    # - 路径 /recordings 需要与directory配置对应
+    url-prefix: http://192.168.1.246:8080/recordings
+    
+    # 录像文件命名规则（自动生成）
+    # 格式：/recordings/{deviceId}/{yyyyMMdd}/recording_{timestamp}_{deviceId}.mp4
+    # 
+    # 示例：
+    # /recordings/8/20251031/recording_1730390400000_8.mp4
+    # 
+    # 说明：
+    # - {deviceId}: 设备ID
+    # - {yyyyMMdd}: 日期（年月日）
+    # - {timestamp}: 时间戳（毫秒）
+    # 
+    # 优点：
+    # - 按设备分目录，便于管理
+    # - 按日期分目录，便于归档和清理
+    # - 文件名包含设备ID和时间戳，确保唯一性
+
+# =====================================================
+# ZLMediaKit 录像配置（参考）
+# =====================================================
+# 
+# ZLMediaKit的配置文件（config.ini）需要同步配置：
+# 
+# [record]
+# # 录像文件存储路径（与iot.recording.directory对应）
+# filePath = /recordings
+# 
+# # 录像文件格式
+# fileRepeat = true
+# 
+# # 录像分段时长（秒）
+# fileSecond = 3600
+# 
+# [http]
+# # HTTP服务端口（与iot.recording.url-prefix的端口对应）
+# port = 8080
+# 
+# # 静态文件根目录（包含录像文件）
+# rootPath = /recordings
+# 
+# =====================================================
+
+# =====================================================
+# 关联基础设施模块的文件存储
+# =====================================================
+# 
+# 未来扩展（可选）：
+# 
+# 1. 通过基础设施模块的FileService上传录像文件到云存储
+#    - 阿里云OSS
+#    - 腾讯云COS
+#    - MinIO
+# 
+# 2. 配置文件存储类型
+# infra:
+#   file:
+#     type: local  # local, s3, oss, cos, minio
+#     local:
+#       path: /recordings
+#     oss:  # 如果使用云存储
+#       endpoint: https://oss-cn-hangzhou.aliyuncs.com
+#       bucket: iot-recordings
+#       accessKey: ${OSS_ACCESS_KEY}
+#       secretKey: ${OSS_SECRET_KEY}
+# 
+# 3. 定时任务：将本地录像上传到云存储并删除本地文件
+#    - 节省本地存储空间
+#    - 提供更可靠的备份
+#    - 支持CDN加速访问
+# 
+# =====================================================
+
+# =====================================================
+# 使用说明
+# =====================================================
+# 
+# 1. 开发环境配置（application-dev.yml）
+# iot:
+#   recording:
+#     directory: D:/temp/recordings
+#     url-prefix: http://localhost:8080/recordings
+# 
+# 2. 生产环境配置（application-prod.yml）
+# iot:
+#   recording:
+#     directory: /data/recordings
+#     url-prefix: http://192.168.1.246:8080/recordings
+# 
+# 3. 创建目录（首次使用前）
+# 
+# Linux:
+# sudo mkdir -p /data/recordings
+# sudo chown -R zlmediakit:zlmediakit /data/recordings
+# 
+# Windows:
+# mkdir D:\data\recordings
+# 
+# 4. 检查ZLMediaKit配置
+# 
+# 编辑 /opt/zlmediakit/config.ini（或ZLMediaKit安装目录下的config.ini）：
+# 
+# [record]
+# filePath = /data/recordings
+# 
+# [http]
+# port = 8080
+# rootPath = /data/recordings
+# 
+# 5. 重启ZLMediaKit服务
+# 
+# Linux:
+# sudo systemctl restart zlmediakit
+# 
+# Windows:
+# 重启ZLMediaKit进程
+# 
+# =====================================================
+

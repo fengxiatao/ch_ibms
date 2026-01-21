@@ -1,0 +1,86 @@
+# IoT 设备模拟器 - E2E 测试配置
+# 用于科鼎固件升级端到端测试
+#
+# 使用方式:
+#   java -jar yudao-module-iot-simulator.jar --spring.profiles.active=e2e-test
+#
+# 或者使用启动脚本:
+#   start-e2e-test.bat [SUCCESS|REJECT|FRAME_FAIL]
+
+spring:
+  application:
+    name: iot-device-simulator-e2e-test
+  main:
+    banner-mode: off
+    web-application-type: none
+
+# 日志配置 - E2E测试使用DEBUG级别
+logging:
+  level:
+    root: INFO
+    cn.iocoder.yudao.module.iot.simulator: DEBUG
+    cn.iocoder.yudao.module.iot.simulator.protocol.keding: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/simulator-e2e-test.log
+
+# 模拟器配置
+simulator:
+  # 线程池大小
+  thread-pool-size: 5
+  # 连接池大小
+  connection-pool-size: 10
+  
+  # 科鼎协议配置
+  keding:
+    enabled: true
+    # Gateway服务器地址 - 本地测试环境
+    server-host: localhost
+    # Gateway服务器端口 - 科鼎协议默认端口
+    server-port: 9600
+    # TEA加密密钥 (4个32位整数) - 与Gateway配置保持一致
+    tea-key:
+      - 0x12345678
+      - 0x9ABCDEF0
+      - 0x12345678
+      - 0x9ABCDEF0
+    # 心跳间隔（秒）- 测试环境使用较短间隔
+    heartbeat-interval: 10
+    # 进度上报间隔（毫秒）
+    progress-interval: 500
+    # 模拟下载延迟（毫秒）- 测试环境使用较短延迟
+    download-delay: 2000
+    # 重连次数
+    max-retries: 3
+    # 重连间隔（秒）
+    retry-interval: 3
+    
+    # E2E测试设备列表
+    # 这些设备对应 iot_keding_e2e_test_data.sql 中的测试数据
+    devices:
+      # 测试设备1 - SUCCESS模式（默认）
+      - station-code: "TEST001"
+        mode: SUCCESS
+        device-type: INTEGRATED_GATE
+      
+      # 测试设备2 - 用于REJECT模式测试
+      - station-code: "TEST002"
+        mode: SUCCESS
+        device-type: INTEGRATED_GATE
+      
+      # 测试设备3 - 用于FRAME_FAIL模式测试
+      - station-code: "TEST003"
+        mode: SUCCESS
+        device-type: INTEGRATED_GATE
+
+# E2E测试专用配置
+e2e-test:
+  # 默认测试设备
+  default-station-code: "TEST001"
+  # 默认模式
+  default-mode: SUCCESS
+  # 失败帧号列表（FRAME_FAIL模式使用）
+  fail-frame-numbers:
+    - 5
+    - 10

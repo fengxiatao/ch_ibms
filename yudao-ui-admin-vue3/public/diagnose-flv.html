@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>FLV 诊断工具</title>
+  <script src="https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js"></script>
+</head>
+<body>
+  <h1>FLV 视频编码诊断</h1>
+  <input type="text" id="flvUrl" placeholder="输入 FLV URL" style="width: 500px" value="http://192.168.1.246/live/camera_4.live.flv">
+  <button onclick="testFlv()">测试</button>
+  <br><br>
+  <video id="videoElement" controls style="width: 800px"></video>
+  <br><br>
+  <pre id="output" style="background: #f0f0f0; padding: 10px;"></pre>
+
+  <script>
+    function log(msg) {
+      document.getElementById('output').textContent += msg + '\n';
+      console.log(msg);
+    }
+
+    function testFlv() {
+      const url = document.getElementById('flvUrl').value;
+      const videoElement = document.getElementById('videoElement');
+      document.getElementById('output').textContent = '';
+
+      log('=== FLV 诊断开始 ===');
+      log('URL: ' + url);
+      log('');
+
+      if (!flvjs.isSupported()) {
+        log('❌ 浏览器不支持 flv.js（MSE 不可用）');
+        return;
+      }
+
+      log('✅ 浏览器支持 flv.js');
+      log('');
+
+      const flvPlayer = flvjs.createPlayer({
+        type: 'flv',
+        url: url,
+        isLive: true,
+        hasAudio: true,
+        hasVideo: true,
+      }, {
+        enableWorker: false,
+        enableStashBuffer: true,
+        stashInitialSize: 384,
+        autoCleanupSourceBuffer: true,
+      });
+
+      flvPlayer.attachMediaElement(videoElement);
+
+      // 监听所有事件
+      flvPlayer.on(flvjs.Events.ERROR, (errorType, errorDetail, errorInfo) => {
+        log('❌ ERROR: ' + errorType + ', ' + errorDetail);
+        log('   详情: ' + JSON.stringify(errorInfo, null, 2));
+      });
+
+      flvPlayer.on(flvjs.Events.MEDIA_INFO, (mediaInfo) => {
+        log('📊 MEDIA_INFO:');
+        log('   视频编码: ' + mediaInfo.videoCodec + ' (videoCodecId: ' + mediaInfo.videoCodecId + ')');
+        log('   音频编码: ' + mediaInfo.audioCodec + ' (audioCodecId: ' + mediaInfo.audioCodecId + ')');
+        log('   宽度: ' + mediaInfo.width + 'x' + mediaInfo.height);
+        log('   帧率: ' + mediaInfo.framerate);
+        log('   详情: ' + JSON.stringify(mediaInfo, null, 2));
+        log('');
+
+        // 检查编码兼容性
+        if (mediaInfo.videoCodecId === 12) {
+          log('❌❌❌ 检测到 H.265 编码（videoCodecId=12）！');
+          log('    flv.js 不支持 H.265！');
+          log('    需要 ZLMediaKit 转码为 H.264（videoCodecId=7）');
+        } else if (mediaInfo.videoCodecId === 7) {
+          log('✅ 检测到 H.264 编码（videoCodecId=7）- 兼容！');
+        } else {
+          log('⚠️ 未知视频编码 ID: ' + mediaInfo.videoCodecId);
+        }
+      });
+
+      flvPlayer.on(flvjs.Events.STATISTICS_INFO, (stats) => {
+        log('📈 STATISTICS: decodedFrames=' + stats.decodedFrames + ', droppedFrames=' + stats.droppedFrames + ', speed=' + stats.speed);
+      });
+
+      flvPlayer.load();
+      flvPlayer.play();
+
+      log('');
+      log('🔄 开始加载流...');
+    }
+
+    // 自动测试
+    window.addEventListener('load', () => {
+      setTimeout(testFlv, 500);
+    });
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+

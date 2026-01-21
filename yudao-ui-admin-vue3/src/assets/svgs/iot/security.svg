@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- 盾牌外形 -->
+  <path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/>
+  <!-- 摄像头图标 -->
+  <circle cx="12" cy="10" r="3"/>
+  <circle cx="12" cy="10" r="1"/>
+  <!-- 信号线 -->
+  <path d="M8 14l1-1 2 2 4-4"/>
+</svg>

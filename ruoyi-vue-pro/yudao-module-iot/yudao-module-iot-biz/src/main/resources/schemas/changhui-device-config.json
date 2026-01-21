@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Changhui Device Configuration",
+  "description": "长辉设备特有配置",
+  "type": "object",
+  "required": ["deviceType"],
+  "properties": {
+    "deviceType": {
+      "type": "string",
+      "const": "CHANGHUI",
+      "description": "设备类型标识"
+    },
+    "stationCode": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{0,20}$",
+      "description": "测站编码（0-20位十六进制字符串，可为空）"
+    },
+    "teaKey": {
+      "type": "string",
+      "description": "TEA加密密钥（JSON数组格式）"
+    },
+    "password": {
+      "type": "string",
+      "pattern": "^([0-9]{4})?$",
+      "default": "0000",
+      "description": "设备密码（4位数字，可为空）"
+    },
+    "manufacturer": {
+      "type": "string",
+      "default": "长辉",
+      "description": "制造商"
+    }
+  }
+}
+
+
+
+
+
+
+
+

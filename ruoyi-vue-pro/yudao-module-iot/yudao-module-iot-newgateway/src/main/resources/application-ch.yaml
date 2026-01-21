@@ -1,0 +1,201 @@
+# ==================== 服务器配置 ====================
+server:
+  port: 48083  # 使用不同于旧网关(48082)的端口
+
+spring:
+  application:
+    name: iot-newgateway-server
+
+  # Redis 配置
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      database: 0
+      timeout: 30000ms
+
+# ==================== 消息队列配置 ====================
+rocketmq:
+  name-server: 192.168.1.126:9876
+  producer:
+    group: ${spring.application.name}_PRODUCER
+
+# ==================== IoT 消息总线配置 ====================
+# 重要：必须配置为 rocketmq 才能与 biz 模块通过消息队列交互
+yudao:
+  iot:
+    message-bus:
+      type: rocketmq
+      consumer-group-prefix: ch-
+
+# ==================== IoT 网关启动初始化配置 ====================
+# 控制 newgateway 启动时设备初始化的行为
+iot:
+  gateway:
+    startup:
+      # 是否启用启动时自动初始化设备
+      enabled: true
+      # 租户ID - 单租户部署必须配置！
+      tenant-id: 1
+      # 启动延迟时间（秒）- 确保所有依赖服务就绪
+      delay-seconds: 10
+      # 并行度（线程池大小）- 同时初始化设备的最大数量
+      parallelism: 10
+      # 单设备初始化超时（秒）
+      device-timeout-seconds: 60
+      # 批次大小 - 每批次处理的设备数量
+      batch-size: 50
+      # 设备间隔时间（毫秒）- 避免连接风暴
+      device-interval-ms: 100
+      # 最大重试次数
+      max-retry-count: 3
+      # 初始重试间隔（秒）- 使用指数退避：10s, 20s, 40s
+      initial-retry-interval-seconds: 10
+      # 是否同步状态到数据库
+      sync-state-to-db: true
+      # 设备类型白名单（为空则不过滤）
+      # device-type-whitelist:
+      #   - NVR
+      #   - ACCESS_GEN1
+      #   - ACCESS_GEN2
+      # 设备类型黑名单（被动连接设备通常不需要主动初始化）
+      device-type-blacklist:
+        - ALARM
+        - CHANGHUI
+        - DETONG
+
+# ==================== IoT 新网关插件化架构配置 ====================
+# 使用独立的配置前缀 iot.newgateway，与旧 gateway 的 iot.gateway 配置隔离
+# 这样可以实现新旧网关并行运行，便于渐进式迁移
+  newgateway:
+    # ==================== 核心框架配置 ====================
+    core:
+      # 心跳检测间隔（毫秒）- 定期检查设备心跳状态
+      heartbeat-check-interval: 30000
+      # 设备离线阈值（毫秒）- 超过此时间未发送心跳则判定为离线
+      device-offline-threshold: 90000
+      # 工作线程数 - 用于处理设备消息的线程池大小
+      worker-threads: 4
+      # 是否启用健康检查端点
+      health-check-enabled: true
+      # 是否启用指标收集
+      metrics-enabled: true
+      # 消息发布重试次数
+      message-publish-retries: 3
+      # 消息发布重试间隔（毫秒）
+      message-publish-retry-interval: 1000
+
+    # ==================== RPC 配置 ====================
+    rpc:
+      url: http://127.0.0.1:48888  # 业务侧服务地址
+      connect-timeout: 30s
+      read-timeout: 30s
+
+    # ==================== 插件配置 ====================
+    plugins:
+      # 插件启用/禁用配置
+      # ====== 调试模式：只启用 changhui 插件 ======
+      enabled:
+        alarm: true          # 报警主机插件（调试时禁用）
+        changhui: false        # 长辉TCP插件（保持启用）
+        access-gen1: true    # 门禁一代插件（调试时禁用）
+        access-gen2: true    # 门禁二代插件（调试时禁用）
+        nvr: true            # NVR插件（调试时禁用）
+        ipc: false           # IPC摄像头插件（独立IPC设备，默认关闭）
+
+      # ---------- 报警主机插件配置 ----------
+      alarm:
+        port: 9500
+        heartbeat-timeout: 60000
+
+      # ---------- 长辉TCP插件配置 ----------
+      changhui:
+        port: 9700
+        heartbeat-timeout: 60000
+        upgrade-timeout: 300000
+
+      # ---------- 门禁一代插件配置（Recordset操作） ----------
+      access-gen1:
+        # SDK路径配置（也可通过环境变量 DAHUA_SDK_PATH 或系统属性 dahua.native.path 配置）
+        # Windows: E:/dh/libs/win64
+        # Linux: /opt/dahua-sdk
+        sdk-path: ${DAHUA_SDK_PATH:}
+        reconnect-interval: 30000
+
+      # ---------- 门禁二代插件配置（标准API） ----------
+      access-gen2:
+        # SDK路径配置（也可通过环境变量 DAHUA_SDK_PATH 或系统属性 dahua.native.path 配置）
+        sdk-path: ${DAHUA_SDK_PATH:}
+        reconnect-interval: 30000
+
+      # ---------- NVR插件配置 ----------
+      nvr:
+        # SDK路径配置（也可通过环境变量 DAHUA_SDK_PATH 或系统属性 dahua.native.path 配置）
+        sdk-path: ${DAHUA_SDK_PATH:}
+        reconnect-interval: 30000
+
+      # ---------- IPC摄像头插件配置 ----------
+      ipc:
+        # SDK路径配置（也可通过环境变量 DAHUA_SDK_PATH 或系统属性 dahua.native.path 配置）
+        sdk-lib-path: ${DAHUA_SDK_PATH:}
+        # 保活检测间隔（毫秒）
+        keepalive-interval: 60000
+        # 重连间隔（毫秒）
+        reconnect-interval: 30000
+        # 默认端口（大华设备默认37777）
+        default-port: 37777
+        # RTSP端口
+        rtsp-port: 554
+        # 默认用户名
+        default-username: admin
+        # 默认密码
+        default-password: admin123
+        # 是否启用PTZ控制
+        ptz-enabled: true
+        # 是否启用抓图
+        capture-enabled: true
+        # 是否启用AI事件订阅（人脸检测、车牌识别等）
+        ai-event-enabled: false
+        # 最大连接数
+        max-connections: 100
+
+# ==================== 日志配置 ====================
+logging:
+  file:
+    name: ${user.home}/logs/${spring.application.name}.log
+  level:
+    cn.iocoder.yudao.module.iot.newgateway: INFO
+    cn.iocoder.yudao.module.iot.newgateway.core: INFO
+    # ====== 调试 Changhui 时：只显示 changhui 日志，其他插件静音 ======
+    cn.iocoder.yudao.module.iot.newgateway.plugins: WARN
+    cn.iocoder.yudao.module.iot.newgateway.plugins.changhui: DEBUG
+    # 其他插件日志关闭（调试 changhui 时减少干扰）
+    cn.iocoder.yudao.module.iot.newgateway.plugins.alarm: WARN
+    cn.iocoder.yudao.module.iot.newgateway.plugins.nvr: WARN
+    cn.iocoder.yudao.module.iot.newgateway.plugins.ipc: WARN
+    cn.iocoder.yudao.module.iot.newgateway.plugins.access: WARN
+    # 重要：命令消费者日志必须开启，否则看不到命令处理日志！
+    cn.iocoder.yudao.module.iot.newgateway.consumer: INFO
+    # 消息总线和 Core 模块日志（用于调试命令传递问题）
+    cn.iocoder.yudao.module.iot.core.messagebus: INFO
+    org.springframework.boot: WARN
+    org.apache.rocketmq: INFO
+    root: WARN
+
+# ==================== Actuator 配置 ====================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,gateway-metrics,metrics
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+    gateway:
+      enabled: true
+    gateway-metrics:
+      enabled: true
+  health:
+    defaults:
+      enabled: true

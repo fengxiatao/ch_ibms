@@ -1,0 +1,53 @@
+# IoT 设备模拟器配置
+spring:
+  application:
+    name: iot-device-simulator
+  main:
+    banner-mode: off
+    web-application-type: none
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    cn.iocoder.yudao.module.iot.simulator: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# 模拟器配置
+simulator:
+  # 线程池大小
+  thread-pool-size: 10
+  # 连接池大小
+  connection-pool-size: 100
+  
+  # 科鼎协议配置
+  keding:
+    enabled: true
+    # Gateway服务器地址
+    server-host: localhost
+    # Gateway服务器端口
+    server-port: 9600
+    # TEA加密密钥 (4个32位整数)
+    tea-key:
+      - 0x12345678
+      - 0x9ABCDEF0
+      - 0x12345678
+      - 0x9ABCDEF0
+    # 心跳间隔（秒）
+    heartbeat-interval: 30
+    # 进度上报间隔（毫秒）
+    progress-interval: 1000
+    # 模拟下载延迟（毫秒）
+    download-delay: 5000
+    # 重连次数
+    max-retries: 3
+    # 重连间隔（秒）
+    retry-interval: 5
+    # 设备列表
+    devices:
+      - station-code: "0102030405060708090A"
+        mode: SUCCESS
+      # - station-code: "0102030405060708090B"
+      #   mode: TIMEOUT
+      #   response-delay: 2000

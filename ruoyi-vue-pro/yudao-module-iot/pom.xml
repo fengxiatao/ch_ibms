@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>yudao</artifactId>
+        <groupId>cn.iocoder.boot</groupId>
+        <version>${revision}</version>
+    </parent>
+    <modules>
+        <module>yudao-module-iot-api</module>
+        <module>yudao-module-iot-core</module>
+        <!-- Gateway模块必须在biz之前编译，因为biz依赖gateway -->
+<!--        <module>yudao-module-iot-gateway</module>-->
+        <!-- 新网关插件化架构模块（与现有gateway并行） -->
+        <module>yudao-module-iot-newgateway</module>
+        <module>yudao-module-iot-biz</module>
+        <!-- IoT设备模拟器框架 -->
+        <module>yudao-module-iot-simulator</module>
+    </modules>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>yudao-module-iot</artifactId>
+    <packaging>pom</packaging>
+
+    <name>${project.artifactId}</name>
+    <description>
+        物联网模块
+                <!-- TODO 长辉开发团队：需要补充下说明！ -->
+    </description>
+
+</project>

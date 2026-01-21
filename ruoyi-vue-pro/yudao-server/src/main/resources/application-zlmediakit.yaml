@@ -1,0 +1,51 @@
+# ZLMediaKit 流媒体服务配置
+# 参考文档: https://github.com/ZLMediaKit/ZLMediaKit/wiki/MediaServer%E6%94%AF%E6%8C%81%E7%9A%84HTTP-API
+
+zlmediakit:
+  api:
+    # ZLMediaKit HTTP API 地址
+    url: http://192.168.1.126:80
+    
+    # API 密钥（如果配置了）
+    # 如果请求来自 127.0.0.1 可以不需要 secret
+    secret: 
+    
+  # 流媒体服务器配置
+  server:
+    # RTSP 端口
+    rtsp-port: 554
+    
+    # RTMP 端口
+    rtmp-port: 1935
+    
+    # HTTP 端口
+    http-port: 80
+    
+    # HTTPS 端口
+    https-port: 443
+    
+  # 录像配置
+  record:
+    # 录像文件存储路径
+    path: /opt/zlmediakit/www/record
+    
+    # 录像文件保存天数
+    days: 7
+    
+    # 录像文件格式: 0=hls, 1=mp4
+    type: 1
+    
+  # 快照配置
+  snapshot:
+    # 快照超时时间（秒）
+    timeout: 10
+    
+    # 快照有效期（秒）
+    expire: 3600
+
+
+
+
+
+
+

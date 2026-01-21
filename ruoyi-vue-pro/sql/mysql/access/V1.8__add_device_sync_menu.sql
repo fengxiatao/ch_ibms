@@ -1,0 +1,45 @@
+-- =====================================================
+-- 门禁设备人员同步 - 菜单配置
+-- 需要根据实际菜单表结构修改
+-- =====================================================
+
+-- 方法1: 如果使用 yudao 的 system_menu 表结构
+-- 请根据门禁管理菜单的实际 parent_id 修改
+
+-- 查找门禁管理父菜单ID
+-- SELECT id FROM system_menu WHERE name = '门禁管理' AND deleted = 0;
+
+-- 假设门禁管理菜单ID为 xxxx，添加设备人员同步子菜单
+-- INSERT INTO system_menu (name, permission, type, sort, parent_id, path, icon, component, visible, keep_alive, creator, create_time, updater, update_time, deleted)
+-- VALUES ('设备人员同步', 'iot:access:device-sync', 2, 99, {门禁管理菜单ID}, 'device-sync', 'ep:refresh', 'iot/access/device-sync/index', 0, 1, '1', NOW(), '1', NOW(), 0);
+
+-- =====================================================
+-- 如需手动添加菜单，请按以下步骤操作：
+-- =====================================================
+-- 
+-- 1. 登录管理后台
+-- 2. 进入 系统管理 -> 菜单管理
+-- 3. 找到"门禁管理"父菜单，点击"新增"
+-- 4. 填写以下信息：
+--    - 菜单名称: 设备人员同步
+--    - 菜单类型: 菜单
+--    - 路由地址: device-sync
+--    - 组件路径: iot/access/device-sync/index
+--    - 权限标识: iot:access:device-sync
+--    - 显示排序: 99 (放在最后)
+--    - 显示状态: 显示
+--    - 菜单图标: ep:refresh (或其他合适的图标)
+-- 
+-- =====================================================
+-- 权限说明
+-- =====================================================
+-- 
+-- 后端控制器使用的权限标识: iot:access:device-sync
+-- 对应的 @PreAuthorize("@ss.hasPermission('iot:access:device-sync')")
+-- 
+-- 如需细分权限，可添加以下按钮权限:
+--   - iot:access:device-sync:check  - 对账检查
+--   - iot:access:device-sync:clean  - 清理用户
+--   - iot:access:device-sync:repair - 补发用户
+--   - iot:access:device-sync:full   - 全量同步
+-- 

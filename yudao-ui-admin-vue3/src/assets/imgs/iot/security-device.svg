@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150" fill="none">
+  <!-- 背景 -->
+  <rect width="200" height="150" fill="#f8fafc" rx="8"/>
+  
+  <!-- 安防设备主体 -->
+  <g transform="translate(50, 30)">
+    <!-- 摄像头主体 -->
+    <rect x="20" y="20" width="60" height="40" fill="#374151" rx="8"/>
+    <!-- 镜头 -->
+    <circle cx="50" cy="40" r="15" fill="#1f2937"/>
+    <circle cx="50" cy="40" r="10" fill="#111827"/>
+    <circle cx="50" cy="40" r="3" fill="#ef4444"/>
+    
+    <!-- 支架 -->
+    <rect x="45" y="60" width="10" height="20" fill="#6b7280"/>
+    <rect x="35" y="75" width="30" height="8" fill="#6b7280" rx="4"/>
+    
+    <!-- 状态指示灯 -->
+    <circle cx="25" cy="25" r="2" fill="#10b981"/>
+    <circle cx="75" cy="25" r="2" fill="#f59e0b"/>
+  </g>
+  
+  <!-- 网络连接图标 -->
+  <g transform="translate(140, 40)">
+    <path d="M5 15 L15 5 M15 15 L5 5" stroke="#6b7280" stroke-width="2" fill="none"/>
+    <circle cx="10" cy="10" r="8" stroke="#6b7280" stroke-width="1.5" fill="none"/>
+  </g>
+  
+  <!-- 安全盾牌图标 -->
+  <g transform="translate(20, 100)">
+    <path d="M10 2L3 6v4c0 4.42 2.87 8.59 7 9.6 4.13-1.01 7-5.18 7-9.6V6l-7-4z" fill="#10b981" stroke="#059669" stroke-width="1"/>
+    <path d="M7 10l2 2 4-4" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  
+  <!-- 文字标识 -->
+  <text x="100" y="130" text-anchor="middle" fill="#374151" font-family="Arial, sans-serif" font-size="12" font-weight="bold">智慧安防设备</text>
+</svg>

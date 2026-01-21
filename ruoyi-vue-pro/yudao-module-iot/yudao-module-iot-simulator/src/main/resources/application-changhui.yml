@@ -1,0 +1,88 @@
+# IoT 设备模拟器 - 长辉协议配置
+# 用于长辉设备升级、心跳等功能的演示测试
+#
+# 使用方式:
+#   java -jar yudao-module-iot-simulator.jar --spring.profiles.active=changhui
+#
+# 或者使用启动脚本:
+#   start-changhui-demo.bat [STATION_CODE] [OPTIONS]
+
+spring:
+  application:
+    name: iot-device-simulator-changhui
+  main:
+    banner-mode: off
+    web-application-type: none
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    cn.iocoder.yudao.module.iot.simulator: DEBUG
+    cn.iocoder.yudao.module.iot.simulator.protocol.changhui: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/simulator-changhui.log
+
+# 模拟器配置
+simulator:
+  # 线程池大小
+  thread-pool-size: 5
+  # 连接池大小
+  connection-pool-size: 10
+  
+  # 长辉协议配置
+  changhui:
+    enabled: true
+    # Gateway服务器地址
+    server-host: localhost
+    # Gateway服务器端口（长辉协议默认端口）
+    server-port: 9700
+    # 心跳间隔（秒）
+    heartbeat-interval: 30
+    # 进度上报间隔（毫秒）
+    progress-report-interval: 1000
+    # 模拟下载延迟（毫秒）
+    download-delay: 5000
+    # 重连次数
+    max-retries: 3
+    # 重连间隔（秒）
+    retry-interval: 5
+    # 连接超时（毫秒）
+    connect-timeout: 10000
+    
+    # 演示设备列表
+    devices:
+      # 演示设备1 - 成功模式（默认）
+      - station-code: "01020304050607080910"
+        device-type: INTEGRATED_GATE
+        mode: SUCCESS
+        current-firmware-version: "V1.0.0"
+        new-firmware-version: "V2.0.0"
+      
+      # 演示设备2 - 可用于测试拒绝升级
+      - station-code: "01020304050607080911"
+        device-type: INTEGRATED_GATE
+        mode: SUCCESS
+        current-firmware-version: "V1.0.0"
+        new-firmware-version: "V2.0.0"
+      
+      # 演示设备3 - 可用于测试升级失败
+      - station-code: "01020304050607080912"
+        device-type: INTEGRATED_GATE
+        mode: SUCCESS
+        current-firmware-version: "V1.0.0"
+        new-firmware-version: "V2.0.0"
+
+# 演示专用配置
+demo:
+  # 默认测站编码
+  default-station-code: "01020304050607080910"
+  # 默认模式
+  default-mode: SUCCESS
+  # 是否自动启动
+  auto-start: true
+  # 数据上报间隔（秒）- 用于模拟定期数据上报
+  data-report-interval: 60
+

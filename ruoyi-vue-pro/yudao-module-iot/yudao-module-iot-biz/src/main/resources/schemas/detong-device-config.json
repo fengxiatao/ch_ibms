@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Detong Device Configuration",
+  "description": "德通设备特有配置",
+  "type": "object",
+  "required": ["deviceType", "stationCode"],
+  "properties": {
+    "deviceType": {
+      "type": "string",
+      "const": "DETONG",
+      "description": "设备类型标识"
+    },
+    "stationCode": {
+      "type": "string",
+      "pattern": "^[A-Z0-9]{4,16}$",
+      "description": "站点编码"
+    },
+    "communicationAddress": {
+      "type": "string",
+      "description": "通信地址"
+    },
+    "protocolVersion": {
+      "type": "string",
+      "enum": ["V2.0", "V2.3"],
+      "default": "V2.3",
+      "description": "协议版本"
+    },
+    "encryptionKey": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 32,
+      "description": "加密密钥"
+    },
+    "dataUploadInterval": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 3600,
+      "default": 300,
+      "description": "数据上传间隔(秒)"
+    }
+  }
+}
