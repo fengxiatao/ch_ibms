@@ -1,0 +1,76 @@
+<svg width="800" height="600" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景 -->
+  <rect width="800" height="600" fill="#f8f9fa"/>
+  
+  <!-- 建筑外墙 -->
+  <rect x="50" y="50" width="700" height="500" fill="none" stroke="#2c3e50" stroke-width="3"/>
+  
+  <!-- 内部房间分割 -->
+  <!-- 大厅 -->
+  <rect x="50" y="50" width="300" height="200" fill="#ecf0f1" stroke="#34495e" stroke-width="2"/>
+  <text x="200" y="160" text-anchor="middle" font-family="Arial" font-size="16" fill="#2c3e50">大厅</text>
+  
+  <!-- 办公区域1 -->
+  <rect x="350" y="50" width="200" height="150" fill="#e8f5e8" stroke="#34495e" stroke-width="2"/>
+  <text x="450" y="130" text-anchor="middle" font-family="Arial" font-size="14" fill="#2c3e50">办公区1</text>
+  
+  <!-- 办公区域2 -->
+  <rect x="550" y="50" width="200" height="150" fill="#e8f5e8" stroke="#34495e" stroke-width="2"/>
+  <text x="650" y="130" text-anchor="middle" font-family="Arial" font-size="14" fill="#2c3e50">办公区2</text>
+  
+  <!-- 会议室 -->
+  <rect x="350" y="200" width="150" height="100" fill="#fff2e8" stroke="#34495e" stroke-width="2"/>
+  <text x="425" y="255" text-anchor="middle" font-family="Arial" font-size="14" fill="#2c3e50">会议室</text>
+  
+  <!-- 休息区 -->
+  <rect x="500" y="200" width="150" height="100" fill="#f0e8ff" stroke="#34495e" stroke-width="2"/>
+  <text x="575" y="255" text-anchor="middle" font-family="Arial" font-size="14" fill="#2c3e50">休息区</text>
+  
+  <!-- 走廊 -->
+  <rect x="650" y="200" width="100" height="350" fill="#f5f5f5" stroke="#34495e" stroke-width="2"/>
+  <text x="700" y="380" text-anchor="middle" font-family="Arial" font-size="14" fill="#2c3e50" transform="rotate(-90 700 380)">走廊</text>
+  
+  <!-- 储物间 -->
+  <rect x="50" y="250" width="100" height="100" fill="#ffe8e8" stroke="#34495e" stroke-width="2"/>
+  <text x="100" y="305" text-anchor="middle" font-family="Arial" font-size="12" fill="#2c3e50">储物间</text>
+  
+  <!-- 机房 -->
+  <rect x="150" y="250" width="100" height="100" fill="#e8e8ff" stroke="#34495e" stroke-width="2"/>
+  <text x="200" y="305" text-anchor="middle" font-family="Arial" font-size="12" fill="#2c3e50">机房</text>
+  
+  <!-- 安全室 -->
+  <rect x="250" y="250" width="100" height="100" fill="#ffe8f0" stroke="#34495e" stroke-width="2"/>
+  <text x="300" y="305" text-anchor="middle" font-family="Arial" font-size="12" fill="#2c3e50">安全室</text>
+  
+  <!-- 办公区域3 -->
+  <rect x="350" y="300" width="300" height="150" fill="#e8f5e8" stroke="#34495e" stroke-width="2"/>
+  <text x="500" y="380" text-anchor="middle" font-family="Arial" font-size="14" fill="#2c3e50">办公区3</text>
+  
+  <!-- 底层区域 -->
+  <rect x="50" y="350" width="300" height="200" fill="#f0f8ff" stroke="#34495e" stroke-width="2"/>
+  <text x="200" y="455" text-anchor="middle" font-family="Arial" font-size="16" fill="#2c3e50">展示区</text>
+  
+  <!-- 办公区域4 -->
+  <rect x="350" y="450" width="300" height="100" fill="#e8f5e8" stroke="#34495e" stroke-width="2"/>
+  <text x="500" y="505" text-anchor="middle" font-family="Arial" font-size="14" fill="#2c3e50">办公区4</text>
+  
+  <!-- 门 -->
+  <line x1="200" y1="50" x2="220" y2="50" stroke="#e74c3c" stroke-width="4"/>
+  <text x="210" y="45" text-anchor="middle" font-family="Arial" font-size="10" fill="#e74c3c">主入口</text>
+  
+  <line x1="750" y1="300" x2="750" y2="320" stroke="#e74c3c" stroke-width="4"/>
+  <text x="760" y="315" font-family="Arial" font-size="10" fill="#e74c3c">侧门</text>
+  
+  <!-- 楼梯 -->
+  <g stroke="#7f8c8d" stroke-width="2" fill="none">
+    <rect x="680" y="450" width="60" height="80"/>
+    <line x1="685" y1="460" x2="735" y2="460"/>
+    <line x1="685" y1="470" x2="735" y2="470"/>
+    <line x1="685" y1="480" x2="735" y2="480"/>
+    <line x1="685" y1="490" x2="735" y2="490"/>
+    <line x1="685" y1="500" x2="735" y2="500"/>
+    <line x1="685" y1="510" x2="735" y2="510"/>
+    <line x1="685" y1="520" x2="735" y2="520"/>
+  </g>
+  <text x="710" y="545" text-anchor="middle" font-family="Arial" font-size="12" fill="#7f8c8d">楼梯</text>
+</svg>

@@ -1,0 +1,84 @@
+# IoT 视频流配置
+iot:
+  video:
+    # ZLMediaKit 流媒体服务配置
+    zlmedia:
+      # ZLMediaKit API地址 (HTTP API) - 后端调用 ZLMediaKit 的地址（内网）
+      api-url: http://192.168.1.246:80
+      # ZLMediaKit API密钥
+      secret: ${ZLM_SECRET:S3KXbjxEBlU9GCnBkVJaaEsdVmEHNzRW}
+      # ZLMediaKit HTTP端口 (内网端口)
+      http-port: 80
+      # RTSP 端口 (Docker映射 8554->554)
+      rtsp-port: 8554
+      # RTMP 端口
+      rtmp-port: 1935
+      # WebRTC 端口
+      rtc-port: 8000
+      # 公网访问配置（用于生成播放地址，让外网用户能访问）
+      public-host: ${ZLM_PUBLIC_HOST:}
+      public-http-port: ${ZLM_PUBLIC_HTTP_PORT:80}
+    
+    # 视频流超时时间（分钟）
+    stream-timeout-minutes: 30
+    
+    # FFmpeg 配置 (备用，当前使用ZLMediaKit)
+    ffmpeg-path: ffmpeg
+    hls-output-dir: /var/www/hls
+    hls-segment-duration: 5
+    hls-list-size: 10
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+iot:
+  video:
+    zlmedia:
+      api-url: http://192.168.1.246:80
+      secret: S3KXbjxEBlU9GCnBkVJaaEsdVmEHNzRW
+      http-port: 80
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+iot:
+  video:
+    zlmedia:
+      api-url: http://192.168.1.246:80
+      secret: S3KXbjxEBlU9GCnBkVJaaEsdVmEHNzRW
+      http-port: 80
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+iot:
+  video:
+    zlmedia:
+      # 后端调用 ZLMediaKit API 的地址（内网，服务器能访问即可）
+      api-url: ${ZLM_API_URL:http://192.168.1.246:80}
+      secret: ${ZLM_SECRET:S3KXbjxEBlU9GCnBkVJaaEsdVmEHNzRW}
+      http-port: 80
+      # 公网访问配置（返回给前端的播放地址）
+      public-host: ${ZLM_PUBLIC_HOST:ibms.gzchanghui.cn}
+      public-http-port: ${ZLM_PUBLIC_HTTP_PORT:80}
+      # WebRTC 公网配置（通过 natapp UDP 隧道）
+      public-rtc-host: ${ZLM_PUBLIC_RTC_HOST:39.108.87.226}
+      public-rtc-port: ${ZLM_PUBLIC_RTC_PORT:48088}
+
+
+
+
+
+
+
+
+
+
+
+

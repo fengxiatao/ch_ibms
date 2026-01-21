@@ -1,0 +1,393 @@
+{
+  "$schema": "12种智慧建筑设备物模型定义规范 v1.0",
+  "metadata": {
+    "description": "电子地图系统 - 12种常见设备基础物模型定义",
+    "author": "长辉信息科技有限公司",
+    "createTime": "2025-11-04",
+    "version": "1.0.0"
+  },
+  
+  "devices": {
+    "bullet_camera": {
+      "productKey": "bullet_camera_001",
+      "productName": "枪型摄像机",
+      "category": "视频监控",
+      "properties": [
+        {
+          "identifier": "online_status",
+          "name": "在线状态",
+          "description": "设备是否在线",
+          "accessMode": "r",
+          "required": true,
+          "dataType": "bool",
+          "dataSpecsList": [
+            {"dataType": "bool", "name": "离线", "value": 0},
+            {"dataType": "bool", "name": "在线", "value": 1}
+          ]
+        },
+        {
+          "identifier": "device_status",
+          "name": "设备状态",
+          "description": "设备运行状态",
+          "accessMode": "r",
+          "required": true,
+          "dataType": "enum",
+          "dataSpecsList": [
+            {"dataType": "enum", "name": "离线", "value": 0},
+            {"dataType": "enum", "name": "在线正常", "value": 1},
+            {"dataType": "enum", "name": "在线异常", "value": 2}
+          ]
+        },
+        {
+          "identifier": "rtsp_url",
+          "name": "RTSP地址",
+          "description": "主码流地址",
+          "accessMode": "r",
+          "required": false,
+          "dataType": "text",
+          "dataSpecs": {"dataType": "text", "length": "256"}
+        },
+        {
+          "identifier": "resolution",
+          "name": "分辨率",
+          "description": "视频分辨率",
+          "accessMode": "r",
+          "required": false,
+          "dataType": "text",
+          "dataSpecs": {"dataType": "text", "length": "32"}
+        }
+      ],
+      "services": [
+        {
+          "identifier": "snapshot",
+          "name": "抓拍快照",
+          "description": "立即抓拍一张快照",
+          "callType": "async",
+          "required": false,
+          "method": "thing.service.snapshot",
+          "inputParams": [],
+          "outputParams": [
+            {
+              "identifier": "snapshot_base64",
+              "name": "快照数据",
+              "direction": "output",
+              "paraOrder": 0,
+              "dataType": "text",
+              "dataSpecs": {"dataType": "text", "length": "1000000"}
+            }
+          ]
+        },
+        {
+          "identifier": "getPlayUrl",
+          "name": "获取播放地址",
+          "description": "获取实时播放URL",
+          "callType": "async",
+          "required": false,
+          "method": "thing.service.getPlayUrl",
+          "inputParams": [],
+          "outputParams": [
+            {
+              "identifier": "play_url",
+              "name": "播放地址",
+              "direction": "output",
+              "paraOrder": 0,
+              "dataType": "text",
+              "dataSpecs": {"dataType": "text", "length": "512"}
+            }
+          ]
+        }
+      ]
+    },
+    
+    "dome_camera": {
+      "productKey": "dome_camera_001",
+      "productName": "半球摄像机",
+      "category": "视频监控",
+      "properties": [
+        {"identifier": "online_status", "name": "在线状态", "accessMode": "r", "required": true, "dataType": "bool"},
+        {"identifier": "device_status", "name": "设备状态", "accessMode": "r", "required": true, "dataType": "enum"},
+        {"identifier": "rtsp_url", "name": "RTSP地址", "accessMode": "r", "required": false, "dataType": "text"}
+      ],
+      "services": [
+        {"identifier": "snapshot", "name": "抓拍快照", "callType": "async", "method": "thing.service.snapshot"},
+        {"identifier": "getPlayUrl", "name": "获取播放地址", "callType": "async", "method": "thing.service.getPlayUrl"}
+      ]
+    },
+    
+    "ptz_camera": {
+      "productKey": "ptz_camera_001",
+      "productName": "球形摄像机",
+      "category": "视频监控",
+      "properties": [
+        {"identifier": "online_status", "name": "在线状态", "accessMode": "r", "required": true, "dataType": "bool"},
+        {"identifier": "device_status", "name": "设备状态", "accessMode": "r", "required": true, "dataType": "enum"},
+        {"identifier": "rtsp_url", "name": "RTSP地址", "accessMode": "r", "required": false, "dataType": "text"},
+        {"identifier": "ptz_support", "name": "云台支持", "accessMode": "r", "required": false, "dataType": "bool"}
+      ],
+      "services": [
+        {"identifier": "snapshot", "name": "抓拍快照", "callType": "async", "method": "thing.service.snapshot"},
+        {"identifier": "getPlayUrl", "name": "获取播放地址", "callType": "async", "method": "thing.service.getPlayUrl"},
+        {
+          "identifier": "ptz_control",
+          "name": "云台控制",
+          "callType": "async",
+          "method": "thing.service.ptz_control",
+          "inputParams": [
+            {"identifier": "action", "name": "动作", "dataType": "enum"},
+            {"identifier": "speed", "name": "速度", "dataType": "int"}
+          ]
+        }
+      ]
+    },
+    
+    "vehicle_barrier": {
+      "productKey": "vehicle_barrier_001",
+      "productName": "车辆道闸",
+      "category": "出入控制",
+      "properties": [
+        {"identifier": "online_status", "name": "在线状态", "accessMode": "r", "required": true, "dataType": "bool"},
+        {"identifier": "device_status", "name": "设备状态", "accessMode": "r", "required": true, "dataType": "enum"},
+        {
+          "identifier": "gate_status",
+          "name": "道闸状态",
+          "accessMode": "r",
+          "required": true,
+          "dataType": "enum",
+          "dataSpecsList": [
+            {"dataType": "enum", "name": "关闭", "value": 0},
+            {"dataType": "enum", "name": "开启", "value": 1},
+            {"dataType": "enum", "name": "运动中", "value": 2}
+          ]
+        }
+      ],
+      "services": [
+        {"identifier": "open", "name": "开闸", "callType": "async", "method": "thing.service.open"},
+        {"identifier": "close", "name": "关闸", "callType": "async", "method": "thing.service.close"}
+      ]
+    },
+    
+    "vehicle_recognition": {
+      "productKey": "vehicle_recognition_001",
+      "productName": "车辆识别一体机",
+      "category": "出入控制",
+      "properties": [
+        {"identifier": "online_status", "name": "在线状态", "accessMode": "r", "required": true, "dataType": "bool"},
+        {"identifier": "device_status", "name": "设备状态", "accessMode": "r", "required": true, "dataType": "enum"},
+        {"identifier": "recognition_count", "name": "识别次数", "accessMode": "r", "required": false, "dataType": "int"}
+      ],
+      "events": [
+        {
+          "identifier": "vehicle_recognized",
+          "name": "车辆识别事件",
+          "type": "info",
+          "method": "thing.event.vehicle_recognized.post",
+          "outputParams": [
+            {"identifier": "plate_number", "name": "车牌号", "dataType": "text"},
+            {"identifier": "confidence", "name": "置信度", "dataType": "float"}
+          ]
+        }
+      ]
+    },
+    
+    "pedestrian_gate": {
+      "productKey": "pedestrian_gate_001",
+      "productName": "人行闸机",
+      "category": "出入控制",
+      "properties": [
+        {"identifier": "online_status", "name": "在线状态", "accessMode": "r", "required": true, "dataType": "bool"},
+        {"identifier": "device_status", "name": "设备状态", "accessMode": "r", "required": true, "dataType": "enum"},
+        {
+          "identifier": "gate_status",
+          "name": "闸机状态",
+          "accessMode": "r",
+          "required": true,
+          "dataType": "enum",
+          "dataSpecsList": [
+            {"dataType": "enum", "name": "关闭", "value": 0},
+            {"dataType": "enum", "name": "开启", "value": 1}
+          ]
+        }
+      ],
+      "services": [
+        {"identifier": "open", "name": "开闸", "callType": "async", "method": "thing.service.open"}
+      ]
+    },
+    
+    "face_recognition": {
+      "productKey": "face_recognition_001",
+      "productName": "人脸识别一体机",
+      "category": "出入控制",
+      "properties": [
+        {"identifier": "online_status", "name": "在线状态", "accessMode": "r", "required": true, "dataType": "bool"},
+        {"identifier": "device_status", "name": "设备状态", "accessMode": "r", "required": true, "dataType": "enum"},
+        {"identifier": "recognition_count", "name": "识别次数", "accessMode": "r", "required": false, "dataType": "int"}
+      ],
+      "events": [
+        {
+          "identifier": "face_recognized",
+          "name": "人脸识别事件",
+          "type": "info",
+          "method": "thing.event.face_recognized.post",
+          "outputParams": [
+            {"identifier": "person_id", "name": "人员ID", "dataType": "text"},
+            {"identifier": "confidence", "name": "置信度", "dataType": "float"}
+          ]
+        }
+      ]
+    },
+    
+    "patrol_point": {
+      "productKey": "patrol_point_001",
+      "productName": "巡更点",
+      "category": "安防管理",
+      "properties": [
+        {"identifier": "online_status", "name": "在线状态", "accessMode": "r", "required": true, "dataType": "bool"},
+        {"identifier": "device_status", "name": "设备状态", "accessMode": "r", "required": true, "dataType": "enum"},
+        {"identifier": "check_count", "name": "打卡次数", "accessMode": "r", "required": false, "dataType": "int"}
+      ],
+      "events": [
+        {
+          "identifier": "patrol_checked",
+          "name": "巡更打卡事件",
+          "type": "info",
+          "method": "thing.event.patrol_checked.post",
+          "outputParams": [
+            {"identifier": "guard_id", "name": "保安ID", "dataType": "text"},
+            {"identifier": "check_time", "name": "打卡时间", "dataType": "date"}
+          ]
+        }
+      ]
+    },
+    
+    "water_meter": {
+      "productKey": "water_meter_001",
+      "productName": "水表",
+      "category": "能耗监测",
+      "properties": [
+        {"identifier": "online_status", "name": "在线状态", "accessMode": "r", "required": true, "dataType": "bool"},
+        {"identifier": "device_status", "name": "设备状态", "accessMode": "r", "required": true, "dataType": "enum"},
+        {
+          "identifier": "water_usage",
+          "name": "用水量",
+          "accessMode": "r",
+          "required": true,
+          "dataType": "float",
+          "dataSpecs": {"dataType": "float", "min": "0", "max": "999999", "unit": "m³", "unitName": "立方米"}
+        },
+        {
+          "identifier": "flow_rate",
+          "name": "流速",
+          "accessMode": "r",
+          "required": false,
+          "dataType": "float",
+          "dataSpecs": {"dataType": "float", "min": "0", "max": "100", "unit": "m³/h", "unitName": "立方米/小时"}
+        }
+      ]
+    },
+    
+    "electricity_meter": {
+      "productKey": "electricity_meter_001",
+      "productName": "电表",
+      "category": "能耗监测",
+      "properties": [
+        {"identifier": "online_status", "name": "在线状态", "accessMode": "r", "required": true, "dataType": "bool"},
+        {"identifier": "device_status", "name": "设备状态", "accessMode": "r", "required": true, "dataType": "enum"},
+        {
+          "identifier": "electricity_usage",
+          "name": "用电量",
+          "accessMode": "r",
+          "required": true,
+          "dataType": "float",
+          "dataSpecs": {"dataType": "float", "min": "0", "max": "999999", "unit": "kWh", "unitName": "千瓦时"}
+        },
+        {
+          "identifier": "power",
+          "name": "当前功率",
+          "accessMode": "r",
+          "required": false,
+          "dataType": "float",
+          "dataSpecs": {"dataType": "float", "min": "0", "max": "10000", "unit": "W", "unitName": "瓦"}
+        },
+        {
+          "identifier": "voltage",
+          "name": "电压",
+          "accessMode": "r",
+          "required": false,
+          "dataType": "float",
+          "dataSpecs": {"dataType": "float", "min": "0", "max": "500", "unit": "V", "unitName": "伏"}
+        },
+        {
+          "identifier": "current",
+          "name": "电流",
+          "accessMode": "r",
+          "required": false,
+          "dataType": "float",
+          "dataSpecs": {"dataType": "float", "min": "0", "max": "100", "unit": "A", "unitName": "安"}
+        }
+      ]
+    },
+    
+    "gas_meter": {
+      "productKey": "gas_meter_001",
+      "productName": "燃气表",
+      "category": "能耗监测",
+      "properties": [
+        {"identifier": "online_status", "name": "在线状态", "accessMode": "r", "required": true, "dataType": "bool"},
+        {"identifier": "device_status", "name": "设备状态", "accessMode": "r", "required": true, "dataType": "enum"},
+        {
+          "identifier": "gas_usage",
+          "name": "用气量",
+          "accessMode": "r",
+          "required": true,
+          "dataType": "float",
+          "dataSpecs": {"dataType": "float", "min": "0", "max": "999999", "unit": "m³", "unitName": "立方米"}
+        },
+        {
+          "identifier": "gas_pressure",
+          "name": "燃气压力",
+          "accessMode": "r",
+          "required": false,
+          "dataType": "float",
+          "dataSpecs": {"dataType": "float", "min": "0", "max": "10", "unit": "kPa", "unitName": "千帕"}
+        }
+      ],
+      "events": [
+        {
+          "identifier": "gas_leak",
+          "name": "燃气泄漏告警",
+          "type": "alert",
+          "method": "thing.event.gas_leak.post",
+          "outputParams": [
+            {"identifier": "alarm_time", "name": "告警时间", "dataType": "date"},
+            {"identifier": "leak_level", "name": "泄漏等级", "dataType": "int"}
+          ]
+        }
+      ]
+    },
+    
+    "attendance_machine": {
+      "productKey": "attendance_machine_001",
+      "productName": "考勤机",
+      "category": "人员管理",
+      "properties": [
+        {"identifier": "online_status", "name": "在线状态", "accessMode": "r", "required": true, "dataType": "bool"},
+        {"identifier": "device_status", "name": "设备状态", "accessMode": "r", "required": true, "dataType": "enum"},
+        {"identifier": "attendance_count", "name": "打卡次数", "accessMode": "r", "required": false, "dataType": "int"}
+      ],
+      "events": [
+        {
+          "identifier": "attendance_recorded",
+          "name": "考勤打卡事件",
+          "type": "info",
+          "method": "thing.event.attendance_recorded.post",
+          "outputParams": [
+            {"identifier": "employee_id", "name": "员工ID", "dataType": "text"},
+            {"identifier": "check_time", "name": "打卡时间", "dataType": "date"},
+            {"identifier": "check_type", "name": "打卡类型", "dataType": "enum"}
+          ]
+        }
+      ]
+    }
+  }
+}
+

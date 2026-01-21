@@ -1,0 +1,81 @@
+{
+	"easycom": {
+		"^u-(.*)": "uview-ui/components/u-$1/u-$1.vue"
+	},
+	"pages": [
+		{
+			"path": "pages/index/index",
+			"style": {
+				"navigationBarTitleText": "停车缴费",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/login/login",
+			"style": {
+				"navigationBarTitleText": "登录",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/empty/empty",
+			"style": {
+				"navigationBarTitleText": "智慧停车",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
+			"path": "pages/login/agreement/agreement",
+			"style": {
+				"navigationBarTitleText": "用户协议",
+				"enablePullDownRefresh": false
+			}
+		}
+	],
+	"subPackages": [{
+		"root": "package/parking",
+		"pages": [
+			{
+				"path": "fee-detail",
+				"style": {
+					"navigationBarTitleText": "费用明细",
+					"enablePullDownRefresh": false
+				}
+			},
+			{
+				"path": "payment",
+				"style": {
+					"navigationBarTitleText": "支付",
+					"enablePullDownRefresh": false
+				}
+			},
+			{
+				"path": "pay-result",
+				"style": {
+					"navigationBarTitleText": "支付结果",
+					"enablePullDownRefresh": false,
+					"navigationStyle": "custom"
+				}
+			},
+			{
+				"path": "history",
+				"style": {
+					"navigationBarTitleText": "停车记录",
+					"enablePullDownRefresh": false
+				}
+			}
+		]
+	}],
+	"navigateToMiniProgramAppIdList": [
+		"wx2ac2313767a99df9"
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "white",
+		"navigationBarTitleText": "停车缴费",
+		"navigationBarBackgroundColor": "#1890FF",
+		"backgroundColor": "#1890FF"
+	},
+	"window": {
+		"initialRenderingCache": "static"
+	}
+}

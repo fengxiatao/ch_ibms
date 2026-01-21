@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.iot.dal.tdengine.OpcAlarmRecordMapper">
+
+    <!-- 
+        MySQL版本说明：
+        - 使用 iot_opc_alarm_record 表存储OPC报警记录
+        - 表结构已通过SQL脚本预先创建
+    -->
+
+    <!-- 检查表是否存在（MySQL版本） -->
+    <select id="showOpcAlarmStable" resultType="String">
+        SELECT TABLE_NAME FROM information_schema.TABLES 
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'iot_opc_alarm_record'
+    </select>
+
+    <!-- 插入报警记录（MySQL版本） -->
+    <insert id="insertAlarmRecord">
+        INSERT INTO iot_opc_alarm_record (
+            account_id,
+            event_code,
+            area,
+            point,
+            sequence,
+            event_description,
+            level,
+            type,
+            receive_time,
+            remote_address,
+            remote_port,
+            raw_message,
+            device_id,
+            device_name,
+            area_name,
+            point_name,
+            location,
+            handled,
+            handle_time,
+            handle_by,
+            handle_remark,
+            create_time,
+            ts
+        ) VALUES (
+            #{record.account},
+            #{record.eventCode},
+            #{record.area},
+            #{record.point},
+            #{record.sequence},
+            #{record.eventDescription},
+            #{record.level},
+            #{record.type},
+            #{record.receiveTime},
+            #{record.remoteAddress},
+            #{record.remotePort},
+            #{record.rawMessage},
+            #{record.deviceId},
+            #{record.deviceName},
+            #{record.areaName},
+            #{record.pointName},
+            #{record.location},
+            #{record.handled},
+            #{record.handleTime},
+            #{record.handleBy},
+            #{record.handleRemark},
+            #{record.createTime},
+            NOW(3)
+        )
+    </insert>
+
+</mapper>

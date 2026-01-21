@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Generic Device Configuration",
+  "description": "通用设备配置 - 用于未定义特定Schema的设备类型",
+  "type": "object",
+  "required": ["deviceType"],
+  "properties": {
+    "deviceType": {
+      "type": "string",
+      "description": "设备类型标识"
+    }
+  },
+  "additionalProperties": true
+}

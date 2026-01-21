@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket 测试</title>
+</head>
+<body>
+    <h1>WebSocket 连接测试</h1>
+    <div id="status">准备连接...</div>
+    <div id="log"></div>
+
+    <script>
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+
+        function addLog(message) {
+            const p = document.createElement('p');
+            p.textContent = new Date().toLocaleTimeString() + ' - ' + message;
+            log.appendChild(p);
+        }
+
+        // 测试 HTTP 接口是否可用
+        fetch('http://localhost:48888/admin-api/system/auth/get-permission-info')
+            .then(response => {
+                addLog('HTTP 接口响应: ' + response.status);
+                return response.json();
+            })
+            .then(data => {
+                addLog('HTTP 接口数据: ' + JSON.stringify(data).substring(0, 100));
+            })
+            .catch(error => {
+                addLog('HTTP 接口错误: ' + error.message);
+            });
+
+        // 测试 WebSocket 连接
+        addLog('尝试连接 WebSocket...');
+        const ws = new WebSocket('ws://localhost:48888/ws/iot?userId=1');
+
+        ws.onopen = function(event) {
+            status.textContent = '✅ 连接成功';
+            status.style.color = 'green';
+            addLog('WebSocket 连接成功！');
+        };
+
+        ws.onerror = function(error) {
+            status.textContent = '❌ 连接失败';
+            status.style.color = 'red';
+            addLog('WebSocket 错误: ' + JSON.stringify(error));
+            console.error('WebSocket error:', error);
+        };
+
+        ws.onclose = function(event) {
+            addLog('WebSocket 关闭: code=' + event.code + ', reason=' + event.reason);
+        };
+
+        ws.onmessage = function(event) {
+            addLog('收到消息: ' + event.data);
+        };
+    </script>
+</body>
+</html>

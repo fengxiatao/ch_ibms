@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.iot.dal.tdengine.IotDevicePropertyMapper">
+
+    <!-- 
+        MySQL版本说明：
+        - 使用统一的 iot_device_property_history 表存储所有设备的属性历史
+        - 每个属性作为单独的一行记录
+        - 原TDEngine的动态表结构操作改为空实现（在Java接口中使用default方法）
+    -->
+
+    <!-- 插入设备属性数据（MySQL版本：将Map中的每个属性拆分为单独记录插入） -->
+    <insert id="insert">
+        INSERT INTO iot_device_property_history (device_id, product_id, identifier, value, report_time, ts)
+        VALUES
+        <foreach collection="properties" index="key" item="value" separator=",">
+            (#{device.id}, #{device.productId}, #{key}, 
+             <choose>
+                 <when test="value != null">#{value}</when>
+                 <otherwise>NULL</otherwise>
+             </choose>,
+             #{reportTime}, NOW(3))
+        </foreach>
+    </insert>
+
+    <!-- 批量插入设备属性数据 -->
+    <insert id="batchInsert">
+        INSERT INTO iot_device_property_history (device_id, product_id, identifier, value, report_time, ts)
+        VALUES
+        <foreach collection="properties" index="key" item="value" separator=",">
+            (#{deviceId}, #{productId}, #{key}, 
+             <choose>
+                 <when test="value != null">#{value}</when>
+                 <otherwise>NULL</otherwise>
+             </choose>,
+             #{reportTime}, NOW(3))
+        </foreach>
+    </insert>
+
+    <!-- 查询结果映射 -->
+    <resultMap id="IotDevicePropertyRespVOMap"
+               type="cn.iocoder.yudao.module.iot.controller.admin.device.vo.property.IotDevicePropertyRespVO">
+        <result property="value" column="value"
+                typeHandler="cn.iocoder.yudao.module.iot.framework.mybatis.handler.SimpleObjectTypeHandler"/>
+        <result property="updateTime" column="update_time" javaType="java.lang.Long"/>
+    </resultMap>
+
+    <!-- 查询设备属性历史数据（MySQL版本） -->
+    <select id="selectListByHistory" resultMap="IotDevicePropertyRespVOMap">
+        SELECT 
+            value AS `value`, 
+            UNIX_TIMESTAMP(ts) * 1000 AS update_time
+        FROM iot_device_property_history
+        WHERE device_id = #{reqVO.deviceId}
+          AND identifier = #{reqVO.identifier}
+          <if test="reqVO.times != null and reqVO.times.length == 2">
+              AND ts BETWEEN #{reqVO.times[0]} AND #{reqVO.times[1]}
+          </if>
+        ORDER BY ts DESC
+    </select>
+
+</mapper>

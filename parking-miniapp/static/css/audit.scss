@@ -1,0 +1,84 @@
+.empty {
+		margin-top: 50%;
+}
+.index {
+		min-height: 100vh;
+		padding-bottom: 150rpx;
+		background-color: $uni-bg-color-grey;
+		position: relative;
+	}
+	
+	.addBtn {
+	
+		background-color: #6399FE;
+		font-size: $uni-font-size-lg;
+		position: fixed;
+		width: 240rpx;
+		bottom: 15px;
+		right: 15px;
+		color: white;
+		border-radius: 55px;
+		z-index: 99;
+	}
+	
+	.container {
+		.u-card-wrap {
+			background-color: $u-bg-color;
+			padding: 1px;
+			margin-top: 20rpx;
+		}
+	
+		.u-body-item {
+			height: 200rpx;
+			font-size: 32rpx;
+			color: #333;
+			padding: 0rpx 10rpx;
+			display: flex;
+			justify-content: space-between;
+		}
+	
+		.u-body-item-title {
+			height: 100%;
+			flex: 1;
+			font-size: $uni-font-size-base;
+			display: flex;
+			flex-direction: column;
+			justify-content: space-evenly;
+			.title{
+				    font-size: 16px;
+				    font-weight: 600;
+			}
+			.wait{
+				color: #FFFFFF;
+				padding: 0 5rpx;
+				margin-right: 10rpx;
+				border-radius: 10rpx;
+			}
+		}
+	
+		.pic {
+			width: 200rpx;
+			height: 100%;
+			margin-bottom: 10%;
+			image {
+				width: 120%;
+				height: 100%;
+			}
+		}
+	
+		.u-body-item button {
+			margin: inherit;
+			font-size: $uni-font-size-base;
+			color: #FFFFFF;
+			background-color: $uni-btn;
+		}
+	
+		.ubtn {
+			background-color: $uni-btn;
+			color: #FFFFFF;
+			font-size: $uni-font-size-base;
+			position: fixed;
+			bottom: 10%;
+			left: 40%;
+		}
+	}

@@ -1,0 +1,27 @@
+-- 报警主机操作记录表
+CREATE TABLE IF NOT EXISTS `iot_alarm_operation_log` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `host_id` bigint DEFAULT NULL COMMENT '报警主机ID',
+  `partition_id` bigint DEFAULT NULL COMMENT '分区ID',
+  `zone_id` bigint DEFAULT NULL COMMENT '防区ID',
+  `operation_type` varchar(50) NOT NULL COMMENT '操作类型：ARM_ALL-外出布防, ARM_EMERGENCY-居家布防, DISARM-撤防, CLEAR_ALARM-消警, BYPASS-旁路, UNBYPASS-撤销旁路, QUERY-查询, REFRESH-刷新, RENAME-重命名',
+  `operation_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+  `operator_id` bigint DEFAULT NULL COMMENT '操作人ID',
+  `operator_name` varchar(100) DEFAULT NULL COMMENT '操作人姓名',
+  `result` varchar(20) DEFAULT 'SUCCESS' COMMENT '操作结果：SUCCESS-成功, FAILED-失败',
+  `error_message` varchar(500) DEFAULT NULL COMMENT '错误信息',
+  `request_id` varchar(64) DEFAULT NULL COMMENT '请求ID',
+  `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户ID',
+  `creator` varchar(64) DEFAULT '' COMMENT '创建者',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater` varchar(64) DEFAULT '' COMMENT '更新者',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_host_id` (`host_id`),
+  KEY `idx_partition_id` (`partition_id`),
+  KEY `idx_zone_id` (`zone_id`),
+  KEY `idx_operation_time` (`operation_time`),
+  KEY `idx_operation_type` (`operation_type`),
+  KEY `idx_tenant_id` (`tenant_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='报警主机操作记录表';

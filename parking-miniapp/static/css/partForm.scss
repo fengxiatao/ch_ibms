@@ -1,0 +1,109 @@
+	// 分不同信息段的表样式
+	.index {
+		display: flex;
+		flex-direction: column;
+		justify-content: space-between;
+
+		.parkName {
+			font-size: 36rpx;
+			height: 96rpx;
+			line-height: 96rpx;
+			background: #fff;
+			padding: 0 20rpx;
+			// margin-top: 30rpx;
+		}
+		
+		/deep/.u-form-item--right__content__slot {
+			display: flex;
+		}
+		
+		/deep/.u-form-item--right {
+			background: #f9fafc;
+		}
+
+		/deep/.u-form-item--left__content::after {
+			width: 1rpx;
+			height: 30rpx;
+			// padding-right: 20rpx;
+			border-right: 6rpx solid #bebebe;
+			content: " ";
+		}
+		/deep/.u-form-item--left__content{
+			text-align: center;
+			padding-left:20rpx;
+		}
+		/deep/.u-form-item--left{
+			background: #f9fafc;
+		}
+		/deep/.u-form-item--right__content{
+			background: #f9fafc;
+		}
+		
+		/deep/.u-form-item--right__content__slot{
+			padding-left: 30rpx;
+		}
+		
+		.uInput{ 
+			width: 99% !important;
+		}
+		.partOne{
+			.title {
+				font-size: 16px;
+				padding: 0 20rpx;
+				color: #1e3c72;
+				border-left: 3px solid;
+				margin: 20rpx 0 20rpx 0;
+			}
+			
+			.uform {
+				padding: 0 30rpx;
+			}
+		}
+		.partTwo {
+			.title {
+				font-size: 16px;
+				padding: 0 20rpx;
+				color: #1e3c72;
+				border-left: 3px solid;
+				margin: 20rpx 0 20rpx 0;
+			}
+			
+			.uform {
+				padding: 0 30rpx;
+			}
+		}
+
+		.partOne {
+			.title {
+				margin-top: 20rpx;
+			}
+		}
+		//确定	按钮
+		.ubtn1 {
+			// font-size: $uni-font-size-base;
+			font-size: 32rpx;
+			height: 50px;
+			line-height: 50px;
+			width: 100%;
+			color: #FFFFFF;
+			border-radius: unset;
+			// background-color: $uni-btn;
+			background-color: #6399FE;
+		}
+		//同意&不同意 按钮
+		.examine{
+			// font-size: $uni-font-size-base;
+			font-size: 32rpx;
+			width: 100%;
+			display: flex;
+			button{
+				width: 50%;
+				color: #FFFFFF;
+				border-radius: unset;
+				background-color: $uni-btn;
+			}
+			:first-child{
+				background-color: #FF7171 ;
+			}
+		}
+	}

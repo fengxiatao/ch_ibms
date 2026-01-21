@@ -1,0 +1,93 @@
+# ===== 构建产物 =====
+**/target/
+**/dist/
+**/dist-prod/
+**/build/
+**/out/
+
+# ===== 依赖 =====
+**/node_modules/
+**/.pnpm-store/
+**/package-lock.json
+**/pnpm-lock.yaml
+
+# ===== IDE =====
+**/.idea/
+**/.vscode/
+**/.cursor/
+**/.kiro/
+**/.kilocode/
+**/.gitee/
+**/.github/
+**/.image/
+*.iml
+*.ipr
+*.iws
+
+# ===== 日志 =====
+*.log
+**/logs/
+hs_err_pid*.log
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+~$*
+
+# ===== 临时文件 =====
+*.tmp
+*.temp
+*.swp
+*.bak
+
+# ===== 编译产物 =====
+*.class
+*.jar
+*.war
+*.ear
+
+# ===== 压缩包 =====
+*.zip
+*.rar
+*.7z
+*.tar.gz
+
+# ===== 上传目录 =====
+**/uploads/
+**/recordings/
+
+# ===== 环境配置 =====
+.env
+.env.local
+*.local
+
+# ===== 缓存 =====
+**/.cache/
+**/unpackage/
+
+# ===== 其他 =====
+.mcp-db.json
+.flattened-pom.xml
+**/libs/
+
+# ===== 根目录排除的文件 =====
+# 证书文件（敏感）
+/1634295428_*/
+/22891366_*/
+
+# 文档和大文件
+/*.pdf
+/*.png
+/*.jpg
+/*.xlsx
+/*.xls
+/*.docx
+/*.doc
+/*.hex
+/*.sql
+
+# 临时/测试文件
+/Untitled
+/compile_output.txt
+/build.log
+/*.py

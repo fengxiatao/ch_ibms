@@ -1,0 +1,15 @@
+# 停车场小程序微信支付配置
+# 将此文件复制为 parking-wechat-pay.yml 并填入真实配置
+
+wxpay:
+  parking:
+    # 小程序AppID
+    appId: your_app_id
+    # 商户号
+    mchId: your_mch_id
+    # API密钥（商户平台设置的32位密钥）
+    apiKey: your_api_key
+    # 小程序密钥
+    secret: your_secret
+    # 支付回调地址（必须是HTTPS）
+    notifyUrl: https://your-domain.com/parking/wechat/notify

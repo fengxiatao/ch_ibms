@@ -1,0 +1,16 @@
+@font-face {
+  font-family: "iconfont"; /* Project id 3513142 */
+  src: url('/static/icon/iconfont.ttf?t=1657508738290') format('truetype');
+}
+
+.iconfont {
+  font-family: "iconfont" !important;
+  font-size: 16px;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.icon-jiantou_zuoyouqiehuan:before {
+  content: "\eb0d";
+}

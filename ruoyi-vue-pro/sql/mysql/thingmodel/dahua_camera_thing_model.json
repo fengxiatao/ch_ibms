@@ -1,0 +1,965 @@
+{
+  "$schema": "物模型定义规范 v1.0",
+  "metadata": {
+    "productKey": "dahua_camera_001",
+    "productName": "大华网络摄像头",
+    "category": "视频监控",
+    "version": "1.0.0",
+    "description": "IBMS智慧安防-大华网络摄像头物模型定义",
+    "author": "长辉信息科技有限公司",
+    "createTime": "2025-10-24",
+    "updateTime": "2025-10-24"
+  },
+  
+  "properties": [
+    {
+      "identifier": "online_status",
+      "name": "在线状态",
+      "description": "设备是否在线",
+      "accessMode": "r",
+      "required": true,
+      "dataType": "bool",
+      "dataSpecsList": [
+        {
+          "dataType": "bool",
+          "name": "离线",
+          "value": 0
+        },
+        {
+          "dataType": "bool",
+          "name": "在线",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "identifier": "device_status",
+      "name": "设备状态",
+      "description": "设备运行状态",
+      "accessMode": "r",
+      "required": true,
+      "dataType": "enum",
+      "dataSpecsList": [
+        {
+          "dataType": "enum",
+          "name": "离线",
+          "value": 0
+        },
+        {
+          "dataType": "enum",
+          "name": "在线正常",
+          "value": 1
+        },
+        {
+          "dataType": "enum",
+          "name": "在线异常",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "identifier": "video_stream_main",
+      "name": "主码流地址",
+      "description": "高清主码流（录像用）",
+      "accessMode": "r",
+      "required": true,
+      "dataType": "struct",
+      "dataSpecsList": [
+        {
+          "dataType": "struct",
+          "identifier": "rtsp_url",
+          "name": "RTSP地址",
+          "accessMode": "r",
+          "required": true,
+          "childDataType": "text",
+          "dataSpecs": {
+            "dataType": "text",
+            "length": "256"
+          }
+        },
+        {
+          "dataType": "struct",
+          "identifier": "hls_url",
+          "name": "HLS地址",
+          "accessMode": "r",
+          "required": false,
+          "childDataType": "text",
+          "dataSpecs": {
+            "dataType": "text",
+            "length": "256"
+          }
+        },
+        {
+          "dataType": "struct",
+          "identifier": "flv_url",
+          "name": "FLV地址",
+          "accessMode": "r",
+          "required": false,
+          "childDataType": "text",
+          "dataSpecs": {
+            "dataType": "text",
+            "length": "256"
+          }
+        },
+        {
+          "dataType": "struct",
+          "identifier": "webrtc_url",
+          "name": "WebRTC地址",
+          "accessMode": "r",
+          "required": false,
+          "childDataType": "text",
+          "dataSpecs": {
+            "dataType": "text",
+            "length": "256"
+          }
+        }
+      ]
+    },
+    {
+      "identifier": "video_stream_sub",
+      "name": "子码流地址",
+      "description": "低分辨率子码流（预览用）",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "struct",
+      "dataSpecsList": [
+        {
+          "dataType": "struct",
+          "identifier": "rtsp_url",
+          "name": "RTSP地址",
+          "accessMode": "r",
+          "required": true,
+          "childDataType": "text",
+          "dataSpecs": {
+            "dataType": "text",
+            "length": "256"
+          }
+        },
+        {
+          "dataType": "struct",
+          "identifier": "hls_url",
+          "name": "HLS地址",
+          "accessMode": "r",
+          "required": false,
+          "childDataType": "text",
+          "dataSpecs": {
+            "dataType": "text",
+            "length": "256"
+          }
+        },
+        {
+          "dataType": "struct",
+          "identifier": "flv_url",
+          "name": "FLV地址",
+          "accessMode": "r",
+          "required": false,
+          "childDataType": "text",
+          "dataSpecs": {
+            "dataType": "text",
+            "length": "256"
+          }
+        }
+      ]
+    },
+    {
+      "identifier": "recording_status",
+      "name": "录像状态",
+      "description": "当前录像状态",
+      "accessMode": "r",
+      "required": true,
+      "dataType": "enum",
+      "dataSpecsList": [
+        {
+          "dataType": "enum",
+          "name": "未录像",
+          "value": 0
+        },
+        {
+          "dataType": "enum",
+          "name": "录像中",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "identifier": "stream_status",
+      "name": "推流状态",
+      "description": "ZLMediaKit推流状态",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "enum",
+      "dataSpecsList": [
+        {
+          "dataType": "enum",
+          "name": "未推流",
+          "value": 0
+        },
+        {
+          "dataType": "enum",
+          "name": "推流中",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "identifier": "ptz_support",
+      "name": "云台支持",
+      "description": "是否支持云台控制",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "bool",
+      "dataSpecsList": [
+        {
+          "dataType": "bool",
+          "name": "不支持",
+          "value": 0
+        },
+        {
+          "dataType": "bool",
+          "name": "支持",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "identifier": "ptz_position",
+      "name": "云台位置",
+      "description": "云台当前位置",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "struct",
+      "dataSpecsList": [
+        {
+          "dataType": "struct",
+          "identifier": "pan",
+          "name": "水平角度",
+          "accessMode": "r",
+          "required": false,
+          "childDataType": "int",
+          "dataSpecs": {
+            "dataType": "int",
+            "min": "0",
+            "max": "360",
+            "step": "1",
+            "unit": "°",
+            "unitName": "度"
+          }
+        },
+        {
+          "dataType": "struct",
+          "identifier": "tilt",
+          "name": "垂直角度",
+          "accessMode": "r",
+          "required": false,
+          "childDataType": "int",
+          "dataSpecs": {
+            "dataType": "int",
+            "min": "0",
+            "max": "180",
+            "step": "1",
+            "unit": "°",
+            "unitName": "度"
+          }
+        },
+        {
+          "dataType": "struct",
+          "identifier": "zoom",
+          "name": "变倍",
+          "accessMode": "r",
+          "required": false,
+          "childDataType": "int",
+          "dataSpecs": {
+            "dataType": "int",
+            "min": "1",
+            "max": "30",
+            "step": "1",
+            "unit": "x",
+            "unitName": "倍"
+          }
+        }
+      ]
+    },
+    {
+      "identifier": "motion_detection_enabled",
+      "name": "移动侦测",
+      "description": "是否启用移动侦测",
+      "accessMode": "rw",
+      "required": false,
+      "dataType": "bool",
+      "dataSpecsList": [
+        {
+          "dataType": "bool",
+          "name": "关闭",
+          "value": 0
+        },
+        {
+          "dataType": "bool",
+          "name": "开启",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "identifier": "motion_sensitivity",
+      "name": "移动侦测灵敏度",
+      "description": "移动侦测灵敏度等级",
+      "accessMode": "rw",
+      "required": false,
+      "dataType": "int",
+      "dataSpecs": {
+        "dataType": "int",
+        "min": "1",
+        "max": "10",
+        "step": "1",
+        "defaultValue": "5",
+        "unit": "",
+        "unitName": "级"
+      }
+    },
+    {
+      "identifier": "resolution",
+      "name": "分辨率",
+      "description": "视频分辨率",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "text",
+      "dataSpecs": {
+        "dataType": "text",
+        "length": "32"
+      }
+    },
+    {
+      "identifier": "frame_rate",
+      "name": "帧率",
+      "description": "视频帧率",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "int",
+      "dataSpecs": {
+        "dataType": "int",
+        "min": "1",
+        "max": "60",
+        "step": "1",
+        "unit": "fps",
+        "unitName": "帧/秒"
+      }
+    },
+    {
+      "identifier": "bit_rate",
+      "name": "码率",
+      "description": "视频码率",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "int",
+      "dataSpecs": {
+        "dataType": "int",
+        "min": "256",
+        "max": "8192",
+        "step": "128",
+        "unit": "kbps",
+        "unitName": "千比特/秒"
+      }
+    },
+    {
+      "identifier": "device_model",
+      "name": "设备型号",
+      "description": "摄像头型号",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "text",
+      "dataSpecs": {
+        "dataType": "text",
+        "length": "64"
+      }
+    },
+    {
+      "identifier": "firmware_version",
+      "name": "固件版本",
+      "description": "固件版本号",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "text",
+      "dataSpecs": {
+        "dataType": "text",
+        "length": "32"
+      }
+    },
+    {
+      "identifier": "hardware_version",
+      "name": "硬件版本",
+      "description": "硬件版本号",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "text",
+      "dataSpecs": {
+        "dataType": "text",
+        "length": "32"
+      }
+    },
+    {
+      "identifier": "serial_number",
+      "name": "序列号",
+      "description": "设备序列号",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "text",
+      "dataSpecs": {
+        "dataType": "text",
+        "length": "64"
+      }
+    },
+    {
+      "identifier": "ip_address",
+      "name": "IP地址",
+      "description": "设备IP地址",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "text",
+      "dataSpecs": {
+        "dataType": "text",
+        "length": "64"
+      }
+    },
+    {
+      "identifier": "device_temperature",
+      "name": "设备温度",
+      "description": "设备当前温度",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "float",
+      "dataSpecs": {
+        "dataType": "float",
+        "min": "-40.0",
+        "max": "85.0",
+        "step": "0.1",
+        "precise": "1",
+        "unit": "℃",
+        "unitName": "摄氏度"
+      }
+    },
+    {
+      "identifier": "cpu_usage",
+      "name": "CPU使用率",
+      "description": "设备CPU使用率",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "float",
+      "dataSpecs": {
+        "dataType": "float",
+        "min": "0.0",
+        "max": "100.0",
+        "step": "0.1",
+        "precise": "1",
+        "unit": "%",
+        "unitName": "百分比"
+      }
+    },
+    {
+      "identifier": "memory_usage",
+      "name": "内存使用率",
+      "description": "设备内存使用率",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "float",
+      "dataSpecs": {
+        "dataType": "float",
+        "min": "0.0",
+        "max": "100.0",
+        "step": "0.1",
+        "precise": "1",
+        "unit": "%",
+        "unitName": "百分比"
+      }
+    },
+    {
+      "identifier": "storage_status",
+      "name": "存储状态",
+      "description": "SD卡或硬盘状态",
+      "accessMode": "r",
+      "required": false,
+      "dataType": "enum",
+      "dataSpecsList": [
+        {
+          "dataType": "enum",
+          "name": "无存储",
+          "value": 0
+        },
+        {
+          "dataType": "enum",
+          "name": "正常",
+          "value": 1
+        },
+        {
+          "dataType": "enum",
+          "name": "已满",
+          "value": 2
+        },
+        {
+          "dataType": "enum",
+          "name": "异常",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "identifier": "night_vision_mode",
+      "name": "夜视模式",
+      "description": "夜视功能模式",
+      "accessMode": "rw",
+      "required": false,
+      "dataType": "enum",
+      "dataSpecsList": [
+        {
+          "dataType": "enum",
+          "name": "关闭",
+          "value": 0
+        },
+        {
+          "dataType": "enum",
+          "name": "自动",
+          "value": 1
+        },
+        {
+          "dataType": "enum",
+          "name": "强制开启",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "identifier": "audio_enabled",
+      "name": "音频功能",
+      "description": "是否启用音频",
+      "accessMode": "rw",
+      "required": false,
+      "dataType": "bool",
+      "dataSpecsList": [
+        {
+          "dataType": "bool",
+          "name": "关闭",
+          "value": 0
+        },
+        {
+          "dataType": "bool",
+          "name": "开启",
+          "value": 1
+        }
+      ]
+    }
+  ],
+  
+  "events": [
+    {
+      "identifier": "motion_detected",
+      "name": "移动侦测告警",
+      "description": "检测到画面移动",
+      "type": "alert",
+      "required": false,
+      "method": "thing.event.motion_detected.post",
+      "outputParams": [
+        {
+          "identifier": "snapshot_url",
+          "name": "告警快照",
+          "direction": "output",
+          "paraOrder": 0,
+          "dataType": "text",
+          "dataSpecs": {
+            "dataType": "text",
+            "length": "256"
+          }
+        },
+        {
+          "identifier": "confidence",
+          "name": "置信度",
+          "direction": "output",
+          "paraOrder": 1,
+          "dataType": "float",
+          "dataSpecs": {
+            "dataType": "float",
+            "min": "0.0",
+            "max": "100.0",
+            "step": "0.1",
+            "unit": "%",
+            "unitName": "百分比"
+          }
+        },
+        {
+          "identifier": "alarm_time",
+          "name": "告警时间",
+          "direction": "output",
+          "paraOrder": 2,
+          "dataType": "date"
+        }
+      ]
+    },
+    {
+      "identifier": "device_offline",
+      "name": "设备离线",
+      "description": "设备断开连接",
+      "type": "error",
+      "required": false,
+      "method": "thing.event.device_offline.post",
+      "outputParams": [
+        {
+          "identifier": "offline_time",
+          "name": "离线时间",
+          "direction": "output",
+          "paraOrder": 0,
+          "dataType": "date"
+        },
+        {
+          "identifier": "offline_reason",
+          "name": "离线原因",
+          "direction": "output",
+          "paraOrder": 1,
+          "dataType": "text",
+          "dataSpecs": {
+            "dataType": "text",
+            "length": "256"
+          }
+        }
+      ]
+    },
+    {
+      "identifier": "device_online",
+      "name": "设备上线",
+      "description": "设备重新连接",
+      "type": "info",
+      "required": false,
+      "method": "thing.event.device_online.post",
+      "outputParams": [
+        {
+          "identifier": "online_time",
+          "name": "上线时间",
+          "direction": "output",
+          "paraOrder": 0,
+          "dataType": "date"
+        }
+      ]
+    },
+    {
+      "identifier": "video_loss",
+      "name": "视频丢失告警",
+      "description": "视频信号丢失",
+      "type": "error",
+      "required": false,
+      "method": "thing.event.video_loss.post",
+      "outputParams": [
+        {
+          "identifier": "alarm_time",
+          "name": "告警时间",
+          "direction": "output",
+          "paraOrder": 0,
+          "dataType": "date"
+        }
+      ]
+    },
+    {
+      "identifier": "storage_full",
+      "name": "存储已满告警",
+      "description": "SD卡或硬盘已满",
+      "type": "alert",
+      "required": false,
+      "method": "thing.event.storage_full.post",
+      "outputParams": [
+        {
+          "identifier": "alarm_time",
+          "name": "告警时间",
+          "direction": "output",
+          "paraOrder": 0,
+          "dataType": "date"
+        },
+        {
+          "identifier": "storage_capacity",
+          "name": "存储容量",
+          "direction": "output",
+          "paraOrder": 1,
+          "dataType": "int",
+          "dataSpecs": {
+            "dataType": "int",
+            "min": "0",
+            "max": "10000000",
+            "step": "1",
+            "unit": "MB",
+            "unitName": "兆字节"
+          }
+        }
+      ]
+    },
+    {
+      "identifier": "high_temperature",
+      "name": "高温告警",
+      "description": "设备温度过高",
+      "type": "alert",
+      "required": false,
+      "method": "thing.event.high_temperature.post",
+      "outputParams": [
+        {
+          "identifier": "temperature",
+          "name": "当前温度",
+          "direction": "output",
+          "paraOrder": 0,
+          "dataType": "float",
+          "dataSpecs": {
+            "dataType": "float",
+            "min": "-40.0",
+            "max": "85.0",
+            "step": "0.1",
+            "unit": "℃",
+            "unitName": "摄氏度"
+          }
+        },
+        {
+          "identifier": "alarm_time",
+          "name": "告警时间",
+          "direction": "output",
+          "paraOrder": 1,
+          "dataType": "date"
+        }
+      ]
+    }
+  ],
+  
+  "services": [
+    {
+      "identifier": "ptz_control",
+      "name": "云台控制",
+      "description": "控制云台转动和变倍",
+      "callType": "async",
+      "required": false,
+      "method": "thing.service.ptz_control",
+      "inputParams": [
+        {
+          "identifier": "action",
+          "name": "动作",
+          "direction": "input",
+          "paraOrder": 0,
+          "dataType": "enum",
+          "dataSpecsList": [
+            {
+              "dataType": "enum",
+              "name": "向上",
+              "value": 1
+            },
+            {
+              "dataType": "enum",
+              "name": "向下",
+              "value": 2
+            },
+            {
+              "dataType": "enum",
+              "name": "向左",
+              "value": 3
+            },
+            {
+              "dataType": "enum",
+              "name": "向右",
+              "value": 4
+            },
+            {
+              "dataType": "enum",
+              "name": "放大",
+              "value": 5
+            },
+            {
+              "dataType": "enum",
+              "name": "缩小",
+              "value": 6
+            },
+            {
+              "dataType": "enum",
+              "name": "停止",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "identifier": "speed",
+          "name": "速度",
+          "direction": "input",
+          "paraOrder": 1,
+          "dataType": "int",
+          "dataSpecs": {
+            "dataType": "int",
+            "min": "1",
+            "max": "8",
+            "step": "1",
+            "defaultValue": "5",
+            "unit": "",
+            "unitName": "级"
+          }
+        }
+      ],
+      "outputParams": [
+        {
+          "identifier": "success",
+          "name": "执行结果",
+          "direction": "output",
+          "paraOrder": 0,
+          "dataType": "bool",
+          "dataSpecsList": [
+            {
+              "dataType": "bool",
+              "name": "失败",
+              "value": 0
+            },
+            {
+              "dataType": "bool",
+              "name": "成功",
+              "value": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "identifier": "capture_snapshot",
+      "name": "抓拍快照",
+      "description": "立即抓拍一张快照",
+      "callType": "async",
+      "required": false,
+      "method": "thing.service.capture_snapshot",
+      "inputParams": [],
+      "outputParams": [
+        {
+          "identifier": "snapshot_url",
+          "name": "快照地址",
+          "direction": "output",
+          "paraOrder": 0,
+          "dataType": "text",
+          "dataSpecs": {
+            "dataType": "text",
+            "length": "256"
+          }
+        },
+        {
+          "identifier": "success",
+          "name": "执行结果",
+          "direction": "output",
+          "paraOrder": 1,
+          "dataType": "bool",
+          "dataSpecsList": [
+            {
+              "dataType": "bool",
+              "name": "失败",
+              "value": 0
+            },
+            {
+              "dataType": "bool",
+              "name": "成功",
+              "value": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "identifier": "start_record",
+      "name": "开始录像",
+      "description": "手动开始录像",
+      "callType": "async",
+      "required": false,
+      "method": "thing.service.start_record",
+      "inputParams": [
+        {
+          "identifier": "duration",
+          "name": "录像时长",
+          "direction": "input",
+          "paraOrder": 0,
+          "dataType": "int",
+          "dataSpecs": {
+            "dataType": "int",
+            "min": "10",
+            "max": "7200",
+            "step": "1",
+            "defaultValue": "3600",
+            "unit": "s",
+            "unitName": "秒"
+          }
+        }
+      ],
+      "outputParams": [
+        {
+          "identifier": "success",
+          "name": "执行结果",
+          "direction": "output",
+          "paraOrder": 0,
+          "dataType": "bool",
+          "dataSpecsList": [
+            {
+              "dataType": "bool",
+              "name": "失败",
+              "value": 0
+            },
+            {
+              "dataType": "bool",
+              "name": "成功",
+              "value": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "identifier": "stop_record",
+      "name": "停止录像",
+      "description": "停止手动录像",
+      "callType": "async",
+      "required": false,
+      "method": "thing.service.stop_record",
+      "inputParams": [],
+      "outputParams": [
+        {
+          "identifier": "success",
+          "name": "执行结果",
+          "direction": "output",
+          "paraOrder": 0,
+          "dataType": "bool",
+          "dataSpecsList": [
+            {
+              "dataType": "bool",
+              "name": "失败",
+              "value": 0
+            },
+            {
+              "dataType": "bool",
+              "name": "成功",
+              "value": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "identifier": "reboot",
+      "name": "重启设备",
+      "description": "重启摄像头设备",
+      "callType": "async",
+      "required": false,
+      "method": "thing.service.reboot",
+      "inputParams": [],
+      "outputParams": [
+        {
+          "identifier": "success",
+          "name": "执行结果",
+          "direction": "output",
+          "paraOrder": 0,
+          "dataType": "bool",
+          "dataSpecsList": [
+            {
+              "dataType": "bool",
+              "name": "失败",
+              "value": 0
+            },
+            {
+              "dataType": "bool",
+              "name": "成功",
+              "value": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+

@@ -1,0 +1,376 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.iot.dal.mysql.gis.IotGisMapper">
+
+    <!-- 统计园区数量 -->
+    <select id="countCampus" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM campus WHERE deleted = 0
+    </select>
+
+    <!-- 统计建筑数量 -->
+    <select id="countBuilding" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM building WHERE deleted = 0
+    </select>
+
+    <!-- 统计楼层数量 -->
+    <select id="countFloor" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM floor WHERE deleted = 0
+    </select>
+
+    <!-- 统计区域数量 -->
+    <select id="countRoom" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM area WHERE deleted = 0
+    </select>
+
+    <!-- 按状态统计设备数量 -->
+    <resultMap id="DeviceStatusCountMap" type="java.util.HashMap" autoMapping="false">
+        <result column="status" property="status" javaType="java.lang.String" jdbcType="VARCHAR"/>
+        <result column="count" property="count" javaType="java.lang.Integer" jdbcType="INTEGER"/>
+    </resultMap>
+    
+    <select id="countDeviceByStatus" resultMap="DeviceStatusCountMap">
+        SELECT 
+            status::text as status,
+            COUNT(*)::int as count
+        FROM iot_device
+        WHERE deleted = 0
+        GROUP BY status
+    </select>
+
+    <!-- 获取图层边界 -->
+    <resultMap id="LayerBoundsMap" type="java.util.HashMap">
+        <result column="min_lon" property="min_lon" jdbcType="DOUBLE" javaType="java.math.BigDecimal"/>
+        <result column="min_lat" property="min_lat" jdbcType="DOUBLE" javaType="java.math.BigDecimal"/>
+        <result column="max_lon" property="max_lon" jdbcType="DOUBLE" javaType="java.math.BigDecimal"/>
+        <result column="max_lat" property="max_lat" jdbcType="DOUBLE" javaType="java.math.BigDecimal"/>
+    </resultMap>
+    
+    <select id="getLayerBounds" resultMap="LayerBoundsMap">
+        <choose>
+            <when test="layer == 'campus'">
+                SELECT 
+                    ST_XMin(ST_Extent(geom))::numeric as min_lon,
+                    ST_YMin(ST_Extent(geom))::numeric as min_lat,
+                    ST_XMax(ST_Extent(geom))::numeric as max_lon,
+                    ST_YMax(ST_Extent(geom))::numeric as max_lat
+                FROM campus
+                WHERE deleted = 0
+            </when>
+            <when test="layer == 'building'">
+                SELECT 
+                    ST_XMin(ST_Extent(geom))::numeric as min_lon,
+                    ST_YMin(ST_Extent(geom))::numeric as min_lat,
+                    ST_XMax(ST_Extent(geom))::numeric as max_lon,
+                    ST_YMax(ST_Extent(geom))::numeric as max_lat
+                FROM building
+                WHERE deleted = 0
+            </when>
+            <when test="layer == 'floor'">
+                SELECT 
+                    ST_XMin(ST_Extent(geom))::numeric as min_lon,
+                    ST_YMin(ST_Extent(geom))::numeric as min_lat,
+                    ST_XMax(ST_Extent(geom))::numeric as max_lon,
+                    ST_YMax(ST_Extent(geom))::numeric as max_lat
+                FROM floor
+                WHERE deleted = 0
+            </when>
+            <when test="layer == 'area'">
+                SELECT 
+                    ST_XMin(ST_Extent(geom))::numeric as min_lon,
+                    ST_YMin(ST_Extent(geom))::numeric as min_lat,
+                    ST_XMax(ST_Extent(geom))::numeric as max_lon,
+                    ST_YMax(ST_Extent(geom))::numeric as max_lat
+                FROM area
+                WHERE deleted = 0
+            </when>
+            <when test="layer == 'device'">
+                SELECT 
+                    ST_XMin(ST_Extent(geom))::numeric as min_lon,
+                    ST_YMin(ST_Extent(geom))::numeric as min_lat,
+                    ST_XMax(ST_Extent(geom))::numeric as max_lon,
+                    ST_YMax(ST_Extent(geom))::numeric as max_lat
+                FROM iot_device
+                WHERE deleted = 0
+            </when>
+        </choose>
+    </select>
+
+    <!-- 搜索要素 -->
+    <select id="searchFeatures" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisFeatureRespVO">
+        <!-- 这里需要根据实际的搜索需求实现 -->
+        SELECT 
+            id,
+            name,
+            ST_AsText(geom) as geom,
+            '${req.layer}' as layer
+        FROM ${req.layer}
+        WHERE deleted = 0
+        <if test="req.keyword != null and req.keyword != ''">
+            AND name LIKE CONCAT('%', #{req.keyword}, '%')
+        </if>
+        LIMIT #{req.pageSize} OFFSET #{req.pageNo}
+    </select>
+
+    <!-- 搜索要素数量 -->
+    <select id="searchFeaturesCount" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM ${req.layer}
+        WHERE deleted = 0
+        <if test="req.keyword != null and req.keyword != ''">
+            AND name LIKE CONCAT('%', #{req.keyword}, '%')
+        </if>
+    </select>
+
+    <!-- 获取附近的设备 -->
+    <select id="getNearbyDevices" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisDeviceRespVO">
+        SELECT 
+            id,
+            name,
+            code,
+            device_type as deviceType,
+            status,
+            health_status as healthStatus,
+            ST_AsText(geom) as geom,
+            ST_Distance(
+                geom,
+                ST_SetSRID(ST_MakePoint(#{req.lon}, #{req.lat}), 4326)
+            ) as distance
+        FROM iot_device
+        WHERE deleted = 0
+        AND ST_DWithin(
+            geom,
+            ST_SetSRID(ST_MakePoint(#{req.lon}, #{req.lat}), 4326),
+            #{req.radius}
+        )
+        ORDER BY distance
+        LIMIT #{req.limit}
+    </select>
+
+    <!-- 获取边界范围内的设备 -->
+    <select id="getDevicesInBounds" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisDeviceRespVO">
+        SELECT 
+            id,
+            name,
+            code,
+            device_type as deviceType,
+            status,
+            health_status as healthStatus,
+            ST_AsText(geom) as geom
+        FROM iot_device
+        WHERE deleted = 0
+        AND ST_Within(
+            geom,
+            ST_MakeEnvelope(
+                #{req.minLon}, #{req.minLat},
+                #{req.maxLon}, #{req.maxLat},
+                4326
+            )
+        )
+        <if test="req.status != null and req.status != ''">
+            AND status = #{req.status}
+        </if>
+    </select>
+
+    <!-- 获取设备位置信息 -->
+    <select id="getDeviceLocation" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisDeviceLocationRespVO">
+        SELECT 
+            d.id,
+            d.name,
+            d.code,
+            ST_AsText(d.geom) as geom,
+            ST_X(d.geom) as lon,
+            ST_Y(d.geom) as lat,
+            a.id as areaId,
+            a.name as areaName,
+            f.id as floorId,
+            f.name as floorName,
+            b.id as buildingId,
+            b.name as buildingName
+        FROM iot_device d
+        LEFT JOIN area a ON d.area_id = a.id
+        LEFT JOIN floor f ON a.floor_id = f.id
+        LEFT JOIN building b ON f.building_id = b.id
+        WHERE d.id = #{deviceId}
+        AND d.deleted = 0
+    </select>
+
+    <!-- 更新设备位置 -->
+    <update id="updateDeviceLocation">
+        UPDATE iot_device
+        SET geom = ST_SetSRID(ST_MakePoint(#{req.lon}, #{req.lat}), 4326),
+            updater = #{req.updater},
+            update_time = NOW()
+        WHERE id = #{req.deviceId}
+        AND deleted = 0
+    </update>
+
+    <!-- 获取设备的空间关系 -->
+    <select id="getSpatialRelation" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisSpatialRelationRespVO">
+        SELECT 
+            d.id as deviceId,
+            d.name as deviceName,
+            a.id as areaId,
+            a.name as areaName,
+            f.id as floorId,
+            f.name as floorName,
+            b.id as buildingId,
+            b.name as buildingName,
+            c.id as campusId,
+            c.name as campusName
+        FROM iot_device d
+        LEFT JOIN area a ON d.area_id = a.id
+        LEFT JOIN floor f ON a.floor_id = f.id
+        LEFT JOIN building b ON f.building_id = b.id
+        LEFT JOIN campus c ON b.campus_id = c.id
+        WHERE d.id = #{deviceId}
+        AND d.deleted = 0
+    </select>
+
+    <!-- 获取热力图数据 -->
+    <select id="getHeatmapData" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisHeatmapPointRespVO">
+        SELECT 
+            ST_X(geom) as lon,
+            ST_Y(geom) as lat,
+            1 as intensity
+        FROM iot_device
+        WHERE deleted = 0
+        <if test="req.status != null and req.status != ''">
+            AND status = #{req.status}
+        </if>
+        <if test="req.deviceType != null and req.deviceType != ''">
+            AND device_type = #{req.deviceType}
+        </if>
+    </select>
+
+    <!-- 获取用于聚合的设备数据 -->
+    <select id="getDevicesForCluster" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisDeviceRespVO">
+        SELECT 
+            id,
+            name,
+            code,
+            device_type as deviceType,
+            status,
+            health_status as healthStatus,
+            ST_AsText(geom) as geom,
+            ST_X(geom) as lon,
+            ST_Y(geom) as lat
+        FROM iot_device
+        WHERE deleted = 0
+        AND ST_Within(
+            geom,
+            ST_MakeEnvelope(
+                #{req.minLon}, #{req.minLat},
+                #{req.maxLon}, #{req.maxLat},
+                4326
+            )
+        )
+    </select>
+
+    <!-- 计算两点之间的距离 (单位：米) -->
+    <select id="calculateDistance" resultType="java.math.BigDecimal">
+        SELECT ST_Distance(
+            ST_SetSRID(ST_MakePoint(#{lon1}, #{lat1}), 4326)::geography,
+            ST_SetSRID(ST_MakePoint(#{lon2}, #{lat2}), 4326)::geography
+        ) as distance
+    </select>
+
+    <!-- 获取图层要素列表 -->
+    <select id="getLayerFeatures" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisFeatureRespVO">
+        <choose>
+            <when test="req.layer == 'campus'">
+                SELECT 
+                    id,
+                    name,
+                    code,
+                    ST_AsText(geom) as geom
+                FROM campus
+                WHERE deleted = 0
+            </when>
+            <when test="req.layer == 'building'">
+                SELECT 
+                    id,
+                    name,
+                    code,
+                    ST_AsText(geom) as geom
+                FROM building
+                WHERE deleted = 0
+            </when>
+            <when test="req.layer == 'floor'">
+                SELECT 
+                    id,
+                    name,
+                    code,
+                    ST_AsText(geom) as geom
+                FROM floor
+                WHERE deleted = 0
+            </when>
+            <when test="req.layer == 'area'">
+                SELECT 
+                    id,
+                    name,
+                    code,
+                    ST_AsText(geom) as geom
+                FROM area
+                WHERE deleted = 0
+            </when>
+            <when test="req.layer == 'device'">
+                SELECT 
+                    id,
+                    name,
+                    code,
+                    ST_AsText(geom) as geom
+                FROM iot_device
+                WHERE deleted = 0
+            </when>
+        </choose>
+        <if test="req.pageSize != null and req.pageNo != null">
+            LIMIT #{req.pageSize} OFFSET #{req.pageNo}
+        </if>
+    </select>
+
+    <!-- 获取图层要素数量 -->
+    <select id="getLayerFeaturesCount" resultType="java.lang.Long">
+        <choose>
+            <when test="req.layer == 'campus'">
+                SELECT COUNT(*) FROM campus WHERE deleted = 0
+            </when>
+            <when test="req.layer == 'building'">
+                SELECT COUNT(*) FROM building WHERE deleted = 0
+            </when>
+            <when test="req.layer == 'floor'">
+                SELECT COUNT(*) FROM floor WHERE deleted = 0
+            </when>
+            <when test="req.layer == 'area'">
+                SELECT COUNT(*) FROM area WHERE deleted = 0
+            </when>
+            <when test="req.layer == 'device'">
+                SELECT COUNT(*) FROM iot_device WHERE deleted = 0
+            </when>
+        </choose>
+    </select>
+
+    <!-- 根据建筑编码查询建筑信息 -->
+    <select id="getBuildingByCode" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisBuildingRespVO">
+        SELECT
+            id,
+            name,
+            code,
+            alias,
+            campus_id,
+            building_type,
+            building_structure,
+            fire_rating,
+            total_floors,
+            above_ground_floors,
+            underground_floors,
+            building_height AS height,
+            building_area AS builtArea,
+            remark
+        FROM building
+        WHERE code = #{code}
+          AND deleted = 0
+        LIMIT 1
+    </select>
+
+</mapper>
+
