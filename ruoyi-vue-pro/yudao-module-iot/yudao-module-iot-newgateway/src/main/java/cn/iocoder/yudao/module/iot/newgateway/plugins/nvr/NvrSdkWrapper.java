@@ -319,6 +319,11 @@ public class NvrSdkWrapper {
     // NET_EXTPTZ_GOTOPRESET = 0x48 = 72 (需要使用结构体 PTZ_CONTROL_GOTOPRESET)
     private static final int NET_EXTPTZ_GOTOPRESET = 0x48;     // 扩展命令：转到预设点
     
+    // 3D 定位/快速定位命令（用于区域框选放大）
+    // NET_EXTPTZ_FASTGOTO = 0x33 = 51
+    // 参数说明: param1=水平坐标(0-8192), param2=垂直坐标(0-8192), param3=变倍(1-128)
+    private static final int NET_EXTPTZ_FASTGOTO = 0x33;       // 快速定位（3D定位/定点放大）
+    
     // 预设点配置命令（用于 CLIENT_GetNewDevConfig / CLIENT_SetNewDevConfig）
     private static final String CFG_CMD_PTZ_PRESET = "PtzPreset";
 
@@ -348,13 +353,27 @@ public class NvrSdkWrapper {
             // 停止命令时速度参数必须为 0
             int actualSpeed = isStop ? 0 : speed;
             
+            // 根据官方 Demo，不同命令的参数不同：
+            // - 方向控制（上下左右及对角）: param1=speed, param2=speed
+            // - 变倍/变焦/光圈控制: param1=0, param2=speed
+            int param1, param2;
+            boolean isZoomFocusIris = isZoomFocusIrisCommand(dwPTZCommand);
+            
+            if (isZoomFocusIris) {
+                param1 = 0;
+                param2 = actualSpeed;
+            } else {
+                param1 = actualSpeed;
+                param2 = actualSpeed;
+            }
+            
             // 调用大华 SDK 的 PTZ 控制接口（使用 CLIENT_DHPTZControlEx2，sdkChannelNo 从 0 开始）
             boolean result = getNetSdk().CLIENT_DHPTZControlEx2(
                     new LLong(loginHandle),
                     sdkChannelNo,
                     dwPTZCommand,
-                    actualSpeed,
-                    actualSpeed,
+                    param1,
+                    param2,
                     0,
                     isStop ? 1 : 0,
                     null  // param4: 简单操作传 null
@@ -425,10 +444,26 @@ public class NvrSdkWrapper {
             // 停止命令时速度参数必须为 0
             int actualSpeed = isStop ? 0 : speed;
             
-            log.info("{} PTZ方向SDK调用参数: handle={}, sdkChannel={}, cmd={}, param1={}, param2={}, dwStop={}", 
-                    LOG_PREFIX, loginHandle.longValue(), sdkChannelNo, dwPTZCommand, actualSpeed, actualSpeed, isStop ? 1 : 0);
+            // 根据官方 Demo，不同命令的参数不同：
+            // - 方向控制（上下左右及对角）: param1=speed, param2=speed
+            // - 变倍/变焦/光圈控制: param1=0, param2=speed
+            int param1, param2;
+            boolean isZoomFocusIris = isZoomFocusIrisCommand(dwPTZCommand);
             
-            log.info("{} >>> 开始调用 CLIENT_DHPTZControlEx2 方向控制...", LOG_PREFIX);
+            if (isZoomFocusIris) {
+                // 变倍/变焦/光圈控制：param1=0, param2=speed
+                param1 = 0;
+                param2 = actualSpeed;
+            } else {
+                // 方向控制：param1=speed, param2=speed
+                param1 = actualSpeed;
+                param2 = actualSpeed;
+            }
+            
+            log.info("{} PTZ SDK调用参数: handle={}, sdkChannel={}, cmd={}, param1={}, param2={}, dwStop={}, isZoomFocusIris={}", 
+                    LOG_PREFIX, loginHandle.longValue(), sdkChannelNo, dwPTZCommand, param1, param2, isStop ? 1 : 0, isZoomFocusIris);
+            
+            log.info("{} >>> 开始调用 CLIENT_DHPTZControlEx2 控制...", LOG_PREFIX);
             boolean result;
             try {
                 // 根据官方文档，使用 CLIENT_DHPTZControlEx2，param4 传 null
@@ -436,15 +471,15 @@ public class NvrSdkWrapper {
                         loginHandle,
                         sdkChannelNo,
                         dwPTZCommand,
-                        actualSpeed,
-                        actualSpeed,
+                        param1,
+                        param2,
                         0,
                         isStop ? 1 : 0,
                         null  // param4: 简单操作传 null
                 );
-                log.info("{} <<< CLIENT_DHPTZControlEx2 方向控制完成, result={}", LOG_PREFIX, result);
+                log.info("{} <<< CLIENT_DHPTZControlEx2 控制完成, result={}", LOG_PREFIX, result);
             } catch (Throwable t) {
-                log.error("{} !!! CLIENT_DHPTZControlEx2 方向控制抛出异常: {}", LOG_PREFIX, t.getMessage(), t);
+                log.error("{} !!! CLIENT_DHPTZControlEx2 控制抛出异常: {}", LOG_PREFIX, t.getMessage(), t);
                 throw t;
             }
             
@@ -474,6 +509,154 @@ public class NvrSdkWrapper {
             return NvrOperationResult.failure("PTZ控制异常: " + e.getMessage());
         }
         // 注意：不再在 finally 中登出，会话由缓存管理
+    }
+
+    /**
+     * 3D 定位/区域放大控制（直连 IPC）
+     * 
+     * <p>用于在视频画面上框选区域进行快速定位放大。
+     * 用户在前端画面上框选一个矩形区域，将矩形的中心点坐标和放大倍数传入此方法，
+     * 摄像头会自动移动并放大到指定区域。</p>
+     * 
+     * <p>坐标系说明：</p>
+     * <ul>
+     *     <li>x, y 为归一化坐标（0-8192），其中 (0,0) 为画面左上角，(8192,8192) 为画面右下角</li>
+     *     <li>zoom 为变倍值（1-128），数值越大放大倍数越高</li>
+     * </ul>
+     * 
+     * @param ip        IPC 设备 IP
+     * @param username  用户名
+     * @param password  密码
+     * @param channelNo 通道号
+     * @param x         水平坐标（0-8192）
+     * @param y         垂直坐标（0-8192）
+     * @param zoom      变倍值（1-128）
+     * @return 操作结果
+     */
+    public NvrOperationResult ptz3DPositionDirect(String ip, String username, String password, 
+                                                   int channelNo, int x, int y, int zoom) {
+        if (!sdkInitialized) {
+            return NvrOperationResult.failure("SDK 未初始化");
+        }
+        
+        if (ip == null || ip.isEmpty()) {
+            return NvrOperationResult.failure("IP 地址不能为空");
+        }
+        
+        // 参数校验
+        if (x < 0 || x > 8192) {
+            return NvrOperationResult.failure("水平坐标 x 必须在 0-8192 范围内");
+        }
+        if (y < 0 || y > 8192) {
+            return NvrOperationResult.failure("垂直坐标 y 必须在 0-8192 范围内");
+        }
+        if (zoom < 1 || zoom > 128) {
+            return NvrOperationResult.failure("变倍值 zoom 必须在 1-128 范围内");
+        }
+        
+        try {
+            log.info("{} 3D定位控制: ip={}, channel={}, x={}, y={}, zoom={}", 
+                    LOG_PREFIX, ip, channelNo, x, y, zoom);
+            
+            // 获取或创建 IPC 登录会话
+            LLong loginHandle = getOrCreateIpcSession(ip, username, password);
+            if (loginHandle == null || loginHandle.longValue() == 0) {
+                return NvrOperationResult.failure("IPC登录失败");
+            }
+            
+            // 大华 SDK 通道号从 0 开始
+            int sdkChannelNo = channelNo > 0 ? channelNo - 1 : 0;
+            
+            log.info("{} 3D定位SDK调用参数: handle={}, sdkChannel={}, cmd={}, x={}, y={}, zoom={}", 
+                    LOG_PREFIX, loginHandle.longValue(), sdkChannelNo, NET_EXTPTZ_FASTGOTO, x, y, zoom);
+            
+            // 调用 SDK 的 3D 定位命令
+            // NET_EXTPTZ_FASTGOTO: param1=水平坐标, param2=垂直坐标, param3=变倍
+            boolean result = getNetSdk().CLIENT_DHPTZControlEx(
+                    loginHandle,
+                    sdkChannelNo,
+                    NET_EXTPTZ_FASTGOTO,
+                    x,      // param1: 水平坐标 (0-8192)
+                    y,      // param2: 垂直坐标 (0-8192)
+                    zoom,   // param3: 变倍值 (1-128)
+                    0       // dwStop: 0=执行
+            );
+            
+            String errorInfo = ToolKits.getErrorCodePrint();
+            int lastError = getNetSdk().CLIENT_GetLastError();
+            log.info("{} 3D定位SDK调用结果: result={}, lastError={}, errorInfo={}", 
+                    LOG_PREFIX, result, lastError, errorInfo);
+            
+            if (result) {
+                log.info("{} 3D定位控制成功: ip={}, x={}, y={}, zoom={}", LOG_PREFIX, ip, x, y, zoom);
+                ipcLoginTimeCache.put(ip, System.currentTimeMillis());
+                return NvrOperationResult.success("3D定位控制成功");
+            } else {
+                log.warn("{} 3D定位控制失败: ip={}, x={}, y={}, zoom={}, error={}", 
+                        LOG_PREFIX, ip, x, y, zoom, errorInfo);
+                return NvrOperationResult.failure("3D定位控制失败: " + errorInfo);
+            }
+            
+        } catch (Exception e) {
+            log.error("{} 3D定位控制异常: ip={}, error={}", LOG_PREFIX, ip, e.getMessage(), e);
+            return NvrOperationResult.failure("3D定位控制异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 区域放大控制（直连 IPC）
+     * 
+     * <p>用于根据框选的矩形区域进行放大。与 3D 定位不同，此方法直接接收矩形的
+     * 左上角和右下角坐标，自动计算中心点和放大倍数。</p>
+     * 
+     * @param ip        IPC 设备 IP
+     * @param username  用户名
+     * @param password  密码
+     * @param channelNo 通道号
+     * @param startX    矩形左上角 X 坐标（0-8192）
+     * @param startY    矩形左上角 Y 坐标（0-8192）
+     * @param endX      矩形右下角 X 坐标（0-8192）
+     * @param endY      矩形右下角 Y 坐标（0-8192）
+     * @return 操作结果
+     */
+    public NvrOperationResult ptzAreaZoomDirect(String ip, String username, String password, 
+                                                 int channelNo, int startX, int startY, int endX, int endY) {
+        if (!sdkInitialized) {
+            return NvrOperationResult.failure("SDK 未初始化");
+        }
+        
+        // 确保坐标正确（左上角到右下角）
+        int x1 = Math.min(startX, endX);
+        int y1 = Math.min(startY, endY);
+        int x2 = Math.max(startX, endX);
+        int y2 = Math.max(startY, endY);
+        
+        // 计算中心点
+        int centerX = (x1 + x2) / 2;
+        int centerY = (y1 + y2) / 2;
+        
+        // 计算放大倍数（基于框选区域大小）
+        // 框选区域越小，放大倍数越大
+        int width = x2 - x1;
+        int height = y2 - y1;
+        
+        // 使用较大的维度来计算放大倍数
+        int maxDimension = Math.max(width, height);
+        
+        // 计算放大倍数：全画面 (8192) 时为 1 倍，框选区域越小倍数越大
+        // 公式：zoom = 8192 / maxDimension，但限制在 1-128 范围内
+        int zoom;
+        if (maxDimension <= 0) {
+            zoom = 128; // 点击时最大放大
+        } else {
+            zoom = Math.max(1, Math.min(128, 8192 / maxDimension));
+        }
+        
+        log.info("{} 区域放大: 矩形({},{}) -> ({},{}), 中心({},{}), 放大倍数={}", 
+                LOG_PREFIX, x1, y1, x2, y2, centerX, centerY, zoom);
+        
+        // 调用 3D 定位方法
+        return ptz3DPositionDirect(ip, username, password, channelNo, centerX, centerY, zoom);
     }
     
     /**
@@ -557,6 +740,19 @@ public class NvrSdkWrapper {
             clearIpcSession(ip);
         }
         log.info("{} 已清除所有 IPC 会话", LOG_PREFIX);
+    }
+
+    /**
+     * 判断是否是变倍/变焦/光圈命令
+     * 这些命令的参数格式与方向控制不同：param1=0, param2=speed
+     */
+    private boolean isZoomFocusIrisCommand(int dwPTZCommand) {
+        return dwPTZCommand == NET_PTZ_ZOOM_ADD_CONTROL ||    // 变倍+
+               dwPTZCommand == NET_PTZ_ZOOM_DEC_CONTROL ||    // 变倍-
+               dwPTZCommand == NET_PTZ_FOCUS_ADD_CONTROL ||   // 聚焦近
+               dwPTZCommand == NET_PTZ_FOCUS_DEC_CONTROL ||   // 聚焦远
+               dwPTZCommand == NET_PTZ_APERTURE_ADD_CONTROL || // 光圈+
+               dwPTZCommand == NET_PTZ_APERTURE_DEC_CONTROL;   // 光圈-
     }
 
     /**

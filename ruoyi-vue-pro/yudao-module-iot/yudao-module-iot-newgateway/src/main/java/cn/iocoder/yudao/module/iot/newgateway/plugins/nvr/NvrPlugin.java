@@ -691,6 +691,15 @@ public class NvrPlugin implements ActiveDeviceHandler {
         Integer presetNo = command.getParam("presetNo");
         String presetAction = command.getParam("presetAction");
         String presetName = command.getParam("presetName");
+        // 3D定位/区域放大参数
+        Integer positionX = command.getParam("positionX");
+        Integer positionY = command.getParam("positionY");
+        Integer positionZoom = command.getParam("positionZoom");
+        // 区域放大参数（框选矩形坐标）
+        Integer areaStartX = command.getParam("areaStartX");
+        Integer areaStartY = command.getParam("areaStartY");
+        Integer areaEndX = command.getParam("areaEndX");
+        Integer areaEndY = command.getParam("areaEndY");
 
         if (channelNo == null) {
             channelNo = 0;
@@ -699,26 +708,46 @@ public class NvrPlugin implements ActiveDeviceHandler {
             speed = 4;
         }
 
-        // 判断是否为预设点操作
+        // 判断操作类型
         boolean isPresetOperation = presetAction != null && !presetAction.isEmpty() && presetNo != null;
+        boolean is3DPosition = positionX != null && positionY != null;
+        boolean isAreaZoom = areaStartX != null && areaStartY != null && areaEndX != null && areaEndY != null;
         
-        if (!isPresetOperation && (ptzCommand == null || ptzCommand.isEmpty())) {
-            return CommandResult.failure("缺少 ptzCommand 或 presetAction 参数");
+        if (!isPresetOperation && !is3DPosition && !isAreaZoom && (ptzCommand == null || ptzCommand.isEmpty())) {
+            return CommandResult.failure("缺少 ptzCommand、presetAction 或 3D定位参数");
         }
 
-        log.info("{} 执行PTZ控制: deviceId={}, channel={}, cmd={}, speed={}, targetIp={}, presetNo={}, presetAction={}", 
-                LOG_PREFIX, deviceId, channelNo, ptzCommand, speed, targetIp, presetNo, presetAction);
+        log.info("{} 执行PTZ控制: deviceId={}, channel={}, cmd={}, speed={}, targetIp={}, presetNo={}, presetAction={}, 3D=({},{},{}), area=({},{},{},{})", 
+                LOG_PREFIX, deviceId, channelNo, ptzCommand, speed, targetIp, presetNo, presetAction, 
+                positionX, positionY, positionZoom, areaStartX, areaStartY, areaEndX, areaEndY);
 
         try {
             NvrOperationResult sdkResult;
+            String operationType = "PTZ";
             
             // 如果指定了 targetIp，则直接连接该设备进行控制
             if (targetIp != null && !targetIp.isEmpty()) {
                 String username = targetUsername != null ? targetUsername : "admin";
                 String password = targetPassword != null ? targetPassword : "admin123";
                 
-                if (isPresetOperation) {
+                if (isAreaZoom) {
+                    // 区域放大（直连 IPC）
+                    operationType = "区域放大";
+                    log.info("{} 直连IPC进行区域放大: ip={}, channel={}, area=({},{}) -> ({},{})", 
+                            LOG_PREFIX, targetIp, channelNo, areaStartX, areaStartY, areaEndX, areaEndY);
+                    sdkResult = sdkWrapper.ptzAreaZoomDirect(targetIp, username, password, 
+                            channelNo, areaStartX, areaStartY, areaEndX, areaEndY);
+                } else if (is3DPosition) {
+                    // 3D定位（直连 IPC）
+                    operationType = "3D定位";
+                    int zoom = positionZoom != null ? positionZoom : 4;
+                    log.info("{} 直连IPC进行3D定位: ip={}, channel={}, x={}, y={}, zoom={}", 
+                            LOG_PREFIX, targetIp, channelNo, positionX, positionY, zoom);
+                    sdkResult = sdkWrapper.ptz3DPositionDirect(targetIp, username, password, 
+                            channelNo, positionX, positionY, zoom);
+                } else if (isPresetOperation) {
                     // 预设点控制（直连 IPC）
+                    operationType = "预设点";
                     log.info("{} 直连IPC进行预设点控制: ip={}, channel={}, presetNo={}, action={}, name={}", 
                             LOG_PREFIX, targetIp, channelNo, presetNo, presetAction, presetName);
                     sdkResult = sdkWrapper.presetControlDirect(targetIp, username, password, 
@@ -737,8 +766,12 @@ public class NvrPlugin implements ActiveDeviceHandler {
                     return CommandResult.failure("设备未连接");
                 }
                 
-                if (isPresetOperation) {
+                if (isAreaZoom || is3DPosition) {
+                    // 3D定位/区域放大目前只支持直连模式
+                    return CommandResult.failure("3D定位/区域放大需要指定 targetIp 直连 IPC");
+                } else if (isPresetOperation) {
                     // 预设点控制
+                    operationType = "预设点";
                     sdkResult = sdkWrapper.presetControl(loginHandle, channelNo, presetNo, presetAction);
                 } else {
                     // PTZ 方向控制
@@ -748,9 +781,18 @@ public class NvrPlugin implements ActiveDeviceHandler {
             
             if (sdkResult.isSuccess()) {
                 Map<String, Object> resultData = new java.util.HashMap<>();
-                resultData.put("message", isPresetOperation ? "预设点控制成功" : "PTZ控制成功");
+                resultData.put("message", operationType + "控制成功");
                 resultData.put("channelNo", channelNo);
-                if (isPresetOperation) {
+                if (isAreaZoom) {
+                    resultData.put("areaStartX", areaStartX);
+                    resultData.put("areaStartY", areaStartY);
+                    resultData.put("areaEndX", areaEndX);
+                    resultData.put("areaEndY", areaEndY);
+                } else if (is3DPosition) {
+                    resultData.put("positionX", positionX);
+                    resultData.put("positionY", positionY);
+                    resultData.put("positionZoom", positionZoom);
+                } else if (isPresetOperation) {
                     resultData.put("presetNo", presetNo);
                     resultData.put("presetAction", presetAction);
                 } else {
@@ -758,7 +800,7 @@ public class NvrPlugin implements ActiveDeviceHandler {
                 }
                 return CommandResult.success(resultData);
             } else {
-                return CommandResult.failure((isPresetOperation ? "预设点" : "PTZ") + "控制失败: " + sdkResult.getMessage());
+                return CommandResult.failure(operationType + "控制失败: " + sdkResult.getMessage());
             }
         } catch (Exception e) {
             log.error("{} PTZ控制异常: deviceId={}", LOG_PREFIX, deviceId, e);
