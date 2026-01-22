@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ehcache>
+    <!-- timeToIdleSeconds:最后一次访问这个元素到当前时间差超出这个值则此元素会失效 -->
+    <!-- timeToLiveSeconds:从创建到死亡的时间长度 -->
+    <cache name="myCache"
+           maxElementsInMemory="100000"
+           eternal="false"
+           timeToIdleSeconds="3600"
+           timeToLiveSeconds="10800"
+           overflowToDisk="true"
+           maxElementsOnDisk="10000000"
+           diskPersistent="true"
+           memoryStoreEvictionPolicy="LRU"/>
+    <defaultCache
+            eternal="false"
+            maxElementsInMemory="10000"
+            overflowToDisk="false"
+            diskPersistent="false"
+            timeToIdleSeconds="0"
+            timeToLiveSeconds="600"
+            memoryStoreEvictionPolicy="LRU"/>
+</ehcache>

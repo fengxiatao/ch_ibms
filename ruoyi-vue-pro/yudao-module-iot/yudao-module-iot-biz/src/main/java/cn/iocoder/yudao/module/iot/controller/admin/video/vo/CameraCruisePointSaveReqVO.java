@@ -13,6 +13,13 @@ import lombok.Data;
 @Data
 public class CameraCruisePointSaveReqVO {
 
+    @Schema(description = "巡航点ID（更新时必填）", example = "1")
+    private Long id;
+
+    @Schema(description = "巡航路线ID", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
+    @NotNull(message = "巡航路线ID不能为空")
+    private Long cruiseId;
+
     @Schema(description = "预设点ID", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     @NotNull(message = "预设点ID不能为空")
     private Long presetId;

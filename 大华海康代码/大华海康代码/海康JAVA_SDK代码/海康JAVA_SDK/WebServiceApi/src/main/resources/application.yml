@@ -1,0 +1,186 @@
+server:
+  port: 8090
+  servlet:
+    context-path: /
+snowFlake:
+  dataCenterId: 1
+  machineId: 1
+logging:
+  config: classpath:conf/log4j2.xml
+  level:
+    cn.jay.repository: trace
+spring:
+  profiles:
+    active: dev
+  mvc:
+    static-path-pattern: /**
+  freemarker:
+    allow-request-override: true
+    allow-session-override: true
+    cache: false
+    check-template-location: true
+    charset: UTF-8
+    content-type: text/html;
+    expose-request-attributes: true
+    expose-session-attributes: true
+    expose-spring-macro-helpers: true
+    template-loader-path: classpath:/views/,classpath:/static/,classpath:/public/
+    prefix:
+    suffix: .html
+    request-context-attribute: request
+    settings:
+      template_update_delay: 0
+      url_escaping_charset: UTF-8
+      locale: UTF-8
+      datetime_format: yyyy-MM-dd HH:mm:ss
+      date_format: yyyy-MM-dd
+      time_format: HH:mm:ss
+      template_exception_handler: html_debug
+      # 数字格式化，无小数点
+      number_format: '0.#'
+      # 设置freemarker标签 0,1,2 0=自动识别，默认1
+      tag_syntax: 'auto_detect'
+    # 配置数据库信息
+  datasource:
+    driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    type: com.alibaba.druid.pool.DruidDataSource
+    druid:
+      master:
+        # 数据源配置
+        #url: jdbc:sqlserver://127.0.0.1:1433;DatabaseName=ActivatedCarbonRevive
+        #username: sa
+        #password: 123456
+        url: jdbc:sqlserver://192.168.1.20;DatabaseName=CameraHC
+        username: sa
+        password: jokeep@sql2020
+        # 初始化 最小 最大
+        initialSize: 5
+        minIdle: 5
+        maxActive: 20
+        # 配置获取连接等待超时的时间
+        maxWait: 60000
+        # 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒
+        timeBetweenEvictionRunsMillis: 60000
+        # 配置一个连接在池中最小生存的时间，单位是毫秒
+        minEvictableIdleTimeMillis: 300000
+        validationQuery: SELECT 1
+        testWhileIdle: true
+        testOnBorrow: false
+        testOnReturn: false
+        # 打开PSCache，并且指定每个连接上PSCache的大小
+        poolPreparedStatements: true
+        maxPoolPreparedStatementPerConnectionSize: 20
+        # 配置多个英文逗号分隔
+        filters: stat,wall,log4j2
+        # WebStatFilter配置，说明请参考Druid Wiki，配置_配置WebStatFilter
+        # 是否启用StatFilter默认值true
+        webStatFilter:
+          enabled: true
+          urlPattern: /*
+          exclusions: "*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*"
+          sessionStatEnable: false
+          sessionStatMaxCount: 1000
+          principalCookieName: admin
+          principalSessionName: admin
+          profileEnable: true
+        # 根据配置中的url-pattern来访问内置监控页面，如果是上面的配置，内置监控页面的首页是/druid/index.html
+        # http://loacalhsot:8081/druid
+        statViewServlet:
+          enabled: true
+          urlPattern: /druid/*  # 监控页面访问路径
+          # 允许清空统计数据
+          resetEnable: true
+          loginUsername: admin
+          loginPassword: 123456
+          # StatViewSerlvet展示出来的监控信息比较敏感，是系统运行的内部情况，如果你需要做访问控制，可以配置allow和deny这两个参数
+          # deny优先于allow，如果在deny列表中，就算在allow列表中，也会被拒绝。如果allow没有配置或者为空，则允许所有访问
+          # 配置的格式
+          # <IP>
+          # 或者<IP>/<SUB_NET_MASK_size>其中128.242.127.1/24
+          # 24表示，前面24位是子网掩码，比对的时候，前面24位相同就匹配,不支持IPV6。
+          allow:
+          deny:
+      slave1:
+        # 数据源配置
+        #url: jdbc:sqlserver://127.0.0.1:1433;DatabaseName=ActivatedCarbonRevive
+        #username: sa
+        #password: 123456
+        url: jdbc:sqlserver://192.168.1.20;DatabaseName=ActivatedCarbonRevive
+        username: sa
+        password: jokeep@sql2020
+        # 初始化 最小 最大
+        initialSize: 5
+        minIdle: 5
+        maxActive: 20
+        # 配置获取连接等待超时的时间
+        maxWait: 60000
+        # 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒
+        timeBetweenEvictionRunsMillis: 60000
+        # 配置一个连接在池中最小生存的时间，单位是毫秒
+        minEvictableIdleTimeMillis: 300000
+        validationQuery: SELECT 2
+        testWhileIdle: true
+        testOnBorrow: false
+        testOnReturn: false
+        # 打开PSCache，并且指定每个连接上PSCache的大小
+        poolPreparedStatements: true
+        maxPoolPreparedStatementPerConnectionSize: 20
+        # 配置多个英文逗号分隔
+        filters: stat,wall,log4j2
+      slave2:
+        # 数据源配置
+        #url: jdbc:sqlserver://127.0.0.1:1433;DatabaseName=ActivatedCarbonRevive
+        #username: sa
+        #password: 123456
+        url: jdbc:sqlserver://192.168.1.20;DatabaseName=ActivatedCarbonRevive
+        username: sa
+        password: jokeep@sql2020
+        # 初始化 最小 最大
+        initialSize: 5
+        minIdle: 5
+        maxActive: 20
+        # 配置获取连接等待超时的时间
+        maxWait: 60000
+        # 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒
+        timeBetweenEvictionRunsMillis: 60000
+        # 配置一个连接在池中最小生存的时间，单位是毫秒
+        minEvictableIdleTimeMillis: 300000
+        validationQuery: SELECT 3
+        testWhileIdle: true
+        testOnBorrow: false
+        testOnReturn: false
+        # 打开PSCache，并且指定每个连接上PSCache的大小
+        poolPreparedStatements: true
+        maxPoolPreparedStatementPerConnectionSize: 20
+        # 配置多个英文逗号分隔
+        filters: stat,wall,log4j2
+
+  cache:
+    type: ehcache
+    ehcache:
+      config: classpath:/conf/ehcache.xml
+mybatis-plus:
+  mapper-locations: classpath:mapper/framework/*.xml,classpath:mapper/business/*.xml
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: assign_id
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+#海康摄像头1ip地址
+#hcnetipaddress: 192.168.60.102
+#hcnetport: 8000
+#hcnetldchannel: 1
+
+
+#hcnetipaddress: 192.168.60.101
+#hcnetport: 8000
+#hcnetldchannel: 1
+
+#铁塔海康摄像头ip地址
+hcnetipaddress: 183.223.248.172
+hcnetport: 8000
+hcnetldchannel: 1

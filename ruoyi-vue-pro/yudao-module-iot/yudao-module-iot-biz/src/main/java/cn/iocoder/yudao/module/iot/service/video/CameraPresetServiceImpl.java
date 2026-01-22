@@ -24,6 +24,8 @@ import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.*;
 @Slf4j
 public class CameraPresetServiceImpl implements CameraPresetService {
 
+    private static final String LOG_PREFIX = "[CameraPreset]";
+
     @Resource
     private CameraPresetMapper presetMapper;
 
@@ -35,12 +37,16 @@ public class CameraPresetServiceImpl implements CameraPresetService {
             throw exception(CAMERA_PRESET_NO_EXISTS);
         }
 
-        // 插入
+        // 插入数据库
         CameraPresetDO preset = BeanUtils.toBean(createReqVO, CameraPresetDO.class);
         presetMapper.insert(preset);
         
-        log.info("[createPreset] 创建预设点成功: channelId={}, presetNo={}, presetName={}", 
-                preset.getChannelId(), preset.getPresetNo(), preset.getPresetName());
+        log.info("{} 创建预设点成功: channelId={}, presetNo={}, presetName={}", 
+                LOG_PREFIX, preset.getChannelId(), preset.getPresetNo(), preset.getPresetName());
+        
+        // 注意：不自动同步到设备。预设点需要先在前端控制摄像头到指定位置，
+        // 然后通过 "设置预设点" 操作将当前位置保存到设备。
+        // 这里只是在数据库中记录预设点信息。
         
         return preset.getId();
     }
@@ -56,29 +62,36 @@ public class CameraPresetServiceImpl implements CameraPresetService {
             throw exception(CAMERA_PRESET_NO_EXISTS);
         }
 
-        // 更新
+        // 更新数据库
         CameraPresetDO updateObj = BeanUtils.toBean(updateReqVO, CameraPresetDO.class);
         presetMapper.updateById(updateObj);
         
-        log.info("[updatePreset] 更新预设点成功: id={}, presetNo={}, presetName={}", 
-                updateObj.getId(), updateObj.getPresetNo(), updateObj.getPresetName());
+        log.info("{} 更新预设点成功: id={}, presetNo={}, presetName={}", 
+                LOG_PREFIX, updateObj.getId(), updateObj.getPresetNo(), updateObj.getPresetName());
+        
+        // 注意：只更新数据库记录，不自动同步到设备。
+        // 如果需要更新设备上的预设点位置，用户需要在前端重新"设置预设点"。
     }
 
     @Override
     public void deletePreset(Long id) {
         // 校验存在
-        validatePresetExists(id);
+        CameraPresetDO preset = validatePresetExists(id);
         
-        // 删除
+        // 删除数据库记录
+        // 注意：不自动从设备删除预设点，因为可能会影响其他预设点
+        // 用户可以通过前端的 "删除预设点" 功能手动从设备删除
         presetMapper.deleteById(id);
         
-        log.info("[deletePreset] 删除预设点成功: id={}", id);
+        log.info("{} 删除预设点成功: id={}, presetNo={}", LOG_PREFIX, id, preset.getPresetNo());
     }
 
-    private void validatePresetExists(Long id) {
-        if (presetMapper.selectById(id) == null) {
+    private CameraPresetDO validatePresetExists(Long id) {
+        CameraPresetDO preset = presetMapper.selectById(id);
+        if (preset == null) {
             throw exception(CAMERA_PRESET_NOT_EXISTS);
         }
+        return preset;
     }
 
     @Override

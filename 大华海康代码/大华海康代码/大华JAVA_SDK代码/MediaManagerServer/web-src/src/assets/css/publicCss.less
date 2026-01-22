@@ -1,0 +1,508 @@
+.sysBorderContent {
+  border-radius: 5rem;
+  box-shadow: 0 2rem 10rem rgb(224 227 231);
+}
+
+.setPadding {
+  width: 100%;
+  height: 100%;
+  padding: 0 30rem 0 30rem;
+  background-color: #ffffff;
+}
+
+.topLayout {
+  width: 100%;
+  padding: 0 30rem;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+//添加按钮那一排的css
+/deep/ .top {
+  height: 76rem;
+  width: 100%;
+  //max-height: 127rem;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+
+  //表格顶部top的css
+  .tableTopContent {
+    justify-content: flex-end;
+  }
+
+  //树形菜单栏顶部top的css
+  .treeTopContent {
+    justify-content: space-between;
+    border-bottom: 1rem solid #E1E4EC;
+  }
+
+  //placeholder改变颜色
+  /*::-webkit-input-placeholder {
+    color: #333;
+  }
+  :-moz-placeholder {!* Firefox 18- *!
+    color: #333;
+  }
+  ::-moz-placeholder{!* Firefox 19+ *!
+    color: #333;
+  }
+  :-ms-input-placeholder {
+    color: #333;
+  }*/
+
+  //输入框样式与间距
+  .search {
+    display: flex;
+    flex-direction: row;
+  }
+
+  .el-input{
+    .el-input__inner {
+      width: 350rem;
+      height: 36rem;
+      line-height: 36rem;
+    }
+  }
+
+  .el-select {
+    .el-input__inner {
+      width: 145rem;
+      height: 36rem;
+      line-height: 36rem;
+    }
+  }
+}
+.selectandname{
+  display: flex;
+  flex-direction: row;
+  font-size: 16rem;
+  .name{
+    line-height: 35rem;
+    height: 36rem;
+    white-space: nowrap;
+  }
+
+}
+.searchBtn {
+  background-color: #2EC37A;
+  color: #fff;
+  width: 80rem;
+  height: 36rem;
+  border: none;
+  border-radius: 3rem;
+  font-size: 16rem;
+  text-align: center;
+  line-height: 36rem;
+  cursor: pointer;
+
+}
+.searchBtn:hover{
+  background-color:#26B36F;
+}
+
+.add {
+  .addBtn {
+    width: 240rem;
+    height: 36rem;
+    background-color: #005EFF;
+    color: #fff;
+    border: none;
+    border-radius: 3rem;
+    font-size: 16rem;
+    text-align: center;
+    line-height: 36rem;
+    cursor: pointer;
+    display: inline-block;
+  }
+  .addBtn:hover{
+    background-color:#6691ff;
+  }
+}
+
+//表格区css
+.content {
+  width: 100%;
+  height: calc(100% - 140rem);
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+
+  .overdue{
+    color: #FC001E;
+  }
+
+  .NoOverdue{
+    color: #F1920C;
+  }
+
+  .normal{
+    color: #333333;
+  }
+}
+
+.foot {
+  width: 100%;
+  height: 70rem;
+  display: flex;
+  flex-direction: row;
+  justify-content: right;
+  align-items: center;
+}
+
+//表格div的宽度
+/deep/ .table {
+  width: 100%;
+  padding: 0 30rem;
+  height: 100%;
+  background-color: #fff;
+}
+
+//输入表单的样式
+/deep/ .inputClass {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+
+  .el-form-item {
+    margin-bottom: 25rem;
+    //flex-grow: 1;
+  }
+
+  .el-form-item__label {
+    font-size: 16rem;
+  }
+
+  //计数器宽度
+  .el-input-number {
+    width: 300rem;
+  }
+
+  .el-input-number.is-controls-right .el-input-number__decrease, .el-input-number.is-controls-right .el-input-number__increase {
+    line-height: 18rem !important;
+  }
+
+  //计数器数据向左对齐
+  .el-input-number .el-input__inner {
+    text-align: left;
+  }
+
+  //输入框宽度
+  .el-input {
+    width: 100%;
+  }
+
+  //下拉框选择器
+  .el-select {
+    width: 100%;
+  }
+
+  .el-input__inner {
+    height: 36rem;
+    line-height: 36rem;
+    font-size: 16rem;
+  }
+
+  //短输入框统一样式
+  .short {
+    .el-form-item__content {
+      width: 300rem;
+    }
+
+    .el-input__icon {
+      font-size: 20rem;
+      line-height: 36rem;
+    }
+  }
+
+  .el-form-item__label {
+    padding: 0 !important;
+  }
+
+  //长输入框统一样式
+  .long {
+    width: 100%;
+  }
+}
+
+//弹窗下的按钮布局
+.dialogBtn {
+  display: flex;
+  justify-content: center;
+}
+
+/*//排序图标大小
+/deep/ .el-table .cell {
+  img {
+    width: 20rem;
+    height: 20rem;
+  }
+}*/
+
+//人员管理框架模板
+.mainLayout {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+//首页框架
+.firstHomeLayout {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.contentLayout {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.publicTop {
+  width: 100%;
+  height: 80rem;
+  background-color: #fff;
+
+  /deep/.publicTopContent {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+
+    .searchClass {
+      height: 100%;
+    }
+
+    //页面中页签的样式
+    .el-tabs{
+      width: auto;
+      height: 100%;
+      padding-top: 19rem;
+      .el-tabs__nav{
+        height: 45rem;
+      }
+
+      .el-tabs__item{
+        font-size: 18rem;
+        color: #9A9A9A;
+      }
+
+      .el-tabs__item.is-active{
+        color: #333333;
+      }
+
+      .el-tabs__nav-wrap::after{
+        height: 0;
+      }
+    }
+  }
+}
+
+.spacing {
+  margin-right: 10rem;
+}
+.marr{
+  margin-right: 40rem;
+}
+
+.topBtn {
+  width: 60rem;
+  height: 36rem;
+  text-align: center;
+  line-height: 36rem;
+  margin-right: 10rem;
+  border-radius: 3rem;
+  font-size: 16rem;
+}
+//
+//.searchBtn:hover {
+//  background-color: #6691ff;
+//  cursor: pointer;
+//}
+
+.resetBtn {
+  border: 1rem solid #1c55fd;
+  color: #1c55fd;
+}
+
+.resetBtn:hover {
+  background-color: #EEF4FF;
+  cursor: pointer;
+}
+
+.btnSpacing {
+  margin-right: 12rem;
+}
+
+/deep/ .publicMain {
+  width: 100%;
+  height: calc(100% - 100rem);
+  background-color: #fff;
+
+  .el-pagination {
+    margin-bottom: 10rem;
+  }
+
+  /*分页样式*/
+
+  .el-pagination.is-background {
+    .el-pager li {
+      border: 1rem solid #C0C4CC;
+      border-radius: 4rem;
+      background-color: #ffffff;
+      font-weight: 500;
+    }
+
+    .btn-prev, .btn-next {
+      border: 1rem solid #C0C4CC;
+      border-radius: 4rem;
+      background-color: #ffffff;
+    }
+
+    .el-pager li:not(.disabled).active {
+      background-color: #005EFF !important;
+    }
+  }
+
+  /deep/ .el-pagination__sizes .el-input .el-input__inner {
+    border-color: #D0D5DD;
+  }
+
+  /deep/ .el-pagination__editor.el-input .el-input__inner {
+    border-color: #D0D5DD;
+  }
+
+  /deep/ .el-pagination button, .el-pagination span:not([class*=suffix]) {
+    font-size: 14rem;
+  }
+}
+
+.dialogDiv {
+  height: 575rem;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 20rem;
+
+  .demo-ruleForm {
+    max-height: 630rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+}
+
+.secondTitle {
+  color: #282828;
+  font-size: 18rem;
+  font-weight: 700;
+  display: flex;
+  flex-direction: row;
+  margin-top: 14rem;
+
+  .blueLine {
+    width: 4rem;
+    height: 16rem;
+    border-left: 6rem solid #005EFF;
+    display: inline-block;
+    margin-right: 5rem;
+    margin-top: 1rem;
+    vertical-align: bottom;
+  }
+}
+
+.createCode {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  .codeBtn {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    margin-top: 19rem;
+
+    .btnClass {
+      width: 90rem;
+      height: 36rem;
+      color: #fff;
+      font-size: 16rem;
+      background-color: #005EFF;
+      border-radius: 22rem;
+      text-align: center;
+      line-height: 36rem;
+      cursor: pointer;
+    }
+
+    .btnClass:hover {
+      background-color: #6691ff;
+    }
+  }
+
+  .arrClass {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    box-sizing: border-box;
+    border-left: 1rem solid #E1E4EC;
+    margin-top: 12rem;
+
+    li {
+      margin-top: -1rem;
+      padding: 0 8rem;
+      height: 46rem;
+      border-top: 1rem solid #E1E4EC;
+      border-bottom: 1rem solid #E1E4EC;
+      border-right: 1rem solid #E1E4EC;
+      color: #282828;
+      font-size: 15rem;
+      text-align: center;
+      line-height: 46rem;
+    }
+  }
+}
+
+.generate {
+  display: flex;
+  flex-direction: row;
+}
+
+/deep/ .operationClass {
+  display: flex;
+  flex-direction: row;
+  height: 24rem;
+
+  span {
+    display: inline-block;
+    cursor: pointer;
+    flex-grow: 1;
+    line-height: 24rem;
+    text-align: center;
+    height: 100%;
+  }
+
+  .operation {
+    color: #1185FF;
+  }
+
+  .patrol{
+    color: #F1920C;
+  }
+
+  .audit{
+    color: #2EC37A;
+  }
+}
+
+.boldText{
+  font-weight: 700;
+}
+
+/deep/.el-upload-list__item.is-ready,
+.el-upload-list__item.is-uploading {
+  display: none !important;
+}

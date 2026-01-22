@@ -86,10 +86,21 @@
           <!-- 预置位控制 -->
           <div class="preset-controls">
             <el-select v-model="selectedPreset" placeholder="选择预置位" size="small">
-              <el-option v-for="i in 8" :key="i" :label="`预置位${i}`" :value="i" />
+              <el-option v-for="preset in presetList" :key="preset.id" 
+                         :label="`${preset.presetNo} - ${preset.presetName}`" :value="preset.presetNo" />
             </el-select>
             <el-button size="small" @click="gotoPreset">转到</el-button>
             <el-button size="small" @click="setPreset">设置</el-button>
+          </div>
+
+          <!-- 管理按钮 -->
+          <div class="manage-controls">
+            <el-button size="small" @click="openPresetManager">
+              <Icon icon="ep:setting" /> 预设点管理
+            </el-button>
+            <el-button size="small" @click="openCruiseManager">
+              <Icon icon="ep:video-camera" /> 巡航管理
+            </el-button>
           </div>
         </div>
       </div>
@@ -120,13 +131,31 @@
         </el-button-group>
       </div>
     </div>
+
+    <!-- 预设点管理对话框 -->
+    <PresetManager
+      ref="presetManagerRef"
+      :channelId="camera.channelId"
+      :deviceId="camera.deviceId"
+      @goto="handleGotoPreset"
+    />
+
+    <!-- 巡航管理对话框 -->
+    <CruiseManager
+      ref="cruiseManagerRef"
+      :channelId="camera.channelId"
+      :deviceId="camera.deviceId"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { CameraApi } from '@/api/iot/device/camera'
+import * as PresetApi from '@/api/iot/cameraPreset'
+import PresetManager from './PresetManager.vue'
+import CruiseManager from './CruiseManager.vue'
 
 interface Props {
   camera: any
@@ -141,6 +170,9 @@ const error = ref('')
 const showInfo = ref(true)
 const showPTZControl = ref(false)
 const selectedPreset = ref(1)
+const presetList = ref<PresetApi.CameraPresetVO[]>([])
+const presetManagerRef = ref()
+const cruiseManagerRef = ref()
 
 // 录像状态
 const isRecording = computed(() => {
@@ -306,8 +338,45 @@ const toggleFullscreen = () => {
   }
 }
 
+// 加载预设点列表
+const loadPresets = async () => {
+  if (!props.camera.channelId) return
+  try {
+    const res = await PresetApi.getPresetListByChannelId(props.camera.channelId)
+    presetList.value = res || []
+    // 如果有预设点，默认选中第一个
+    if (presetList.value.length > 0 && !selectedPreset.value) {
+      selectedPreset.value = presetList.value[0].presetNo
+    }
+  } catch (error) {
+    console.error('加载预设点列表失败:', error)
+  }
+}
+
+// 打开预设点管理
+const openPresetManager = () => {
+  presetManagerRef.value?.open()
+}
+
+// 打开巡航管理
+const openCruiseManager = () => {
+  cruiseManagerRef.value?.open()
+}
+
+// 从预设点管理转到预设点
+const handleGotoPreset = async (presetNo: number) => {
+  selectedPreset.value = presetNo
+  await gotoPreset()
+}
+
 onMounted(() => {
   console.log('摄像头播放器加载:', props.camera.name, props.streamUrl)
+  loadPresets()
+})
+
+// 监听 channelId 变化重新加载预设点
+watch(() => props.camera.channelId, () => {
+  loadPresets()
 })
 </script>
 
@@ -499,9 +568,21 @@ onMounted(() => {
       .preset-controls {
         display: flex;
         gap: 8px;
+        margin-bottom: 8px;
 
         :deep(.el-select) {
           flex: 1;
+        }
+      }
+
+      .manage-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+
+        .el-button {
+          margin: 0;
+          font-size: 11px;
         }
       }
     }
