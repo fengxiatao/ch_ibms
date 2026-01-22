@@ -160,4 +160,92 @@ public class CameraCruiseController {
         return success(true);
     }
 
+    // ========== 巡航点管理 ==========
+
+    @GetMapping("/point/list")
+    @Operation(summary = "获取巡航线路的所有点")
+    @Parameter(name = "cruiseId", description = "巡航路线ID", required = true)
+    @PreAuthorize("@ss.hasPermission('iot:camera:cruise:query')")
+    public CommonResult<List<CameraCruisePointRespVO>> getCruisePointList(@RequestParam("cruiseId") Long cruiseId) {
+        List<CameraCruisePointDO> points = cruisePointMapper.selectListByCruiseId(cruiseId);
+        
+        // 查询预设点信息
+        Map<Long, CameraPresetDO> presetMap = new HashMap<>();
+        if (!points.isEmpty()) {
+            List<Long> presetIds = points.stream().map(CameraCruisePointDO::getPresetId).collect(Collectors.toList());
+            presetMap = presetMapper.selectBatchIds(presetIds).stream()
+                    .collect(Collectors.toMap(CameraPresetDO::getId, p -> p));
+        }
+        
+        // 组装返回数据
+        Map<Long, CameraPresetDO> finalPresetMap = presetMap;
+        List<CameraCruisePointRespVO> result = points.stream().map(point -> {
+            CameraCruisePointRespVO vo = BeanUtils.toBean(point, CameraCruisePointRespVO.class);
+            CameraPresetDO preset = finalPresetMap.get(point.getPresetId());
+            if (preset != null) {
+                vo.setPresetNo(preset.getPresetNo());
+                vo.setPresetName(preset.getPresetName());
+            }
+            return vo;
+        }).collect(Collectors.toList());
+        
+        return success(result);
+    }
+
+    @PostMapping("/point/add")
+    @Operation(summary = "添加巡航点")
+    @PreAuthorize("@ss.hasPermission('iot:camera:cruise:update')")
+    public CommonResult<Long> addCruisePoint(@Valid @RequestBody CameraCruisePointSaveReqVO reqVO) {
+        return success(cruiseService.addCruisePoint(reqVO));
+    }
+
+    @PutMapping("/point/update")
+    @Operation(summary = "更新巡航点")
+    @PreAuthorize("@ss.hasPermission('iot:camera:cruise:update')")
+    public CommonResult<Boolean> updateCruisePoint(@Valid @RequestBody CameraCruisePointSaveReqVO reqVO) {
+        cruiseService.updateCruisePoint(reqVO);
+        return success(true);
+    }
+
+    @DeleteMapping("/point/delete")
+    @Operation(summary = "删除巡航点")
+    @Parameter(name = "id", description = "巡航点ID", required = true)
+    @PreAuthorize("@ss.hasPermission('iot:camera:cruise:update')")
+    public CommonResult<Boolean> deleteCruisePoint(@RequestParam("id") Long id) {
+        cruiseService.deleteCruisePoint(id);
+        return success(true);
+    }
+
+    // ========== 设备同步 ==========
+
+    @PostMapping("/sync-to-device")
+    @Operation(summary = "同步巡航线路到设备")
+    @PreAuthorize("@ss.hasPermission('iot:camera:cruise:control')")
+    public CommonResult<Boolean> syncCruiseToDevice(@RequestBody Map<String, Object> params) {
+        Long id = Long.valueOf(params.get("id").toString());
+        Integer tourNo = params.get("tourNo") != null ? Integer.valueOf(params.get("tourNo").toString()) : 1;
+        cruiseService.syncCruiseToDevice(id, tourNo);
+        return success(true);
+    }
+
+    @PostMapping("/start-device-cruise")
+    @Operation(summary = "启动设备巡航")
+    @PreAuthorize("@ss.hasPermission('iot:camera:cruise:control')")
+    public CommonResult<Boolean> startDeviceCruise(@RequestBody Map<String, Object> params) {
+        Long id = Long.valueOf(params.get("id").toString());
+        Integer tourNo = params.get("tourNo") != null ? Integer.valueOf(params.get("tourNo").toString()) : 1;
+        cruiseService.startDeviceCruise(id, tourNo);
+        return success(true);
+    }
+
+    @PostMapping("/stop-device-cruise")
+    @Operation(summary = "停止设备巡航")
+    @PreAuthorize("@ss.hasPermission('iot:camera:cruise:control')")
+    public CommonResult<Boolean> stopDeviceCruise(@RequestBody Map<String, Object> params) {
+        Long id = Long.valueOf(params.get("id").toString());
+        Integer tourNo = params.get("tourNo") != null ? Integer.valueOf(params.get("tourNo").toString()) : 1;
+        cruiseService.stopDeviceCruise(id, tourNo);
+        return success(true);
+    }
+
 }

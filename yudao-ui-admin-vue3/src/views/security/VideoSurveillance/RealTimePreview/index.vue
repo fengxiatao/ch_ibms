@@ -153,19 +153,29 @@
                           v-for="preset in presetList"
                           :key="preset.id"
                           class="preset-item"
-                          :class="{ active: selectedPresetNo === preset.presetNo }"
+                          :class="{ active: selectedPresetNo === preset.presetNo, editing: editingPresetId === preset.id }"
                           @click="handleSelectPreset(preset)"
                         >
                           <span class="preset-no">{{ preset.presetNo }}</span>
                           <span class="preset-name">{{
                             preset.presetName || `预设点${preset.presetNo}`
                           }}</span>
-                          <el-icon
-                            class="preset-delete"
-                            @click.stop="handleDeletePreset(preset.id)"
-                          >
-                            <Close />
-                          </el-icon>
+                          <div class="preset-actions">
+                            <el-icon
+                              class="preset-edit"
+                              @click.stop="handleEditPreset(preset)"
+                              title="编辑名称"
+                            >
+                              <Edit />
+                            </el-icon>
+                            <el-icon
+                              class="preset-delete"
+                              @click.stop="handleDeletePreset(preset.id)"
+                              title="删除"
+                            >
+                              <Close />
+                            </el-icon>
+                          </div>
                         </div>
                       </div>
                       <div class="preset-empty" v-else>
@@ -173,17 +183,32 @@
                       </div>
                     </div>
 
-                    <!-- 预设点添加 -->
+                    <!-- 预设点添加/编辑 -->
                     <div class="ptz-preset-add">
                       <el-input
                         v-model="presetPointName"
                         size="small"
-                        placeholder="预设点名称"
+                        :placeholder="editingPresetId ? '修改预设点名称' : '预设点名称'"
                         clearable
+                        @keyup.enter="editingPresetId ? handleUpdatePresetName() : handleAddPreset()"
                       />
-                      <el-button size="small" type="primary" @click="handleAddPreset"
-                        >添加</el-button
-                      >
+                      <el-button 
+                        v-if="editingPresetId" 
+                        size="small" 
+                        type="success" 
+                        @click="handleUpdatePresetName"
+                      >保存</el-button>
+                      <el-button 
+                        v-if="editingPresetId" 
+                        size="small" 
+                        @click="cancelEditPreset"
+                      >取消</el-button>
+                      <el-button 
+                        v-else 
+                        size="small" 
+                        type="primary" 
+                        @click="handleAddPreset"
+                      >添加</el-button>
                     </div>
 
                     <!-- 巡航管理 -->
@@ -233,6 +258,14 @@
                               circle
                               title="停止巡航"
                               @click="handleStopCruise(cruise)"
+                            />
+                            <el-button
+                              size="small"
+                              type="primary"
+                              :icon="Upload"
+                              circle
+                              title="同步到设备"
+                              @click="handleSyncCruiseToDevice(cruise.id)"
                             />
                             <el-button
                               size="small"
@@ -951,7 +984,7 @@
 import { ref, reactive, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { VideoPlay, VideoPause, Edit, Delete, Search } from '@element-plus/icons-vue'
+import { VideoPlay, VideoPause, Edit, Delete, Search, Close, Upload } from '@element-plus/icons-vue'
 import { ContentWrap } from '@/components/ContentWrap'
 import { Icon } from '@/components/Icon'
 import {
@@ -961,6 +994,7 @@ import {
   uploadCameraSnapshot,
   getCameraPresetListByChannel,
   createCameraPreset,
+  updateCameraPreset,
   deleteCameraPreset,
   getCameraCruiseListByChannel,
   createCameraCruise,
@@ -968,7 +1002,10 @@ import {
   deleteCameraCruise,
   getCameraCruise,
   startCameraCruise,
-  stopCameraCruise
+  stopCameraCruise,
+  syncCruiseToDevice,
+  startDeviceCruise,
+  stopDeviceCruise
 } from '@/api/iot/video'
 import type {
   CameraRecordingRespVO,
@@ -984,7 +1021,7 @@ import * as FloorDxfApi from '@/api/iot/spatial/floorDxf'
 import { DeviceApi } from '@/api/iot/device/device'
 import { getChannelPage } from '@/api/iot/channel'
 import { getLivePlayUrl, stopStream } from '@/api/iot/video/zlm'
-import { nvrPtzControl } from '@/api/iot/video/nvr'
+import { nvrPtzControl, nvrPresetControl } from '@/api/iot/video/nvr'
 import mpegts from 'mpegts.js'
 import {
   getPatrolPlanPage,
@@ -1435,6 +1472,12 @@ const playChannelInPane = async (channelData: any, paneIndex?: number) => {
         `[实时预览] ✅ 窗口 ${idx + 1} 播放成功 [${mode}]: ${channel.channelName || channel.name}`
       )
       ElMessage.success(`正在播放: ${channel.channelName || channel.name}`)
+
+      // 如果当前窗口是活动窗口且支持云台，自动加载预设点
+      if (idx === activePane.value && (channel.ptzSupport === true || channel.ptzSupport === 1 || channel.ptzSupport === '1')) {
+        console.log(`[预设点] 播放成功后自动加载预设点，channelId: ${channelId}`)
+        loadPresetList(channelId)
+      }
     } else {
       throw new Error('播放失败')
     }
@@ -2791,20 +2834,29 @@ const cleanupAllPlayers = () => {
 watch([activePane, leftPanelActive], async ([paneIndex, panelNames]) => {
   const pane = panes.value[paneIndex]
 
+  console.log(`[预设点 Watch] paneIndex: ${paneIndex}, panelNames:`, panelNames, 
+    'pane.channel:', pane?.channel ? { id: pane.channel.id, channelNo: pane.channel.channelNo, channelName: pane.channel.channelName } : null,
+    'supportsPtz:', activePaneSupportsPtz.value)
+
   // 当活动窗口有通道且支持云台时，自动加载预设点
   if (pane && pane.channel && activePaneSupportsPtz.value) {
-    // 如果是云台面板展开，或者切换了窗口
+    const currentChannelId = pane.channel.id
+    // 如果是云台面板展开，或者预设点列表为空，或者通道已切换
     const isPtzPanelOpen = Array.isArray(panelNames)
       ? panelNames.includes('ptz')
       : panelNames === 'ptz'
-    if (isPtzPanelOpen || presetList.value.length === 0) {
-      console.log(`[预设点] 自动加载通道 ${pane.channel.id} 的预设点列表`)
-      await loadPresetList(pane.channel.id)
+    const channelChanged = presetListChannelId.value !== currentChannelId
+    console.log(`[预设点 Watch] currentChannelId: ${currentChannelId}, isPtzPanelOpen: ${isPtzPanelOpen}, channelChanged: ${channelChanged}, presetListChannelId: ${presetListChannelId.value}`)
+    if (isPtzPanelOpen || presetList.value.length === 0 || channelChanged) {
+      console.log(`[预设点] 自动加载通道 ${currentChannelId} 的预设点列表${channelChanged ? '（通道已切换）' : ''}`)
+      await loadPresetList(currentChannelId)
     }
   } else {
     // 如果窗口不支持云台，清空预设点列表
+    console.log(`[预设点 Watch] 不满足加载条件，清空列表`)
     presetList.value = []
     cruiseList.value = []
+    presetListChannelId.value = null
   }
 })
 
@@ -3158,7 +3210,10 @@ const handleGroupContextMenu = async (event: MouseEvent, data: any) => {
 const ptzStep = ref(5)
 const presetPointName = ref('') // 预设点名称
 const presetList = ref<CameraPresetRespVO[]>([]) // 预设点列表
+const presetListChannelId = ref<number | null>(null) // 当前预设点列表对应的通道ID
 const selectedPresetNo = ref<number | null>(null) // 当前选中的预设点编号
+const editingPresetId = ref<number | null>(null) // 正在编辑的预设点ID
+const editingPresetNo = ref<number | null>(null) // 正在编辑的预设点编号
 
 // 巡航相关数据
 const cruiseList = ref<CameraCruiseRespVO[]>([])
@@ -3200,17 +3255,21 @@ const loadPresetList = async (channelId: number) => {
     // 先清空列表
     presetList.value = []
     cruiseList.value = []
+    presetListChannelId.value = channelId
+
+    console.log(`[预设点] 开始加载，channelId: ${channelId}`)
 
     // 加载预设点列表
     const data = await getCameraPresetListByChannel(channelId)
     presetList.value = data
-    console.log(`[预设点] 加载了 ${data.length} 个预设点`)
+    console.log(`[预设点] 加载了 ${data.length} 个预设点，通道ID: ${channelId}`, data)
 
     // 同时加载巡航列表
     await loadCruiseList(channelId)
   } catch (error) {
-    console.error('[预设点] 加载失败:', error)
+    console.error('[预设点] 加载失败，channelId:', channelId, error)
     presetList.value = []
+    presetListChannelId.value = null
   }
 }
 
@@ -3320,10 +3379,10 @@ const handleSaveCruise = async () => {
 
     if (cruiseForm.id) {
       await updateCameraCruise(cruiseForm)
-      ElMessage.success('更新巡航路线成功')
+      ElMessage.success('巡航路线已保存并同步到设备')
     } else {
       await createCameraCruise(cruiseForm)
-      ElMessage.success('创建巡航路线成功')
+      ElMessage.success('巡航路线已创建并同步到设备')
     }
 
     showCruiseDialog.value = false
@@ -3331,6 +3390,19 @@ const handleSaveCruise = async () => {
   } catch (error: any) {
     console.error('[巡航] 保存失败:', error)
     ElMessage.error('保存巡航路线失败：' + (error?.message || error))
+  }
+}
+
+/**
+ * 同步巡航到设备
+ */
+const handleSyncCruiseToDevice = async (cruiseId: number) => {
+  try {
+    await syncCruiseToDevice(cruiseId, 1) // 默认同步到巡航组1
+    ElMessage.success('巡航路线已同步到设备')
+  } catch (error: any) {
+    console.error('[巡航] 同步到设备失败:', error)
+    ElMessage.error('同步到设备失败：' + (error?.message || error))
   }
 }
 
@@ -3684,12 +3756,12 @@ const handleAddPreset = async () => {
 
   try {
     const channel = pane.channel
-    await ensureRpcLogin(channel)
-
-    const RPC = (window as any).RPC
-    const targetChannelNo = channel.targetChannelNo || channel.target_channel_no
-    const channelNo =
-      targetChannelNo !== undefined ? Number(targetChannelNo) : Number(channel.channelNo || 0)
+    const nvrId = channel.deviceId || channel.nvrId
+    if (!nvrId) {
+      ElMessage.error('无法获取 NVR 设备ID')
+      return
+    }
+    const channelNo = channel.channelNo ?? 0
 
     // 自动分配编号：找到第一个未使用的编号
     let newNo = 1
@@ -3703,19 +3775,16 @@ const handleAddPreset = async () => {
 
     const presetName = presetPointName.value.trim() || `预设点${newNo}`
 
-    console.log(`[预设点] 添加预设点 ${newNo}，通道: ${channelNo}，名称: ${presetName}`)
+    console.log(`[预设点] 添加预设点 ${newNo}，通道号: ${channelNo}，通道ID: ${pane.channel.id}，名称: ${presetName}，NVR: ${nvrId}`)
+    console.log(`[预设点] 当前预设点列表:`, presetList.value)
+    console.log(`[预设点] 已用编号:`, usedNos)
 
-    // 设置预设点（设备会自动保存当前的 Pan、Tilt、Zoom 位置）
-    const setResult = await RPC.PTZManager('start', channelNo, {
-      code: 'SetPreset',
-      arg1: newNo,
-      arg2: 0,
-      arg3: 0
+    // 通过后端 API 设置预设点（设备会自动保存当前的 Pan、Tilt、Zoom 位置）
+    await nvrPresetControl(nvrId, {
+      channelNo: channelNo,
+      presetNo: newNo,
+      action: 'SET'
     })
-
-    if (!setResult || setResult.result === false) {
-      throw new Error(setResult?.error?.message || '设置预设点失败')
-    }
 
     // 保存到数据库（PTZ 位置由设备自动保存，数据库仅记录预设点编号和名称）
     await createCameraPreset({
@@ -3760,21 +3829,20 @@ const handleDeletePreset = async (presetId: number) => {
     })
 
     const channel = pane.channel
-    await ensureRpcLogin(channel)
+    const nvrId = channel.deviceId || channel.nvrId
+    if (!nvrId) {
+      ElMessage.error('无法获取 NVR 设备ID')
+      return
+    }
+    const channelNo = channel.channelNo ?? 0
 
-    const RPC = (window as any).RPC
-    const targetChannelNo = channel.targetChannelNo || channel.target_channel_no
-    const channelNo =
-      targetChannelNo !== undefined ? Number(targetChannelNo) : Number(channel.channelNo || 0)
+    console.log(`[预设点] 删除预设点 ${preset.presetNo}，通道: ${channelNo}，NVR: ${nvrId}`)
 
-    console.log(`[预设点] 删除预设点 ${preset.presetNo}，通道: ${channelNo}`)
-
-    // 清除预设点
-    await RPC.PTZManager('start', channelNo, {
-      code: 'ClearPreset',
-      arg1: preset.presetNo,
-      arg2: 0,
-      arg3: 0
+    // 通过后端 API 清除预设点
+    await nvrPresetControl(nvrId, {
+      channelNo: channelNo,
+      presetNo: preset.presetNo,
+      action: 'CLEAR'
     })
 
     // 从数据库删除
@@ -3798,6 +3866,85 @@ const handleDeletePreset = async (presetId: number) => {
 }
 
 /**
+ * 编辑预设点名称
+ */
+const handleEditPreset = (preset: CameraPresetRespVO) => {
+  editingPresetId.value = preset.id
+  editingPresetNo.value = preset.presetNo
+  presetPointName.value = preset.presetName || ''
+}
+
+/**
+ * 取消编辑预设点
+ */
+const cancelEditPreset = () => {
+  editingPresetId.value = null
+  editingPresetNo.value = null
+  presetPointName.value = ''
+}
+
+/**
+ * 更新预设点名称
+ */
+const handleUpdatePresetName = async () => {
+  const pane = panes.value[activePane.value]
+  if (!pane || !pane.channel) {
+    ElMessage.warning('请先选择一个窗口')
+    return
+  }
+
+  if (!editingPresetId.value || !editingPresetNo.value) {
+    ElMessage.warning('请先选择要编辑的预设点')
+    return
+  }
+
+  const newName = presetPointName.value.trim()
+  if (!newName) {
+    ElMessage.warning('请输入预设点名称')
+    return
+  }
+
+  try {
+    const channel = pane.channel
+    const nvrId = channel.deviceId || channel.nvrId
+    if (!nvrId) {
+      ElMessage.error('无法获取 NVR 设备ID')
+      return
+    }
+    const channelNo = channel.channelNo ?? 0
+
+    console.log(`[预设点] 更新预设点名称: id=${editingPresetId.value}, no=${editingPresetNo.value}, name=${newName}`)
+
+    // 通过后端 API 更新预设点（包括同步到设备）
+    await nvrPresetControl(nvrId, {
+      channelNo: channelNo,
+      presetNo: editingPresetNo.value,
+      presetName: newName,
+      action: 'SET'
+    })
+
+    // 更新数据库中的名称
+    await updateCameraPreset({
+      id: editingPresetId.value,
+      channelId: channel.id,
+      presetNo: editingPresetNo.value,
+      presetName: newName
+    })
+
+    // 重新加载预设点列表
+    await loadPresetList(channel.id)
+
+    // 清除编辑状态
+    cancelEditPreset()
+
+    ElMessage.success('预设点名称已更新')
+  } catch (error: any) {
+    console.error('[预设点] 更新名称失败:', error)
+    ElMessage.error('更新预设点名称失败：' + (error?.message || error))
+  }
+}
+
+/**
  * 选择预设点（从列表点击） - 自动转到该位置
  */
 const handleSelectPreset = async (preset: CameraPresetRespVO) => {
@@ -3811,26 +3958,22 @@ const handleSelectPreset = async (preset: CameraPresetRespVO) => {
     selectedPresetNo.value = preset.presetNo
 
     const channel = pane.channel
-    await ensureRpcLogin(channel)
-
-    const RPC = (window as any).RPC
-    const targetChannelNo = channel.targetChannelNo || channel.target_channel_no
-    const channelNo =
-      targetChannelNo !== undefined ? Number(targetChannelNo) : Number(channel.channelNo || 0)
-
-    console.log(`[预设点] 转到预设点 ${preset.presetNo} "${preset.presetName}"，通道: ${channelNo}`)
-
-    // 调用预设点
-    const gotoResult = await RPC.PTZManager('start', channelNo, {
-      code: 'GotoPreset',
-      arg1: preset.presetNo,
-      arg2: 0,
-      arg3: 0
-    })
-
-    if (!gotoResult || gotoResult.result === false) {
-      throw new Error(gotoResult?.error?.message || '转到预设点失败')
+    const nvrId = channel.deviceId || channel.nvrId
+    if (!nvrId) {
+      ElMessage.error('无法获取 NVR 设备ID')
+      selectedPresetNo.value = null
+      return
     }
+    const channelNo = channel.channelNo ?? 0
+
+    console.log(`[预设点] 转到预设点 ${preset.presetNo} "${preset.presetName}"，通道: ${channelNo}，NVR: ${nvrId}`)
+
+    // 通过后端 API 调用预设点
+    await nvrPresetControl(nvrId, {
+      channelNo: channelNo,
+      presetNo: preset.presetNo,
+      action: 'GOTO'
+    })
 
     ElMessage.success(`正在转到 "${preset.presetName}"`)
   } catch (error: any) {
@@ -5199,20 +5342,50 @@ const submitSaveView = async () => {
   white-space: nowrap;
 }
 
+.preset-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.preset-edit,
 .preset-delete {
-  font-size: 13px;
-  color: #7a9aba;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 14px;
+  border-radius: 3px;
   cursor: pointer;
-  opacity: 0;
   transition: all 0.2s;
 }
 
-.preset-item:hover .preset-delete {
-  opacity: 1;
+.preset-edit {
+  color: #409eff;
+  background: rgba(64, 158, 255, 0.15);
+}
+
+.preset-edit:hover {
+  color: #fff;
+  background: #409eff;
+}
+
+.preset-delete {
+  color: #f56c6c;
+  background: rgba(245, 108, 108, 0.15);
 }
 
 .preset-delete:hover {
-  color: #ff6b6b;
+  color: #fff;
+  background: #f56c6c;
+}
+
+.preset-item.editing {
+  background: rgba(103, 194, 58, 0.15);
+  border-left: 3px solid #67c23a;
 }
 
 /* 空状态 */

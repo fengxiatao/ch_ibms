@@ -310,10 +310,11 @@ public class DahuaIpcAdapter extends AbstractIpcAdapter {
     private static final int NET_PTZ_FOCUS_DEC_CONTROL = 7;    // 聚焦远
     private static final int NET_PTZ_APERTURE_ADD_CONTROL = 8; // 光圈扩大
     private static final int NET_PTZ_APERTURE_DEC_CONTROL = 9; // 光圈缩小
-    private static final int NET_PTZ_LEFTUP_CONTROL = 10;      // 左上
-    private static final int NET_PTZ_RIGHTUP_CONTROL = 11;     // 右上
-    private static final int NET_PTZ_LEFTDOWN_CONTROL = 12;    // 左下
-    private static final int NET_PTZ_RIGHTDOWN_CONTROL = 13;   // 右下
+    // 扩展方向控制命令（NET_EXTPTZ_ControlType，从 0x20 开始）
+    private static final int NET_EXTPTZ_LEFTTOP = 0x20;        // 左上 (32)
+    private static final int NET_EXTPTZ_RIGHTTOP = 0x21;       // 右上 (33)
+    private static final int NET_EXTPTZ_LEFTDOWN = 0x22;       // 左下 (34)
+    private static final int NET_EXTPTZ_RIGHTDOWN = 0x23;      // 右下 (35)
 
     /**
      * 转换 PTZ 命令字符串为 SDK 命令码
@@ -334,10 +335,10 @@ public class DahuaIpcAdapter extends AbstractIpcAdapter {
             case "FOCUS_FAR": return NET_PTZ_FOCUS_DEC_CONTROL;
             case "IRIS_OPEN": return NET_PTZ_APERTURE_ADD_CONTROL;
             case "IRIS_CLOSE": return NET_PTZ_APERTURE_DEC_CONTROL;
-            case "LEFT_UP": return NET_PTZ_LEFTUP_CONTROL;
-            case "RIGHT_UP": return NET_PTZ_RIGHTUP_CONTROL;
-            case "LEFT_DOWN": return NET_PTZ_LEFTDOWN_CONTROL;
-            case "RIGHT_DOWN": return NET_PTZ_RIGHTDOWN_CONTROL;
+            case "LEFT_UP": return NET_EXTPTZ_LEFTTOP;
+            case "RIGHT_UP": return NET_EXTPTZ_RIGHTTOP;
+            case "LEFT_DOWN": return NET_EXTPTZ_LEFTDOWN;
+            case "RIGHT_DOWN": return NET_EXTPTZ_RIGHTDOWN;
             default: return -1;
         }
     }

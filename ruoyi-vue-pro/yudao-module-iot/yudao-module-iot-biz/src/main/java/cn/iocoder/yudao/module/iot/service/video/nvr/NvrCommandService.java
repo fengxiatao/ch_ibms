@@ -161,6 +161,89 @@ public class NvrCommandService {
     }
 
     /**
+     * 发送预设点控制命令
+     * 
+     * <p>通过消息总线发送预设点控制命令到 NewGateway。</p>
+     * <p>支持的操作：GOTO（转到预设点）、SET（设置预设点）、CLEAR（删除预设点）</p>
+     * 
+     * @param deviceId  设备ID（NVR）
+     * @param channelNo 通道号
+     * @param presetNo  预设点编号（1-255）
+     * @param action    操作类型：GOTO, SET, CLEAR
+     * @return requestId 请求ID
+     */
+    public String presetControl(Long deviceId, int channelNo, int presetNo, String action) {
+        return presetControl(deviceId, channelNo, presetNo, action, null, null, null, null);
+    }
+
+    /**
+     * 发送预设点控制命令（支持直连 IPC）
+     * 
+     * <p>当指定 targetIp 时，gateway 会直接连接该 IP 的设备进行预设点控制。</p>
+     * 
+     * @param deviceId   设备ID（NVR）
+     * @param channelNo  通道号
+     * @param presetNo   预设点编号（1-255）
+     * @param action     操作类型：GOTO, SET, CLEAR
+     * @param targetIp   目标设备IP（如果指定，则直接连接该IP设备）
+     * @param username   目标设备用户名
+     * @param password   目标设备密码
+     * @return requestId 请求ID
+     */
+    public String presetControl(Long deviceId, int channelNo, int presetNo, String action,
+                                String targetIp, String username, String password) {
+        return presetControl(deviceId, channelNo, presetNo, action, targetIp, username, password, null);
+    }
+
+    /**
+     * 发送预设点控制命令（支持直连 IPC，支持预设点名称）
+     * 
+     * <p>当指定 targetIp 时，gateway 会直接连接该 IP 的设备进行预设点控制。</p>
+     * 
+     * @param deviceId    设备ID（NVR）
+     * @param channelNo   通道号
+     * @param presetNo    预设点编号（1-255）
+     * @param action      操作类型：GOTO, SET, CLEAR
+     * @param targetIp    目标设备IP（如果指定，则直接连接该IP设备）
+     * @param username    目标设备用户名
+     * @param password    目标设备密码
+     * @param presetName  预设点名称（SET操作时使用）
+     * @return requestId 请求ID
+     */
+    public String presetControl(Long deviceId, int channelNo, int presetNo, String action,
+                                String targetIp, String username, String password, String presetName) {
+        Map<String, Object> params = new HashMap<>();
+        params.put(NvrDeviceTypeConstants.PARAM_CHANNEL_NO, channelNo);
+        params.put("presetNo", presetNo);
+        params.put("presetAction", action);
+        
+        // 如果指定了预设点名称
+        if (presetName != null && !presetName.isEmpty()) {
+            params.put("presetName", presetName);
+        }
+        
+        // 如果指定了目标IP，则传递给gateway，让其直接连接该设备
+        if (targetIp != null && !targetIp.isEmpty()) {
+            params.put("targetIp", targetIp);
+            params.put("targetUsername", username != null ? username : "admin");
+            params.put("targetPassword", password != null ? password : "admin123");
+            log.info("{} 预设点控制将直连目标设备: targetIp={}", LOG_PREFIX, targetIp);
+        }
+
+        String requestId = deviceCommandPublisher.publishCommand(
+                NvrDeviceTypeConstants.NVR,
+                deviceId,
+                NvrDeviceTypeConstants.COMMAND_PTZ_CONTROL,
+                params
+        );
+
+        log.info("{} 预设点控制命令已发送: deviceId={}, channel={}, presetNo={}, action={}, presetName={}, targetIp={}, requestId={}",
+                LOG_PREFIX, deviceId, channelNo, presetNo, action, presetName, targetIp, requestId);
+
+        return requestId;
+    }
+
+    /**
      * 发送截图命令
      * 
      * <p>通过消息总线发送截图命令到 NewGateway。</p>
@@ -208,6 +291,126 @@ public class NvrCommandService {
 
         log.info("{} 获取能力集命令已发送: deviceId={}, requestId={}",
                 LOG_PREFIX, deviceId, requestId);
+
+        return requestId;
+    }
+
+    // ==================== 巡航控制命令 ====================
+
+    /**
+     * 同步巡航配置到设备
+     * 
+     * @param deviceId    设备ID
+     * @param channelNo   通道号
+     * @param tourNo      巡航组编号（1-8）
+     * @param tourName    巡航组名称
+     * @param presetNos   预设点编号列表
+     * @param dwellTimes  每个预设点的停留时间（秒）
+     * @param targetIp    目标设备IP
+     * @param username    用户名
+     * @param password    密码
+     * @return requestId 请求ID
+     */
+    public String syncTourToDevice(Long deviceId, int channelNo, int tourNo, String tourName,
+                                    java.util.List<Integer> presetNos, java.util.List<Integer> dwellTimes,
+                                    String targetIp, String username, String password) {
+        Map<String, Object> params = new HashMap<>();
+        params.put(NvrDeviceTypeConstants.PARAM_CHANNEL_NO, channelNo);
+        params.put("tourAction", "SYNC");
+        params.put("tourNo", tourNo);
+        params.put("tourName", tourName);
+        params.put("presetNos", presetNos);
+        params.put("dwellTimes", dwellTimes);
+        
+        if (targetIp != null && !targetIp.isEmpty()) {
+            params.put("targetIp", targetIp);
+            params.put("targetUsername", username != null ? username : "admin");
+            params.put("targetPassword", password != null ? password : "admin123");
+        }
+
+        String requestId = deviceCommandPublisher.publishCommand(
+                NvrDeviceTypeConstants.NVR,
+                deviceId,
+                "TOUR_CONTROL",
+                params
+        );
+
+        log.info("{} 同步巡航命令已发送: deviceId={}, channel={}, tourNo={}, tourName={}, presetCount={}, requestId={}",
+                LOG_PREFIX, deviceId, channelNo, tourNo, tourName, presetNos.size(), requestId);
+
+        return requestId;
+    }
+
+    /**
+     * 启动设备巡航
+     * 
+     * @param deviceId   设备ID
+     * @param channelNo  通道号
+     * @param tourNo     巡航组编号（1-8）
+     * @param targetIp   目标设备IP
+     * @param username   用户名
+     * @param password   密码
+     * @return requestId 请求ID
+     */
+    public String startDeviceTour(Long deviceId, int channelNo, int tourNo,
+                                   String targetIp, String username, String password) {
+        Map<String, Object> params = new HashMap<>();
+        params.put(NvrDeviceTypeConstants.PARAM_CHANNEL_NO, channelNo);
+        params.put("tourAction", "START");
+        params.put("tourNo", tourNo);
+        
+        if (targetIp != null && !targetIp.isEmpty()) {
+            params.put("targetIp", targetIp);
+            params.put("targetUsername", username != null ? username : "admin");
+            params.put("targetPassword", password != null ? password : "admin123");
+        }
+
+        String requestId = deviceCommandPublisher.publishCommand(
+                NvrDeviceTypeConstants.NVR,
+                deviceId,
+                "TOUR_CONTROL",
+                params
+        );
+
+        log.info("{} 启动设备巡航命令已发送: deviceId={}, channel={}, tourNo={}, requestId={}",
+                LOG_PREFIX, deviceId, channelNo, tourNo, requestId);
+
+        return requestId;
+    }
+
+    /**
+     * 停止设备巡航
+     * 
+     * @param deviceId   设备ID
+     * @param channelNo  通道号
+     * @param tourNo     巡航组编号（1-8）
+     * @param targetIp   目标设备IP
+     * @param username   用户名
+     * @param password   密码
+     * @return requestId 请求ID
+     */
+    public String stopDeviceTour(Long deviceId, int channelNo, int tourNo,
+                                  String targetIp, String username, String password) {
+        Map<String, Object> params = new HashMap<>();
+        params.put(NvrDeviceTypeConstants.PARAM_CHANNEL_NO, channelNo);
+        params.put("tourAction", "STOP");
+        params.put("tourNo", tourNo);
+        
+        if (targetIp != null && !targetIp.isEmpty()) {
+            params.put("targetIp", targetIp);
+            params.put("targetUsername", username != null ? username : "admin");
+            params.put("targetPassword", password != null ? password : "admin123");
+        }
+
+        String requestId = deviceCommandPublisher.publishCommand(
+                NvrDeviceTypeConstants.NVR,
+                deviceId,
+                "TOUR_CONTROL",
+                params
+        );
+
+        log.info("{} 停止设备巡航命令已发送: deviceId={}, channel={}, tourNo={}, requestId={}",
+                LOG_PREFIX, deviceId, channelNo, tourNo, requestId);
 
         return requestId;
     }

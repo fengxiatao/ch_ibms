@@ -140,13 +140,12 @@ logging:
   level:
     cn.iocoder.yudao.module.iot.newgateway: INFO
     cn.iocoder.yudao.module.iot.newgateway.core: INFO
-    # ====== 调试 Changhui 时：只显示 changhui 日志，其他插件静音 ======
-    cn.iocoder.yudao.module.iot.newgateway.plugins: WARN
-    cn.iocoder.yudao.module.iot.newgateway.plugins.changhui: DEBUG
-    # 其他插件日志关闭（调试 changhui 时减少干扰）
-    cn.iocoder.yudao.module.iot.newgateway.plugins.alarm: WARN
-    cn.iocoder.yudao.module.iot.newgateway.plugins.nvr: WARN
-    cn.iocoder.yudao.module.iot.newgateway.plugins.access: WARN
+    # ====== 调试 NVR 预设点问题：启用 NVR 插件日志 ======
+    cn.iocoder.yudao.module.iot.newgateway.plugins: INFO
+    cn.iocoder.yudao.module.iot.newgateway.plugins.changhui: INFO
+    cn.iocoder.yudao.module.iot.newgateway.plugins.alarm: INFO
+    cn.iocoder.yudao.module.iot.newgateway.plugins.nvr: DEBUG
+    cn.iocoder.yudao.module.iot.newgateway.plugins.access: INFO
     # 重要：命令消费者日志必须开启，否则看不到命令处理日志！
     cn.iocoder.yudao.module.iot.newgateway.consumer: INFO
     # 消息总线和 Core 模块日志（用于调试命令传递问题）

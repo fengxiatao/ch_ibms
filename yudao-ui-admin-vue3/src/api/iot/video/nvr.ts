@@ -69,6 +69,20 @@ export const nvrPtzControl = (nvrId: number, data: NvrPtzControlReq) => {
   return request.post<string>({ url: `/iot/video/nvr/${nvrId}/ptz/control`, data })
 }
 
+/**
+ * 预设点控制
+ * 支持的操作：GOTO（转到预设点）、SET（设置预设点）、CLEAR（删除预设点）
+ */
+export interface NvrPresetControlReq {
+  channelNo: number    // 通道号
+  presetNo: number     // 预设点编号（1-255）
+  action: string       // 操作：GOTO, SET, CLEAR
+}
+
+export const nvrPresetControl = (nvrId: number, data: NvrPresetControlReq) => {
+  return request.post<string>({ url: `/iot/video/nvr/${nvrId}/ptz/preset`, data })
+}
+
 // 云台控制：旧的网关直接调用接口（已废弃，保留兼容）
 export interface PtzControlReq {
   ip: string

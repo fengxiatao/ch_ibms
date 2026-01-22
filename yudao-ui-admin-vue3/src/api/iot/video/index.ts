@@ -128,14 +128,29 @@ export const getCameraCruiseListByChannel = (channelId: number) => {
   return request.get<CameraCruiseRespVO[]>({ url: '/iot/camera/cruise/list-by-channel?channelId=' + channelId })
 }
 
-// 启动巡航
+// 启动巡航（软件模拟）
 export const startCameraCruise = (id: number) => {
   return request.post({ url: '/iot/camera/cruise/start?id=' + id })
 }
 
-// 停止巡航
+// 停止巡航（软件模拟）
 export const stopCameraCruise = (id: number) => {
   return request.post({ url: '/iot/camera/cruise/stop?id=' + id })
+}
+
+// 同步巡航线路到设备（大华设备巡航组）
+export const syncCruiseToDevice = (id: number, tourNo?: number) => {
+  return request.post({ url: '/iot/camera/cruise/sync-to-device', data: { id, tourNo: tourNo || 1 } })
+}
+
+// 启动设备巡航（使用设备内置巡航组）
+export const startDeviceCruise = (id: number, tourNo?: number) => {
+  return request.post({ url: '/iot/camera/cruise/start-device-cruise', data: { id, tourNo: tourNo || 1 } })
+}
+
+// 停止设备巡航
+export const stopDeviceCruise = (id: number, tourNo?: number) => {
+  return request.post({ url: '/iot/camera/cruise/stop-device-cruise', data: { id, tourNo: tourNo || 1 } })
 }
 
 /**

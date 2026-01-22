@@ -336,6 +336,8 @@ public class NvrPlugin implements ActiveDeviceHandler {
             switch (mappedCommandType) {
                 case CMD_PTZ_CONTROL:
                     return executePtzControl(deviceId, command);
+                case "TOUR_CONTROL":
+                    return executeTourControl(deviceId, command);
                 case CMD_START_PLAYBACK:
                     return executeStartPlayback(deviceId, command);
                 case CMD_STOP_PLAYBACK:
@@ -685,56 +687,169 @@ public class NvrPlugin implements ActiveDeviceHandler {
         String targetIp = command.getParam("targetIp");
         String targetUsername = command.getParam("targetUsername");
         String targetPassword = command.getParam("targetPassword");
+        // 预设点参数
+        Integer presetNo = command.getParam("presetNo");
+        String presetAction = command.getParam("presetAction");
+        String presetName = command.getParam("presetName");
 
         if (channelNo == null) {
             channelNo = 0;
-        }
-        if (ptzCommand == null || ptzCommand.isEmpty()) {
-            return CommandResult.failure("缺少 ptzCommand 参数");
         }
         if (speed == null) {
             speed = 4;
         }
 
-        log.info("{} 执行PTZ控制: deviceId={}, channel={}, cmd={}, speed={}, targetIp={}", 
-                LOG_PREFIX, deviceId, channelNo, ptzCommand, speed, targetIp);
+        // 判断是否为预设点操作
+        boolean isPresetOperation = presetAction != null && !presetAction.isEmpty() && presetNo != null;
+        
+        if (!isPresetOperation && (ptzCommand == null || ptzCommand.isEmpty())) {
+            return CommandResult.failure("缺少 ptzCommand 或 presetAction 参数");
+        }
+
+        log.info("{} 执行PTZ控制: deviceId={}, channel={}, cmd={}, speed={}, targetIp={}, presetNo={}, presetAction={}", 
+                LOG_PREFIX, deviceId, channelNo, ptzCommand, speed, targetIp, presetNo, presetAction);
 
         try {
             NvrOperationResult sdkResult;
             
-            // 如果指定了 targetIp，则直接连接该设备进行 PTZ 控制
+            // 如果指定了 targetIp，则直接连接该设备进行控制
             if (targetIp != null && !targetIp.isEmpty()) {
-                log.info("{} 直连IPC进行PTZ控制: ip={}, channel={}, cmd={}", 
-                        LOG_PREFIX, targetIp, channelNo, ptzCommand);
-                sdkResult = sdkWrapper.ptzControlDirect(
-                        targetIp, 
-                        targetUsername != null ? targetUsername : "admin",
-                        targetPassword != null ? targetPassword : "admin123",
-                        channelNo, 
-                        ptzCommand, 
-                        speed
-                );
+                String username = targetUsername != null ? targetUsername : "admin";
+                String password = targetPassword != null ? targetPassword : "admin123";
+                
+                if (isPresetOperation) {
+                    // 预设点控制（直连 IPC）
+                    log.info("{} 直连IPC进行预设点控制: ip={}, channel={}, presetNo={}, action={}, name={}", 
+                            LOG_PREFIX, targetIp, channelNo, presetNo, presetAction, presetName);
+                    sdkResult = sdkWrapper.presetControlDirect(targetIp, username, password, 
+                            channelNo, presetNo, presetAction, presetName);
+                } else {
+                    // PTZ 方向控制（直连 IPC）
+                    log.info("{} 直连IPC进行PTZ控制: ip={}, channel={}, cmd={}", 
+                            LOG_PREFIX, targetIp, channelNo, ptzCommand);
+                    sdkResult = sdkWrapper.ptzControlDirect(targetIp, username, password, 
+                            channelNo, ptzCommand, speed);
+                }
             } else {
                 // 通过 NVR 控制
                 Long loginHandle = connectionManager.getLoginHandle(deviceId);
                 if (loginHandle == null || loginHandle <= 0) {
                     return CommandResult.failure("设备未连接");
                 }
-                sdkResult = sdkWrapper.ptzControl(loginHandle, channelNo, ptzCommand, speed);
+                
+                if (isPresetOperation) {
+                    // 预设点控制
+                    sdkResult = sdkWrapper.presetControl(loginHandle, channelNo, presetNo, presetAction);
+                } else {
+                    // PTZ 方向控制
+                    sdkResult = sdkWrapper.ptzControl(loginHandle, channelNo, ptzCommand, speed);
+                }
             }
             
             if (sdkResult.isSuccess()) {
-                return CommandResult.success(Map.of(
-                        "message", "PTZ控制成功",
-                        "channelNo", channelNo,
-                        "ptzCommand", ptzCommand
-                ));
+                Map<String, Object> resultData = new java.util.HashMap<>();
+                resultData.put("message", isPresetOperation ? "预设点控制成功" : "PTZ控制成功");
+                resultData.put("channelNo", channelNo);
+                if (isPresetOperation) {
+                    resultData.put("presetNo", presetNo);
+                    resultData.put("presetAction", presetAction);
+                } else {
+                    resultData.put("ptzCommand", ptzCommand);
+                }
+                return CommandResult.success(resultData);
             } else {
-                return CommandResult.failure("PTZ控制失败: " + sdkResult.getMessage());
+                return CommandResult.failure((isPresetOperation ? "预设点" : "PTZ") + "控制失败: " + sdkResult.getMessage());
             }
         } catch (Exception e) {
             log.error("{} PTZ控制异常: deviceId={}", LOG_PREFIX, deviceId, e);
             return CommandResult.failure("PTZ控制异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 执行巡航控制命令
+     * 
+     * <p>支持的操作：</p>
+     * <ul>
+     *     <li>SYNC - 同步巡航配置到设备</li>
+     *     <li>START - 启动设备巡航</li>
+     *     <li>STOP - 停止设备巡航</li>
+     * </ul>
+     */
+    @SuppressWarnings("unchecked")
+    private CommandResult executeTourControl(Long deviceId, DeviceCommand command) {
+        Integer channelNo = command.getParam("channelNo");
+        String tourAction = command.getParam("tourAction");
+        Integer tourNo = command.getParam("tourNo");
+        String tourName = command.getParam("tourName");
+        String targetIp = command.getParam("targetIp");
+        String targetUsername = command.getParam("targetUsername");
+        String targetPassword = command.getParam("targetPassword");
+        
+        if (channelNo == null) {
+            channelNo = 1;
+        }
+        if (tourNo == null) {
+            tourNo = 1;
+        }
+        if (tourAction == null || tourAction.isEmpty()) {
+            return CommandResult.failure("缺少 tourAction 参数");
+        }
+
+        log.info("{} 执行巡航控制: deviceId={}, channel={}, tourNo={}, tourName={}, action={}, targetIp={}", 
+                LOG_PREFIX, deviceId, channelNo, tourNo, tourName, tourAction, targetIp);
+
+        try {
+            NvrOperationResult sdkResult;
+            String username = targetUsername != null ? targetUsername : "admin";
+            String password = targetPassword != null ? targetPassword : "admin123";
+            
+            if (targetIp == null || targetIp.isEmpty()) {
+                return CommandResult.failure("巡航控制需要指定 targetIp");
+            }
+
+            switch (tourAction.toUpperCase()) {
+                case "SYNC":
+                    // 获取预设点列表和停留时间
+                    java.util.List<Integer> presetNos = command.getParam("presetNos");
+                    java.util.List<Integer> dwellTimes = command.getParam("dwellTimes");
+                    if (presetNos == null || presetNos.isEmpty()) {
+                        return CommandResult.failure("同步巡航需要 presetNos 参数");
+                    }
+                    log.info("{} 同步巡航到设备: ip={}, tourNo={}, tourName={}, presetCount={}, dwellTimes={}", 
+                            LOG_PREFIX, targetIp, tourNo, tourName, presetNos.size(), dwellTimes);
+                    sdkResult = sdkWrapper.syncTourToDeviceDirect(targetIp, username, password, channelNo, 
+                            tourNo, tourName, presetNos, dwellTimes);
+                    break;
+                    
+                case "START":
+                    log.info("{} 启动设备巡航: ip={}, tourNo={}", LOG_PREFIX, targetIp, tourNo);
+                    sdkResult = sdkWrapper.startTourDirect(targetIp, username, password, channelNo, tourNo);
+                    break;
+                    
+                case "STOP":
+                    log.info("{} 停止设备巡航: ip={}, tourNo={}", LOG_PREFIX, targetIp, tourNo);
+                    sdkResult = sdkWrapper.stopTourDirect(targetIp, username, password, channelNo, tourNo);
+                    break;
+                    
+                default:
+                    return CommandResult.failure("不支持的巡航操作: " + tourAction);
+            }
+            
+            if (sdkResult.isSuccess()) {
+                Map<String, Object> resultData = new java.util.HashMap<>();
+                resultData.put("tourAction", tourAction);
+                resultData.put("tourNo", tourNo);
+                resultData.put("tourName", tourName);
+                resultData.put("channelNo", channelNo);
+                resultData.put("message", sdkResult.getMessage());
+                return CommandResult.success(resultData);
+            } else {
+                return CommandResult.failure("巡航控制失败: " + sdkResult.getMessage());
+            }
+        } catch (Exception e) {
+            log.error("{} 巡航控制异常: deviceId={}", LOG_PREFIX, deviceId, e);
+            return CommandResult.failure("巡航控制异常: " + e.getMessage());
         }
     }
 

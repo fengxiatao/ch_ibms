@@ -381,17 +381,27 @@ public class NvrController {
     @Operation(summary = "NVR通道云台控制（命令模式）", description = "支持 UP/DOWN/LEFT/RIGHT/ZOOM_IN/ZOOM_OUT 等直接命令")
     @PreAuthorize("@ss.hasPermission('iot:camera:query')")
     public CommonResult<String> ptzControl(@PathVariable("id") Long nvrId, @RequestBody PtzControlReq req) {
-        // 查找通道信息，获取 target_channel_no 和 target_ip
+        // 查找通道信息，获取 target_channel_no、target_ip 和认证信息
         Integer targetChannelNo = req.getChannelNo();
         String targetIp = null;
+        String targetUsername = "admin";      // 默认用户名
+        String targetPassword = "admin123";   // 默认密码
+        
         IotDeviceChannelDO channel = channelService.getChannelByDeviceIdAndChannelNo(nvrId, req.getChannelNo());
         if (channel != null) {
             if (channel.getTargetChannelNo() != null) {
                 targetChannelNo = channel.getTargetChannelNo();
             }
             targetIp = channel.getTargetIp();
-            log.info("[PTZ控制] 映射通道: nvrChannelNo={} -> targetChannelNo={}, targetIp={}", 
-                    req.getChannelNo(), targetChannelNo, targetIp);
+            // 从通道表读取用户名密码，如果没有则使用默认值
+            if (StringUtils.isNotBlank(channel.getUsername())) {
+                targetUsername = channel.getUsername();
+            }
+            if (StringUtils.isNotBlank(channel.getPassword())) {
+                targetPassword = channel.getPassword();
+            }
+            log.info("[PTZ控制] 映射通道: nvrChannelNo={} -> targetChannelNo={}, targetIp={}, username={}", 
+                    req.getChannelNo(), targetChannelNo, targetIp, targetUsername);
         }
         
         log.info("[PTZ控制] nvrId={}, nvrChannelNo={}, targetChannelNo={}, targetIp={}, command={}, stop={}, speed={}",
@@ -404,9 +414,54 @@ public class NvrController {
                 req.getCommand(),
                 req.getSpeed() != null ? req.getSpeed() : 4,
                 Boolean.TRUE.equals(req.getStop()),
-                targetIp,       // 传递目标IP，让gateway直接连接
-                "admin",        // 默认用户名
-                "admin123"      // 默认密码
+                targetIp,           // 传递目标IP，让gateway直接连接
+                targetUsername,     // 从通道表读取的用户名
+                targetPassword      // 从通道表读取的密码
+        );
+        
+        return success(requestId);
+    }
+
+    @PostMapping("/{id}/ptz/preset")
+    @Operation(summary = "NVR通道预设点控制", description = "支持转到预设点(GOTO)、设置预设点(SET)、删除预设点(CLEAR)")
+    @PreAuthorize("@ss.hasPermission('iot:camera:query')")
+    public CommonResult<String> presetControl(@PathVariable("id") Long nvrId, @RequestBody PresetControlReq req) {
+        // 查找通道信息，获取 target_channel_no、target_ip 和认证信息
+        Integer targetChannelNo = req.getChannelNo();
+        String targetIp = null;
+        String targetUsername = "admin";      // 默认用户名
+        String targetPassword = "admin123";   // 默认密码
+        
+        IotDeviceChannelDO channel = channelService.getChannelByDeviceIdAndChannelNo(nvrId, req.getChannelNo());
+        if (channel != null) {
+            if (channel.getTargetChannelNo() != null) {
+                targetChannelNo = channel.getTargetChannelNo();
+            }
+            targetIp = channel.getTargetIp();
+            // 从通道表读取用户名密码，如果没有则使用默认值
+            if (StringUtils.isNotBlank(channel.getUsername())) {
+                targetUsername = channel.getUsername();
+            }
+            if (StringUtils.isNotBlank(channel.getPassword())) {
+                targetPassword = channel.getPassword();
+            }
+            log.info("[预设点控制] 映射通道: nvrChannelNo={} -> targetChannelNo={}, targetIp={}, username={}", 
+                    req.getChannelNo(), targetChannelNo, targetIp, targetUsername);
+        }
+        
+        log.info("[预设点控制] nvrId={}, nvrChannelNo={}, targetChannelNo={}, targetIp={}, presetNo={}, action={}, name={}",
+                nvrId, req.getChannelNo(), targetChannelNo, targetIp, req.getPresetNo(), req.getAction(), req.getPresetName());
+        
+        // 发送预设点控制命令
+        String requestId = nvrCommandService.presetControl(
+                nvrId,
+                targetChannelNo,
+                req.getPresetNo(),
+                req.getAction(),
+                targetIp,           // 传递目标IP，让gateway直接连接
+                targetUsername,     // 从通道表读取的用户名
+                targetPassword,     // 从通道表读取的密码
+                req.getPresetName() // 预设点名称
         );
         
         return success(requestId);
@@ -580,6 +635,26 @@ public class NvrController {
         public void setSpeed(Integer speed) { this.speed = speed; }
         public Boolean getStop() { return stop; }
         public void setStop(Boolean stop) { this.stop = stop; }
+    }
+
+    /**
+     * 预设点控制请求
+     * 支持的操作：GOTO（转到预设点）、SET（设置预设点）、CLEAR（删除预设点）
+     */
+    public static class PresetControlReq {
+        private Integer channelNo;   // 通道号
+        private Integer presetNo;    // 预设点编号（1-255）
+        private String action;       // 操作：GOTO, SET, CLEAR
+        private String presetName;   // 预设点名称（SET操作时使用）
+        
+        public Integer getChannelNo() { return channelNo; }
+        public void setChannelNo(Integer channelNo) { this.channelNo = channelNo; }
+        public Integer getPresetNo() { return presetNo; }
+        public void setPresetNo(Integer presetNo) { this.presetNo = presetNo; }
+        public String getAction() { return action; }
+        public void setAction(String action) { this.action = action; }
+        public String getPresetName() { return presetName; }
+        public void setPresetName(String presetName) { this.presetName = presetName; }
     }
 
     /**

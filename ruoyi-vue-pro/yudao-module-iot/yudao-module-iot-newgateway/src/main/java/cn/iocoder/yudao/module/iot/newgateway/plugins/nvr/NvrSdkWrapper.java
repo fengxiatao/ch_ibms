@@ -6,6 +6,7 @@ import com.netsdk.lib.NetSDKLib;
 import com.netsdk.lib.NetSDKLib.*;
 import com.netsdk.lib.ToolKits;
 import com.sun.jna.Pointer;
+import com.sun.jna.ptr.IntByReference;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -13,6 +14,13 @@ import org.springframework.util.StringUtils;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.Authenticator;
+import java.net.HttpURLConnection;
+import java.net.PasswordAuthentication;
+import java.net.URL;
+import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -297,10 +305,22 @@ public class NvrSdkWrapper {
     private static final int NET_PTZ_FOCUS_DEC_CONTROL = 7;    // 聚焦远
     private static final int NET_PTZ_APERTURE_ADD_CONTROL = 8; // 光圈扩大
     private static final int NET_PTZ_APERTURE_DEC_CONTROL = 9; // 光圈缩小
-    private static final int NET_PTZ_LEFTUP_CONTROL = 10;      // 左上
-    private static final int NET_PTZ_RIGHTUP_CONTROL = 11;     // 右上
-    private static final int NET_PTZ_LEFTDOWN_CONTROL = 12;    // 左下
-    private static final int NET_PTZ_RIGHTDOWN_CONTROL = 13;   // 右下
+    // 扩展方向控制命令（NET_EXTPTZ_ControlType，从 0x20 开始）
+    private static final int NET_EXTPTZ_LEFTTOP = 0x20;        // 左上 (32)
+    private static final int NET_EXTPTZ_RIGHTTOP = 0x21;       // 右上 (33)
+    private static final int NET_EXTPTZ_LEFTDOWN = 0x22;       // 左下 (34)
+    private static final int NET_EXTPTZ_RIGHTDOWN = 0x23;      // 右下 (35)
+    // 预设点控制命令（NET_PTZ_ControlType）- 标准命令
+    private static final int NET_PTZ_POINT_MOVE_CONTROL = 10;  // 转到预设点
+    private static final int NET_PTZ_POINT_SET_CONTROL = 11;   // 设置预设点
+    private static final int NET_PTZ_POINT_DEL_CONTROL = 12;   // 删除预设点
+    
+    // 预设点控制命令（NET_EXTPTZ_ControlType）- 扩展命令（某些设备需要使用）
+    // NET_EXTPTZ_GOTOPRESET = 0x48 = 72 (需要使用结构体 PTZ_CONTROL_GOTOPRESET)
+    private static final int NET_EXTPTZ_GOTOPRESET = 0x48;     // 扩展命令：转到预设点
+    
+    // 预设点配置命令（用于 CLIENT_GetNewDevConfig / CLIENT_SetNewDevConfig）
+    private static final String CFG_CMD_PTZ_PRESET = "PtzPreset";
 
     public NvrOperationResult ptzControl(long loginHandle, int channelNo, String ptzCommand, int speed) {
         if (loginHandle <= 0) {
@@ -328,15 +348,16 @@ public class NvrSdkWrapper {
             // 停止命令时速度参数必须为 0
             int actualSpeed = isStop ? 0 : speed;
             
-            // 调用大华 SDK 的 PTZ 控制接口（使用 sdkChannelNo，从 0 开始）
-            boolean result = getNetSdk().CLIENT_DHPTZControlEx(
+            // 调用大华 SDK 的 PTZ 控制接口（使用 CLIENT_DHPTZControlEx2，sdkChannelNo 从 0 开始）
+            boolean result = getNetSdk().CLIENT_DHPTZControlEx2(
                     new LLong(loginHandle),
                     sdkChannelNo,
                     dwPTZCommand,
                     actualSpeed,
                     actualSpeed,
                     0,
-                    isStop ? 1 : 0
+                    isStop ? 1 : 0,
+                    null  // param4: 简单操作传 null
             );
             
             if (result) {
@@ -404,18 +425,33 @@ public class NvrSdkWrapper {
             // 停止命令时速度参数必须为 0
             int actualSpeed = isStop ? 0 : speed;
             
-            log.debug("{} PTZ SDK调用: handle={}, channel={}, cmd={}, speed={}, stop={}", 
-                    LOG_PREFIX, loginHandle.longValue(), sdkChannelNo, dwPTZCommand, actualSpeed, isStop);
+            log.info("{} PTZ方向SDK调用参数: handle={}, sdkChannel={}, cmd={}, param1={}, param2={}, dwStop={}", 
+                    LOG_PREFIX, loginHandle.longValue(), sdkChannelNo, dwPTZCommand, actualSpeed, actualSpeed, isStop ? 1 : 0);
             
-            boolean result = getNetSdk().CLIENT_DHPTZControlEx(
-                    loginHandle,
-                    sdkChannelNo,
-                    dwPTZCommand,
-                    actualSpeed,
-                    actualSpeed,
-                    0,
-                    isStop ? 1 : 0
-            );
+            log.info("{} >>> 开始调用 CLIENT_DHPTZControlEx2 方向控制...", LOG_PREFIX);
+            boolean result;
+            try {
+                // 根据官方文档，使用 CLIENT_DHPTZControlEx2，param4 传 null
+                result = getNetSdk().CLIENT_DHPTZControlEx2(
+                        loginHandle,
+                        sdkChannelNo,
+                        dwPTZCommand,
+                        actualSpeed,
+                        actualSpeed,
+                        0,
+                        isStop ? 1 : 0,
+                        null  // param4: 简单操作传 null
+                );
+                log.info("{} <<< CLIENT_DHPTZControlEx2 方向控制完成, result={}", LOG_PREFIX, result);
+            } catch (Throwable t) {
+                log.error("{} !!! CLIENT_DHPTZControlEx2 方向控制抛出异常: {}", LOG_PREFIX, t.getMessage(), t);
+                throw t;
+            }
+            
+            // 获取 SDK 错误码用于调试
+            String sdkErrorInfo = ToolKits.getErrorCodePrint();
+            int lastError = getNetSdk().CLIENT_GetLastError();
+            log.info("{} PTZ方向SDK调用结果: result={}, lastError={}, errorInfo={}", LOG_PREFIX, result, lastError, sdkErrorInfo);
             
             if (result) {
                 log.info("{} 直连IPC PTZ控制成功: ip={}, channel={}, cmd={}", LOG_PREFIX, ip, channelNo, ptzCommand);
@@ -542,11 +578,903 @@ public class NvrSdkWrapper {
             case "FOCUS_FAR": case "FOCUSFAR": return NET_PTZ_FOCUS_DEC_CONTROL;
             case "IRIS_OPEN": case "IRISLARGE": return NET_PTZ_APERTURE_ADD_CONTROL;
             case "IRIS_CLOSE": case "IRISSMALL": return NET_PTZ_APERTURE_DEC_CONTROL;
-            case "LEFT_UP": case "LEFTUP": return NET_PTZ_LEFTUP_CONTROL;
-            case "RIGHT_UP": case "RIGHTUP": return NET_PTZ_RIGHTUP_CONTROL;
-            case "LEFT_DOWN": case "LEFTDOWN": return NET_PTZ_LEFTDOWN_CONTROL;
-            case "RIGHT_DOWN": case "RIGHTDOWN": return NET_PTZ_RIGHTDOWN_CONTROL;
+            case "LEFT_UP": case "LEFTUP": return NET_EXTPTZ_LEFTTOP;
+            case "RIGHT_UP": case "RIGHTUP": return NET_EXTPTZ_RIGHTTOP;
+            case "LEFT_DOWN": case "LEFTDOWN": return NET_EXTPTZ_LEFTDOWN;
+            case "RIGHT_DOWN": case "RIGHTDOWN": return NET_EXTPTZ_RIGHTDOWN;
             default: return -1;
+        }
+    }
+
+    // ==================== 预设点控制 ====================
+
+    /**
+     * 预设点控制（通过 NVR）
+     * 
+     * @param loginHandle 登录句柄
+     * @param channelNo   通道号（业务层从1开始）
+     * @param presetNo    预设点编号（1-255）
+     * @param action      动作：GOTO=转到, SET=设置, CLEAR=删除
+     * @return 操作结果
+     */
+    public NvrOperationResult presetControl(long loginHandle, int channelNo, int presetNo, String action) {
+        if (loginHandle <= 0) {
+            return NvrOperationResult.failure("无效的登录句柄");
+        }
+        
+        if (!sdkInitialized) {
+            return NvrOperationResult.failure("SDK 未初始化");
+        }
+
+        if (presetNo < 1 || presetNo > 255) {
+            return NvrOperationResult.failure("预设点编号必须在 1-255 之间");
+        }
+
+        try {
+            // 大华 SDK 通道号从 0 开始，业务层通道号从 1 开始
+            int sdkChannelNo = channelNo > 0 ? channelNo - 1 : 0;
+            
+            int ptzCommand = convertPresetAction(action);
+            if (ptzCommand < 0) {
+                return NvrOperationResult.failure("不支持的预设点操作: " + action);
+            }
+            
+            log.info("{} 预设点控制: handle={}, bizChannel={}, sdkChannel={}, presetNo={}, action={}", 
+                    LOG_PREFIX, loginHandle, channelNo, sdkChannelNo, presetNo, action);
+            
+            // 调用大华 SDK 的 PTZ 控制接口（使用 CLIENT_DHPTZControlEx2）
+            // 参照方向控制：param1=预设点编号，param2=速度(可选)，param3=0
+            boolean result = getNetSdk().CLIENT_DHPTZControlEx2(
+                    new LLong(loginHandle),
+                    sdkChannelNo,
+                    ptzCommand,
+                    presetNo,  // param1: 预设点编号
+                    4,         // param2: 速度参数（参照方向控制）
+                    0,         // param3: 未使用
+                    0,         // dwStop: 0=执行
+                    null       // param4: 简单操作传 null
+            );
+            
+            if (result) {
+                log.info("{} 预设点控制成功: channel={}, presetNo={}, action={}", 
+                        LOG_PREFIX, channelNo, presetNo, action);
+                return NvrOperationResult.success("预设点控制成功");
+            } else {
+                String errorMsg = ToolKits.getErrorCodePrint();
+                log.warn("{} 预设点控制失败: channel={}, presetNo={}, action={}, error={}", 
+                        LOG_PREFIX, channelNo, presetNo, action, errorMsg);
+                return NvrOperationResult.failure("预设点控制失败: " + errorMsg);
+            }
+            
+        } catch (Exception e) {
+            log.error("{} 预设点控制异常: channel={}, presetNo={}, action={}, error={}", 
+                    LOG_PREFIX, channelNo, presetNo, action, e.getMessage(), e);
+            return NvrOperationResult.failure("预设点控制异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 预设点控制（直连 IPC）
+     * 
+     * @param ip        IPC 设备 IP
+     * @param username  用户名
+     * @param password  密码
+     * @param channelNo 通道号
+     * @param presetNo  预设点编号（1-255）
+     * @param action    动作：GOTO=转到, SET=设置, CLEAR=删除
+     * @param presetName 预设点名称（SET操作时使用，可选）
+     * @return 操作结果
+     */
+    public NvrOperationResult presetControlDirect(String ip, String username, String password,
+                                                   int channelNo, int presetNo, String action, String presetName) {
+        if (!sdkInitialized) {
+            return NvrOperationResult.failure("SDK 未初始化");
+        }
+        
+        if (ip == null || ip.isEmpty()) {
+            return NvrOperationResult.failure("IP 地址不能为空");
+        }
+
+        if (presetNo < 1 || presetNo > 255) {
+            return NvrOperationResult.failure("预设点编号必须在 1-255 之间");
+        }
+
+        try {
+            log.info("{} 直连IPC预设点控制: ip={}, channel={}, presetNo={}, action={}", 
+                    LOG_PREFIX, ip, channelNo, presetNo, action);
+            
+            // 获取或创建 IPC 登录会话
+            LLong loginHandle = getOrCreateIpcSession(ip, username, password);
+            if (loginHandle == null || loginHandle.longValue() == 0) {
+                return NvrOperationResult.failure("IPC登录失败");
+            }
+            
+            int ptzCommand = convertPresetAction(action);
+            if (ptzCommand < 0) {
+                return NvrOperationResult.failure("不支持的预设点操作: " + action);
+            }
+            
+            // 直连 IPC 时，使用与方向控制相同的通道号（已验证可用）
+            // 双镜头球机：channelNo=2 -> sdkChannel=1（PTZ通道）
+            int sdkChannelNo = channelNo > 0 ? channelNo - 1 : 0;
+            log.info("{} 直连IPC预设点控制: sdkChannel={} (原始 channelNo={})", 
+                    LOG_PREFIX, sdkChannelNo, channelNo);
+            
+            // 根据官方示例，参数规范：
+            // GOTO (转到预设点): param1=presetIndex, param2=speed, param3=0, dwStop=0
+            // SET  (设置预设点): param1=presetIndex, param2=0, param3=0, dwStop=0
+            // DEL  (删除预设点): param1=presetIndex, param2=0, param3=0, dwStop=0
+            int param2 = (ptzCommand == NET_PTZ_POINT_MOVE_CONTROL) ? 4 : 0;  // 只有 GOTO 需要速度
+            
+            // 根据官方示例，预设点控制使用 CLIENT_DHPTZControlEx
+            // 参数顺序：handle, channel, command, param1, param2, param3, stop
+            // 预设点编号应该在 param2 位置！
+            // SET:  param1=0, param2=presetNo, param3=0, stop=0
+            // DEL:  param1=0, param2=presetNo, param3=0, stop=0
+            // GOTO: param1=0, param2=presetNo, param3=0, stop=0
+            boolean result = false;
+            
+            log.info("{} 预设点SDK调用参数(官方格式): handle={}, sdkChannel={}, ptzCommand={}, param1=0, param2(presetNo)={}, param3=0, stop=0", 
+                    LOG_PREFIX, loginHandle.longValue(), sdkChannelNo, ptzCommand, presetNo);
+            
+            try {
+                log.info("{} >>> 开始调用 CLIENT_DHPTZControlEx 预设点控制(官方格式)...", LOG_PREFIX);
+                
+                // 使用官方示例的参数格式：param1=0, param2=presetNo, param3=0, stop=0
+                result = getNetSdk().CLIENT_DHPTZControlEx(
+                        loginHandle,
+                        sdkChannelNo,
+                        ptzCommand,
+                        0,            // param1: 0（固定）
+                        presetNo,     // param2: 预设点编号（关键：预设点ID在这里！）
+                        0,            // param3: 0（固定）
+                        0             // dwStop: 0=执行
+                );
+                
+                int lastError = getNetSdk().CLIENT_GetLastError();
+                log.info("{} <<< CLIENT_DHPTZControlEx 调用完成: result={}, errorCode={}", 
+                        LOG_PREFIX, result, lastError);
+                
+                // 对于 GOTO 操作，使用官方格式已经足够，不需要扩展命令
+                if (ptzCommand == NET_PTZ_POINT_MOVE_CONTROL) {
+                    log.info("{} GOTO操作使用官方格式完成", LOG_PREFIX);
+                }
+            } catch (Throwable t) {
+                log.error("{} !!! CLIENT_DHPTZControlEx 调用抛出异常: {}", LOG_PREFIX, t.getMessage(), t);
+                throw t;
+            }
+            
+            // 始终获取 SDK 错误码用于调试
+            String sdkErrorInfo = ToolKits.getErrorCodePrint();
+            int lastError = getNetSdk().CLIENT_GetLastError();
+            
+            log.info("{} 预设点SDK调用结果: result={}, lastError={}, errorInfo={}", 
+                    LOG_PREFIX, result, lastError, sdkErrorInfo);
+            
+            if (result) {
+                log.info("{} 直连IPC预设点控制SDK返回成功: ip={}, channel={}, presetNo={}, action={}", 
+                        LOG_PREFIX, ip, channelNo, presetNo, action);
+                
+                // 对于 SET 操作，设置预设点名称
+                // 参照官方Demo：设置位置和设置名称是两个独立操作，需要间隔一定时间
+                if ("SET".equalsIgnoreCase(action)) {
+                    String actualName = (presetName != null && !presetName.isEmpty()) ? presetName : ("预置点" + presetNo);
+                    boolean nameSetSuccess = false;
+                    
+                    // 延时500ms，等待设备处理完位置设置
+                    // 官方Demo中设置位置和设置名称是通过两个独立的HTTP请求完成的
+                    try {
+                        log.info("{} 等待500ms后设置预设点名称...", LOG_PREFIX);
+                        Thread.sleep(500);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    
+                    // 方法1：使用 CLIENT_DHPTZControlEx2 设置名称（官方Demo的方法）
+                    try {
+                        log.info("{} 尝试使用SDK设置预设点名称: sdkChannel={}, presetNo={}, name={}", 
+                                LOG_PREFIX, sdkChannelNo, presetNo, actualName);
+                        
+                        Pointer namePointer = ToolKits.GetGBKStringToPointer(actualName);
+                        
+                        // 参照官方Demo DHNetServiceImpl.UpdateYZDName：
+                        // CLIENT_DHPTZControlEx2(handle, nChannelID, NET_PTZ_POINT_SET_CONTROL, 0, yzdId, 0, 0, namePointer)
+                        boolean nameResult = getNetSdk().CLIENT_DHPTZControlEx2(
+                                loginHandle,
+                                sdkChannelNo,           // 通道号（SDK从0开始）
+                                NET_PTZ_POINT_SET_CONTROL,
+                                0,                      // param1: 0（固定）
+                                presetNo,               // param2: 预设点编号
+                                0,                      // param3: 0（固定）
+                                0,                      // dwStop: 0（执行）
+                                namePointer             // param4: 预设点名称（GBK编码）
+                        );
+                        
+                        int nameLastError = getNetSdk().CLIENT_GetLastError();
+                        if (nameResult) {
+                            log.info("{} ✅ SDK设置预设点名称成功: name={}", LOG_PREFIX, actualName);
+                            nameSetSuccess = true;
+                        } else {
+                            String nameError = ToolKits.getErrorCodePrint();
+                            log.warn("{} SDK设置预设点名称失败: name={}, errorCode={}, error={}", 
+                                    LOG_PREFIX, actualName, nameLastError, nameError);
+                        }
+                    } catch (Exception e) {
+                        log.warn("{} SDK设置预设点名称异常: {}", LOG_PREFIX, e.getMessage());
+                    }
+                    
+                    // 方法2：如果SDK方法失败，尝试使用配置API设置预设点名称
+                    if (!nameSetSuccess) {
+                        try {
+                            // 再等待200ms
+                            Thread.sleep(200);
+                            log.info("{} SDK设置名称失败，尝试使用配置API设置预设点名称: presetNo={}, name={}", 
+                                    LOG_PREFIX, presetNo, actualName);
+                            NvrOperationResult configResult = setPresetNameByConfig(ip, username, password, sdkChannelNo, presetNo, actualName);
+                            if (configResult.isSuccess()) {
+                                log.info("{} ✅ 配置API设置预设点名称成功: name={}", LOG_PREFIX, actualName);
+                            } else {
+                                log.warn("{} 配置API设置预设点名称失败: name={}, error={}", 
+                                        LOG_PREFIX, actualName, configResult.getMessage());
+                            }
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        } catch (Exception e) {
+                            log.warn("{} 配置API设置预设点名称异常: {}", LOG_PREFIX, e.getMessage());
+                        }
+                    }
+                }
+                
+                // 对于 GOTO 操作，额外尝试 HTTP CGI 接口
+                if ("GOTO".equalsIgnoreCase(action)) {
+                    try {
+                        log.info("{} SDK命令完成，额外尝试HTTP CGI接口转到预设点...", LOG_PREFIX);
+                        boolean cgiResult = gotoPresetByCgi(ip, username, password, sdkChannelNo, presetNo);
+                        if (cgiResult) {
+                            log.info("{} ✅ HTTP CGI转到预设点成功!", LOG_PREFIX);
+                        } else {
+                            log.warn("{} HTTP CGI转到预设点失败，但SDK命令已返回成功", LOG_PREFIX);
+                        }
+                    } catch (Exception e) {
+                        log.warn("{} HTTP CGI转到预设点异常: {}", LOG_PREFIX, e.getMessage());
+                    }
+                    
+                    // 获取预设点列表进行调试
+                    try {
+                        log.debug("{} 尝试通过配置API获取预设点列表进行调试...", LOG_PREFIX);
+                        NvrOperationResult configResult = getPresetListByConfig(ip, username, password, channelNo);
+                        if (configResult.isSuccess()) {
+                            log.info("{} 配置API获取预设点列表成功: {}", LOG_PREFIX, configResult.getMessage());
+                        } else {
+                            log.info("{} 配置API获取预设点列表失败: {}", LOG_PREFIX, configResult.getMessage());
+                        }
+                    } catch (Exception e) {
+                        log.debug("{} 配置API调试失败: {}", LOG_PREFIX, e.getMessage());
+                    }
+                }
+                
+                ipcLoginTimeCache.put(ip, System.currentTimeMillis());
+                return NvrOperationResult.success("预设点控制成功");
+            } else {
+                log.warn("{} 直连IPC预设点控制失败: ip={}, channel={}, presetNo={}, action={}, error={}", 
+                        LOG_PREFIX, ip, channelNo, presetNo, action, sdkErrorInfo);
+                clearIpcSession(ip);
+                return NvrOperationResult.failure("预设点控制失败: " + sdkErrorInfo);
+            }
+            
+        } catch (Exception e) {
+            log.error("{} 直连IPC预设点控制异常: ip={}, error={}", LOG_PREFIX, ip, e.getMessage(), e);
+            clearIpcSession(ip);
+            return NvrOperationResult.failure("预设点控制异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 转换预设点操作为 SDK 命令码
+     */
+    private int convertPresetAction(String action) {
+        if (action == null) {
+            return -1;
+        }
+        switch (action.toUpperCase()) {
+            case "GOTO": case "MOVE": return NET_PTZ_POINT_MOVE_CONTROL;
+            case "SET": case "ADD": return NET_PTZ_POINT_SET_CONTROL;
+            case "CLEAR": case "DELETE": case "DEL": return NET_PTZ_POINT_DEL_CONTROL;
+            default: return -1;
+        }
+    }
+    
+    /**
+     * 通过配置 API 设置预设点（某些设备不支持 PTZ 控制命令设置预设点，需要用配置 API）
+     * 这是备选方案，当 PTZ 控制命令不工作时使用
+     */
+    public NvrOperationResult setPresetByConfig(String ip, String username, String password, int channelNo, int presetNo, String presetName) {
+        try {
+            log.info("{} 尝试通过配置API设置预设点: ip={}, channel={}, presetNo={}, name={}", 
+                    LOG_PREFIX, ip, channelNo, presetNo, presetName);
+            
+            LLong loginHandle = getOrCreateIpcSession(ip, username, password);
+            if (loginHandle == null || loginHandle.longValue() == 0) {
+                return NvrOperationResult.failure("IPC登录失败");
+            }
+            
+            // 直连 IPC 时直接使用原始通道号，不做 -1 转换
+            // 配置 API 的 channel 参数含义可能与 PTZ 控制不同
+            int configChannel = channelNo;
+            
+            // 构建预设点配置 JSON
+            // 大华设备的预设点配置格式为 JSON
+            String name = (presetName != null && !presetName.isEmpty()) ? presetName : ("Preset" + presetNo);
+            String jsonConfig = String.format(
+                "{ \"PtzPreset\" : [ { \"Index\" : %d, \"Name\" : \"%s\", \"Enable\" : true } ] }",
+                presetNo, name
+            );
+            
+            log.info("{} 设置预设点配置JSON: channel={}, config={}", LOG_PREFIX, configChannel, jsonConfig);
+            
+            byte[] inBuffer = jsonConfig.getBytes("UTF-8");
+            IntByReference error = new IntByReference(0);
+            IntByReference restart = new IntByReference(0);
+            
+            boolean result = getNetSdk().CLIENT_SetNewDevConfig(
+                    loginHandle,
+                    CFG_CMD_PTZ_PRESET,
+                    configChannel,
+                    inBuffer,
+                    inBuffer.length,
+                    error,
+                    restart,
+                    5000
+            );
+            
+            if (result) {
+                log.info("{} 配置API设置预设点成功: channel={}, presetNo={}", LOG_PREFIX, configChannel, presetNo);
+                ipcLoginTimeCache.put(ip, System.currentTimeMillis());
+                return NvrOperationResult.success("预设点设置成功(配置API)");
+            } else {
+                String sdkErrorInfo = ToolKits.getErrorCodePrint();
+                int lastError = getNetSdk().CLIENT_GetLastError();
+                log.warn("{} 配置API设置预设点失败: channel={}, presetNo={}, error={}, lastError={}", 
+                        LOG_PREFIX, configChannel, presetNo, sdkErrorInfo, lastError);
+                return NvrOperationResult.failure("配置API设置预设点失败: " + sdkErrorInfo);
+            }
+        } catch (Exception e) {
+            log.error("{} 配置API设置预设点异常: ip={}, error={}", LOG_PREFIX, ip, e.getMessage(), e);
+            return NvrOperationResult.failure("配置API设置预设点异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 通过配置 API 设置预设点（指定SDK通道号，不做转换）
+     * 用于遍历尝试不同通道号
+     */
+    private NvrOperationResult setPresetByConfigWithChannel(String ip, String username, String password, int sdkChannel, int presetNo, String presetName) {
+        try {
+            LLong loginHandle = getOrCreateIpcSession(ip, username, password);
+            if (loginHandle == null || loginHandle.longValue() == 0) {
+                return NvrOperationResult.failure("IPC登录失败");
+            }
+            
+            String name = (presetName != null && !presetName.isEmpty()) ? presetName : ("Preset" + presetNo);
+            String jsonConfig = String.format(
+                "{ \"PtzPreset\" : [ { \"Index\" : %d, \"Name\" : \"%s\", \"Enable\" : true } ] }",
+                presetNo, name
+            );
+            
+            log.debug("{} 配置API设置预设点: channel={}, config={}", LOG_PREFIX, sdkChannel, jsonConfig);
+            
+            byte[] inBuffer = jsonConfig.getBytes("UTF-8");
+            IntByReference error = new IntByReference(0);
+            IntByReference restart = new IntByReference(0);
+            
+            boolean result = getNetSdk().CLIENT_SetNewDevConfig(
+                    loginHandle,
+                    CFG_CMD_PTZ_PRESET,
+                    sdkChannel,
+                    inBuffer,
+                    inBuffer.length,
+                    error,
+                    restart,
+                    5000
+            );
+            
+            if (result) {
+                ipcLoginTimeCache.put(ip, System.currentTimeMillis());
+                return NvrOperationResult.success("预设点设置成功(配置API, channel=" + sdkChannel + ")");
+            } else {
+                return NvrOperationResult.failure("配置API设置预设点失败: " + ToolKits.getErrorCodePrint());
+            }
+        } catch (Exception e) {
+            return NvrOperationResult.failure("配置API设置预设点异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 通过配置 API 设置预设点名称（不覆盖位置）
+     * 
+     * 注意：根据官方Demo，配置API通道号使用 -1 表示所有通道
+     */
+    private NvrOperationResult setPresetNameByConfig(String ip, String username, String password, int sdkChannel, int presetNo, String presetName) {
+        try {
+            LLong loginHandle = getOrCreateIpcSession(ip, username, password);
+            if (loginHandle == null || loginHandle.longValue() == 0) {
+                return NvrOperationResult.failure("IPC登录失败");
+            }
+            
+            // 构建预设点配置 JSON - 只设置名称
+            // 注意：Index 是预设点编号（1-based），与 presetNo 一致
+            String jsonConfig = String.format(
+                "{ \"PtzPreset\" : [ { \"Index\" : %d, \"Name\" : \"%s\", \"Enable\" : true } ] }",
+                presetNo, presetName
+            );
+            
+            log.info("{} 配置API设置预设点名称: sdkChannel={}, presetNo={}, name={}, json={}", 
+                    LOG_PREFIX, sdkChannel, presetNo, presetName, jsonConfig);
+            
+            byte[] inBuffer = jsonConfig.getBytes("UTF-8");
+            IntByReference error = new IntByReference(0);
+            IntByReference restart = new IntByReference(0);
+            
+            // 先尝试使用 -1（所有通道），这是官方Demo的用法
+            boolean result = getNetSdk().CLIENT_SetNewDevConfig(
+                    loginHandle,
+                    CFG_CMD_PTZ_PRESET,
+                    -1,  // 使用 -1 表示所有通道，符合官方Demo
+                    inBuffer,
+                    inBuffer.length,
+                    error,
+                    restart,
+                    5000
+            );
+            
+            // 如果 -1 失败，尝试使用具体的SDK通道号
+            if (!result) {
+                log.info("{} 配置API(-1)失败，尝试使用sdkChannel={}", LOG_PREFIX, sdkChannel);
+                result = getNetSdk().CLIENT_SetNewDevConfig(
+                        loginHandle,
+                        CFG_CMD_PTZ_PRESET,
+                        sdkChannel,
+                        inBuffer,
+                        inBuffer.length,
+                        error,
+                        restart,
+                        5000
+                );
+            }
+            
+            if (result) {
+                ipcLoginTimeCache.put(ip, System.currentTimeMillis());
+                log.info("{} ✅ 配置API设置预设点名称成功: presetNo={}, name={}", LOG_PREFIX, presetNo, presetName);
+                return NvrOperationResult.success("预设点名称设置成功");
+            } else {
+                return NvrOperationResult.failure("配置API设置名称失败: " + ToolKits.getErrorCodePrint());
+            }
+        } catch (Exception e) {
+            return NvrOperationResult.failure("配置API设置名称异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 删除预设点（直连 IPC）
+     * 
+     * @param ip        IPC 设备 IP
+     * @param username  用户名
+     * @param password  密码
+     * @param channelNo 通道号
+     * @param presetNo  预设点编号（1-255）
+     * @return 操作结果
+     */
+    public NvrOperationResult deletePresetDirect(String ip, String username, String password, int channelNo, int presetNo) {
+        if (!sdkInitialized) {
+            return NvrOperationResult.failure("SDK 未初始化");
+        }
+        
+        try {
+            log.info("{} 删除预设点: ip={}, channel={}, presetNo={}", LOG_PREFIX, ip, channelNo, presetNo);
+            
+            LLong loginHandle = getOrCreateIpcSession(ip, username, password);
+            if (loginHandle == null || loginHandle.longValue() == 0) {
+                return NvrOperationResult.failure("IPC登录失败");
+            }
+            
+            int sdkChannelNo = channelNo > 0 ? channelNo - 1 : 0;
+            
+            // 使用 NET_PTZ_POINT_DEL_CONTROL 删除预设点
+            log.info("{} 删除预设点SDK调用: handle={}, sdkChannel={}, presetNo={}", 
+                    LOG_PREFIX, loginHandle.longValue(), sdkChannelNo, presetNo);
+            
+            boolean result = getNetSdk().CLIENT_DHPTZControlEx(
+                    loginHandle,
+                    sdkChannelNo,
+                    NET_PTZ_POINT_DEL_CONTROL,
+                    0,           // param1: 0
+                    presetNo,    // param2: 预设点编号
+                    0,           // param3: 0
+                    0            // dwStop: 0
+            );
+            
+            String errorInfo = ToolKits.getErrorCodePrint();
+            
+            if (result) {
+                log.info("{} 删除预设点成功: ip={}, presetNo={}", LOG_PREFIX, ip, presetNo);
+                ipcLoginTimeCache.put(ip, System.currentTimeMillis());
+                return NvrOperationResult.success("删除预设点成功");
+            } else {
+                log.warn("{} 删除预设点失败: ip={}, presetNo={}, error={}", LOG_PREFIX, ip, presetNo, errorInfo);
+                return NvrOperationResult.failure("删除预设点失败: " + errorInfo);
+            }
+            
+        } catch (Exception e) {
+            log.error("{} 删除预设点异常: ip={}, error={}", LOG_PREFIX, ip, e.getMessage(), e);
+            return NvrOperationResult.failure("删除预设点异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 通过 PTZ 扩展命令同步巡航组到设备（推荐方式）
+     * 
+     * 使用以下命令序列：
+     * 1. NET_EXTPTZ_CLOSELOOP (0x26) - 清除巡航组
+     * 2. NET_EXTPTZ_ADDTOLOOP (0x24) - 逐个添加预设点到巡航组
+     * 
+     * @param ip         IPC 设备 IP
+     * @param username   用户名
+     * @param password   密码
+     * @param channelNo  通道号
+     * @param tourNo     巡航组编号（1-8）
+     * @param tourName   巡航组名称（用于日志）
+     * @param presetNos  预设点编号列表
+     * @param dwellTimes 每个预设点的停留时间列表（秒）- 暂不支持，由设备默认
+     * @param speeds     每个预设点的转动速度列表（1-10）- 暂不支持，由设备默认
+     * @return 操作结果
+     */
+    public NvrOperationResult syncTourByConfig(String ip, String username, String password, int channelNo,
+                                                int tourNo, String tourName, List<Integer> presetNos,
+                                                List<Integer> dwellTimes, List<Integer> speeds) {
+        if (!sdkInitialized) {
+            return NvrOperationResult.failure("SDK 未初始化");
+        }
+        
+        if (presetNos == null || presetNos.isEmpty()) {
+            return NvrOperationResult.failure("预设点列表不能为空");
+        }
+        
+        try {
+            log.info("{} 同步巡航组到设备: ip={}, channel={}, tourNo={}, name={}, presetCount={}", 
+                    LOG_PREFIX, ip, channelNo, tourNo, tourName, presetNos.size());
+            
+            LLong loginHandle = getOrCreateIpcSession(ip, username, password);
+            if (loginHandle == null || loginHandle.longValue() == 0) {
+                return NvrOperationResult.failure("IPC登录失败");
+            }
+            
+            int sdkChannelNo = channelNo > 0 ? channelNo - 1 : 0;
+            
+            // 步骤1：清除巡航组
+            log.info("{} 步骤1: 清除巡航组 tourNo={}", LOG_PREFIX, tourNo);
+            boolean clearResult = getNetSdk().CLIENT_DHPTZControlEx(
+                    loginHandle,
+                    sdkChannelNo,
+                    NET_EXTPTZ_CLOSELOOP,  // 0x26 - 清除巡航
+                    tourNo,                 // param1: 巡航组编号
+                    0,                      // param2: 0
+                    0,                      // param3: 0
+                    0                       // dwStop: 0
+            );
+            
+            if (!clearResult) {
+                String errorInfo = ToolKits.getErrorCodePrint();
+                log.warn("{} 清除巡航组失败: tourNo={}, error={}", LOG_PREFIX, tourNo, errorInfo);
+                // 继续尝试添加预设点，即使清除失败
+            } else {
+                log.info("{} 清除巡航组成功: tourNo={}", LOG_PREFIX, tourNo);
+            }
+            
+            // 等待设备处理
+            Thread.sleep(200);
+            
+            // 步骤2：逐个添加预设点到巡航组
+            int successCount = 0;
+            for (int i = 0; i < presetNos.size(); i++) {
+                int presetNo = presetNos.get(i);
+                
+                log.info("{} 步骤2.{}: 添加预设点到巡航组 tourNo={}, presetNo={}", 
+                        LOG_PREFIX, i + 1, tourNo, presetNo);
+                
+                boolean addResult = getNetSdk().CLIENT_DHPTZControlEx(
+                        loginHandle,
+                        sdkChannelNo,
+                        NET_EXTPTZ_ADDTOLOOP,  // 0x24 - 加入预设点到巡航
+                        tourNo,                 // param1: 巡航组编号
+                        presetNo,               // param2: 预设点编号
+                        0,                      // param3: 0
+                        0                       // dwStop: 0
+                );
+                
+                if (addResult) {
+                    successCount++;
+                    log.info("{} 添加预设点成功: tourNo={}, presetNo={}", LOG_PREFIX, tourNo, presetNo);
+                } else {
+                    String errorInfo = ToolKits.getErrorCodePrint();
+                    log.warn("{} 添加预设点失败: tourNo={}, presetNo={}, error={}", 
+                            LOG_PREFIX, tourNo, presetNo, errorInfo);
+                }
+                
+                // 每个命令之间稍微延迟
+                Thread.sleep(100);
+            }
+            
+            ipcLoginTimeCache.put(ip, System.currentTimeMillis());
+            
+            if (successCount == presetNos.size()) {
+                log.info("{} ✅ 巡航组同步成功: tourNo={}, presetCount={}", LOG_PREFIX, tourNo, successCount);
+                return NvrOperationResult.success("巡航组同步成功，共添加 " + successCount + " 个预设点");
+            } else if (successCount > 0) {
+                log.warn("{} ⚠️ 巡航组部分同步: tourNo={}, success={}/{}", 
+                        LOG_PREFIX, tourNo, successCount, presetNos.size());
+                return NvrOperationResult.success("巡航组部分同步，成功 " + successCount + "/" + presetNos.size() + " 个预设点");
+            } else {
+                log.error("{} ❌ 巡航组同步失败: tourNo={}", LOG_PREFIX, tourNo);
+                return NvrOperationResult.failure("巡航组同步失败，所有预设点添加失败");
+            }
+            
+        } catch (Exception e) {
+            log.error("{} 巡航组同步异常: ip={}, error={}", LOG_PREFIX, ip, e.getMessage(), e);
+            return NvrOperationResult.failure("巡航组同步异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 通过 HTTP CGI 接口设置预设点
+     * 
+     * <p>大华设备支持 CGI 接口来控制 PTZ，格式为：</p>
+     * <pre>
+     * http://ip/cgi-bin/ptz.cgi?action=start&channel=X&code=SetPreset&arg1=0&arg2=N&arg3=0
+     * </pre>
+     * 
+     * @param ip        设备 IP
+     * @param username  用户名
+     * @param password  密码
+     * @param sdkChannel SDK通道号（0-based）
+     * @param presetNo  预设点编号（1-based）
+     * @return true=成功, false=失败
+     */
+    private boolean setPresetByCgi(String ip, String username, String password, int sdkChannel, int presetNo) {
+        // 大华 CGI 接口格式
+        // action=start 表示开始执行
+        // channel=X 通道号（0-based）
+        // code=SetPreset 设置预设点
+        // arg1=0 固定为0
+        // arg2=N 预设点编号（1-based）
+        // arg3=0 固定为0
+        String cgiUrl = String.format(
+            "http://%s/cgi-bin/ptz.cgi?action=start&channel=%d&code=SetPreset&arg1=0&arg2=%d&arg3=0",
+            ip, sdkChannel, presetNo
+        );
+        
+        return executeHttpCgiWithDigest(cgiUrl, ip, username, password, "SetPreset");
+    }
+    
+    /**
+     * 通过 HTTP CGI 接口转到预设点
+     * 
+     * @param ip        设备 IP
+     * @param username  用户名
+     * @param password  密码
+     * @param sdkChannel SDK通道号（0-based）
+     * @param presetNo  预设点编号（1-based）
+     * @return true=成功, false=失败
+     */
+    private boolean gotoPresetByCgi(String ip, String username, String password, int sdkChannel, int presetNo) {
+        // code=GotoPreset 转到预设点
+        String cgiUrl = String.format(
+            "http://%s/cgi-bin/ptz.cgi?action=start&channel=%d&code=GotoPreset&arg1=0&arg2=%d&arg3=0",
+            ip, sdkChannel, presetNo
+        );
+        
+        return executeHttpCgiWithDigest(cgiUrl, ip, username, password, "GotoPreset");
+    }
+    
+    /**
+     * 执行 HTTP CGI 请求（支持 Digest 认证）
+     * 
+     * <p>大华设备使用 Digest 认证，需要两次请求：</p>
+     * <ol>
+     *     <li>第一次请求获取 WWW-Authenticate 头中的 realm, nonce 等参数</li>
+     *     <li>第二次请求带上计算后的 Authorization 头</li>
+     * </ol>
+     */
+    private boolean executeHttpCgiWithDigest(String cgiUrl, String ip, String username, String password, String operation) {
+        HttpURLConnection conn = null;
+        try {
+            log.info("{} HTTP CGI {}: url={}", LOG_PREFIX, operation, cgiUrl);
+            
+            URL url = new URL(cgiUrl);
+            
+            // 第一次请求，获取 Digest 认证参数
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            
+            int responseCode = conn.getResponseCode();
+            
+            if (responseCode == 401) {
+                // 获取 WWW-Authenticate 头
+                String wwwAuth = conn.getHeaderField("WWW-Authenticate");
+                log.debug("{} HTTP CGI Digest 认证头: {}", LOG_PREFIX, wwwAuth);
+                
+                if (wwwAuth != null && wwwAuth.startsWith("Digest")) {
+                    // 解析 Digest 参数
+                    String realm = extractDigestParam(wwwAuth, "realm");
+                    String nonce = extractDigestParam(wwwAuth, "nonce");
+                    String qop = extractDigestParam(wwwAuth, "qop");
+                    
+                    // 计算 Digest 响应
+                    String uri = url.getPath() + (url.getQuery() != null ? "?" + url.getQuery() : "");
+                    String nc = "00000001";
+                    String cnonce = Long.toHexString(System.currentTimeMillis());
+                    
+                    String ha1 = md5(username + ":" + realm + ":" + password);
+                    String ha2 = md5("GET:" + uri);
+                    String response;
+                    
+                    if (qop != null && !qop.isEmpty()) {
+                        response = md5(ha1 + ":" + nonce + ":" + nc + ":" + cnonce + ":" + qop + ":" + ha2);
+                    } else {
+                        response = md5(ha1 + ":" + nonce + ":" + ha2);
+                    }
+                    
+                    // 构建 Authorization 头
+                    StringBuilder authHeader = new StringBuilder();
+                    authHeader.append("Digest username=\"").append(username).append("\"");
+                    authHeader.append(", realm=\"").append(realm).append("\"");
+                    authHeader.append(", nonce=\"").append(nonce).append("\"");
+                    authHeader.append(", uri=\"").append(uri).append("\"");
+                    if (qop != null && !qop.isEmpty()) {
+                        authHeader.append(", qop=").append(qop);
+                        authHeader.append(", nc=").append(nc);
+                        authHeader.append(", cnonce=\"").append(cnonce).append("\"");
+                    }
+                    authHeader.append(", response=\"").append(response).append("\"");
+                    
+                    conn.disconnect();
+                    
+                    // 第二次请求，带上认证信息
+                    conn = (HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("GET");
+                    conn.setConnectTimeout(5000);
+                    conn.setReadTimeout(5000);
+                    conn.setRequestProperty("Authorization", authHeader.toString());
+                    
+                    responseCode = conn.getResponseCode();
+                }
+            }
+            
+            if (responseCode == 200) {
+                // 读取响应内容
+                StringBuilder respBuilder = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        respBuilder.append(line);
+                    }
+                }
+                
+                String responseBody = respBuilder.toString();
+                log.info("{} HTTP CGI 响应: code={}, body={}", LOG_PREFIX, responseCode, responseBody);
+                
+                // 大华设备成功时返回 "OK" 或空响应
+                return responseBody.isEmpty() || responseBody.contains("OK") || responseBody.contains("ok");
+            } else {
+                log.warn("{} HTTP CGI 失败: responseCode={}", LOG_PREFIX, responseCode);
+                return false;
+            }
+            
+        } catch (Exception e) {
+            log.warn("{} HTTP CGI 异常: {}", LOG_PREFIX, e.getMessage());
+            return false;
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+    
+    /**
+     * 从 WWW-Authenticate 头中提取 Digest 参数
+     */
+    private String extractDigestParam(String wwwAuth, String param) {
+        String search = param + "=\"";
+        int start = wwwAuth.indexOf(search);
+        if (start < 0) {
+            // 尝试不带引号的格式
+            search = param + "=";
+            start = wwwAuth.indexOf(search);
+            if (start < 0) {
+                return null;
+            }
+            start += search.length();
+            int end = wwwAuth.indexOf(",", start);
+            if (end < 0) {
+                end = wwwAuth.length();
+            }
+            return wwwAuth.substring(start, end).trim();
+        }
+        start += search.length();
+        int end = wwwAuth.indexOf("\"", start);
+        if (end < 0) {
+            return null;
+        }
+        return wwwAuth.substring(start, end);
+    }
+    
+    /**
+     * 计算 MD5 哈希
+     */
+    private String md5(String input) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] digest = md.digest(input.getBytes());
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b & 0xff));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("MD5 计算失败", e);
+        }
+    }
+
+    /**
+     * 通过配置 API 获取设备的预设点列表
+     * 用于测试设备是否支持配置方式的预设点操作
+     */
+    public NvrOperationResult getPresetListByConfig(String ip, String username, String password, int channelNo) {
+        try {
+            log.info("{} 尝试通过配置API获取预设点列表: ip={}, channel={}", LOG_PREFIX, ip, channelNo);
+            
+            LLong loginHandle = getOrCreateIpcSession(ip, username, password);
+            if (loginHandle == null || loginHandle.longValue() == 0) {
+                return NvrOperationResult.failure("IPC登录失败");
+            }
+            
+            // 使用配置 API 获取预设点列表
+            int sdkChannelNo = channelNo > 0 ? channelNo - 1 : 0;
+            byte[] outBuffer = new byte[512 * 1024]; // 512KB buffer (预设点配置可能很大)
+            IntByReference error = new IntByReference(0);
+            
+            boolean result = getNetSdk().CLIENT_GetNewDevConfig(
+                    loginHandle,
+                    CFG_CMD_PTZ_PRESET,
+                    sdkChannelNo,
+                    outBuffer,
+                    outBuffer.length,
+                    error,
+                    5000,
+                    null
+            );
+            
+            if (result) {
+                String jsonConfig = new String(outBuffer).trim();
+                // 去除末尾的 null 字符
+                int nullIndex = jsonConfig.indexOf('\0');
+                if (nullIndex > 0) {
+                    jsonConfig = jsonConfig.substring(0, nullIndex);
+                }
+                log.info("{} 获取预设点配置成功: channel={}, config={}", LOG_PREFIX, sdkChannelNo, jsonConfig);
+                ipcLoginTimeCache.put(ip, System.currentTimeMillis());
+                return NvrOperationResult.success(jsonConfig);
+            } else {
+                String sdkErrorInfo = ToolKits.getErrorCodePrint();
+                int lastError = getNetSdk().CLIENT_GetLastError();
+                log.warn("{} 获取预设点配置失败: channel={}, error={}, lastError={}", 
+                        LOG_PREFIX, sdkChannelNo, sdkErrorInfo, lastError);
+                return NvrOperationResult.failure("获取预设点配置失败: " + sdkErrorInfo);
+            }
+        } catch (Exception e) {
+            log.error("{} 获取预设点配置异常: ip={}, error={}", LOG_PREFIX, ip, e.getMessage(), e);
+            return NvrOperationResult.failure("获取预设点配置异常: " + e.getMessage());
         }
     }
 
@@ -1030,6 +1958,387 @@ public class NvrSdkWrapper {
         } catch (Exception e) {
             log.error("{} 抓图异常: channel={}, error={}", LOG_PREFIX, channelNo, e.getMessage(), e);
             return NvrOperationResult.failure("抓图异常: " + e.getMessage());
+        }
+    }
+
+    // ==================== 巡航组控制 ====================
+
+    /**
+     * PTZ 扩展命令常量
+     */
+    private static final int NET_EXTPTZ_ADDTOLOOP = 0x24;      // 加入预置点到巡航
+    private static final int NET_EXTPTZ_DELFROMLOOP = 0x25;    // 从巡航中删除预置点
+    private static final int NET_EXTPTZ_CLOSELOOP = 0x26;      // 清除巡航
+    private static final int NET_EXTPTZ_STARTLOOP = 0x27;      // 开始巡航（官方可能使用 NET_PTZ_POINT_LOOP_CONTROL）
+    private static final int NET_PTZ_POINT_LOOP_CONTROL = 13;  // 点间巡航
+
+    /**
+     * 启动设备巡航（直连 IPC）
+     * 
+     * @param ip        IPC 设备 IP
+     * @param username  用户名
+     * @param password  密码
+     * @param channelNo 通道号
+     * @param tourNo    巡航组编号（1-8）
+     * @return 操作结果
+     */
+    public NvrOperationResult startTourDirect(String ip, String username, String password,
+                                               int channelNo, int tourNo) {
+        if (!sdkInitialized) {
+            return NvrOperationResult.failure("SDK 未初始化");
+        }
+        
+        try {
+            log.info("{} 启动设备巡航: ip={}, channel={}, tourNo={}", LOG_PREFIX, ip, channelNo, tourNo);
+            
+            LLong loginHandle = getOrCreateIpcSession(ip, username, password);
+            if (loginHandle == null || loginHandle.longValue() == 0) {
+                return NvrOperationResult.failure("IPC登录失败");
+            }
+            
+            int sdkChannelNo = channelNo > 0 ? channelNo - 1 : 0;
+            
+            // 使用 NET_PTZ_POINT_LOOP_CONTROL 命令启动巡航
+            // param1: 巡航组编号, param2: 0, param3: 0, stop: 0
+            log.info("{} 启动巡航SDK调用: handle={}, sdkChannel={}, tourNo={}", 
+                    LOG_PREFIX, loginHandle.longValue(), sdkChannelNo, tourNo);
+            
+            boolean result = getNetSdk().CLIENT_DHPTZControlEx(
+                    loginHandle,
+                    sdkChannelNo,
+                    NET_PTZ_POINT_LOOP_CONTROL,
+                    0,           // param1: 0
+                    tourNo,      // param2: 巡航组编号
+                    0,           // param3: 0
+                    0            // dwStop: 0=启动
+            );
+            
+            String errorInfo = ToolKits.getErrorCodePrint();
+            
+            if (result) {
+                log.info("{} 启动设备巡航成功: ip={}, tourNo={}", LOG_PREFIX, ip, tourNo);
+                ipcLoginTimeCache.put(ip, System.currentTimeMillis());
+                return NvrOperationResult.success("启动巡航成功");
+            } else {
+                log.warn("{} 启动设备巡航失败: ip={}, tourNo={}, error={}", LOG_PREFIX, ip, tourNo, errorInfo);
+                return NvrOperationResult.failure("启动巡航失败: " + errorInfo);
+            }
+            
+        } catch (Exception e) {
+            log.error("{} 启动设备巡航异常: ip={}, error={}", LOG_PREFIX, ip, e.getMessage(), e);
+            return NvrOperationResult.failure("启动巡航异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 停止设备巡航（直连 IPC）
+     * 
+     * @param ip        IPC 设备 IP
+     * @param username  用户名
+     * @param password  密码
+     * @param channelNo 通道号
+     * @param tourNo    巡航组编号（1-8）
+     * @return 操作结果
+     */
+    public NvrOperationResult stopTourDirect(String ip, String username, String password,
+                                              int channelNo, int tourNo) {
+        if (!sdkInitialized) {
+            return NvrOperationResult.failure("SDK 未初始化");
+        }
+        
+        try {
+            log.info("{} 停止设备巡航: ip={}, channel={}, tourNo={}", LOG_PREFIX, ip, channelNo, tourNo);
+            
+            LLong loginHandle = getOrCreateIpcSession(ip, username, password);
+            if (loginHandle == null || loginHandle.longValue() == 0) {
+                return NvrOperationResult.failure("IPC登录失败");
+            }
+            
+            int sdkChannelNo = channelNo > 0 ? channelNo - 1 : 0;
+            
+            // 使用 NET_PTZ_POINT_LOOP_CONTROL 命令停止巡航
+            // param1: 巡航组编号, param2: 0, param3: 0, stop: 1
+            log.info("{} 停止巡航SDK调用: handle={}, sdkChannel={}, tourNo={}", 
+                    LOG_PREFIX, loginHandle.longValue(), sdkChannelNo, tourNo);
+            
+            boolean result = getNetSdk().CLIENT_DHPTZControlEx(
+                    loginHandle,
+                    sdkChannelNo,
+                    NET_PTZ_POINT_LOOP_CONTROL,
+                    0,           // param1: 0
+                    tourNo,      // param2: 巡航组编号
+                    0,           // param3: 0
+                    1            // dwStop: 1=停止
+            );
+            
+            String errorInfo = ToolKits.getErrorCodePrint();
+            
+            if (result) {
+                log.info("{} 停止设备巡航成功: ip={}, tourNo={}", LOG_PREFIX, ip, tourNo);
+                ipcLoginTimeCache.put(ip, System.currentTimeMillis());
+                return NvrOperationResult.success("停止巡航成功");
+            } else {
+                log.warn("{} 停止设备巡航失败: ip={}, tourNo={}, error={}", LOG_PREFIX, ip, tourNo, errorInfo);
+                return NvrOperationResult.failure("停止巡航失败: " + errorInfo);
+            }
+            
+        } catch (Exception e) {
+            log.error("{} 停止设备巡航异常: ip={}, error={}", LOG_PREFIX, ip, e.getMessage(), e);
+            return NvrOperationResult.failure("停止巡航异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 添加预设点到巡航组（直连 IPC）
+     * 
+     * @param ip        IPC 设备 IP
+     * @param username  用户名
+     * @param password  密码
+     * @param channelNo 通道号
+     * @param tourNo    巡航组编号（1-8）
+     * @param presetNo  预设点编号
+     * @return 操作结果
+     */
+    public NvrOperationResult addPresetToTourDirect(String ip, String username, String password,
+                                                     int channelNo, int tourNo, int presetNo) {
+        if (!sdkInitialized) {
+            return NvrOperationResult.failure("SDK 未初始化");
+        }
+        
+        try {
+            log.info("{} 添加预设点到巡航组: ip={}, channel={}, tourNo={}, presetNo={}", 
+                    LOG_PREFIX, ip, channelNo, tourNo, presetNo);
+            
+            LLong loginHandle = getOrCreateIpcSession(ip, username, password);
+            if (loginHandle == null || loginHandle.longValue() == 0) {
+                return NvrOperationResult.failure("IPC登录失败");
+            }
+            
+            int sdkChannelNo = channelNo > 0 ? channelNo - 1 : 0;
+            
+            // 使用扩展命令 NET_EXTPTZ_ADDTOLOOP
+            // param1: 巡航组编号, param2: 预设点编号
+            log.info("{} 添加预设点到巡航SDK调用: handle={}, sdkChannel={}, tourNo={}, presetNo={}", 
+                    LOG_PREFIX, loginHandle.longValue(), sdkChannelNo, tourNo, presetNo);
+            
+            boolean result = getNetSdk().CLIENT_DHPTZControlEx(
+                    loginHandle,
+                    sdkChannelNo,
+                    NET_EXTPTZ_ADDTOLOOP,
+                    tourNo,      // param1: 巡航组编号
+                    presetNo,    // param2: 预设点编号
+                    0,           // param3: 0
+                    0            // dwStop: 0
+            );
+            
+            String errorInfo = ToolKits.getErrorCodePrint();
+            
+            if (result) {
+                log.info("{} 添加预设点到巡航组成功: ip={}, tourNo={}, presetNo={}", 
+                        LOG_PREFIX, ip, tourNo, presetNo);
+                ipcLoginTimeCache.put(ip, System.currentTimeMillis());
+                return NvrOperationResult.success("添加预设点成功");
+            } else {
+                log.warn("{} 添加预设点到巡航组失败: ip={}, tourNo={}, presetNo={}, error={}", 
+                        LOG_PREFIX, ip, tourNo, presetNo, errorInfo);
+                return NvrOperationResult.failure("添加预设点失败: " + errorInfo);
+            }
+            
+        } catch (Exception e) {
+            log.error("{} 添加预设点到巡航组异常: ip={}, error={}", LOG_PREFIX, ip, e.getMessage(), e);
+            return NvrOperationResult.failure("添加预设点异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 清除巡航组（直连 IPC）
+     * 
+     * @param ip        IPC 设备 IP
+     * @param username  用户名
+     * @param password  密码
+     * @param channelNo 通道号
+     * @param tourNo    巡航组编号（1-8）
+     * @return 操作结果
+     */
+    public NvrOperationResult clearTourDirect(String ip, String username, String password,
+                                               int channelNo, int tourNo) {
+        if (!sdkInitialized) {
+            return NvrOperationResult.failure("SDK 未初始化");
+        }
+        
+        try {
+            log.info("{} 清除巡航组: ip={}, channel={}, tourNo={}", LOG_PREFIX, ip, channelNo, tourNo);
+            
+            LLong loginHandle = getOrCreateIpcSession(ip, username, password);
+            if (loginHandle == null || loginHandle.longValue() == 0) {
+                return NvrOperationResult.failure("IPC登录失败");
+            }
+            
+            int sdkChannelNo = channelNo > 0 ? channelNo - 1 : 0;
+            
+            // 使用扩展命令 NET_EXTPTZ_CLOSELOOP
+            log.info("{} 清除巡航组SDK调用: handle={}, sdkChannel={}, tourNo={}", 
+                    LOG_PREFIX, loginHandle.longValue(), sdkChannelNo, tourNo);
+            
+            boolean result = getNetSdk().CLIENT_DHPTZControlEx(
+                    loginHandle,
+                    sdkChannelNo,
+                    NET_EXTPTZ_CLOSELOOP,
+                    tourNo,      // param1: 巡航组编号
+                    0,           // param2: 0
+                    0,           // param3: 0
+                    0            // dwStop: 0
+            );
+            
+            String errorInfo = ToolKits.getErrorCodePrint();
+            
+            if (result) {
+                log.info("{} 清除巡航组成功: ip={}, tourNo={}", LOG_PREFIX, ip, tourNo);
+                ipcLoginTimeCache.put(ip, System.currentTimeMillis());
+                return NvrOperationResult.success("清除巡航组成功");
+            } else {
+                log.warn("{} 清除巡航组失败: ip={}, tourNo={}, error={}", LOG_PREFIX, ip, tourNo, errorInfo);
+                return NvrOperationResult.failure("清除巡航组失败: " + errorInfo);
+            }
+            
+        } catch (Exception e) {
+            log.error("{} 清除巡航组异常: ip={}, error={}", LOG_PREFIX, ip, e.getMessage(), e);
+            return NvrOperationResult.failure("清除巡航组异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 同步巡航组配置到设备（直连 IPC）
+     * 
+     * <p>将本地巡航配置同步到设备，使用配置 API 设置巡航组名称、预设点及停留时间</p>
+     * 
+     * @param ip         IPC 设备 IP
+     * @param username   用户名
+     * @param password   密码
+     * @param channelNo  通道号
+     * @param tourNo     巡航组编号（1-8）
+     * @param tourName   巡航组名称
+     * @param presetNos  预设点编号列表（按顺序）
+     * @param dwellTimes 每个预设点的停留时间（秒）
+     * @return 操作结果
+     */
+    public NvrOperationResult syncTourToDeviceDirect(String ip, String username, String password,
+                                                      int channelNo, int tourNo, String tourName,
+                                                      List<Integer> presetNos, List<Integer> dwellTimes) {
+        if (!sdkInitialized) {
+            return NvrOperationResult.failure("SDK 未初始化");
+        }
+        
+        if (presetNos == null || presetNos.isEmpty()) {
+            return NvrOperationResult.failure("预设点列表为空");
+        }
+        
+        try {
+            log.info("{} 同步巡航组到设备: ip={}, channel={}, tourNo={}, tourName={}, presetCount={}, dwellTimes={}", 
+                    LOG_PREFIX, ip, channelNo, tourNo, tourName, presetNos.size(), dwellTimes);
+            
+            LLong loginHandle = getOrCreateIpcSession(ip, username, password);
+            if (loginHandle == null || loginHandle.longValue() == 0) {
+                return NvrOperationResult.failure("IPC登录失败");
+            }
+            
+            int sdkChannelNo = channelNo > 0 ? channelNo - 1 : 0;
+            
+            // 使用配置 API 设置巡航组（包含名称和停留时间）
+            // 先尝试配置 API，如果失败则回退到 PTZ 命令
+            boolean configSuccess = false;
+            
+            try {
+                // 构建巡航组配置 JSON（格式参考大华 SDK 文档 CFG_PTZTOUR_INFO）
+                StringBuilder presetsJson = new StringBuilder();
+                for (int i = 0; i < presetNos.size(); i++) {
+                    if (i > 0) presetsJson.append(",");
+                    int presetId = presetNos.get(i);
+                    int duration = (dwellTimes != null && i < dwellTimes.size()) ? dwellTimes.get(i) : 15;
+                    int speed = 7; // 默认速度
+                    presetsJson.append(String.format("{ \"PresetID\" : %d, \"Duration\" : %d, \"Speed\" : %d }", 
+                            presetId, duration, speed));
+                }
+                
+                // 巡航组索引（0-based）
+                int tourIndex = tourNo - 1;
+                if (tourIndex < 0) tourIndex = 0;
+                
+                // 构建完整的 PtzTour 配置
+                // 注意：需要设置对应索引的巡航组
+                String actualTourName = (tourName != null && !tourName.isEmpty()) ? tourName : ("巡航组" + tourNo);
+                String jsonConfig = String.format(
+                    "{ \"PtzTour\" : [ { \"Enable\" : true, \"Name\" : \"%s\", \"Presets\" : [ %s ] } ] }",
+                    actualTourName,
+                    presetsJson.toString()
+                );
+                
+                log.info("{} 配置API同步巡航组JSON: {}", LOG_PREFIX, jsonConfig);
+                
+                byte[] inBuffer = jsonConfig.getBytes("GBK"); // 大华设备使用 GBK 编码
+                IntByReference error = new IntByReference(0);
+                IntByReference restart = new IntByReference(0);
+                
+                // 使用 CFG_CMD_PTZTOUR 命令，通道号使用 tourIndex 指定巡航组
+                boolean result = getNetSdk().CLIENT_SetNewDevConfig(
+                        loginHandle,
+                        "PtzTour",
+                        tourIndex,  // 使用巡航组索引作为通道参数
+                        inBuffer,
+                        inBuffer.length,
+                        error,
+                        restart,
+                        5000
+                );
+                
+                if (result) {
+                    log.info("{} ✅ 配置API同步巡航组成功: ip={}, tourNo={}, tourName={}", 
+                            LOG_PREFIX, ip, tourNo, actualTourName);
+                    configSuccess = true;
+                } else {
+                    String errorInfo = ToolKits.getErrorCodePrint();
+                    log.warn("{} 配置API同步巡航组失败，尝试PTZ命令方式: error={}", LOG_PREFIX, errorInfo);
+                }
+                
+            } catch (Exception e) {
+                log.warn("{} 配置API同步巡航组异常，回退到PTZ命令方式: {}", LOG_PREFIX, e.getMessage());
+            }
+            
+            // 如果配置API失败，回退到PTZ命令方式（但无法设置名称和停留时间）
+            if (!configSuccess) {
+                log.info("{} 使用PTZ命令方式同步巡航组（无法设置名称和停留时间）", LOG_PREFIX);
+                
+                // 1. 先清除巡航组
+                NvrOperationResult clearResult = clearTourDirect(ip, username, password, channelNo, tourNo);
+                if (!clearResult.isSuccess()) {
+                    log.warn("{} 清除巡航组失败，继续添加: {}", LOG_PREFIX, clearResult.getMessage());
+                }
+                
+                Thread.sleep(500);
+                
+                // 2. 依次添加预设点
+                int successCount = 0;
+                for (int presetNo : presetNos) {
+                    NvrOperationResult addResult = addPresetToTourDirect(ip, username, password, channelNo, tourNo, presetNo);
+                    if (addResult.isSuccess()) {
+                        successCount++;
+                    }
+                    Thread.sleep(100);
+                }
+                
+                if (successCount > 0) {
+                    return NvrOperationResult.success("PTZ命令同步成功，添加了 " + successCount + " 个预设点（名称和停留时间使用设备默认值）");
+                } else {
+                    return NvrOperationResult.failure("同步失败，没有成功添加预设点");
+                }
+            }
+            
+            ipcLoginTimeCache.put(ip, System.currentTimeMillis());
+            return NvrOperationResult.success("巡航组同步成功");
+            
+        } catch (Exception e) {
+            log.error("{} 同步巡航组异常: ip={}, error={}", LOG_PREFIX, ip, e.getMessage(), e);
+            return NvrOperationResult.failure("同步巡航组异常: " + e.getMessage());
         }
     }
 

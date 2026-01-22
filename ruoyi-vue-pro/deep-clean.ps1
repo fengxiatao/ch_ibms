@@ -6,12 +6,18 @@
 #   .\deep-clean.ps1                    # Full clean and rebuild
 #   .\deep-clean.ps1 -SkipMavenBuild    # Clean only, no build
 #   .\deep-clean.ps1 -CleanIdeaConfig   # Also clean IDEA config
+#   .\deep-clean.ps1 -KillAllJava       # Kill ALL Java processes (including IDEA)
+# 
+# If deletion fails due to locked files:
+#   1. Close IDEA completely
+#   2. Run: .\deep-clean.ps1 -KillAllJava
 # ============================================================================
 
 param(
     [switch]$SkipMavenBuild,
     [switch]$CleanIdeaConfig,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$KillAllJava
 )
 
 $ErrorActionPreference = "Continue"
@@ -76,13 +82,31 @@ foreach ($port in $ports) {
 
 $javaProcesses = Get-WmiObject Win32_Process -Filter "Name='java.exe'" -ErrorAction SilentlyContinue
 foreach ($proc in $javaProcesses) {
-    if ($proc.CommandLine -match "maven|yudao|YudaoServerApplication") {
+    if ($KillAllJava) {
+        Write-Info "Killing ALL Java process (PID: $($proc.ProcessId)): $($proc.Name)"
+        Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    elseif ($proc.CommandLine -match "maven|yudao|YudaoServerApplication|IotNewGatewayServerApplication|newgateway|spring-boot|iot-biz") {
         Write-Info "Killing Java process (PID: $($proc.ProcessId))"
         Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
     }
 }
 
-Start-Sleep -Seconds 2
+$fsNotifier = Get-Process -Name "fsnotifier*" -ErrorAction SilentlyContinue
+foreach ($proc in $fsNotifier) {
+    Write-Info "Killing fsnotifier process (PID: $($proc.Id))"
+    Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+}
+
+if ($KillAllJava) {
+    $cursorProcesses = Get-Process -Name "*cursor*", "*code*" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "cursor|code" -and $_.Name -notmatch "codecatalyst" }
+    foreach ($proc in $cursorProcesses) {
+        Write-Info "Killing Cursor/VSCode process (PID: $($proc.Id)): $($proc.Name)"
+        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Start-Sleep -Seconds 3
 Write-Success "Process cleanup complete"
 
 # ============================================================================
@@ -90,23 +114,73 @@ Write-Success "Process cleanup complete"
 # ============================================================================
 Write-Header "Step 2/7: Deleting all target directories"
 
+function Force-RemoveDirectory {
+    param([string]$Path, [int]$MaxRetries = 3)
+    
+    for ($retry = 1; $retry -le $MaxRetries; $retry++) {
+        if (-not (Test-Path $Path)) {
+            return $true
+        }
+        
+        try {
+            Remove-Item -Path $Path -Recurse -Force -ErrorAction Stop
+            if (-not (Test-Path $Path)) { return $true }
+        } catch { }
+        
+        try {
+            cmd /c "rd /s /q `"$Path`"" 2>$null
+            if (-not (Test-Path $Path)) { return $true }
+        } catch { }
+        
+        try {
+            $emptyDir = Join-Path $env:TEMP "empty_$(Get-Random)"
+            New-Item -ItemType Directory -Path $emptyDir -Force | Out-Null
+            robocopy $emptyDir $Path /MIR /NFL /NDL /NJH /NJS /nc /ns /np 2>$null
+            Remove-Item -Path $Path -Force -Recurse -ErrorAction SilentlyContinue
+            Remove-Item -Path $emptyDir -Force -ErrorAction SilentlyContinue
+            if (-not (Test-Path $Path)) { return $true }
+        } catch { }
+        
+        try {
+            Get-ChildItem -Path $Path -Recurse -Force -ErrorAction SilentlyContinue | Sort-Object { $_.FullName.Length } -Descending | ForEach-Object {
+                $_.Attributes = 'Normal'
+                Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+            }
+            Remove-Item -Path $Path -Force -Recurse -ErrorAction SilentlyContinue
+            if (-not (Test-Path $Path)) { return $true }
+        } catch { }
+        
+        if ($retry -lt $MaxRetries) {
+            Write-Warn "Retry $retry/$MaxRetries for: $Path"
+            Start-Sleep -Seconds 2
+        }
+    }
+    
+    return -not (Test-Path $Path)
+}
+
 $targetDirs = Get-ChildItem -Path . -Directory -Recurse -Filter "target" -ErrorAction SilentlyContinue
 $deletedCount = 0
+$failedDirs = @()
 
 foreach ($dir in $targetDirs) {
-    try {
-        Write-Info "Deleting: $($dir.FullName)"
-        Remove-Item -Path $dir.FullName -Recurse -Force -ErrorAction Stop
+    Write-Info "Deleting: $($dir.FullName)"
+    if (Force-RemoveDirectory -Path $dir.FullName) {
         $deletedCount++
     }
-    catch {
-        Write-Warn "Cannot delete $($dir.FullName): $($_.Exception.Message)"
-        $emptyDir = Join-Path $env:TEMP "empty_$(Get-Random)"
-        New-Item -ItemType Directory -Path $emptyDir -Force | Out-Null
-        robocopy $emptyDir $dir.FullName /MIR /NFL /NDL /NJH /NJS /nc /ns /np 2>$null
-        Remove-Item -Path $dir.FullName -Force -Recurse -ErrorAction SilentlyContinue
-        Remove-Item -Path $emptyDir -Force -ErrorAction SilentlyContinue
+    else {
+        Write-Warn "Failed to delete (may be locked): $($dir.FullName)"
+        $failedDirs += $dir.FullName
     }
+}
+
+if ($failedDirs.Count -gt 0) {
+    Write-Warn "The following directories could not be deleted (likely locked by IDEA or other process):"
+    foreach ($dir in $failedDirs) {
+        Write-Host "    - $dir" -ForegroundColor Yellow
+    }
+    Write-Host ""
+    Write-Warn "Try: 1) Close IDEA completely  2) Run with -KillAllJava parameter"
 }
 
 Write-Success "Deleted $deletedCount target directories"
@@ -146,15 +220,26 @@ Write-Success "Class file cleanup complete (deleted $classFileCount class files 
 # ============================================================================
 Write-Header "Step 4/7: Cleaning Maven local repository cache"
 
-$m2Path = "$env:USERPROFILE\.m2\repository\cn\iocoder\boot"
+$m2Paths = @(
+    "$env:USERPROFILE\.m2\repository\cn\iocoder\boot",
+    "F:\repo\cn\iocoder\boot",
+    "D:\repo\cn\iocoder\boot"
+)
 
-if (Test-Path $m2Path) {
-    Write-Info "Deleting Maven cache: $m2Path"
-    Remove-Item -Path $m2Path -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Success "Maven local repository cache cleaned"
+$cleanedCount = 0
+foreach ($m2Path in $m2Paths) {
+    if (Test-Path $m2Path) {
+        Write-Info "Deleting Maven cache: $m2Path"
+        Remove-Item -Path $m2Path -Recurse -Force -ErrorAction SilentlyContinue
+        $cleanedCount++
+    }
+}
+
+if ($cleanedCount -gt 0) {
+    Write-Success "Maven local repository cache cleaned ($cleanedCount locations)"
 }
 else {
-    Write-Info "Maven cache directory not found, skipping: $m2Path"
+    Write-Info "No Maven cache directories found, skipping"
 }
 
 # ============================================================================
@@ -206,19 +291,20 @@ Write-Success "IDEA compilation cache cleaned"
 if (-not $SkipMavenBuild) {
     Write-Header "Step 6/7: Executing Maven full rebuild"
     
-    Write-Host "  Command: mvn clean install -DskipTests -U -T 1C" -ForegroundColor White
+    Write-Host "  Command: mvn install -DskipTests -U -T 1C" -ForegroundColor White
     Write-Host "  Options:" -ForegroundColor Gray
-    Write-Host "    -U      Force update snapshots" -ForegroundColor Gray
-    Write-Host "    -T 1C   Multi-threaded build (1 thread per CPU core)" -ForegroundColor Gray
+    Write-Host "    (no clean) Script already cleaned target directories thoroughly" -ForegroundColor Gray
+    Write-Host "    -U         Force update snapshots" -ForegroundColor Gray
+    Write-Host "    -T 1C      Multi-threaded build (1 thread per CPU core)" -ForegroundColor Gray
     Write-Host ""
     
     if (Test-Path "mvnw.cmd") {
         Write-Info "Detected Maven Wrapper, using mvnw.cmd"
-        & .\mvnw.cmd clean install -DskipTests -U -T 1C
+        & .\mvnw.cmd install -DskipTests -U -T 1C
     }
     else {
         Write-Info "Using system Maven"
-        & mvn clean install -DskipTests -U -T 1C
+        & mvn install -DskipTests -U -T 1C
     }
     $buildSuccess = ($LASTEXITCODE -eq 0)
 }
