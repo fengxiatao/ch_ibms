@@ -244,6 +244,100 @@ public class NvrCommandService {
     }
 
     /**
+     * 发送区域放大（3D定位）命令
+     * 
+     * <p>通过消息总线发送区域放大命令到 NewGateway。</p>
+     * <p>用户在视频画面上框选区域，摄像头会自动移动并放大到该区域。</p>
+     * 
+     * <p>坐标系说明：所有坐标为归一化坐标（0-8192），
+     * 其中 (0,0) 为画面左上角，(8192,8192) 为画面右下角。</p>
+     * 
+     * @param deviceId   设备ID（NVR）
+     * @param channelNo  通道号
+     * @param startX     框选起始点 X
+     * @param startY     框选起始点 Y
+     * @param endX       框选结束点 X
+     * @param endY       框选结束点 Y
+     * @param targetIp   目标设备IP（直连 IPC）
+     * @param username   目标设备用户名
+     * @param password   目标设备密码
+     * @return requestId 请求ID
+     */
+    public String areaZoom(Long deviceId, int channelNo, int startX, int startY, int endX, int endY,
+                           String targetIp, String username, String password) {
+        Map<String, Object> params = new HashMap<>();
+        params.put(NvrDeviceTypeConstants.PARAM_CHANNEL_NO, channelNo);
+        params.put("areaStartX", startX);
+        params.put("areaStartY", startY);
+        params.put("areaEndX", endX);
+        params.put("areaEndY", endY);
+        
+        // 区域放大需要直连 IPC
+        if (targetIp != null && !targetIp.isEmpty()) {
+            params.put("targetIp", targetIp);
+            params.put("targetUsername", username != null ? username : "admin");
+            params.put("targetPassword", password != null ? password : "admin123");
+            log.info("{} 区域放大将直连目标设备: targetIp={}", LOG_PREFIX, targetIp);
+        }
+
+        String requestId = deviceCommandPublisher.publishCommand(
+                NvrDeviceTypeConstants.NVR,
+                deviceId,
+                NvrDeviceTypeConstants.COMMAND_PTZ_CONTROL,
+                params
+        );
+
+        log.info("{} 区域放大命令已发送: deviceId={}, channel={}, area=({},{}) -> ({},{}), targetIp={}, requestId={}",
+                LOG_PREFIX, deviceId, channelNo, startX, startY, endX, endY, targetIp, requestId);
+
+        return requestId;
+    }
+
+    /**
+     * 发送 3D 定位命令
+     * 
+     * <p>直接指定中心点和放大倍数进行 3D 定位。</p>
+     * 
+     * @param deviceId   设备ID（NVR）
+     * @param channelNo  通道号
+     * @param x          中心点 X（0-8192）
+     * @param y          中心点 Y（0-8192）
+     * @param zoom       放大倍数（1-128）
+     * @param targetIp   目标设备IP（直连 IPC）
+     * @param username   目标设备用户名
+     * @param password   目标设备密码
+     * @return requestId 请求ID
+     */
+    public String position3D(Long deviceId, int channelNo, int x, int y, int zoom,
+                             String targetIp, String username, String password) {
+        Map<String, Object> params = new HashMap<>();
+        params.put(NvrDeviceTypeConstants.PARAM_CHANNEL_NO, channelNo);
+        params.put("positionX", x);
+        params.put("positionY", y);
+        params.put("positionZoom", zoom);
+        
+        // 3D 定位需要直连 IPC
+        if (targetIp != null && !targetIp.isEmpty()) {
+            params.put("targetIp", targetIp);
+            params.put("targetUsername", username != null ? username : "admin");
+            params.put("targetPassword", password != null ? password : "admin123");
+            log.info("{} 3D定位将直连目标设备: targetIp={}", LOG_PREFIX, targetIp);
+        }
+
+        String requestId = deviceCommandPublisher.publishCommand(
+                NvrDeviceTypeConstants.NVR,
+                deviceId,
+                NvrDeviceTypeConstants.COMMAND_PTZ_CONTROL,
+                params
+        );
+
+        log.info("{} 3D定位命令已发送: deviceId={}, channel={}, position=({},{},{}), targetIp={}, requestId={}",
+                LOG_PREFIX, deviceId, channelNo, x, y, zoom, targetIp, requestId);
+
+        return requestId;
+    }
+
+    /**
      * 发送截图命令
      * 
      * <p>通过消息总线发送截图命令到 NewGateway。</p>

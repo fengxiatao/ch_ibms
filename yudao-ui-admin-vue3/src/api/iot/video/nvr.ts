@@ -83,6 +83,40 @@ export const nvrPresetControl = (nvrId: number, data: NvrPresetControlReq) => {
   return request.post<string>({ url: `/iot/video/nvr/${nvrId}/ptz/preset`, data })
 }
 
+/**
+ * 3D定位/区域放大控制
+ * 用于在视频画面上框选区域进行快速定位放大
+ * 
+ * 坐标系说明：
+ * - x, y 为归一化坐标（0-8192），其中 (0,0) 为画面左上角，(8192,8192) 为画面右下角
+ * - 前端传入框选区域的像素坐标，后端会进行坐标转换
+ */
+export interface NvrAreaZoomReq {
+  channelNo: number      // 通道号
+  startX: number         // 框选起始点 X（归一化坐标 0-8192）
+  startY: number         // 框选起始点 Y（归一化坐标 0-8192）
+  endX: number           // 框选结束点 X（归一化坐标 0-8192）
+  endY: number           // 框选结束点 Y（归一化坐标 0-8192）
+}
+
+export const nvrAreaZoom = (nvrId: number, data: NvrAreaZoomReq) => {
+  return request.post<string>({ url: `/iot/video/nvr/${nvrId}/ptz/area-zoom`, data })
+}
+
+/**
+ * 3D定位控制（直接指定中心点和放大倍数）
+ */
+export interface Nvr3DPositionReq {
+  channelNo: number      // 通道号
+  x: number              // 中心点 X（归一化坐标 0-8192）
+  y: number              // 中心点 Y（归一化坐标 0-8192）
+  zoom: number           // 放大倍数（1-128）
+}
+
+export const nvr3DPosition = (nvrId: number, data: Nvr3DPositionReq) => {
+  return request.post<string>({ url: `/iot/video/nvr/${nvrId}/ptz/3d-position`, data })
+}
+
 // 云台控制：旧的网关直接调用接口（已废弃，保留兼容）
 export interface PtzControlReq {
   ip: string

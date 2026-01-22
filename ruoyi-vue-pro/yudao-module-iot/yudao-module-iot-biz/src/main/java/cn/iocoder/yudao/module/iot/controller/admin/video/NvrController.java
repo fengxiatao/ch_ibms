@@ -467,6 +467,109 @@ public class NvrController {
         return success(requestId);
     }
 
+    @PostMapping("/{id}/ptz/area-zoom")
+    @Operation(summary = "NVR通道区域放大（3D定位）", description = "在视频画面上框选区域进行快速定位放大")
+    @PreAuthorize("@ss.hasPermission('iot:camera:query')")
+    public CommonResult<String> areaZoom(@PathVariable("id") Long nvrId, @RequestBody AreaZoomReq req) {
+        // 查找通道信息，获取 target_channel_no、target_ip 和认证信息
+        Integer targetChannelNo = req.getChannelNo();
+        String targetIp = null;
+        String targetUsername = "admin";      // 默认用户名
+        String targetPassword = "admin123";   // 默认密码
+        
+        IotDeviceChannelDO channel = channelService.getChannelByDeviceIdAndChannelNo(nvrId, req.getChannelNo());
+        if (channel != null) {
+            if (channel.getTargetChannelNo() != null) {
+                targetChannelNo = channel.getTargetChannelNo();
+            }
+            targetIp = channel.getTargetIp();
+            // 从通道表读取用户名密码，如果没有则使用默认值
+            if (StringUtils.isNotBlank(channel.getUsername())) {
+                targetUsername = channel.getUsername();
+            }
+            if (StringUtils.isNotBlank(channel.getPassword())) {
+                targetPassword = channel.getPassword();
+            }
+            log.info("[区域放大] 映射通道: nvrChannelNo={} -> targetChannelNo={}, targetIp={}, username={}", 
+                    req.getChannelNo(), targetChannelNo, targetIp, targetUsername);
+        }
+        
+        // 区域放大需要直连 IPC
+        if (StringUtils.isBlank(targetIp)) {
+            log.warn("[区域放大] 未配置 targetIp，无法执行区域放大: nvrId={}, channelNo={}", nvrId, req.getChannelNo());
+            return CommonResult.error(500, "区域放大需要配置 IPC 的 IP 地址");
+        }
+        
+        log.info("[区域放大] nvrId={}, targetChannelNo={}, targetIp={}, area=({},{}) -> ({},{})",
+                nvrId, targetChannelNo, targetIp, req.getStartX(), req.getStartY(), req.getEndX(), req.getEndY());
+        
+        // 发送区域放大命令
+        String requestId = nvrCommandService.areaZoom(
+                nvrId,
+                targetChannelNo,
+                req.getStartX(),
+                req.getStartY(),
+                req.getEndX(),
+                req.getEndY(),
+                targetIp,
+                targetUsername,
+                targetPassword
+        );
+        
+        return success(requestId);
+    }
+
+    @PostMapping("/{id}/ptz/3d-position")
+    @Operation(summary = "NVR通道3D定位", description = "直接指定中心点和放大倍数进行3D定位")
+    @PreAuthorize("@ss.hasPermission('iot:camera:query')")
+    public CommonResult<String> position3D(@PathVariable("id") Long nvrId, @RequestBody Position3DReq req) {
+        // 查找通道信息，获取 target_channel_no、target_ip 和认证信息
+        Integer targetChannelNo = req.getChannelNo();
+        String targetIp = null;
+        String targetUsername = "admin";      // 默认用户名
+        String targetPassword = "admin123";   // 默认密码
+        
+        IotDeviceChannelDO channel = channelService.getChannelByDeviceIdAndChannelNo(nvrId, req.getChannelNo());
+        if (channel != null) {
+            if (channel.getTargetChannelNo() != null) {
+                targetChannelNo = channel.getTargetChannelNo();
+            }
+            targetIp = channel.getTargetIp();
+            // 从通道表读取用户名密码，如果没有则使用默认值
+            if (StringUtils.isNotBlank(channel.getUsername())) {
+                targetUsername = channel.getUsername();
+            }
+            if (StringUtils.isNotBlank(channel.getPassword())) {
+                targetPassword = channel.getPassword();
+            }
+            log.info("[3D定位] 映射通道: nvrChannelNo={} -> targetChannelNo={}, targetIp={}, username={}", 
+                    req.getChannelNo(), targetChannelNo, targetIp, targetUsername);
+        }
+        
+        // 3D定位需要直连 IPC
+        if (StringUtils.isBlank(targetIp)) {
+            log.warn("[3D定位] 未配置 targetIp，无法执行3D定位: nvrId={}, channelNo={}", nvrId, req.getChannelNo());
+            return CommonResult.error(500, "3D定位需要配置 IPC 的 IP 地址");
+        }
+        
+        log.info("[3D定位] nvrId={}, targetChannelNo={}, targetIp={}, position=({},{},{})",
+                nvrId, targetChannelNo, targetIp, req.getX(), req.getY(), req.getZoom());
+        
+        // 发送3D定位命令
+        String requestId = nvrCommandService.position3D(
+                nvrId,
+                targetChannelNo,
+                req.getX(),
+                req.getY(),
+                req.getZoom() != null ? req.getZoom() : 4,
+                targetIp,
+                targetUsername,
+                targetPassword
+        );
+        
+        return success(requestId);
+    }
+
     private Integer extractChannelNo(String config) {
         if (StringUtils.isBlank(config)) return null;
         try {
@@ -655,6 +758,49 @@ public class NvrController {
         public void setAction(String action) { this.action = action; }
         public String getPresetName() { return presetName; }
         public void setPresetName(String presetName) { this.presetName = presetName; }
+    }
+
+    /**
+     * 区域放大请求（3D定位 - 框选模式）
+     * 坐标为归一化坐标（0-8192），(0,0) 为画面左上角，(8192,8192) 为画面右下角
+     */
+    public static class AreaZoomReq {
+        private Integer channelNo;   // 通道号
+        private Integer startX;      // 框选起始点 X
+        private Integer startY;      // 框选起始点 Y
+        private Integer endX;        // 框选结束点 X
+        private Integer endY;        // 框选结束点 Y
+        
+        public Integer getChannelNo() { return channelNo; }
+        public void setChannelNo(Integer channelNo) { this.channelNo = channelNo; }
+        public Integer getStartX() { return startX; }
+        public void setStartX(Integer startX) { this.startX = startX; }
+        public Integer getStartY() { return startY; }
+        public void setStartY(Integer startY) { this.startY = startY; }
+        public Integer getEndX() { return endX; }
+        public void setEndX(Integer endX) { this.endX = endX; }
+        public Integer getEndY() { return endY; }
+        public void setEndY(Integer endY) { this.endY = endY; }
+    }
+
+    /**
+     * 3D定位请求（直接指定中心点和放大倍数）
+     * 坐标为归一化坐标（0-8192），(0,0) 为画面左上角，(8192,8192) 为画面右下角
+     */
+    public static class Position3DReq {
+        private Integer channelNo;   // 通道号
+        private Integer x;           // 中心点 X
+        private Integer y;           // 中心点 Y
+        private Integer zoom;        // 放大倍数（1-128）
+        
+        public Integer getChannelNo() { return channelNo; }
+        public void setChannelNo(Integer channelNo) { this.channelNo = channelNo; }
+        public Integer getX() { return x; }
+        public void setX(Integer x) { this.x = x; }
+        public Integer getY() { return y; }
+        public void setY(Integer y) { this.y = y; }
+        public Integer getZoom() { return zoom; }
+        public void setZoom(Integer zoom) { this.zoom = zoom; }
     }
 
     /**

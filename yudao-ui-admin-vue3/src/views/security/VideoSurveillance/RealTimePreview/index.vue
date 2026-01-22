@@ -140,6 +140,15 @@
                     >
                   </template>
                   <div class="ptz-panel">
+                    <!-- 不支持云台时显示提示 -->
+                    <div v-if="!activePaneSupportsPtz" class="ptz-panel-disabled">
+                      <Icon icon="ep:warning-filled" :size="48" />
+                      <p class="main-tip">当前通道不支持云台控制</p>
+                      <p class="sub-tip">请选择支持云台的球机或云台摄像头</p>
+                    </div>
+                    
+                    <!-- 支持云台时显示完整控制面板 -->
+                    <template v-else>
                     <!-- 预设点列表 - 放在最上面 -->
                     <div class="ptz-preset-list">
                       <div class="preset-list-header">
@@ -296,107 +305,124 @@
                     <div class="ptz-card">
                       <div class="ptz-title">云台控制</div>
                       <div class="ptz-dpad">
-                        <button
-                          class="ptz-dir up"
-                          @mousedown="handlePtzMoveStart('up')"
-                          @mouseup="handlePtzMoveStop"
-                          @mouseleave="handlePtzMoveStop"
+                          <button
+                            class="ptz-dir up"
+                            @mousedown="handlePtzMoveStart('up')"
+                            @mouseup="handlePtzMoveStop"
+                            @mouseleave="handlePtzMoveStop"
+                          >
+                            <Icon icon="ep:arrow-up-bold" />
+                          </button>
+                          <button
+                            class="ptz-dir left"
+                            @mousedown="handlePtzMoveStart('left')"
+                            @mouseup="handlePtzMoveStop"
+                            @mouseleave="handlePtzMoveStop"
+                          >
+                            <Icon icon="ep:arrow-left-bold" />
+                          </button>
+                          <button
+                            class="ptz-center"
+                            @mousedown="handlePtzStart()"
+                            @mouseup="handlePtzStop()"
+                          >
+                            <Icon icon="ep:aim" />
+                          </button>
+                          <button
+                            class="ptz-dir right"
+                            @mousedown="handlePtzMoveStart('right')"
+                            @mouseup="handlePtzMoveStop"
+                            @mouseleave="handlePtzMoveStop"
+                          >
+                            <Icon icon="ep:arrow-right-bold" />
+                          </button>
+                          <button
+                            class="ptz-dir down"
+                            @mousedown="handlePtzMoveStart('down')"
+                            @mouseup="handlePtzMoveStop"
+                            @mouseleave="handlePtzMoveStop"
+                          >
+                            <Icon icon="ep:arrow-down-bold" />
+                          </button>
+                        </div>
+                        <div class="ptz-step">
+                          <span>步长</span>
+                          <el-slider v-model="ptzStep" :min="1" :max="10" :show-tooltip="false" />
+                        </div>
+                        <div class="ptz-grid">
+                          <button
+                            class="ptz-op"
+                            @mousedown="handlePtzZoomInStart"
+                            @mouseup="handlePtzOperationStop"
+                            @mouseleave="handlePtzOperationStop"
+                          >
+                            <Icon icon="ep:zoom-in" />
+                            <span>缩放</span>
+                          </button>
+                          <button
+                            class="ptz-op"
+                            @mousedown="handlePtzFocusInStart"
+                            @mouseup="handlePtzOperationStop"
+                            @mouseleave="handlePtzOperationStop"
+                          >
+                            <Icon icon="ep:filter" />
+                            <span>聚焦</span>
+                          </button>
+                          <button
+                            class="ptz-op"
+                            @mousedown="handlePtzIrisOpenStart"
+                            @mouseup="handlePtzOperationStop"
+                            @mouseleave="handlePtzOperationStop"
+                          >
+                            <Icon icon="ep:sunny" />
+                            <span>光圈</span>
+                          </button>
+                          <button
+                            class="ptz-op"
+                            @mousedown="handlePtzZoomOutStart"
+                            @mouseup="handlePtzOperationStop"
+                            @mouseleave="handlePtzOperationStop"
+                          >
+                            <Icon icon="ep:zoom-out" />
+                            <span>缩放</span>
+                          </button>
+                          <button
+                            class="ptz-op"
+                            @mousedown="handlePtzFocusOutStart"
+                            @mouseup="handlePtzOperationStop"
+                            @mouseleave="handlePtzOperationStop"
+                          >
+                            <Icon icon="ep:filter" />
+                            <span>聚焦</span>
+                          </button>
+                          <button
+                            class="ptz-op"
+                            @mousedown="handlePtzIrisCloseStart"
+                            @mouseup="handlePtzOperationStop"
+                            @mouseleave="handlePtzOperationStop"
+                          >
+                            <Icon icon="ep:moon" />
+                            <span>光圈</span>
+                          </button>
+                        </div>
+                        
+                      <!-- 区域放大功能 -->
+                      <div class="ptz-area-zoom">
+                        <el-button
+                          :type="areaZoomMode ? 'primary' : 'default'"
+                          size="small"
+                          @click="toggleAreaZoomMode"
+                          :title="areaZoomMode ? '点击取消框选模式' : '点击开启框选放大模式'"
                         >
-                          <Icon icon="ep:arrow-up-bold" />
-                        </button>
-                        <button
-                          class="ptz-dir left"
-                          @mousedown="handlePtzMoveStart('left')"
-                          @mouseup="handlePtzMoveStop"
-                          @mouseleave="handlePtzMoveStop"
-                        >
-                          <Icon icon="ep:arrow-left-bold" />
-                        </button>
-                        <button
-                          class="ptz-center"
-                          @mousedown="handlePtzStart()"
-                          @mouseup="handlePtzStop()"
-                        >
-                          <Icon icon="ep:aim" />
-                        </button>
-                        <button
-                          class="ptz-dir right"
-                          @mousedown="handlePtzMoveStart('right')"
-                          @mouseup="handlePtzMoveStop"
-                          @mouseleave="handlePtzMoveStop"
-                        >
-                          <Icon icon="ep:arrow-right-bold" />
-                        </button>
-                        <button
-                          class="ptz-dir down"
-                          @mousedown="handlePtzMoveStart('down')"
-                          @mouseup="handlePtzMoveStop"
-                          @mouseleave="handlePtzMoveStop"
-                        >
-                          <Icon icon="ep:arrow-down-bold" />
-                        </button>
-                      </div>
-                      <div class="ptz-step">
-                        <span>步长</span>
-                        <el-slider v-model="ptzStep" :min="1" :max="10" :show-tooltip="false" />
-                      </div>
-                      <div class="ptz-grid">
-                        <button
-                          class="ptz-op"
-                          @mousedown="handlePtzZoomInStart"
-                          @mouseup="handlePtzOperationStop"
-                          @mouseleave="handlePtzOperationStop"
-                        >
-                          <Icon icon="ep:zoom-in" />
-                          <span>缩放</span>
-                        </button>
-                        <button
-                          class="ptz-op"
-                          @mousedown="handlePtzFocusInStart"
-                          @mouseup="handlePtzOperationStop"
-                          @mouseleave="handlePtzOperationStop"
-                        >
-                          <Icon icon="ep:filter" />
-                          <span>聚焦</span>
-                        </button>
-                        <button
-                          class="ptz-op"
-                          @mousedown="handlePtzIrisOpenStart"
-                          @mouseup="handlePtzOperationStop"
-                          @mouseleave="handlePtzOperationStop"
-                        >
-                          <Icon icon="ep:sunny" />
-                          <span>光圈</span>
-                        </button>
-                        <button
-                          class="ptz-op"
-                          @mousedown="handlePtzZoomOutStart"
-                          @mouseup="handlePtzOperationStop"
-                          @mouseleave="handlePtzOperationStop"
-                        >
-                          <Icon icon="ep:zoom-out" />
-                          <span>缩放</span>
-                        </button>
-                        <button
-                          class="ptz-op"
-                          @mousedown="handlePtzFocusOutStart"
-                          @mouseup="handlePtzOperationStop"
-                          @mouseleave="handlePtzOperationStop"
-                        >
-                          <Icon icon="ep:filter" />
-                          <span>聚焦</span>
-                        </button>
-                        <button
-                          class="ptz-op"
-                          @mousedown="handlePtzIrisCloseStart"
-                          @mouseup="handlePtzOperationStop"
-                          @mouseleave="handlePtzOperationStop"
-                        >
-                          <Icon icon="ep:moon" />
-                          <span>光圈</span>
-                        </button>
+                          <Icon icon="ep:crop" />
+                          <span>{{ areaZoomMode ? '取消框选' : '区域放大' }}</span>
+                        </el-button>
+                        <span v-if="areaZoomMode" class="area-zoom-tip">
+                          在视频画面上框选区域进行定点放大
+                        </span>
                       </div>
                     </div>
+                    </template>
                   </div>
                 </el-collapse-item>
               </el-collapse>
@@ -590,6 +616,29 @@
                           </template>
                         </el-dropdown>
                       </div>
+                    </div>
+                    
+                    <!-- 区域框选覆盖层 -->
+                    <div 
+                      v-if="areaZoomMode && pane.isPlaying && activePane === idx"
+                      class="area-zoom-overlay"
+                      @mousedown.stop="handleAreaZoomStart($event, idx)"
+                      @mousemove.stop="handleAreaZoomMove($event)"
+                      @mouseup.stop="handleAreaZoomEnd($event, idx)"
+                      @mouseleave.stop="handleAreaZoomCancel"
+                    >
+                      <!-- 框选提示 -->
+                      <div class="area-zoom-hint" v-if="!areaZoomSelection.isDrawing">
+                        <Icon icon="ep:crop" :size="32" />
+                        <p>按住鼠标拖动框选区域</p>
+                        <p class="sub-tip">松开鼠标后将自动放大到选中区域</p>
+                      </div>
+                      <!-- 框选矩形 -->
+                      <div 
+                        v-if="areaZoomSelection.isDrawing"
+                        class="area-zoom-rect"
+                        :style="areaZoomRectStyle"
+                      ></div>
                     </div>
                   </div>
                 </div>
@@ -3215,6 +3264,18 @@ const selectedPresetNo = ref<number | null>(null) // 当前选中的预设点编
 const editingPresetId = ref<number | null>(null) // 正在编辑的预设点ID
 const editingPresetNo = ref<number | null>(null) // 正在编辑的预设点编号
 
+// 区域放大相关
+const areaZoomMode = ref(false) // 区域放大模式
+const areaZoomSelection = reactive({
+  isDrawing: false,
+  startX: 0,
+  startY: 0,
+  currentX: 0,
+  currentY: 0,
+  paneIdx: -1,
+  paneRect: null as DOMRect | null
+})
+
 // 巡航相关数据
 const cruiseList = ref<CameraCruiseRespVO[]>([])
 const showCruiseDialog = ref(false)
@@ -3736,6 +3797,150 @@ const handlePtzOperationStop = () => {
   if (currentPtzCommand) {
     executePtzCommand(currentPtzCommand, true)
     currentPtzCommand = null
+  }
+}
+
+// ==================== 区域放大功能 ====================
+
+// 区域放大矩形样式
+const areaZoomRectStyle = computed(() => {
+  if (!areaZoomSelection.isDrawing) return {}
+  
+  const x1 = Math.min(areaZoomSelection.startX, areaZoomSelection.currentX)
+  const y1 = Math.min(areaZoomSelection.startY, areaZoomSelection.currentY)
+  const x2 = Math.max(areaZoomSelection.startX, areaZoomSelection.currentX)
+  const y2 = Math.max(areaZoomSelection.startY, areaZoomSelection.currentY)
+  
+  return {
+    left: `${x1}px`,
+    top: `${y1}px`,
+    width: `${x2 - x1}px`,
+    height: `${y2 - y1}px`
+  }
+})
+
+// 切换区域放大模式
+const toggleAreaZoomMode = () => {
+  areaZoomMode.value = !areaZoomMode.value
+  if (areaZoomMode.value) {
+    ElMessage.info('区域放大模式已开启，在视频画面上框选区域')
+  } else {
+    // 清理状态
+    areaZoomSelection.isDrawing = false
+  }
+}
+
+// 开始框选
+const handleAreaZoomStart = (event: MouseEvent, paneIdx: number) => {
+  const target = event.currentTarget as HTMLElement
+  if (!target) return
+  
+  const rect = target.getBoundingClientRect()
+  areaZoomSelection.paneRect = rect
+  areaZoomSelection.paneIdx = paneIdx
+  areaZoomSelection.startX = event.clientX - rect.left
+  areaZoomSelection.startY = event.clientY - rect.top
+  areaZoomSelection.currentX = areaZoomSelection.startX
+  areaZoomSelection.currentY = areaZoomSelection.startY
+  areaZoomSelection.isDrawing = true
+  
+  console.log('[区域放大] 开始框选:', { 
+    startX: areaZoomSelection.startX, 
+    startY: areaZoomSelection.startY,
+    paneIdx 
+  })
+}
+
+// 框选移动
+const handleAreaZoomMove = (event: MouseEvent) => {
+  if (!areaZoomSelection.isDrawing || !areaZoomSelection.paneRect) return
+  
+  const rect = areaZoomSelection.paneRect
+  areaZoomSelection.currentX = Math.max(0, Math.min(event.clientX - rect.left, rect.width))
+  areaZoomSelection.currentY = Math.max(0, Math.min(event.clientY - rect.top, rect.height))
+}
+
+// 结束框选并执行区域放大
+const handleAreaZoomEnd = async (event: MouseEvent, paneIdx: number) => {
+  if (!areaZoomSelection.isDrawing) return
+  
+  areaZoomSelection.isDrawing = false
+  
+  const pane = panes.value[paneIdx]
+  if (!pane || !pane.channel || !pane.isPlaying) {
+    ElMessage.warning('当前窗口未播放视频')
+    return
+  }
+  
+  // 检查框选区域大小（至少 20x20 像素）
+  const x1 = Math.min(areaZoomSelection.startX, areaZoomSelection.currentX)
+  const y1 = Math.min(areaZoomSelection.startY, areaZoomSelection.currentY)
+  const x2 = Math.max(areaZoomSelection.startX, areaZoomSelection.currentX)
+  const y2 = Math.max(areaZoomSelection.startY, areaZoomSelection.currentY)
+  
+  const width = x2 - x1
+  const height = y2 - y1
+  
+  if (width < 20 || height < 20) {
+    ElMessage.warning('框选区域太小，请重新框选')
+    return
+  }
+  
+  // 获取画布尺寸
+  const rect = areaZoomSelection.paneRect
+  if (!rect) return
+  
+  // 将像素坐标转换为归一化坐标（0-8192）
+  const normalizeX = (px: number) => Math.round((px / rect.width) * 8192)
+  const normalizeY = (py: number) => Math.round((py / rect.height) * 8192)
+  
+  const startX = normalizeX(x1)
+  const startY = normalizeY(y1)
+  const endX = normalizeX(x2)
+  const endY = normalizeY(y2)
+  
+  console.log('[区域放大] 框选完成:', {
+    pixelRect: { x1, y1, x2, y2, width, height },
+    normalizedRect: { startX, startY, endX, endY },
+    canvasSize: { width: rect.width, height: rect.height }
+  })
+  
+  try {
+    const channel = pane.channel
+    const nvrId = channel.deviceId || channel.nvrId
+    const channelNo = channel.channelNo ?? 0
+    
+    if (!nvrId) {
+      ElMessage.error('无法获取 NVR 设备ID')
+      return
+    }
+    
+    // 调用区域放大 API
+    const { nvrAreaZoom } = await import('@/api/iot/video/nvr')
+    await nvrAreaZoom(nvrId, {
+      channelNo,
+      startX,
+      startY,
+      endX,
+      endY
+    })
+    
+    ElMessage.success('区域放大命令已发送')
+    
+    // 自动关闭区域放大模式
+    areaZoomMode.value = false
+    
+  } catch (error: any) {
+    console.error('[区域放大] 执行失败:', error)
+    ElMessage.error('区域放大失败：' + (error?.message || error))
+  }
+}
+
+// 取消框选
+const handleAreaZoomCancel = () => {
+  if (areaZoomSelection.isDrawing) {
+    areaZoomSelection.isDrawing = false
+    console.log('[区域放大] 取消框选')
   }
 }
 
@@ -4701,6 +4906,78 @@ const submitSaveView = async () => {
             box-shadow: 0 0 8px rgba(78, 161, 255, 0.35);
           }
 
+          /* 云台面板禁用提示 */
+          .ptz-panel-disabled {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            color: #909399;
+            text-align: center;
+            
+            .main-tip {
+              margin: 16px 0 8px 0;
+              font-size: 14px;
+              font-weight: 500;
+              color: #e6a23c;
+            }
+            .sub-tip {
+              margin: 0;
+              font-size: 12px;
+              color: #6c757d;
+            }
+          }
+
+          /* 云台不支持提示 */
+          .ptz-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .ptz-disabled-tip {
+            font-size: 11px;
+            color: #f56c6c;
+            font-weight: normal;
+          }
+          .ptz-not-supported {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 10px;
+            color: #909399;
+            text-align: center;
+            
+            p {
+              margin: 8px 0 0 0;
+              font-size: 13px;
+            }
+            .sub-tip {
+              font-size: 11px;
+              color: #6c757d;
+            }
+          }
+
+          /* 区域放大按钮区域 */
+          .ptz-area-zoom {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 4px;
+            border-top: 1px solid #2b3e62;
+            margin-top: 10px;
+          }
+          .ptz-area-zoom .area-zoom-tip {
+            font-size: 11px;
+            color: #4ea1ff;
+            animation: pulse 2s infinite;
+          }
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+          }
+
           :deep(.el-collapse) {
             background: transparent;
             border: none;
@@ -4924,6 +5201,48 @@ const submitSaveView = async () => {
                       border-color: #409eff;
                     }
                   }
+                }
+              }
+
+              /* 区域框选覆盖层 */
+              .area-zoom-overlay {
+                position: absolute;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.3);
+                z-index: 100;
+                cursor: crosshair;
+                user-select: none;
+                
+                .area-zoom-hint {
+                  position: absolute;
+                  top: 50%;
+                  left: 50%;
+                  transform: translate(-50%, -50%);
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  gap: 8px;
+                  color: #fff;
+                  text-align: center;
+                  pointer-events: none;
+                  
+                  p {
+                    margin: 0;
+                    font-size: 14px;
+                    font-weight: 500;
+                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+                  }
+                  .sub-tip {
+                    font-size: 12px;
+                    color: rgba(255, 255, 255, 0.7);
+                  }
+                }
+                
+                .area-zoom-rect {
+                  position: absolute;
+                  border: 2px dashed #409eff;
+                  background: rgba(64, 158, 255, 0.2);
+                  pointer-events: none;
                 }
               }
 
