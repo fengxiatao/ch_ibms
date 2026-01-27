@@ -48,6 +48,9 @@ public class PatrolSceneChannelSaveReqVO {
     @Schema(description = "子码流地址", example = "rtsp://192.168.1.100/sub")
     private String streamUrlSub;
 
+    @Schema(description = "WVP通道ID（commonGbChannelId），用于视频播放", example = "1")
+    private String wvpPlayId;
+
     @Schema(description = "配置信息（JSON）", example = "{\"preset\":1}")
     private Map<String, Object> config;
 

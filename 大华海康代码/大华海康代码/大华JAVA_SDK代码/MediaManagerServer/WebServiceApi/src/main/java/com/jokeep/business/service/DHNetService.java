@@ -26,4 +26,18 @@ public interface DHNetService {
     List<Map<String, Object>> getFileList(String m_strIp, int m_nPort, String m_strUser, String m_strPassword) throws UnsupportedEncodingException;
 
     String UpdateYZDName(String m_strIp, int m_nPort, int nChannelID, String m_strUser, String m_strPassword, String name,String yzdIDs);
+
+    /**
+     * 查询录像文件列表（使用大华SDK CLIENT_QueryRecordFile）
+     * @param m_strIp 设备IP
+     * @param m_nPort 设备端口
+     * @param m_strUser 用户名
+     * @param m_strPassword 密码
+     * @param nChannelID 通道号
+     * @param startTime 开始时间 yyyy-MM-dd HH:mm:ss
+     * @param endTime 结束时间 yyyy-MM-dd HH:mm:ss
+     * @return 录像文件列表
+     */
+    List<Map<String, Object>> queryRecordFiles(String m_strIp, int m_nPort, String m_strUser, String m_strPassword, 
+                                                int nChannelID, String startTime, String endTime);
 }

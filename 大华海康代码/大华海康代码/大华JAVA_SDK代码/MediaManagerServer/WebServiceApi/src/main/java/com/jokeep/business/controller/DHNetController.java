@@ -158,18 +158,54 @@ public class DHNetController {
 
 
 
-        @NoAuthentication
-        @RequestDecrypt(false)
-        @ResponseEncrypt(false)
-        @RequestMapping(value = "/getToolPoint" , method = RequestMethod.POST, produces = "application/json;charset=utf-8")
-        public Map<String,Object> getToolPoint(HttpServletRequest request, @RequestBody JSONObject jsonObject){
-            Map<String,Object>map=new HashMap<>();
-            String m_strUser=jsonObject.getString("UserName");//登录用户名
-            String m_strPassword=jsonObject.getString("Password");//登录密码
-            int m_nPort=80;
-            String m_strIp="192.168.60.100";
-            String data=dhNetService.getToolPoint(m_strIp,m_nPort,m_strUser,m_strPassword);
-            map.put("data",data);
-            return map;
+    @NoAuthentication
+    @RequestDecrypt(false)
+    @ResponseEncrypt(false)
+    @RequestMapping(value = "/getToolPoint" , method = RequestMethod.POST, produces = "application/json;charset=utf-8")
+    public Map<String,Object> getToolPoint(HttpServletRequest request, @RequestBody JSONObject jsonObject){
+        Map<String,Object>map=new HashMap<>();
+        String m_strUser=jsonObject.getString("UserName");//登录用户名
+        String m_strPassword=jsonObject.getString("Password");//登录密码
+        int m_nPort=80;
+        String m_strIp="192.168.60.100";
+        String data=dhNetService.getToolPoint(m_strIp,m_nPort,m_strUser,m_strPassword);
+        map.put("data",data);
+        return map;
+    }
+
+    /**
+     * 查询录像文件列表（使用大华SDK）
+     * @param jsonObject 包含设备信息、通道号、时间范围
+     * @return 录像文件列表
+     */
+    @NoAuthentication
+    @RequestDecrypt(false)
+    @ResponseEncrypt(false)
+    @RequestMapping(value = "/queryRecordFiles", method = RequestMethod.POST, produces = "application/json;charset=utf-8")
+    public Map<String, Object> queryRecordFiles(HttpServletRequest request, @RequestBody JSONObject jsonObject) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            String m_strUser = jsonObject.getString("userName");       // 登录用户名
+            String m_strPassword = jsonObject.getString("password");   // 登录密码
+            String m_strIp = jsonObject.getString("ip");               // 设备IP
+            int m_nPort = jsonObject.getInteger("port");               // 设备端口
+            int nChannelID = jsonObject.getInteger("channelId");       // 通道号
+            String startTime = jsonObject.getString("startTime");      // 开始时间 yyyy-MM-dd HH:mm:ss
+            String endTime = jsonObject.getString("endTime");          // 结束时间 yyyy-MM-dd HH:mm:ss
+            
+            List<Map<String, Object>> recordFiles = dhNetService.queryRecordFiles(
+                m_strIp, m_nPort, m_strUser, m_strPassword, 
+                nChannelID, startTime, endTime
+            );
+            
+            result.put("success", true);
+            result.put("data", recordFiles);
+            result.put("total", recordFiles.size());
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("message", "查询录像失败：" + e.getMessage());
+            e.printStackTrace();
         }
+        return result;
+    }
 }

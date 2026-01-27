@@ -18,15 +18,23 @@
             :accordion="true" 
             node-key="id" 
             class="org-tree"
-            :allow-drag="allowDrag"
+            :filter-node-method="filterNode"
+            ref="treeRef"
           >
             <template #default="{ data }">
-              <div class="tree-node" :draggable="data.type === 'channel'" @dragstart="handleDragStart($event, data)">
+              <div 
+                class="tree-node" 
+                :class="{ 'is-channel': data.type === 'channel', 'is-online': data.isOnline, 'is-draggable': data.type === 'channel' }"
+                :draggable="data.type === 'channel'" 
+                @dragstart="handleDragStart($event, data)"
+              >
                 <Icon v-if="data.type === 'building'" icon="ep:office-building" style="color: #409eff" />
                 <Icon v-else-if="data.type === 'floor'" icon="ep:tickets" style="color: #67c23a" />
-                <Icon v-else-if="data.type === 'area'" icon="ep:location" style="color: #e6a23c" />
-                <Icon v-else-if="data.type === 'channels'" icon="ep:folder-opened" style="color: #909399" />
-                <Icon v-else-if="data.type === 'channel'" icon="ep:video-camera" style="color: #f56c6c" />
+                <Icon 
+                  v-else-if="data.type === 'channel'" 
+                  icon="ep:video-camera-filled" 
+                  :style="{ color: data.isOnline ? '#67c23a' : '#909399' }"
+                />
                 <span>{{ data.name }}</span>
               </div>
             </template>
@@ -34,17 +42,20 @@
           <el-collapse v-model="activePreviewPanel">
             <el-collapse-item title="预览" name="preview">
               <div class="preview-box">
-                <VideoPlayer 
-                  v-if="previewChannel"
-                  ref="videoPlayerRef"
-                  :channel="previewChannel"
-                  container-id="preview-container"
-                  :wnd-index="0"
-                  :auto-play="true"
-                  @play-start="handlePreviewStart"
-                  @error="handlePreviewError"
-                />
-                <div v-else class="preview-placeholder">点击"预览"查看通道</div>
+                <div v-if="!previewChannel" class="preview-placeholder">
+                  <Icon icon="ep:video-camera" :size="32" />
+                  <span>点击"预览"查看通道</span>
+                </div>
+                <div v-else-if="previewPane.isLoading" class="preview-loading">
+                  <Icon icon="ep:loading" :size="24" class="is-loading" />
+                  <span>加载中...</span>
+                </div>
+                <div v-else-if="previewPane.error" class="preview-error">
+                  <Icon icon="ep:warning" :size="24" />
+                  <span>{{ previewPane.error }}</span>
+                </div>
+                <!-- 大华 SDK 播放器容器 -->
+                <div v-show="previewChannel && !previewPane.isLoading && !previewPane.error" class="dahua-preview" ref="dahuaPreviewContainerRef"></div>
               </div>
             </el-collapse-item>
           </el-collapse>
@@ -57,7 +68,13 @@
                   <el-input v-model="form.taskName" placeholder="任务名称" style="width: 180px" size="small" />
                 </el-form-item>
                 <el-form-item label="任务时长">
-                  <el-input-number v-model="form.duration" :min="10" :max="3600" size="small" />
+                  <el-input-number 
+                    v-model="form.duration" 
+                    :min="10" 
+                    :max="3600" 
+                    size="small" 
+                    @change="handleTaskDurationChange"
+                  />
                   <span class="unit">秒</span>
                 </el-form-item>
               </el-form>
@@ -76,7 +93,7 @@
           <div class="center-scroll">
             <div class="grid-preview" :class="gridClass">
               <div 
-                v-for="(pane, i) in panes" 
+                v-for="(_, i) in panes" 
                 :key="i" 
                 class="pane"
                 :class="{ 'drag-over': dragOverPane === i, 'selected': selectedPane === i }"
@@ -128,7 +145,7 @@
               <el-table-column label="操作" width="180">
                 <template #default="{ row, $index }">
                   <div class="ops">
-                    <el-button size="small" @click="handlePreview(row)">预览</el-button>
+                    <el-button size="small" @click="handlePreview(row)" :disabled="!row.channelNo">预览</el-button>
                     <span class="op-icon" title="上移" @click="handleMoveUp($index)"><Icon icon="ep:arrow-up" /></span>
                     <span class="op-icon" title="下移" @click="handleMoveDown($index)"><Icon icon="ep:arrow-down" /></span>
                     <span class="op-icon" title="删除" @click="handleRemoveRow($index)"><Icon icon="ep:delete" /></span>
@@ -148,11 +165,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ContentWrap } from '@/components/ContentWrap'
 import { Icon } from '@/components/Icon'
-import VideoPlayer from '@/components/VideoPlayer/index.vue'
 import { ElMessage } from 'element-plus'
 import {
   getPatrolTask,
@@ -164,8 +180,27 @@ import {
   type PatrolSceneVO,
   type PatrolSceneChannelVO
 } from '@/api/iot/patrolplan'
-import { getBuildingList, getFloorListByBuildingId, getAreaListByFloorId } from '@/api/iot/spatial'
+import { getBuildingList, getFloorListByBuildingId } from '@/api/iot/spatial'
 import { getChannelPage } from '@/api/iot/channel'
+import { useDahuaPlayer, DEFAULT_NVR_CONFIG } from '@/composables/useDahuaPlayer'
+
+// IBMS 通道类型
+interface IbmsChannel {
+  id: number
+  deviceId: number
+  channelNo: number
+  channelName: string
+  channelType: string
+  onlineStatus?: number
+  targetIp?: string
+  targetPort?: number
+  rtspPort?: number        // RTSP 端口（默认 554）
+  username?: string
+  password?: string
+  streamUrlMain?: string
+  streamUrlSub?: string
+  ptzSupport?: boolean
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -180,20 +215,125 @@ const form = ref({
 })
 const deviceSearchKeyword = ref('')
 const saving = ref(false)
+const treeRef = ref()
 
-// 空间树相关
-const cameraTreeData = ref<any[]>([])
-const treeProps = { label: 'name', children: 'children', isLeaf: 'leaf' }
-const allowDrag = (node: any) => node.data.type === 'channel'
+// ==================== 大华 SDK 播放器 ====================
 
-// 拖拽相关
+const { checkSDK, createEmptyPane, startPreview, stopPlayer } = useDahuaPlayer()
+
+// IBMS 通道缓存
+const channelCache = new Map<number, IbmsChannel>()
+
+// ==================== 空间树相关 ====================
+
+interface TreeNode {
+  id: string
+  name: string
+  type: 'building' | 'floor' | 'channel'
+  buildingId?: number
+  floorId?: number
+  channelId?: number
+  ibmsChannel?: IbmsChannel
+  isOnline?: boolean
+  children?: TreeNode[]
+}
+
+const cameraTreeData = ref<TreeNode[]>([])
+const treeProps = { label: 'name', children: 'children', isLeaf: (data: TreeNode) => data.type === 'channel' }
+
+// 搜索过滤
+watch(deviceSearchKeyword, (val) => {
+  treeRef.value?.filter(val)
+})
+
+const filterNode = (value: string, data: TreeNode) => {
+  if (!value) return true
+  return data.name.toLowerCase().includes(value.toLowerCase())
+}
+
+// 加载空间树
+const loadSpaceTree = async () => {
+  try {
+    const buildings = await getBuildingList()
+    const treeData = buildings.map((b: any) => ({
+      id: `building-${b.id}`,
+      name: b.name,
+      type: 'building' as const,
+      buildingId: b.id
+    }))
+    cameraTreeData.value = treeData
+  } catch (e: any) {
+    console.error('加载空间树失败:', e)
+  }
+}
+
+// 懒加载树节点（直接在建筑/楼层下加载通道，不需要区域和中间的"通道"节点）
+const loadTreeNode = async (node: any, resolve: Function) => {
+  try {
+    const data = node.data as TreeNode
+    let children: TreeNode[] = []
+    
+    if (data.type === 'building') {
+      // 加载楼层
+      const floors = await getFloorListByBuildingId(data.buildingId!)
+      children = floors.map((f: any) => ({
+        id: `floor-${f.id}`,
+        name: f.name,
+        type: 'floor' as const,
+        floorId: f.id,
+        buildingId: data.buildingId
+      }))
+      
+      // 加载建筑下的直属通道
+      const params: any = { pageNo: 1, pageSize: 100, channelType: 'video', buildingId: data.buildingId }
+      const channelsRes = await getChannelPage(params)
+      const channelsList = channelsRes.list || []
+      
+      // 将通道添加到建筑下（过滤掉有楼层的通道）
+      const buildingChannels = channelsList.filter((ch: any) => !ch.floorId)
+      for (const ch of buildingChannels) {
+        const ibmsChannel = ch as IbmsChannel
+        channelCache.set(ch.id, ibmsChannel)
+        children.push({
+          id: `channel-${ch.id}`,
+          name: ch.channelName || `通道${ch.channelNo}`,
+          type: 'channel',
+          channelId: ch.id,
+          ibmsChannel: ibmsChannel,
+          isOnline: ch.onlineStatus === 1
+        })
+      }
+    } else if (data.type === 'floor') {
+      // 直接加载楼层下的通道
+      const params: any = { pageNo: 1, pageSize: 100, channelType: 'video', floorId: data.floorId }
+      const channelsRes = await getChannelPage(params)
+      const channelsList = channelsRes.list || []
+      
+      children = channelsList.map((ch: any) => {
+        const ibmsChannel = ch as IbmsChannel
+        channelCache.set(ch.id, ibmsChannel)
+        return {
+          id: `channel-${ch.id}`,
+          name: ch.channelName || `通道${ch.channelNo}`,
+          type: 'channel' as const,
+          channelId: ch.id,
+          ibmsChannel: ibmsChannel,
+          isOnline: ch.onlineStatus === 1
+        }
+      })
+    }
+    
+    resolve(children)
+  } catch (e: any) {
+    console.error('加载节点失败:', e)
+    resolve([])
+  }
+}
+
+// ==================== 拖拽相关 ====================
+
 const dragOverPane = ref(-1)
 const selectedPane = ref(0)
-
-// 预览相关
-const activePreviewPanel = ref<string[]>([]) // 控制预览折叠面板
-const previewChannel = ref<any>(null)
-const videoPlayerRef = ref()
 
 const gridLayout = ref<'1x1' | '2x2' | '2x3' | '3x3' | '3x4' | '4x4'>('2x3')
 const gridClass = computed(() => `grid-${gridLayout.value}`)
@@ -203,7 +343,12 @@ const paneCount = computed(() => {
 })
 const panes = computed(() => Array.from({ length: paneCount.value }, () => ({ bindCount: 1 })))
 
-const channels = ref<PatrolSceneChannelVO[]>([])
+// 场景通道数据
+interface SceneChannelData extends PatrolSceneChannelVO {
+  ibmsChannel?: IbmsChannel  // 关联的 IBMS 通道数据
+}
+
+const channels = ref<SceneChannelData[]>([])
 const sceneId = ref<number>()
 
 // 获取指定格子的通道列表
@@ -216,6 +361,185 @@ const getPaneChannels = (paneIndex: number) => {
 const currentPaneChannels = computed(() => {
   return getPaneChannels(selectedPane.value)
 })
+
+// 拖拽开始
+const handleDragStart = (e: DragEvent, data: TreeNode) => {
+  if (data.type !== 'channel') {
+    e.preventDefault()
+    return
+  }
+  
+  if (!data.ibmsChannel) {
+    ElMessage.warning('该通道数据未加载，请稍后重试')
+    e.preventDefault()
+    return
+  }
+  
+  console.log('[拖拽] 开始拖拽通道:', data.ibmsChannel.channelName)
+  e.dataTransfer!.effectAllowed = 'copy'
+  e.dataTransfer!.setData('text/plain', JSON.stringify({
+    ibmsChannel: data.ibmsChannel
+  }))
+}
+
+// 拖拽经过（必须 preventDefault 才能触发 drop）
+const handleDragOver = (e: DragEvent, paneIndex: number) => {
+  e.preventDefault()
+  e.dataTransfer!.dropEffect = 'copy'
+  dragOverPane.value = paneIndex
+}
+
+// 拖拽离开
+const handleDragLeave = () => {
+  dragOverPane.value = -1
+}
+
+// 放置通道
+const handleDrop = async (e: DragEvent, paneIndex: number) => {
+  e.preventDefault()
+  dragOverPane.value = -1
+  
+  try {
+    const dataStr = e.dataTransfer!.getData('text/plain')
+    if (!dataStr) {
+      console.warn('[拖拽] 没有获取到拖拽数据')
+      return
+    }
+    
+    console.log('[拖拽] 接收到数据:', dataStr)
+    const nodeData = JSON.parse(dataStr)
+    const ibmsChannel = nodeData.ibmsChannel as IbmsChannel
+    
+    if (!ibmsChannel) {
+      ElMessage.warning('无效的通道数据')
+      return
+    }
+    
+    // 计算该格子当前的总时长
+    const currentPaneChannels = channels.value.filter(ch => ch.gridPosition === paneIndex + 1)
+    const currentTotalDuration = currentPaneChannels.reduce((sum, ch) => sum + (ch.duration || 0), 0)
+    
+    // 默认新通道时长为10秒
+    const newChannelDuration = 10
+    const newTotalDuration = currentTotalDuration + newChannelDuration
+    
+    // 检查是否超过任务时长
+    if (newTotalDuration > form.value.duration) {
+      ElMessage.warning(
+        `格子 ${paneIndex + 1} 的通道总时长（${newTotalDuration}秒）将超过任务时长（${form.value.duration}秒），` +
+        `请先增加任务时长或减少该格子中其他通道的时长`
+      )
+      return
+    }
+    
+    // 添加到通道列表（使用 IBMS 通道数据）
+    const newChannel: SceneChannelData = {
+      gridPosition: paneIndex + 1,
+      duration: newChannelDuration,
+      channelId: ibmsChannel.id,
+      channelName: ibmsChannel.channelName || `通道${ibmsChannel.channelNo}`,
+      deviceId: String(ibmsChannel.deviceId),
+      channelNo: ibmsChannel.channelNo,
+      streamUrlMain: ibmsChannel.streamUrlMain,
+      streamUrlSub: ibmsChannel.streamUrlSub,
+      ibmsChannel: ibmsChannel  // 存储完整的 IBMS 通道数据
+    }
+    
+    channels.value.push(newChannel)
+    ElMessage.success(
+      `已添加到格子 ${paneIndex + 1}（当前格子总时长：${newTotalDuration}秒 / 任务时长：${form.value.duration}秒）`
+    )
+  } catch (err) {
+    console.error('拖拽失败:', err)
+    ElMessage.error('添加通道失败')
+  }
+}
+
+// ==================== 预览相关 ====================
+
+const activePreviewPanel = ref<string[]>([])
+const previewChannel = ref<IbmsChannel | null>(null)
+const dahuaPreviewContainerRef = ref<HTMLElement>()
+
+// 预览播放器窗格
+const previewPane = createEmptyPane(0)
+
+// 停止预览
+const stopPreview = async () => {
+  if (previewPane.isPlaying || previewPane.player) {
+    await stopPlayer(previewPane)
+  }
+  previewChannel.value = null
+}
+
+// 预览通道（使用大华 SDK）
+const handlePreview = async (row: SceneChannelData) => {
+  try {
+    // 获取通道号（优先使用 ibmsChannel，否则使用保存的 channelNo）
+    const channelNo = row.ibmsChannel?.channelNo || row.channelNo
+    const channelName = row.ibmsChannel?.channelName || row.channelName
+    
+    // 检查是否有有效的通道号
+    if (!channelNo || channelNo < 1) {
+      ElMessage.warning('该通道无效，无法预览')
+      return
+    }
+    
+    // 检查 SDK 是否加载
+    if (!checkSDK()) {
+      ElMessage.error('大华播放器 SDK 未加载，请刷新页面')
+      return
+    }
+    
+    // 先展开预览面板
+    if (!activePreviewPanel.value.includes('preview')) {
+      activePreviewPanel.value = ['preview']
+    }
+    
+    // 等待面板展开
+    await nextTick()
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    // 停止之前的预览
+    await stopPreview()
+    
+    // 设置预览通道信息（用于显示）
+    previewChannel.value = row.ibmsChannel || { channelNo, channelName } as any
+    
+    // 确保容器存在
+    await nextTick()
+    if (!dahuaPreviewContainerRef.value) {
+      throw new Error('播放器容器不存在')
+    }
+    
+    // 设置容器
+    previewPane.container = dahuaPreviewContainerRef.value
+    previewPane.streamType = 'sub'  // 预览使用子码流
+    
+    // 使用大华 SDK 播放
+    // 注意：必须通过 NVR 连接，IPC 不支持 WebSocket 直连
+    const success = await startPreview(previewPane, {
+      ip: DEFAULT_NVR_CONFIG.ip,           // 使用 NVR IP
+      port: DEFAULT_NVR_CONFIG.port,       // NVR HTTP 端口
+      rtspPort: DEFAULT_NVR_CONFIG.rtspPort,  // NVR RTSP 端口
+      username: row.ibmsChannel?.username || DEFAULT_NVR_CONFIG.username,
+      password: row.ibmsChannel?.password || DEFAULT_NVR_CONFIG.password,
+      channelNo: channelNo,                // NVR 通道号
+      subtype: 1  // 子码流
+    }, channelName)
+    
+    if (!success) {
+      throw new Error('播放失败')
+    }
+    
+  } catch (e: any) {
+    console.error('预览失败:', e)
+    previewPane.error = e?.message || '预览失败'
+    ElMessage.error('预览失败: ' + (e?.message || e))
+  }
+}
+
+// ==================== 任务数据 ====================
 
 // 加载任务数据
 const loadTask = async () => {
@@ -233,12 +557,99 @@ const loadTask = async () => {
       if (scene) {
         sceneId.value = scene.id
         gridLayout.value = scene.gridLayout as any
-        channels.value = scene.channels || []
+        
+        // 转换通道数据，并尝试从缓存获取完整 IBMS 通道数据
+        channels.value = (scene.channels || []).map(ch => ({
+          ...ch,
+          ibmsChannel: ch.channelId ? channelCache.get(ch.channelId) : undefined
+        }))
       }
     } catch (error) {
       console.error('[任务编辑] 加载任务失败:', error)
       ElMessage.error('加载任务数据失败')
     }
+  }
+}
+
+// 修改任务时长时验证
+const handleTaskDurationChange = (newDuration: number) => {
+  // 检查所有格子的通道时长是否超过新的任务时长
+  const gridPositions = [...new Set(channels.value.map(ch => ch.gridPosition))]
+  let hasWarning = false
+  
+  for (const position of gridPositions) {
+    const paneChannels = channels.value.filter(ch => ch.gridPosition === position)
+    const totalDuration = paneChannels.reduce((sum, ch) => sum + (ch.duration || 0), 0)
+    
+    if (totalDuration > newDuration) {
+      ElMessage.warning(
+        `格子 ${position} 的通道总时长（${totalDuration}秒）超过任务时长（${newDuration}秒），保存前请调整`
+      )
+      hasWarning = true
+    }
+  }
+  
+  if (!hasWarning && channels.value.length > 0) {
+    ElMessage.success(`任务时长已更新为 ${newDuration} 秒`)
+  }
+}
+
+// 修改通道时长时验证
+const handleDurationChange = (row: SceneChannelData) => {
+  const paneChannels = channels.value.filter(ch => ch.gridPosition === row.gridPosition)
+  const totalDuration = paneChannels.reduce((sum, ch) => sum + (ch.duration || 0), 0)
+  
+  if (totalDuration > form.value.duration) {
+    ElMessage.warning(
+      `格子 ${row.gridPosition} 的通道总时长（${totalDuration}秒）超过任务时长（${form.value.duration}秒），` +
+      `请调整通道时长或增加任务时长`
+    )
+  } else {
+    ElMessage.success(
+      `格子 ${row.gridPosition} 当前总时长：${totalDuration}秒 / 任务时长：${form.value.duration}秒`
+    )
+  }
+}
+
+// 上移通道
+const handleMoveUp = (idx: number) => {
+  const currentChannels = currentPaneChannels.value
+  if (idx > 0) {
+    const globalIdx = channels.value.findIndex(ch => ch === currentChannels[idx])
+    const prevGlobalIdx = channels.value.findIndex(ch => ch === currentChannels[idx - 1])
+    
+    if (globalIdx > -1 && prevGlobalIdx > -1) {
+      const temp = channels.value[globalIdx]
+      channels.value[globalIdx] = channels.value[prevGlobalIdx]
+      channels.value[prevGlobalIdx] = temp
+    }
+  }
+}
+
+// 下移通道
+const handleMoveDown = (idx: number) => {
+  const currentChannels = currentPaneChannels.value
+  if (idx < currentChannels.length - 1) {
+    const globalIdx = channels.value.findIndex(ch => ch === currentChannels[idx])
+    const nextGlobalIdx = channels.value.findIndex(ch => ch === currentChannels[idx + 1])
+    
+    if (globalIdx > -1 && nextGlobalIdx > -1) {
+      const temp = channels.value[globalIdx]
+      channels.value[globalIdx] = channels.value[nextGlobalIdx]
+      channels.value[nextGlobalIdx] = temp
+    }
+  }
+}
+
+// 删除通道
+const handleRemoveRow = (idx: number) => { 
+  const currentChannels = currentPaneChannels.value
+  const channelToRemove = currentChannels[idx]
+  
+  const globalIdx = channels.value.findIndex(ch => ch === channelToRemove)
+  if (globalIdx > -1) {
+    channels.value.splice(globalIdx, 1)
+    ElMessage.success('已删除')
   }
 }
 
@@ -301,12 +712,21 @@ const handleSave = async () => {
       taskId: savedTaskId,
       sceneName: form.value.taskName,
       sceneOrder: 0,
-      duration: form.value.duration, // 场景停留时长（使用任务时长）
+      duration: form.value.duration,
       gridLayout: gridLayout.value,
       gridCount: cols * rows,
       description: '',
       status: 1,
-      channels: channels.value
+      channels: channels.value.map(ch => ({
+        gridPosition: ch.gridPosition,
+        duration: ch.duration,
+        channelId: ch.channelId,
+        channelName: ch.channelName,
+        deviceId: ch.deviceId,
+        channelNo: ch.channelNo,
+        streamUrlMain: ch.streamUrlMain,
+        streamUrlSub: ch.streamUrlSub
+      }))
     }
     
     // 保存场景和通道
@@ -315,11 +735,9 @@ const handleSave = async () => {
       ElMessage.success('保存成功')
       router.back()
     } catch (sceneError: any) {
-      // 如果是 404 错误，说明后端接口未实现
       if (sceneError?.code === 404 || sceneError?.message?.includes('404')) {
         ElMessage.warning('场景保存接口暂未实现，任务已保存，场景配置将在后端接口实现后生效')
         console.log('[任务编辑] 场景数据（待后端实现）:', sceneData)
-        // 任务已保存，返回列表
         setTimeout(() => router.back(), 1500)
       } else {
         throw sceneError
@@ -333,280 +751,23 @@ const handleSave = async () => {
   }
 }
 
-// 加载空间树
-const loadSpaceTree = async () => {
-  try {
-    const buildings = await getBuildingList()
-    const treeData = buildings.map((b: any) => ({
-      id: `building-${b.id}`,
-      name: b.name,
-      type: 'building',
-      buildingId: b.id
-    }))
-    cameraTreeData.value = treeData
-  } catch (e: any) {
-    console.error('加载空间树失败:', e)
-  }
+const handleCancel = () => { 
+  stopPreview()
+  router.back() 
 }
 
-// 懒加载树节点
-const loadTreeNode = async (node: any, resolve: Function) => {
-  try {
-    const data = node.data
-    let children: any[] = []
-    
-    if (data.type === 'building') {
-      children.push({
-        id: `channels-building-${data.buildingId}`,
-        name: '通道',
-        type: 'channels',
-        buildingId: data.buildingId
-      })
-      const floors = await getFloorListByBuildingId(data.buildingId)
-      children.push(...floors.map((f: any) => ({
-        id: `floor-${f.id}`,
-        name: f.name,
-        type: 'floor',
-        floorId: f.id,
-        buildingId: data.buildingId
-      })))
-    } else if (data.type === 'floor') {
-      children.push({
-        id: `channels-floor-${data.floorId}`,
-        name: '通道',
-        type: 'channels',
-        floorId: data.floorId,
-        buildingId: data.buildingId
-      })
-      const areas = await getAreaListByFloorId(data.floorId)
-      children.push(...areas.map((a: any) => ({
-        id: `area-${a.id}`,
-        name: a.name,
-        type: 'area',
-        areaId: a.id,
-        floorId: data.floorId
-      })))
-    } else if (data.type === 'area') {
-      children.push({
-        id: `channels-area-${data.areaId}`,
-        name: '通道',
-        type: 'channels',
-        areaId: data.areaId,
-        floorId: data.floorId,
-        buildingId: data.buildingId
-      })
-    } else if (data.type === 'channels') {
-      const params: any = { pageNo: 1, pageSize: 100 }
-      if (data.buildingId) params.buildingId = data.buildingId
-      if (data.floorId) params.floorId = data.floorId
-      if (data.areaId) params.areaId = data.areaId
-      
-      const channelsRes = await getChannelPage(params)
-      const channelsList = channelsRes.list || []
-      children = channelsList.map((ch: any) => ({
-        id: `channel-${ch.id}`,
-        name: ch.channelName || `通道${ch.channelNo}`,
-        type: 'channel',
-        channelId: ch.id,
-        channel: ch
-      }))
-    }
-    
-    resolve(children)
-  } catch (e: any) {
-    console.error('加载节点失败:', e)
-    resolve([])
-  }
-}
+// ==================== 生命周期 ====================
 
-// 拖拽开始
-const handleDragStart = (e: DragEvent, data: any) => {
-  if (data.type !== 'channel') return
-  e.dataTransfer!.effectAllowed = 'copy'
-  e.dataTransfer!.setData('channel', JSON.stringify(data))
-}
-
-// 拖拽经过
-const handleDragOver = (e: DragEvent, paneIndex: number) => {
-  dragOverPane.value = paneIndex
-}
-
-// 拖拽离开
-const handleDragLeave = () => {
-  dragOverPane.value = -1
-}
-
-// 放置通道
-const handleDrop = async (e: DragEvent, paneIndex: number) => {
-  e.preventDefault()
-  dragOverPane.value = -1
-  
-  try {
-    const channelData = JSON.parse(e.dataTransfer!.getData('channel'))
-    const channel = channelData.channel
-    
-    if (!channel) {
-      ElMessage.warning('无效的通道数据')
-      return
-    }
-    
-    // 计算该格子当前的总时长
-    const currentPaneChannels = channels.value.filter(ch => ch.gridPosition === paneIndex + 1)
-    const currentTotalDuration = currentPaneChannels.reduce((sum, ch) => sum + (ch.duration || 0), 0)
-    
-    // 默认新通道时长为10秒
-    const newChannelDuration = 10
-    const newTotalDuration = currentTotalDuration + newChannelDuration
-    
-    // 检查是否超过任务时长
-    if (newTotalDuration > form.value.duration) {
-      ElMessage.warning(
-        `格子 ${paneIndex + 1} 的通道总时长（${newTotalDuration}秒）将超过任务时长（${form.value.duration}秒），` +
-        `请先增加任务时长或减少该格子中其他通道的时长`
-      )
-      return
-    }
-    
-    // 添加到通道列表（允许重复添加同一通道）
-    const newChannel: PatrolSceneChannelVO = {
-      gridPosition: paneIndex + 1,
-      duration: newChannelDuration,
-      channelId: channel.id,
-      channelName: channel.channelName || channel.name,
-      deviceId: channel.deviceId,
-      channelNo: channel.channelNo,
-      streamUrlMain: channel.streamUrlMain,
-      streamUrlSub: channel.streamUrlSub
-    }
-    
-    channels.value.push(newChannel)
-    ElMessage.success(
-      `已添加到格子 ${paneIndex + 1}（当前格子总时长：${newTotalDuration}秒 / 任务时长：${form.value.duration}秒）`
-    )
-  } catch (err) {
-    console.error('拖拽失败:', err)
-    ElMessage.error('添加通道失败')
-  }
-}
-
-// 修改通道时长时验证
-const handleDurationChange = (row: any) => {
-  // 计算该格子的总时长
-  const paneChannels = channels.value.filter(ch => ch.gridPosition === row.gridPosition)
-  const totalDuration = paneChannels.reduce((sum, ch) => sum + (ch.duration || 0), 0)
-  
-  // 检查是否超过任务时长
-  if (totalDuration > form.value.duration) {
-    ElMessage.warning(
-      `格子 ${row.gridPosition} 的通道总时长（${totalDuration}秒）超过任务时长（${form.value.duration}秒），` +
-      `请调整通道时长或增加任务时长`
-    )
-  } else {
-    ElMessage.success(
-      `格子 ${row.gridPosition} 当前总时长：${totalDuration}秒 / 任务时长：${form.value.duration}秒`
-    )
-  }
-}
-
-// 预览通道
-const handlePreview = async (row: any) => {
-  try {
-    // 先展开预览面板
-    if (!activePreviewPanel.value.includes('preview')) {
-      activePreviewPanel.value = ['preview']
-    }
-    
-    // 等待面板展开
-    await nextTick()
-    await new Promise(resolve => setTimeout(resolve, 300))
-    
-    // 获取通道详情
-    const channelsRes = await getChannelPage({ 
-      pageNo: 1, 
-      pageSize: 1, 
-      channelName: row.channelName 
-    })
-    const channel = channelsRes.list?.[0]
-    
-    if (!channel) {
-      ElMessage.error('未找到通道信息')
-      return
-    }
-    
-    // 设置预览通道（VideoPlayer 组件会自动播放）
-    previewChannel.value = channel
-    
-  } catch (e: any) {
-    console.error('预览失败:', e)
-    ElMessage.error('预览失败: ' + (e?.message || e))
-  }
-}
-
-// 预览开始回调
-const handlePreviewStart = () => {
-  ElMessage.success('开始预览')
-}
-
-// 预览错误回调
-const handlePreviewError = (error: any) => {
-  console.error('预览错误:', error)
-  ElMessage.error('预览失败: ' + (error?.message || error))
-}
-
-const handleCancel = () => { router.back() }
-
-// 上移通道（仅在当前格子内）
-const handleMoveUp = (idx: number) => {
-  const currentChannels = currentPaneChannels.value
-  if (idx > 0) {
-    // 找到全局索引
-    const globalIdx = channels.value.findIndex(ch => ch === currentChannels[idx])
-    const prevGlobalIdx = channels.value.findIndex(ch => ch === currentChannels[idx - 1])
-    
-    if (globalIdx > -1 && prevGlobalIdx > -1) {
-      const temp = channels.value[globalIdx]
-      channels.value[globalIdx] = channels.value[prevGlobalIdx]
-      channels.value[prevGlobalIdx] = temp
-    }
-  }
-}
-
-// 下移通道（仅在当前格子内）
-const handleMoveDown = (idx: number) => {
-  const currentChannels = currentPaneChannels.value
-  if (idx < currentChannels.length - 1) {
-    // 找到全局索引
-    const globalIdx = channels.value.findIndex(ch => ch === currentChannels[idx])
-    const nextGlobalIdx = channels.value.findIndex(ch => ch === currentChannels[idx + 1])
-    
-    if (globalIdx > -1 && nextGlobalIdx > -1) {
-      const temp = channels.value[globalIdx]
-      channels.value[globalIdx] = channels.value[nextGlobalIdx]
-      channels.value[nextGlobalIdx] = temp
-    }
-  }
-}
-
-// 删除通道（从当前格子中删除）
-const handleRemoveRow = (idx: number) => { 
-  const currentChannels = currentPaneChannels.value
-  const channelToRemove = currentChannels[idx]
-  
-  // 找到全局索引并删除
-  const globalIdx = channels.value.findIndex(ch => ch === channelToRemove)
-  if (globalIdx > -1) {
-    channels.value.splice(globalIdx, 1)
-    ElMessage.success('已删除')
-  }
-}
-
-// 页面加载时获取数据
 onMounted(async () => {
   // 加载空间树
   await loadSpaceTree()
   
   // 加载任务数据
   await loadTask()
+})
+
+onBeforeUnmount(() => {
+  stopPreview()
 })
 </script>
 
@@ -621,22 +782,80 @@ onMounted(async () => {
 .content { flex: 1; display: grid; grid-template-columns: 280px 1fr; gap: 10px; padding: 2px 10px; }
 .left { border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
 .left-toolbar { display: grid; gap: 8px; padding: 8px; }
-.org-tree { flex: 1; padding: 8px; }
-.placeholder { color: #94a3b8; padding: 8px; }
-.preview-box { padding: 8px; height: 180px; display: flex; align-items: center; justify-content: center; background: #000; border-radius: 4px; }
-.preview-video { width: 100%; height: 100%; object-fit: contain; }
-.preview-placeholder { color: #909399; font-size: 12px; text-align: center; }
-.tree-node { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
-.tree-node[draggable="true"] { cursor: move; }
-.tree-node[draggable="true"]:hover { background: rgba(64, 158, 255, 0.1); }
+.org-tree { flex: 1; padding: 8px; overflow: auto; }
+
+.tree-node { 
+  display: flex; 
+  align-items: center; 
+  gap: 4px; 
+  cursor: pointer; 
+  user-select: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.tree-node.is-channel {
+  &:hover { 
+    background: rgba(64, 158, 255, 0.1); 
+  }
+}
+
+.tree-node.is-draggable {
+  cursor: grab;
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.preview-box { 
+  height: 180px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  background: #000; 
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.preview-placeholder,
+.preview-loading,
+.preview-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #909399;
+  font-size: 12px;
+}
+
+.preview-error {
+  color: #f56c6c;
+}
+
+.dahua-preview {
+  width: 100%;
+  height: 100%;
+}
+
+.is-loading {
+  animation: rotating 2s linear infinite;
+}
+
+@keyframes rotating {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .center { display: grid; grid-template-rows: auto 1fr auto auto; height: 100%; min-height: 0; overflow: hidden; }
 .center-scroll { min-height: 0; overflow: auto; margin-bottom: 2px; }
 .grid-preview { display: grid; gap: 6px; border: 1px solid #e5e7eb; border-radius: 6px; padding: 2px; background: #0f172a; min-height: 0; height: 100%; }
 .grid-preview.grid-1x1 { grid-template-columns: repeat(1, 1fr); grid-template-rows: repeat(1, 1fr); }
 .grid-preview.grid-2x2 { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); }
-.grid-preview.grid-2x3 { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(3, 1fr); }
+.grid-preview.grid-2x3 { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); }  // 2行3列
 .grid-preview.grid-3x3 { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); }
-.grid-preview.grid-3x4 { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(4, 1fr); }
+.grid-preview.grid-3x4 { grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(3, 1fr); }  // 3行4列
 .grid-preview.grid-4x4 { grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); }
 .pane { display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px solid #334155; border-radius: 4px; color: #cbd5e1; background: #111827; cursor: pointer; transition: all 0.2s; }
 .pane.drag-over { border-color: #409eff; background: #1a2332; }

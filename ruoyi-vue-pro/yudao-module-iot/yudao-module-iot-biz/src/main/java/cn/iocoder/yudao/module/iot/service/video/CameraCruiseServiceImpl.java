@@ -16,8 +16,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.PreDestroy;
-import javax.annotation.Resource;
+import jakarta.annotation.PreDestroy;
+import jakarta.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -189,10 +189,10 @@ public class CameraCruiseServiceImpl implements CameraCruiseService {
             doStopCruise(id);
         }
 
-        // 获取巡航点列表
+        // 获取巡航点列表（至少需要2个预设点才能启动巡航）
         List<CameraCruisePointDO> cruisePoints = cruisePointMapper.selectListByCruiseId(id);
-        if (cruisePoints.isEmpty()) {
-            throw exception(CAMERA_CRUISE_NO_POINTS);
+        if (cruisePoints.size() < 2) {
+            throw exception(CAMERA_CRUISE_POINTS_TOO_FEW);
         }
 
         // 获取通道信息
@@ -411,10 +411,10 @@ public class CameraCruiseServiceImpl implements CameraCruiseService {
         // 校验存在
         CameraCruiseDO cruise = validateCruiseExists(id);
 
-        // 获取巡航点列表
+        // 获取巡航点列表（至少需要2个预设点才能同步）
         List<CameraCruisePointDO> cruisePoints = cruisePointMapper.selectListByCruiseId(id);
-        if (cruisePoints.isEmpty()) {
-            throw exception(CAMERA_CRUISE_NO_POINTS);
+        if (cruisePoints.size() < 2) {
+            throw exception(CAMERA_CRUISE_POINTS_TOO_FEW);
         }
 
         // 获取通道信息
@@ -697,6 +697,11 @@ public class CameraCruiseServiceImpl implements CameraCruiseService {
         cruisePointMapper.deleteById(id);
         
         log.info("{} 删除巡航点成功: id={}", LOG_PREFIX, id);
+    }
+
+    @Override
+    public List<CameraCruisePointDO> getCruisePointListByCruiseId(Long cruiseId) {
+        return cruisePointMapper.selectListByCruiseId(cruiseId);
     }
 
 }

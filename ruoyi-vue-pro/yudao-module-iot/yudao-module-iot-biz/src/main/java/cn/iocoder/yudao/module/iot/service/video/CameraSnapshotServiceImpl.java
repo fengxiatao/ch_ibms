@@ -7,8 +7,10 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.video.vo.CameraSnapshotPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.video.vo.CameraSnapshotRespVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.camera.IotCameraSnapshotDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.camera.IotCameraSnapshotMapper;
+import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
 import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +48,9 @@ public class CameraSnapshotServiceImpl implements CameraSnapshotService {
 
     @Resource
     private IotDeviceService deviceService;
+
+    @Resource
+    private IotDeviceChannelService channelService;
 
     @Resource
     private FileApi fileApi;
@@ -88,8 +93,12 @@ public class CameraSnapshotServiceImpl implements CameraSnapshotService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long uploadSnapshot(Long channelId, Integer snapshotType, MultipartFile file) throws Exception {
-        // 1. TODO: 验证通道是否存在（需要从 iot_device_channel 表查询）
-        // 暂时跳过验证
+        // 1. 查询通道信息
+        IotDeviceChannelDO channel = channelService.getChannel(channelId);
+        if (channel == null) {
+            log.warn("[抓图管理] 通道不存在: channelId={}", channelId);
+            throw new ServiceException(BAD_REQUEST.getCode(), "通道不存在: " + channelId);
+        }
 
         // 2. 通过基础设施文件存储保存文件
         String directory = String.format("snapshots/%d/%04d%02d%02d", channelId,
@@ -115,12 +124,11 @@ public class CameraSnapshotServiceImpl implements CameraSnapshotService {
             }
         } catch (Exception ignore) {}
 
-        // 5. 创建抓图记录
+        // 5. 创建抓图记录（包含完整通道信息）
         IotCameraSnapshotDO snapshot = new IotCameraSnapshotDO();
         snapshot.setChannelId(channelId);
-        // TODO: 从通道表查询 deviceId
-        snapshot.setDeviceId(null);
-        // 通道名称需要从通道表查询，这里暂时不设置
+        snapshot.setDeviceId(channel.getDeviceId());
+        snapshot.setChannelName(channel.getChannelName());
         snapshot.setSnapshotUrl(url);
         snapshot.setSnapshotPath(pathOnly);
         snapshot.setFileSize(file.getSize());
@@ -132,7 +140,8 @@ public class CameraSnapshotServiceImpl implements CameraSnapshotService {
 
         cameraSnapshotMapper.insert(snapshot);
 
-        log.info("[抓图管理] 上传抓图并创建记录: id={}, channelId={}, url={}", snapshot.getId(), channelId, url);
+        log.info("[抓图管理] 上传抓图并创建记录: id={}, channelId={}, channelName={}, deviceId={}, url={}", 
+                snapshot.getId(), channelId, channel.getChannelName(), channel.getDeviceId(), url);
         return snapshot.getId();
     }
 

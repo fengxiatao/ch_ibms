@@ -21,4 +21,23 @@ public interface IotVideoPatrolSceneChannelMapper extends BaseMapperX<IotVideoPa
                 .orderByAsc(IotVideoPatrolSceneChannelDO::getGridPosition));
     }
 
+    /**
+     * 根据场景ID删除场景通道
+     */
+    default int deleteBySceneId(Long sceneId) {
+        return delete(new LambdaQueryWrapperX<IotVideoPatrolSceneChannelDO>()
+                .eq(IotVideoPatrolSceneChannelDO::getSceneId, sceneId));
+    }
+
+    /**
+     * 根据场景ID列表批量删除场景通道
+     */
+    default int deleteBySceneIds(java.util.Collection<Long> sceneIds) {
+        if (sceneIds == null || sceneIds.isEmpty()) {
+            return 0;
+        }
+        return delete(new LambdaQueryWrapperX<IotVideoPatrolSceneChannelDO>()
+                .in(IotVideoPatrolSceneChannelDO::getSceneId, sceneIds));
+    }
+
 }

@@ -22,4 +22,12 @@ public interface IotVideoPatrolTaskMapper extends BaseMapperX<IotVideoPatrolTask
                 .orderByDesc(IotVideoPatrolTaskDO::getId));
     }
 
+    /**
+     * 根据计划ID删除任务
+     */
+    default int deleteByPlanId(Long planId) {
+        return delete(new LambdaQueryWrapperX<IotVideoPatrolTaskDO>()
+                .eq(IotVideoPatrolTaskDO::getPlanId, planId));
+    }
+
 }

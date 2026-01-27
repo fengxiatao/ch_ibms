@@ -1,0 +1,32 @@
+version: '3.8'
+
+# WVP-GB28181-PRO + ZLMediaKit 部署配置
+# 使用已有的 MySQL (127.0.0.1:3306) 和 Redis (127.0.0.1:6379)
+
+services:
+  # ZLMediaKit 流媒体服务器
+  zlmediakit:
+    image: zlmediakit/zlmediakit:master
+    container_name: zlmediakit
+    restart: always
+    network_mode: host  # 使用 host 网络，方便访问本地 MySQL/Redis
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./zlm/config:/opt/media/conf
+      - ./zlm/record:/opt/media/www/record
+      - ./zlm/snap:/opt/media/www/snap
+
+  # WVP-GB28181-PRO 信令服务器
+  wvp:
+    image: 648540858/wvp_pro:latest
+    container_name: wvp
+    restart: always
+    depends_on:
+      - zlmediakit
+    network_mode: host  # 使用 host 网络，方便访问本地 MySQL/Redis
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./wvp/application.yml:/opt/wvp/config/application.yml
+      - ./wvp/logs:/opt/wvp/logs

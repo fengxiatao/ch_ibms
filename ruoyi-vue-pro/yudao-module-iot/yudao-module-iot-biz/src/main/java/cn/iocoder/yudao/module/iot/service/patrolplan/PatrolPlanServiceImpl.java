@@ -4,15 +4,21 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.patrolplan.vo.plan.PatrolPlanPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.patrolplan.vo.plan.PatrolPlanSaveReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.patrolplan.IotVideoPatrolPlanDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.patrolplan.IotVideoPatrolSceneDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.patrolplan.IotVideoPatrolTaskDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.patrolplan.IotVideoPatrolPlanMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.patrolplan.IotVideoPatrolSceneChannelMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.patrolplan.IotVideoPatrolSceneMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.patrolplan.IotVideoPatrolTaskMapper;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.*;
@@ -24,6 +30,7 @@ import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.*;
  */
 @Service
 @Validated
+@Slf4j
 public class PatrolPlanServiceImpl implements PatrolPlanService {
 
     @Resource
@@ -31,6 +38,12 @@ public class PatrolPlanServiceImpl implements PatrolPlanService {
 
     @Resource
     private IotVideoPatrolTaskMapper patrolTaskMapper;
+
+    @Resource
+    private IotVideoPatrolSceneMapper patrolSceneMapper;
+
+    @Resource
+    private IotVideoPatrolSceneChannelMapper patrolSceneChannelMapper;
 
     @Override
     public Long createPatrolPlan(PatrolPlanSaveReqVO createReqVO) {
@@ -86,14 +99,44 @@ public class PatrolPlanServiceImpl implements PatrolPlanService {
         // 校验存在
         validatePatrolPlanExists(id);
         
-        // 检查是否有关联的任务（自动过滤租户）
+        // 级联删除：计划 -> 任务 -> 场景 -> 场景通道
         List<IotVideoPatrolTaskDO> tasks = patrolTaskMapper.selectListByPlanId(id);
         if (!tasks.isEmpty()) {
-            throw exception(VIDEO_PATROL_PLAN_HAS_TASKS);
+            // 收集所有任务ID
+            List<Long> taskIds = tasks.stream()
+                    .map(IotVideoPatrolTaskDO::getId)
+                    .collect(Collectors.toList());
+            
+            // 查询所有场景
+            List<Long> allSceneIds = new ArrayList<>();
+            for (Long taskId : taskIds) {
+                List<IotVideoPatrolSceneDO> scenes = patrolSceneMapper.selectListByTaskId(taskId);
+                allSceneIds.addAll(scenes.stream()
+                        .map(IotVideoPatrolSceneDO::getId)
+                        .collect(Collectors.toList()));
+            }
+            
+            // 1. 删除所有场景通道
+            if (!allSceneIds.isEmpty()) {
+                int channelCount = patrolSceneChannelMapper.deleteBySceneIds(allSceneIds);
+                log.info("[删除轮巡计划] 删除场景通道: planId={}, sceneCount={}, channelCount={}", id, allSceneIds.size(), channelCount);
+            }
+            
+            // 2. 删除所有场景
+            int sceneCount = 0;
+            for (Long taskId : taskIds) {
+                sceneCount += patrolSceneMapper.deleteByTaskId(taskId);
+            }
+            log.info("[删除轮巡计划] 删除场景: planId={}, sceneCount={}", id, sceneCount);
+            
+            // 3. 删除所有任务
+            int taskCount = patrolTaskMapper.deleteByPlanId(id);
+            log.info("[删除轮巡计划] 删除任务: planId={}, taskCount={}", id, taskCount);
         }
         
-        // 删除
+        // 4. 删除计划
         patrolPlanMapper.deleteById(id);
+        log.info("[删除轮巡计划] 删除计划成功: id={}", id);
     }
 
     @Override

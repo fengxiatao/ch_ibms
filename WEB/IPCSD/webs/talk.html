@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+		<!--<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'">-->
+        <title>Title</title>
+    </head>
+    <body>
+        <div>
+            <input id="play" type="button" value="开启对讲"/>
+            <input id="close" type="button" value="停止对讲"/>
+        </div>
+    </body>
+    <script src="module/playerControl.js"></script>
+    <script>
+        var player = null;
+        document.getElementById('close').onclick = function(){
+            player && player.talk('off');
+			player = null;
+        }
+        document.getElementById('play').onclick = function(){
+			var options = {
+			//45.64.99.242:2444
+				wsURL: 'ws://172.28.6.14/rtspoverwebsocket',
+				rtspURL: 'rtsp://172.28.6.14/cam/realmonitor?channel=1&subtype=5&proto=Private3',
+				username: 'admin',
+				password: 'admin123',
+				isTalkService: true
+			};
+			player = new PlayerControl(options);
+			player.talk('on');
+        }
+
+    </script>
+</html>

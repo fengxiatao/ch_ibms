@@ -37,13 +37,10 @@ public class CameraCruiseSaveReqVO {
     @Max(value = 300, message = "停留时间最大为300秒")
     private Integer dwellTime;
 
-    @Schema(description = "是否循环", requiredMode = Schema.RequiredMode.REQUIRED, example = "true")
-    @NotNull(message = "是否循环不能为空")
+    @Schema(description = "是否循环", example = "true")
     private Boolean loopEnabled;
 
-    @Schema(description = "巡航点列表", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotEmpty(message = "巡航点列表不能为空")
-    @Size(min = 2, message = "至少需要2个预设点")
+    @Schema(description = "巡航点列表（创建时可为空，同步到设备时校验）")
     private List<CameraCruisePointSaveReqVO> points;
 
 }

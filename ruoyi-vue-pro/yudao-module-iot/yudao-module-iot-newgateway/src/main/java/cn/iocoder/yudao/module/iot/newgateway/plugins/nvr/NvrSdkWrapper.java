@@ -1707,21 +1707,188 @@ public class NvrSdkWrapper {
 
     // ==================== 录像文件查询 ====================
 
+    /**
+     * 查询录像文件列表
+     * 
+     * <p>通过大华 SDK 的 CLIENT_QueryRecordFile 接口查询 NVR 中指定通道的录像文件。</p>
+     * <p>NVR 通常按小时分割录像文件，返回的是录像文件列表而非时间段。</p>
+     * 
+     * @param loginHandle 登录句柄
+     * @param channelNo   通道号（从1开始，SDK内部会转为从0开始）
+     * @param startTime   开始时间，格式: yyyy-MM-dd HH:mm:ss
+     * @param endTime     结束时间，格式: yyyy-MM-dd HH:mm:ss
+     * @param recordType  录像类型（可为null，默认0=所有录像）
+     * @return 操作结果，成功时 data 包含录像文件列表
+     */
     public NvrOperationResult queryRecordFiles(long loginHandle, int channelNo, 
             String startTime, String endTime, Integer recordType) {
         if (loginHandle <= 0) {
             return NvrOperationResult.failure("无效的登录句柄");
         }
         
+        if (!sdkInitialized) {
+            return NvrOperationResult.failure("SDK 未初始化");
+        }
+        
         try {
-            log.info("{} 查询录像文件: handle={}, channel={}, start={}, end={}", 
-                    LOG_PREFIX, loginHandle, channelNo, startTime, endTime);
-            log.warn("{} {}", LOG_PREFIX, UNSUPPORTED_MSG);
-            return NvrOperationResult.failure(UNSUPPORTED_MSG);
+            log.info("{} 查询录像文件: handle={}, channel={}, start={}, end={}, recordType={}", 
+                    LOG_PREFIX, loginHandle, channelNo, startTime, endTime, recordType);
+            
+            // SDK 通道号从 0 开始，业务层从 1 开始
+            int sdkChannelNo = channelNo > 0 ? channelNo - 1 : 0;
+            
+            // 解析时间
+            NET_TIME stTimeStart = new NET_TIME();
+            NET_TIME stTimeEnd = new NET_TIME();
+            parseDateTime(startTime, stTimeStart);
+            parseDateTime(endTime, stTimeEnd);
+            
+            // 录像类型：0=所有录像, 1=外部报警, 2=动态监测报警, 3=所有报警, 4=卡号查询, 5=组合条件查询
+            int nRecordFileType = recordType != null ? recordType : 0;
+            
+            // 创建录像文件信息数组（最大2000个文件）
+            // 重要：必须使用 toArray() 方法创建连续内存的结构体数组
+            // 参考大华官方示例 DownLoadRecord.java 第71行的写法
+            int maxFileCount = 2000;
+            NET_RECORDFILE_INFO[] stFileInfo = (NET_RECORDFILE_INFO[]) new NET_RECORDFILE_INFO().toArray(maxFileCount);
+            
+            log.info("{} [toArray版本-v2] 查询录像文件参数: channel={}, arrayLen={}, structSize={}, bufferSize={}", 
+                    LOG_PREFIX, channelNo, stFileInfo.length, stFileInfo[0].size(), 
+                    stFileInfo.length * stFileInfo[0].size());
+            
+            // 查询结果数量
+            IntByReference nFindCount = new IntByReference(0);
+            
+            // 调用 SDK 查询录像文件（参考官方示例 DownLoadRecordModule.java）
+            boolean bRet = getNetSdk().CLIENT_QueryRecordFile(
+                    new LLong(loginHandle),
+                    sdkChannelNo,
+                    nRecordFileType,
+                    stTimeStart,
+                    stTimeEnd,
+                    null,  // 查询条件扩展参数
+                    stFileInfo,  // 直接传递数组，与官方示例一致
+                    stFileInfo.length * stFileInfo[0].size(),
+                    nFindCount,
+                    TIMEOUT_MS,
+                    false  // 是否按时间倒序
+            );
+            
+            if (!bRet) {
+                String errorMsg = ToolKits.getErrorCodePrint();
+                log.warn("{} 查询录像文件失败: channel={}, error={}", LOG_PREFIX, channelNo, errorMsg);
+                return NvrOperationResult.failure("查询录像文件失败: " + errorMsg);
+            }
+            
+            int fileCount = nFindCount.getValue();
+            log.info("{} 查询录像文件成功: channel={}, 文件数量={}", LOG_PREFIX, channelNo, fileCount);
+            
+            // 转换结果
+            List<Map<String, Object>> recordFiles = new ArrayList<>();
+            for (int i = 0; i < fileCount; i++) {
+                NET_RECORDFILE_INFO fileInfo = stFileInfo[i];
+                Map<String, Object> record = new HashMap<>();
+                
+                // 通道号（转回业务层从1开始）
+                record.put("channelNo", fileInfo.ch + 1);
+                
+                // 文件名
+                String fileName = new String(fileInfo.filename).trim();
+                record.put("fileName", fileName);
+                
+                // 文件大小（字节）
+                record.put("fileSize", fileInfo.size);
+                
+                // 开始时间
+                record.put("startTime", formatNetTime(fileInfo.starttime));
+                
+                // 结束时间
+                record.put("endTime", formatNetTime(fileInfo.endtime));
+                
+                // 计算时长（秒）
+                long duration = calculateDuration(fileInfo.starttime, fileInfo.endtime);
+                record.put("duration", duration);
+                
+                // 录像类型
+                record.put("recordType", fileInfo.nRecordFileType);
+                
+                // 帧数
+                record.put("frameNum", fileInfo.framenum);
+                
+                recordFiles.add(record);
+            }
+            
+            Map<String, Object> resultData = new HashMap<>();
+            resultData.put("files", recordFiles);
+            resultData.put("totalCount", fileCount);
+            resultData.put("channelNo", channelNo);
+            resultData.put("startTime", startTime);
+            resultData.put("endTime", endTime);
+            
+            return NvrOperationResult.success("查询成功", resultData);
             
         } catch (Exception e) {
             log.error("{} 查询录像文件异常: channel={}, error={}", LOG_PREFIX, channelNo, e.getMessage(), e);
             return NvrOperationResult.failure("查询录像文件异常: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 解析日期时间字符串到 NET_TIME
+     * @param dateTimeStr 日期时间字符串，格式: yyyy-MM-dd HH:mm:ss
+     * @param netTime SDK 时间结构
+     */
+    private void parseDateTime(String dateTimeStr, NET_TIME netTime) {
+        if (dateTimeStr == null || dateTimeStr.isEmpty()) {
+            return;
+        }
+        try {
+            String[] parts = dateTimeStr.split(" ");
+            String[] dateParts = parts[0].split("-");
+            String[] timeParts = parts.length > 1 ? parts[1].split(":") : new String[]{"0", "0", "0"};
+            
+            netTime.dwYear = Integer.parseInt(dateParts[0]);
+            netTime.dwMonth = Integer.parseInt(dateParts[1]);
+            netTime.dwDay = Integer.parseInt(dateParts[2]);
+            netTime.dwHour = Integer.parseInt(timeParts[0]);
+            netTime.dwMinute = Integer.parseInt(timeParts[1]);
+            netTime.dwSecond = Integer.parseInt(timeParts[2]);
+        } catch (Exception e) {
+            log.warn("{} 解析时间失败: {} - {}", LOG_PREFIX, dateTimeStr, e.getMessage());
+        }
+    }
+    
+    /**
+     * 格式化 NET_TIME 为字符串
+     * @param netTime SDK 时间结构
+     * @return 格式化的日期时间字符串
+     */
+    private String formatNetTime(NET_TIME netTime) {
+        if (netTime == null || netTime.dwYear == 0) {
+            return null;
+        }
+        return String.format("%04d-%02d-%02d %02d:%02d:%02d",
+                netTime.dwYear, netTime.dwMonth, netTime.dwDay,
+                netTime.dwHour, netTime.dwMinute, netTime.dwSecond);
+    }
+    
+    /**
+     * 计算时长（秒）
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @return 时长（秒）
+     */
+    private long calculateDuration(NET_TIME startTime, NET_TIME endTime) {
+        try {
+            java.time.LocalDateTime start = java.time.LocalDateTime.of(
+                    startTime.dwYear, startTime.dwMonth, startTime.dwDay,
+                    startTime.dwHour, startTime.dwMinute, startTime.dwSecond);
+            java.time.LocalDateTime end = java.time.LocalDateTime.of(
+                    endTime.dwYear, endTime.dwMonth, endTime.dwDay,
+                    endTime.dwHour, endTime.dwMinute, endTime.dwSecond);
+            return java.time.Duration.between(start, end).getSeconds();
+        } catch (Exception e) {
+            return 0;
         }
     }
 
@@ -1888,24 +2055,167 @@ public class NvrSdkWrapper {
     /**
      * 查询通道名称
      * 
+     * <p>通过 CLIENT_GetNewDevConfig 获取设备配置的通道名称（ChannelTitle）</p>
+     * 
      * @param loginHandle 登录句柄
      * @param maxChannels 最大通道数
      * @return 通道名称数组
      */
     private String[] queryChannelNames(long loginHandle, int maxChannels) {
+        String[] names = new String[maxChannels];
+        
+        // 初始化默认名称
+        for (int i = 0; i < maxChannels; i++) {
+            names[i] = "通道" + (i + 1);
+        }
+        
         try {
-            String[] names = new String[maxChannels];
+            // 使用 CLIENT_GetNewDevConfig + "ChannelTitle" 获取通道标题（JSON格式）
+            byte[] outBuffer = new byte[64 * 1024]; // 64KB buffer
+            IntByReference error = new IntByReference(0);
             
-            // 尝试获取通道名称配置
-            // 这里使用简化方式，实际可以通过 CLIENT_GetDevConfig 获取
-            for (int i = 0; i < maxChannels; i++) {
-                names[i] = "通道" + (i + 1);
+            boolean result = getNetSdk().CLIENT_GetNewDevConfig(
+                    new LLong(loginHandle),
+                    "ChannelTitle",   // 配置命令：获取通道标题
+                    -1,               // -1 表示获取所有通道
+                    outBuffer,
+                    outBuffer.length,
+                    error,
+                    TIMEOUT_MS,
+                    (Pointer) null
+            );
+            
+            if (result) {
+                String jsonConfig = new String(outBuffer, java.nio.charset.StandardCharsets.UTF_8).trim();
+                // 去除末尾的 null 字符
+                int nullIndex = jsonConfig.indexOf('\0');
+                if (nullIndex > 0) {
+                    jsonConfig = jsonConfig.substring(0, nullIndex);
+                }
+                
+                log.info("{} 获取通道名称配置成功: {}", LOG_PREFIX, 
+                        jsonConfig.length() > 500 ? jsonConfig.substring(0, 500) + "..." : jsonConfig);
+                
+                // 解析 JSON 获取通道名称
+                // 格式类似: { "ChannelTitle" : [ { "Name" : "大堂前门" }, { "Name" : "IPC222" }, ... ] }
+                parseChannelTitlesFromJson(jsonConfig, names);
+            } else {
+                String sdkErrorInfo = ToolKits.getErrorCodePrint();
+                log.warn("{} 获取通道名称配置失败: error={}, sdkError={}", LOG_PREFIX, error.getValue(), sdkErrorInfo);
+                
+                // 尝试使用备用方法：逐个通道获取
+                queryChannelNamesOneByOne(loginHandle, names, maxChannels);
             }
             
+            log.info("{} 查询通道名称完成，部分名称: [{}]", LOG_PREFIX, 
+                    names.length > 0 ? String.join(", ", Arrays.copyOf(names, Math.min(6, names.length))) : "无");
             return names;
+            
         } catch (Exception e) {
             log.warn("{} 查询通道名称异常: {}", LOG_PREFIX, e.getMessage());
-            return null;
+            return names; // 返回默认名称
+        }
+    }
+    
+    /**
+     * 从 JSON 配置中解析通道标题
+     */
+    private void parseChannelTitlesFromJson(String jsonConfig, String[] names) {
+        try {
+            // 简单解析 JSON: { "ChannelTitle" : [ { "Name" : "xxx" }, ... ] }
+            // 也可能是: { "table" : { "ChannelTitle" : [ ... ] } }
+            
+            // 查找 Name 字段
+            int idx = 0;
+            int searchStart = 0;
+            while (idx < names.length) {
+                // 查找 "Name" : "xxx" 模式
+                int nameKeyIdx = jsonConfig.indexOf("\"Name\"", searchStart);
+                if (nameKeyIdx < 0) {
+                    break;
+                }
+                
+                // 找到冒号后的值
+                int colonIdx = jsonConfig.indexOf(":", nameKeyIdx + 6);
+                if (colonIdx < 0) {
+                    break;
+                }
+                
+                // 找到引号包围的值
+                int quoteStart = jsonConfig.indexOf("\"", colonIdx + 1);
+                if (quoteStart < 0) {
+                    break;
+                }
+                
+                int quoteEnd = jsonConfig.indexOf("\"", quoteStart + 1);
+                if (quoteEnd < 0) {
+                    break;
+                }
+                
+                String channelName = jsonConfig.substring(quoteStart + 1, quoteEnd).trim();
+                if (!channelName.isEmpty()) {
+                    names[idx] = channelName;
+                    log.debug("{} 解析到通道 {} 名称: {}", LOG_PREFIX, idx + 1, channelName);
+                }
+                
+                idx++;
+                searchStart = quoteEnd + 1;
+            }
+            
+            log.info("{} 从JSON解析到 {} 个通道名称", LOG_PREFIX, idx);
+        } catch (Exception e) {
+            log.warn("{} 解析通道名称JSON异常: {}", LOG_PREFIX, e.getMessage());
+        }
+    }
+    
+    /**
+     * 逐个通道获取名称（备用方法）
+     */
+    private void queryChannelNamesOneByOne(long loginHandle, String[] names, int maxChannels) {
+        try {
+            byte[] outBuffer = new byte[4096];
+            IntByReference error = new IntByReference(0);
+            
+            for (int channel = 0; channel < maxChannels; channel++) {
+                try {
+                    boolean result = getNetSdk().CLIENT_GetNewDevConfig(
+                            new LLong(loginHandle),
+                            "ChannelTitle",
+                            channel,   // 具体通道号
+                            outBuffer,
+                            outBuffer.length,
+                            error,
+                            3000,
+                            (Pointer) null
+                    );
+                    
+                    if (result) {
+                        String jsonConfig = new String(outBuffer, java.nio.charset.StandardCharsets.UTF_8).trim();
+                        int nullIndex = jsonConfig.indexOf('\0');
+                        if (nullIndex > 0) {
+                            jsonConfig = jsonConfig.substring(0, nullIndex);
+                        }
+                        
+                        // 解析单个通道名称
+                        int nameIdx = jsonConfig.indexOf("\"Name\"");
+                        if (nameIdx >= 0) {
+                            int colonIdx = jsonConfig.indexOf(":", nameIdx + 6);
+                            int quoteStart = jsonConfig.indexOf("\"", colonIdx + 1);
+                            int quoteEnd = jsonConfig.indexOf("\"", quoteStart + 1);
+                            if (quoteStart >= 0 && quoteEnd > quoteStart) {
+                                String name = jsonConfig.substring(quoteStart + 1, quoteEnd).trim();
+                                if (!name.isEmpty()) {
+                                    names[channel] = name;
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    // 忽略单个通道的错误
+                }
+            }
+        } catch (Exception e) {
+            log.warn("{} 逐个获取通道名称异常: {}", LOG_PREFIX, e.getMessage());
         }
     }
     

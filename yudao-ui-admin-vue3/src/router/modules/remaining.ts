@@ -795,6 +795,17 @@ const remainingRouter: AppRouteRecordRaw[] = [
         component: () => import('@/views/security/VideoSurveillance/ZlmPreview/index.vue')
       },
       {
+        path: 'video-surveillance/wvp-preview',
+        name: 'WvpPreview',
+        meta: {
+          title: '实时预览(WVP)',
+          noCache: true,
+          hidden: false,
+          canTo: true
+        },
+        component: () => import('@/views/security/VideoSurveillance/RealTimePreviewWvp/index.vue')
+      },
+      {
         path: 'video-surveillance/patrol-config',
         name: 'PatrolConfig',
         meta: {

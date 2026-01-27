@@ -38,4 +38,12 @@ public interface CameraPresetService {
      */
     List<CameraPresetDO> getPresetListByChannelId(Long channelId);
 
+    /**
+     * 根据预设点ID列表批量查询预设点
+     *
+     * @param ids 预设点ID列表
+     * @return 预设点列表
+     */
+    List<CameraPresetDO> getPresetListByIds(List<Long> ids);
+
 }

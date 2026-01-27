@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.iot.service.video;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.iot.controller.admin.video.vo.CameraPresetSaveReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.video.CameraPresetDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.video.CameraCruisePointMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.video.CameraPresetMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -29,12 +30,24 @@ public class CameraPresetServiceImpl implements CameraPresetService {
     @Resource
     private CameraPresetMapper presetMapper;
 
+    @Resource
+    private CameraCruisePointMapper cruisePointMapper;
+
     @Override
     public Long createPreset(CameraPresetSaveReqVO createReqVO) {
-        // 校验预设点编号是否已存在
+        // 校验预设点编号是否已存在（排除软删除的记录）
         if (presetMapper.existsByChannelIdAndPresetNo(createReqVO.getChannelId(), 
                 createReqVO.getPresetNo(), null)) {
             throw exception(CAMERA_PRESET_NO_EXISTS);
+        }
+        
+        // 清理可能存在的软删除记录（防止唯一索引冲突）
+        // 由于唯一索引不包含 deleted 字段，如果存在同一 channel_id + preset_no 的软删除记录，
+        // 插入时会发生冲突。这里先物理删除这些软删除记录。
+        int deletedCount = presetMapper.physicalDeleteSoftDeleted(createReqVO.getChannelId(), createReqVO.getPresetNo());
+        if (deletedCount > 0) {
+            log.info("{} 清理软删除记录: channelId={}, presetNo={}, count={}", 
+                    LOG_PREFIX, createReqVO.getChannelId(), createReqVO.getPresetNo(), deletedCount);
         }
 
         // 插入数据库
@@ -78,12 +91,18 @@ public class CameraPresetServiceImpl implements CameraPresetService {
         // 校验存在
         CameraPresetDO preset = validatePresetExists(id);
         
-        // 删除数据库记录
+        // 检查预设点是否被巡航路线使用
+        if (cruisePointMapper.existsByPresetId(id)) {
+            throw exception(CAMERA_PRESET_USED_BY_CRUISE);
+        }
+        
+        // 物理删除数据库记录（预设点数据不需要保留删除历史）
         // 注意：不自动从设备删除预设点，因为可能会影响其他预设点
         // 用户可以通过前端的 "删除预设点" 功能手动从设备删除
-        presetMapper.deleteById(id);
+        presetMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CameraPresetDO>()
+                .eq(CameraPresetDO::getId, id));
         
-        log.info("{} 删除预设点成功: id={}, presetNo={}", LOG_PREFIX, id, preset.getPresetNo());
+        log.info("{} 删除预设点成功(物理删除): id={}, presetNo={}", LOG_PREFIX, id, preset.getPresetNo());
     }
 
     private CameraPresetDO validatePresetExists(Long id) {
@@ -102,6 +121,14 @@ public class CameraPresetServiceImpl implements CameraPresetService {
     @Override
     public List<CameraPresetDO> getPresetListByChannelId(Long channelId) {
         return presetMapper.selectListByChannelId(channelId);
+    }
+
+    @Override
+    public List<CameraPresetDO> getPresetListByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return presetMapper.selectBatchIds(ids);
     }
 
 }

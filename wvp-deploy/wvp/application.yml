@@ -1,0 +1,89 @@
+spring:
+  # 数据库配置
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://mysql:3306/wvp?useUnicode=true&characterEncoding=UTF8&rewriteBatchedStatements=true&serverTimezone=Asia/Shanghai&allowMultiQueries=true
+    username: root
+    password: wvp123456
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 30
+      minimum-idle: 5
+  
+  # Redis 配置
+  redis:
+    host: redis
+    port: 6379
+    database: 0
+    timeout: 10000
+    lettuce:
+      pool:
+        max-active: 300
+        max-wait: 5000
+
+# SIP 服务配置
+sip:
+  # SIP 服务 ID（20位数字）
+  id: 34020000002000000001
+  # SIP 服务域
+  domain: 3402000000
+  # SIP 监听 IP（0.0.0.0 监听所有）
+  ip: 0.0.0.0
+  # 对外暴露的 IP（NVR/IPC 连接的 IP，改成你的服务器 IP）
+  show-ip: 192.168.1.246
+  # SIP 端口
+  port: 5060
+  # 密码（设备接入时使用）
+  password: admin123
+
+# 流媒体服务器配置
+media:
+  # ZLMediaKit 服务 ID
+  id: your_server_id
+  # ZLMediaKit IP
+  ip: zlmediakit
+  # ZLMediaKit HTTP 端口
+  http-port: 80
+  # ZLMediaKit HTTP-SSL 端口
+  http-ssl-port: 443
+  # RTSP 端口
+  rtsp-port: 554
+  # RTMP 端口
+  rtmp-port: 1935
+  # RTP 接收端口范围
+  rtp-proxy-port: 10000
+  # 流媒体 Hook 地址
+  hook-ip: wvp
+  # 流媒体对外访问 IP（改成你的服务器 IP）
+  stream-ip: 192.168.1.246
+  # 是否自动配置 ZLM
+  auto-config: true
+  # secret（需与 ZLM 配置一致）
+  secret: S3KXbjxEBlU9GCnBkVJaaEsdVmEHNzRW
+
+# 用户配置
+user-settings:
+  # 是否开启鉴权
+  auth-required: false
+  # 是否推送国标级联消息
+  push-authority: false
+  # 设备/通道状态变化时是否推送回调
+  device-status-notify: true
+
+# Webhook 回调配置（回调到 BIZ 层）
+hook:
+  # 设备上线回调
+  on-device-online: http://host.docker.internal:48080/admin-api/iot/video/wvp/webhook/device/online
+  # 设备离线回调
+  on-device-offline: http://host.docker.internal:48080/admin-api/iot/video/wvp/webhook/device/offline
+  # 通道同步回调
+  on-channel-sync: http://host.docker.internal:48080/admin-api/iot/video/wvp/webhook/channel/sync
+  # 报警回调
+  on-alarm: http://host.docker.internal:48080/admin-api/iot/video/wvp/webhook/alarm
+
+# 日志配置
+logging:
+  level:
+    root: info
+    com.genersoft.iot.vmp: info

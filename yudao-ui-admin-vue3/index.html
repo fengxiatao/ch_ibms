@@ -19,9 +19,27 @@
     <link href="https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Cesium.js"></script>
     
-    <!-- 注意：大华播放器 SDK 已移除，实时预览和录像回放现使用 ZLMediaKit + mpegts.js -->
-    <!-- 如果需要轮巡任务等功能，相关页面会动态加载大华 SDK -->
+    <!-- Jessibuca 播放器 - 支持 H.264/H.265 -->
+    <script src="/jessibuca/jessibuca.js"></script>
     
+    <!-- 大华 H5 播放器 SDK -->
+    <!-- 修复大华 SDK Worker 路径问题 -->
+    <script>
+      (function() {
+        const OriginalWorker = window.Worker;
+        window.Worker = function(scriptURL, options) {
+          // 修复 Worker 相对路径问题
+          if (typeof scriptURL === 'string' && scriptURL.endsWith('.worker.js')) {
+            const workerFileName = scriptURL.split('/').pop();
+            scriptURL = '/dahua/' + workerFileName;
+            console.log('[Dahua SDK] Worker 路径修正:', scriptURL);
+          }
+          return new OriginalWorker(scriptURL, options);
+        };
+        window.Worker.prototype = OriginalWorker.prototype;
+      })();
+    </script>
+    <script src="/dahua/PlayerControl.js"></script>
     
   </head>
   <body>

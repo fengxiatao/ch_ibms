@@ -5,8 +5,12 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.patrolplan.IotVideoPatrolPlanD
 import cn.iocoder.yudao.module.iot.dal.dataobject.patrolplan.IotVideoPatrolSceneDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.patrolplan.IotVideoPatrolTaskDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.patrolplan.IotVideoPatrolPlanMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.patrolplan.IotVideoPatrolSceneChannelMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.patrolplan.IotVideoPatrolSceneMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.patrolplan.IotVideoPatrolTaskMapper;
+import lombok.extern.slf4j.Slf4j;
+
+import java.util.stream.Collectors;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +29,7 @@ import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.*;
  */
 @Service
 @Validated
+@Slf4j
 public class PatrolTaskServiceImpl implements PatrolTaskService {
 
     @Resource
@@ -35,6 +40,9 @@ public class PatrolTaskServiceImpl implements PatrolTaskService {
 
     @Resource
     private IotVideoPatrolSceneMapper patrolSceneMapper;
+
+    @Resource
+    private IotVideoPatrolSceneChannelMapper patrolSceneChannelMapper;
 
     @Override
     public Long createPatrolTask(PatrolTaskSaveReqVO createReqVO) {
@@ -50,6 +58,8 @@ public class PatrolTaskServiceImpl implements PatrolTaskService {
                 .taskName(createReqVO.getTaskName())
                 .taskCode(createReqVO.getTaskCode())
                 .description(createReqVO.getDescription())
+                .taskOrder(createReqVO.getTaskOrder() != null ? createReqVO.getTaskOrder() : 1)
+                .duration(createReqVO.getDuration() != null ? createReqVO.getDuration() : 60)
                 .scheduleType(createReqVO.getScheduleType())
                 .scheduleConfig(createReqVO.getScheduleConfig())
                 .timeSlots(convertTimeSlots(createReqVO.getTimeSlots()))
@@ -90,6 +100,8 @@ public class PatrolTaskServiceImpl implements PatrolTaskService {
                 .taskName(updateReqVO.getTaskName())
                 .taskCode(updateReqVO.getTaskCode())
                 .description(updateReqVO.getDescription())
+                .taskOrder(updateReqVO.getTaskOrder())
+                .duration(updateReqVO.getDuration())
                 .scheduleType(updateReqVO.getScheduleType())
                 .scheduleConfig(updateReqVO.getScheduleConfig())
                 .timeSlots(convertTimeSlots(updateReqVO.getTimeSlots()))
@@ -114,14 +126,26 @@ public class PatrolTaskServiceImpl implements PatrolTaskService {
         // 校验存在
         validatePatrolTaskExists(id);
         
-        // 检查是否有关联的场景（自动过滤租户）
+        // 级联删除：先删除关联的场景和场景通道
         List<IotVideoPatrolSceneDO> scenes = patrolSceneMapper.selectListByTaskId(id);
         if (!scenes.isEmpty()) {
-            throw exception(VIDEO_PATROL_TASK_HAS_SCENES);
+            // 收集场景ID
+            List<Long> sceneIds = scenes.stream()
+                    .map(IotVideoPatrolSceneDO::getId)
+                    .collect(Collectors.toList());
+            
+            // 1. 删除场景通道
+            int channelCount = patrolSceneChannelMapper.deleteBySceneIds(sceneIds);
+            log.info("[删除轮巡任务] 删除场景通道: taskId={}, sceneIds={}, channelCount={}", id, sceneIds, channelCount);
+            
+            // 2. 删除场景
+            int sceneCount = patrolSceneMapper.deleteByTaskId(id);
+            log.info("[删除轮巡任务] 删除场景: taskId={}, sceneCount={}", id, sceneCount);
         }
         
-        // 删除（自动过滤租户）
+        // 3. 删除任务
         patrolTaskMapper.deleteById(id);
+        log.info("[删除轮巡任务] 删除任务成功: id={}", id);
     }
 
     @Override

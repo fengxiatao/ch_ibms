@@ -634,6 +634,8 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
             return null;
         }
         // subtype: 0=主码流, 1=辅码流1, 2=辅码流2
+        int rtspChannel = channelNo - 1;
+        if (rtspChannel < 0) rtspChannel = 0;
         int subtype = "sub".equals(streamType) ? 1 : 0;
         // 大华 RTSP 使用 HTTP 端口（80），不是 RTSP 端口（554）
         int port = 80;
@@ -705,24 +707,15 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void batchAssignSpatial(List<Long> channelIds, Long campusId, Long buildingId, Long floorId, Long areaId) {
         if (channelIds == null || channelIds.isEmpty()) {
             return;
         }
-        // 先查询空间信息（在事务外执行，使用PostgreSQL数据源）
+        // 先查询空间信息
         SpatialInfo spatialInfo = querySpatialInfo(campusId, buildingId, floorId, areaId);
         
-        // 然后在事务中更新通道信息（使用MySQL数据源）
-        batchAssignSpatialInTransaction(channelIds, buildingId, floorId, areaId, spatialInfo.location);
-        
-        log.info("[通道管理] 批量指派空间: count={}, campusId={}, buildingId={}, floorId={}", channelIds.size(), campusId, buildingId, floorId);
-    }
-    
-    /**
-     * 在事务中批量指派空间（仅更新MySQL中的通道表）
-     */
-    @Transactional(rollbackFor = Exception.class)
-    private void batchAssignSpatialInTransaction(List<Long> channelIds, Long buildingId, Long floorId, Long areaId, String location) {
+        // 然后更新通道信息
         for (Long id : channelIds) {
             IotDeviceChannelDO updateObj = new IotDeviceChannelDO();
             updateObj.setId(id);
@@ -730,9 +723,11 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
             updateObj.setFloorId(floorId);
             updateObj.setAreaId(areaId);
             updateObj.setSpaceId(null);
-            updateObj.setLocation(location);
+            updateObj.setLocation(spatialInfo.location);
             channelMapper.updateById(updateObj);
         }
+        
+        log.info("[通道管理] 批量指派空间: count={}, campusId={}, buildingId={}, floorId={}", channelIds.size(), campusId, buildingId, floorId);
     }
 
     // ========== 多屏预览专用 ==========
@@ -762,17 +757,56 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public SyncResult batchSyncAllNvrChannels() {
         SyncResult result = new SyncResult();
         long startTime = System.currentTimeMillis();
         
-        // TODO: 实现批量同步所有NVR通道的逻辑
-        // 需要在 IotDeviceService 中添加 getDevicesByType 方法
-        log.warn("[batchSyncAllNvrChannels] 方法待实现");
-        
-        result.setNvrCount(0);
-        result.setDuration(System.currentTimeMillis() - startTime);
+        try {
+            // 1. 获取所有 NVR 设备
+            List<IotDeviceDO> nvrList = nvrQueryService.getNvrList();
+            if (nvrList == null || nvrList.isEmpty()) {
+                log.info("[批量同步NVR通道] 没有找到 NVR 设备");
+                result.setNvrCount(0);
+                result.setDuration(System.currentTimeMillis() - startTime);
+                return result;
+            }
+            
+            log.info("[批量同步NVR通道] 开始同步，共 {} 台 NVR", nvrList.size());
+            
+            int successCount = 0;
+            int failCount = 0;
+            
+            // 2. 对每个 NVR 发送通道同步命令
+            for (IotDeviceDO nvr : nvrList) {
+                try {
+                    // 只对在线的 NVR 发送同步命令
+                    if (nvr.getState() != null && nvr.getState() == 1) {
+                        // 调用 NvrQueryService 发送通道查询命令到 newgateway
+                        // 结果会通过 DeviceServiceResultConsumer 异步处理并更新数据库
+                        nvrQueryService.refreshChannelsByNvrId(nvr.getId());
+                        successCount++;
+                        log.info("[批量同步NVR通道] NVR {} ({}) 同步命令已发送", nvr.getId(), nvr.getDeviceName());
+                    } else {
+                        log.info("[批量同步NVR通道] NVR {} ({}) 不在线，跳过", nvr.getId(), nvr.getDeviceName());
+                    }
+                } catch (Exception e) {
+                    failCount++;
+                    log.error("[批量同步NVR通道] NVR {} 同步失败: {}", nvr.getId(), e.getMessage());
+                }
+            }
+            
+            result.setNvrCount(nvrList.size());
+            result.setSuccessCount(successCount);
+            result.setFailCount(failCount);
+            result.setDuration(System.currentTimeMillis() - startTime);
+            
+            log.info("[批量同步NVR通道] 同步完成: 总数={}, 成功={}, 失败={}, 耗时={}ms",
+                    nvrList.size(), successCount, failCount, result.getDuration());
+            
+        } catch (Exception e) {
+            log.error("[批量同步NVR通道] 批量同步异常", e);
+            result.setDuration(System.currentTimeMillis() - startTime);
+        }
         
         return result;
     }

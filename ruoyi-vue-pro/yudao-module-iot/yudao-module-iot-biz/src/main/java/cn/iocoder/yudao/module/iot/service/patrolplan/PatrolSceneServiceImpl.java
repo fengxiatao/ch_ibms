@@ -196,6 +196,7 @@ public class PatrolSceneServiceImpl implements PatrolSceneService {
                     .targetChannelNo(channelVO.getTargetChannelNo())
                     .streamUrlMain(channelVO.getStreamUrlMain())
                     .streamUrlSub(channelVO.getStreamUrlSub())
+                    .wvpPlayId(channelVO.getWvpPlayId())
                     .config(channelVO.getConfig())
                     .build();
             
@@ -244,6 +245,7 @@ public class PatrolSceneServiceImpl implements PatrolSceneService {
                 channelVO.setTargetChannelNo(channelDO.getTargetChannelNo());
                 channelVO.setStreamUrlMain(channelDO.getStreamUrlMain());
                 channelVO.setStreamUrlSub(channelDO.getStreamUrlSub());
+                channelVO.setWvpPlayId(channelDO.getWvpPlayId());
                 channelVO.setConfig(channelDO.getConfig());
                 channelVOs.add(channelVO);
             }

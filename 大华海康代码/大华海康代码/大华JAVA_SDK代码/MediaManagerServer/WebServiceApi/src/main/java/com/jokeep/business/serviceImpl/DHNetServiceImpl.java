@@ -606,6 +606,121 @@ public String setAlarmLight(String m_strIp, int m_nPort, int nChannelID,String m
 
 
 
+    /**
+     * 查询录像文件列表（使用大华SDK CLIENT_QueryRecordFile）
+     */
+    @Override
+    public List<Map<String, Object>> queryRecordFiles(String m_strIp, int m_nPort, String m_strUser, 
+                                                       String m_strPassword, int nChannelID, 
+                                                       String startTime, String endTime) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        
+        try {
+            // 初始化SDK
+            LoginModule.init(disConnect, haveReConnect);
+            
+            // 登录设备
+            if (LoginModule.m_hLoginHandle.longValue() == 0) {
+                LoginModule.login(m_strIp, m_nPort, m_strUser, m_strPassword);
+            }
+            
+            if (LoginModule.m_hLoginHandle.longValue() == 0) {
+                System.err.println("[录像查询] 设备登录失败");
+                return result;
+            }
+            
+            // 转换时间格式
+            NetSDKLib.NET_TIME stTimeStart = convertStringToNetTime(startTime);
+            NetSDKLib.NET_TIME stTimeEnd = convertStringToNetTime(endTime);
+            
+            // 创建录像文件信息数组（最多查询2000条）
+            int maxRecordCount = 2000;
+            NetSDKLib.NET_RECORDFILE_INFO[] stFileInfo = 
+                (NetSDKLib.NET_RECORDFILE_INFO[]) new NetSDKLib.NET_RECORDFILE_INFO().toArray(maxRecordCount);
+            IntByReference nFindCount = new IntByReference(0);
+            
+            // 调用大华SDK查询录像
+            // RecordFileType: 0-所有录像, 1-外部报警, 2-动态监测报警
+            int nRecordFileType = 0;
+            boolean bRet = netsdk.CLIENT_QueryRecordFile(
+                LoginModule.m_hLoginHandle,
+                nChannelID,
+                nRecordFileType,
+                stTimeStart,
+                stTimeEnd,
+                null,
+                stFileInfo,
+                maxRecordCount * stFileInfo[0].size(),
+                nFindCount,
+                5000,  // 超时时间5秒
+                false
+            );
+            
+            if (bRet) {
+                int count = nFindCount.getValue();
+                System.out.println("[录像查询] 查询成功，找到 " + count + " 个录像文件");
+                
+                // 转换为Map格式返回
+                for (int i = 0; i < count; i++) {
+                    NetSDKLib.NET_RECORDFILE_INFO fileInfo = stFileInfo[i];
+                    
+                    Map<String, Object> record = new HashMap<>();
+                    record.put("channelId", fileInfo.ch);
+                    record.put("fileName", new String(fileInfo.filename).trim());
+                    record.put("fileSize", fileInfo.size);
+                    record.put("startTime", formatNetTime(fileInfo.starttime));
+                    record.put("endTime", formatNetTime(fileInfo.endtime));
+                    record.put("recordType", fileInfo.driveno); // 录像类型
+                    record.put("diskNo", fileInfo.diskno);      // 磁盘号
+                    
+                    result.add(record);
+                }
+            } else {
+                System.err.println("[录像查询] 查询失败: " + ToolKits.getErrorCodePrint());
+            }
+            
+        } catch (Exception e) {
+            System.err.println("[录像查询] 异常: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return result;
+    }
+    
+    /**
+     * 将字符串时间转换为 NET_TIME 格构
+     * @param timeStr 格式: yyyy-MM-dd HH:mm:ss
+     */
+    private NetSDKLib.NET_TIME convertStringToNetTime(String timeStr) {
+        NetSDKLib.NET_TIME netTime = new NetSDKLib.NET_TIME();
+        try {
+            String[] parts = timeStr.split(" ");
+            String[] dateParts = parts[0].split("-");
+            String[] timeParts = parts[1].split(":");
+            
+            netTime.dwYear = Integer.parseInt(dateParts[0]);
+            netTime.dwMonth = Integer.parseInt(dateParts[1]);
+            netTime.dwDay = Integer.parseInt(dateParts[2]);
+            netTime.dwHour = Integer.parseInt(timeParts[0]);
+            netTime.dwMinute = Integer.parseInt(timeParts[1]);
+            netTime.dwSecond = Integer.parseInt(timeParts[2]);
+        } catch (Exception e) {
+            System.err.println("[时间转换] 失败: " + e.getMessage());
+        }
+        return netTime;
+    }
+    
+    /**
+     * 将 NET_TIME 格式转换为字符串
+     * @param netTime NET_TIME对象
+     * @return yyyy-MM-dd HH:mm:ss 格式的字符串
+     */
+    private String formatNetTime(NetSDKLib.NET_TIME netTime) {
+        return String.format("%04d-%02d-%02d %02d:%02d:%02d",
+            netTime.dwYear, netTime.dwMonth, netTime.dwDay,
+            netTime.dwHour, netTime.dwMinute, netTime.dwSecond);
+    }
+
     /////////////////面板///////////////////
     // 设备断线回调: 通过 CLIENT_Init 设置该回调函数，当设备出现断线时，SDK会调用该函数
     private static class DisConnect implements NetSDKLib.fDisConnect {

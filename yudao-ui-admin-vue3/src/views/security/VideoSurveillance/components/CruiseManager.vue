@@ -245,11 +245,13 @@ const showAddCruise = () => {
 const saveCruise = async () => {
   await cruiseFormRef.value?.validate()
   try {
-    const data: CruiseApi.CameraCruiseVO = {
+    const data: any = {
       channelId: props.channelId,
       cruiseName: cruiseForm.cruiseName,
       dwellTime: cruiseForm.dwellTime,
-      remark: cruiseForm.remark
+      loopEnabled: true, // 默认循环
+      remark: cruiseForm.remark,
+      points: [] // 可以为空，稍后添加
     }
     if (cruiseForm.id) {
       data.id = cruiseForm.id

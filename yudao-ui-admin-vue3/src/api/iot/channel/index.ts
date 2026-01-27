@@ -132,6 +132,16 @@ export const syncDeviceChannels = (deviceId: number) => {
   return request.post({ url: `/iot/channel/sync/${deviceId}` })
 }
 
+// 批量同步所有NVR通道（更新通道名称）
+export const syncAllNvrChannels = () => {
+  return request.post<{
+    nvrCount: number
+    successCount: number
+    failCount: number
+    duration: number
+  }>({ url: '/iot/channel/sync-all-nvr' })
+}
+
 // 批量启用通道
 export const batchEnableChannels = (channelIds: number[]) => {
   return request.post({ url: '/iot/channel/batch/enable', data: channelIds })

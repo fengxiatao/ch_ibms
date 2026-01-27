@@ -3,8 +3,12 @@ package cn.iocoder.yudao.module.iot.service.video;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.video.vo.CameraRecordingPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.video.vo.CameraRecordingRespVO;
+import cn.iocoder.yudao.module.iot.controller.admin.video.vo.DahuaRecordingFileRespVO;
+import cn.iocoder.yudao.module.iot.controller.admin.video.vo.QueryDahuaRecordingReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.camera.IotCameraRecordingDO;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 /**
  * 摄像头录像记录 Service接口
@@ -82,6 +86,17 @@ public interface CameraRecordingService {
      * @return 录像记录ID
      */
     Long uploadRecording(Long deviceId, Integer recordingType, MultipartFile file) throws Exception;
+
+    /**
+     * 使用大华SDK查询NVR录像文件列表
+     * 
+     * <p>通过消息总线向网关侧发送命令，网关侧调用大华SDK查询录像文件。</p>
+     * <p>NVR通常按小时分割录像文件，返回的是录像文件列表。</p>
+     *
+     * @param reqVO 查询参数（通道ID、开始时间、结束时间、录像类型）
+     * @return 录像文件列表
+     */
+    List<DahuaRecordingFileRespVO> queryDahuaRecordingFiles(QueryDahuaRecordingReqVO reqVO);
 
 }
 

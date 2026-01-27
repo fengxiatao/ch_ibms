@@ -22,4 +22,12 @@ public interface IotVideoPatrolSceneMapper extends BaseMapperX<IotVideoPatrolSce
                 .orderByDesc(IotVideoPatrolSceneDO::getId));
     }
 
+    /**
+     * 根据任务ID删除场景
+     */
+    default int deleteByTaskId(Long taskId) {
+        return delete(new LambdaQueryWrapperX<IotVideoPatrolSceneDO>()
+                .eq(IotVideoPatrolSceneDO::getTaskId, taskId));
+    }
+
 }

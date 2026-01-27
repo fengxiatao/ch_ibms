@@ -30,4 +30,19 @@ public interface CameraCruisePointMapper extends BaseMapperX<CameraCruisePointDO
         delete(CameraCruisePointDO::getCruiseId, cruiseId);
     }
 
+    /**
+     * 根据预设点ID查询使用该预设点的巡航点列表
+     */
+    default List<CameraCruisePointDO> selectListByPresetId(Long presetId) {
+        return selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CameraCruisePointDO>()
+                .eq(CameraCruisePointDO::getPresetId, presetId));
+    }
+
+    /**
+     * 检查预设点是否被巡航使用
+     */
+    default boolean existsByPresetId(Long presetId) {
+        return selectCount(CameraCruisePointDO::getPresetId, presetId) > 0;
+    }
+
 }
