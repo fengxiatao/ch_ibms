@@ -76,7 +76,22 @@ public interface ZlmStreamService {
      * @param endTime    结束时间（ISO格式或时间戳）
      * @return 多协议播放地址
      */
-    PlayUrlRespVO getPlaybackUrl(Long channelId, String startTime, String endTime);
+    default PlayUrlRespVO getPlaybackUrl(Long channelId, String startTime, String endTime) {
+        return getPlaybackUrl(channelId, startTime, endTime, null);
+    }
+
+    /**
+     * 获取录像回放播放地址（支持窗口复用）
+     * 
+     * <p>从 NVR 拉取指定时间段的录像流</p>
+     *
+     * @param channelId  通道ID
+     * @param startTime  开始时间（ISO格式或时间戳）
+     * @param endTime    结束时间（ISO格式或时间戳）
+     * @param playId     播放窗口标识（同一窗口使用固定标识，便于复用流）
+     * @return 多协议播放地址
+     */
+    PlayUrlRespVO getPlaybackUrl(Long channelId, String startTime, String endTime, String playId);
 
     /**
      * 清除所有流代理（清空缓存的流）

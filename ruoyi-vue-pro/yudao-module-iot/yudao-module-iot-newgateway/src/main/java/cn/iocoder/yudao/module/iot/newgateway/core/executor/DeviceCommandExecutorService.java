@@ -15,6 +15,9 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
+import static cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants.INTERNAL_SERVER_ERROR;
+import static cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants.SUCCESS;
+
 /**
  * 设备命令执行服务
  * <p>
@@ -203,23 +206,30 @@ public class DeviceCommandExecutorService {
     private void publishCommandResult(String requestId, Long deviceId, String method,
                                       Map<String, Object> params, CommandResult result) {
         try {
+            // 统一补齐 code/msg，避免下游判空导致结果丢失
+            int code = result != null && result.isSuccess() ? SUCCESS.getCode() : INTERNAL_SERVER_ERROR.getCode();
+            String msg = result != null ? result.getMessage() : null;
+            if (msg == null || msg.isEmpty()) {
+                msg = result != null && result.isSuccess() ? SUCCESS.getMsg() : INTERNAL_SERVER_ERROR.getMsg();
+            }
+
             IotDeviceMessage resultMessage = IotDeviceMessage.builder()
                     .requestId(requestId)
                     .deviceId(deviceId)
                     .method(method)
                     .params(params)
-                    .code(result.isSuccess() ? 0 : -1)
-                    .msg(result.getMessage())
-                    .data(result.getData())
+                    .code(code)
+                    .msg(msg)
+                    .data(result != null ? result.getData() : null)
                     .build();
 
             messageBus.post(IotMessageTopics.DEVICE_SERVICE_RESULT, resultMessage);
             
-            if (result.isSuccess()) {
+            if (result != null && result.isSuccess()) {
                 log.info("[CommandExecutor] ✅ 命令执行成功: deviceId={}, requestId={}", deviceId, requestId);
             } else {
                 log.warn("[CommandExecutor] 命令执行失败: deviceId={}, requestId={}, error={}",
-                        deviceId, requestId, result.getMessage());
+                        deviceId, requestId, result != null ? result.getMessage() : "未知错误");
             }
         } catch (Exception e) {
             log.error("[CommandExecutor] 发布命令结果失败: deviceId={}, requestId={}", deviceId, requestId, e);

@@ -77,6 +77,7 @@ export interface NvrPresetControlReq {
   channelNo: number    // 通道号
   presetNo: number     // 预设点编号（1-255）
   action: string       // 操作：GOTO, SET, CLEAR
+  presetName?: string  // 预设点名称（SET操作时使用）
 }
 
 export const nvrPresetControl = (nvrId: number, data: NvrPresetControlReq) => {

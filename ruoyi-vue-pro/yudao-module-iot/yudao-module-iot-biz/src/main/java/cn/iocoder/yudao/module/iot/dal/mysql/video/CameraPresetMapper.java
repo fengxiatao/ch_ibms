@@ -3,7 +3,9 @@ package cn.iocoder.yudao.module.iot.dal.mysql.video;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.iot.dal.dataobject.video.CameraPresetDO;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -42,5 +44,12 @@ public interface CameraPresetMapper extends BaseMapperX<CameraPresetDO> {
                 .eq(CameraPresetDO::getPresetNo, presetNo)
                 .ne(excludeId != null, CameraPresetDO::getId, excludeId)) > 0;
     }
+
+    /**
+     * 物理删除指定通道和预设点编号的软删除记录
+     * 注意：这个方法会绕过 MyBatis-Plus 的逻辑删除功能，直接执行物理删除
+     */
+    @Delete("DELETE FROM iot_camera_preset WHERE channel_id = #{channelId} AND preset_no = #{presetNo} AND deleted = 1")
+    int physicalDeleteSoftDeleted(@Param("channelId") Long channelId, @Param("presetNo") Integer presetNo);
 
 }

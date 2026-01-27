@@ -86,6 +86,11 @@ public class IotVideoPatrolSceneChannelDO extends BaseDO {
     private String streamUrlSub;
 
     /**
+     * WVP 通道 ID（commonGbChannelId），用于视频播放
+     */
+    private String wvpPlayId;
+
+    /**
      * 配置信息（包含用户名、密码、端口等）
      */
     @TableField(typeHandler = JacksonTypeHandler.class)

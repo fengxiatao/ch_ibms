@@ -6,9 +6,8 @@ import cn.iocoder.yudao.module.iot.controller.admin.video.vo.*;
 import cn.iocoder.yudao.module.iot.dal.dataobject.video.CameraCruiseDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.video.CameraCruisePointDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.video.CameraPresetDO;
-import cn.iocoder.yudao.module.iot.dal.mysql.video.CameraCruisePointMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.video.CameraPresetMapper;
 import cn.iocoder.yudao.module.iot.service.video.CameraCruiseService;
+import cn.iocoder.yudao.module.iot.service.video.CameraPresetService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import lombok.extern.slf4j.Slf4j;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,10 +40,7 @@ public class CameraCruiseController {
     private CameraCruiseService cruiseService;
 
     @Resource
-    private CameraCruisePointMapper cruisePointMapper;
-
-    @Resource
-    private CameraPresetMapper presetMapper;
+    private CameraPresetService presetService;
 
     @PostMapping("/create")
     @Operation(summary = "创建巡航路线")
@@ -83,16 +79,16 @@ public class CameraCruiseController {
         }
         CameraCruiseRespVO respVO = BeanUtils.toBean(cruise, CameraCruiseRespVO.class);
 
-        // 查询巡航点列表
-        List<CameraCruisePointDO> points = cruisePointMapper.selectListByCruiseId(id);
+        // 查询巡航点列表（通过 Service 层）
+        List<CameraCruisePointDO> points = cruiseService.getCruisePointListByCruiseId(id);
         log.info("[getCruise] 查询到 {} 个巡航点, cruiseId={}", points.size(), id);
 
-        // 查询预设点信息
+        // 查询预设点信息（通过 Service 层）
         Map<Long, CameraPresetDO> presetMap = new HashMap<>();
         if (!points.isEmpty()) {
             List<Long> presetIds = points.stream().map(CameraCruisePointDO::getPresetId).collect(Collectors.toList());
             log.info("[getCruise] 预设点ID列表: {}", presetIds);
-            presetMap = presetMapper.selectBatchIds(presetIds).stream()
+            presetMap = presetService.getPresetListByIds(presetIds).stream()
                     .collect(Collectors.toMap(CameraPresetDO::getId, p -> p));
             log.info("[getCruise] 查询到 {} 个预设点信息", presetMap.size());
         }
@@ -122,9 +118,9 @@ public class CameraCruiseController {
         List<CameraCruiseDO> list = cruiseService.getCruiseListByChannelId(channelId);
         List<CameraCruiseRespVO> result = BeanUtils.toBean(list, CameraCruiseRespVO.class);
         
-        // 为每个巡航路线查询巡航点数量
+        // 为每个巡航路线查询巡航点数量（通过 Service 层）
         for (CameraCruiseRespVO cruise : result) {
-            List<CameraCruisePointDO> points = cruisePointMapper.selectListByCruiseId(cruise.getId());
+            List<CameraCruisePointDO> points = cruiseService.getCruisePointListByCruiseId(cruise.getId());
             // 只设置简单的巡航点信息（不包含预设点详情），用于显示数量
             List<CameraCruisePointRespVO> pointVOs = points.stream()
                     .map(point -> {
@@ -167,13 +163,14 @@ public class CameraCruiseController {
     @Parameter(name = "cruiseId", description = "巡航路线ID", required = true)
     @PreAuthorize("@ss.hasPermission('iot:camera:cruise:query')")
     public CommonResult<List<CameraCruisePointRespVO>> getCruisePointList(@RequestParam("cruiseId") Long cruiseId) {
-        List<CameraCruisePointDO> points = cruisePointMapper.selectListByCruiseId(cruiseId);
+        // 通过 Service 层查询巡航点
+        List<CameraCruisePointDO> points = cruiseService.getCruisePointListByCruiseId(cruiseId);
         
-        // 查询预设点信息
+        // 查询预设点信息（通过 Service 层）
         Map<Long, CameraPresetDO> presetMap = new HashMap<>();
         if (!points.isEmpty()) {
             List<Long> presetIds = points.stream().map(CameraCruisePointDO::getPresetId).collect(Collectors.toList());
-            presetMap = presetMapper.selectBatchIds(presetIds).stream()
+            presetMap = presetService.getPresetListByIds(presetIds).stream()
                     .collect(Collectors.toMap(CameraPresetDO::getId, p -> p));
         }
         

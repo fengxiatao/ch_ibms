@@ -20,6 +20,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants.INTERNAL_SERVER_ERROR;
+import static cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants.SUCCESS;
+
 /**
  * 设备控制命令消费者
  * <p>
@@ -325,14 +328,21 @@ public class DeviceCommandConsumer implements IotMessageSubscriber<IotMessageEnv
         try {
             // 将请求的 method/params 一并回传，便于 biz 侧提取 deviceType、serviceIdentifier 等信息
             // 否则 biz 侧会出现 deviceType=UNKNOWN、无法做通道同步等问题
+            // 统一补齐 code/msg，避免下游判空导致结果丢失
+            int code = result != null && result.isSuccess() ? SUCCESS.getCode() : INTERNAL_SERVER_ERROR.getCode();
+            String msg = result != null ? result.getMessage() : null;
+            if (msg == null || msg.isEmpty()) {
+                msg = result != null && result.isSuccess() ? SUCCESS.getMsg() : INTERNAL_SERVER_ERROR.getMsg();
+            }
+
             IotDeviceMessage resultMessage = IotDeviceMessage.builder()
                     .requestId(requestId)
                     .deviceId(deviceId)
                     .method(method)
                     .params(params)
-                    .code(result.isSuccess() ? 0 : -1)
-                    .msg(result.getMessage())
-                    .data(result.getData())
+                    .code(code)
+                    .msg(msg)
+                    .data(result != null ? result.getData() : null)
                     .build();
 
             messageBus.post(IotMessageTopics.DEVICE_SERVICE_RESULT, resultMessage);

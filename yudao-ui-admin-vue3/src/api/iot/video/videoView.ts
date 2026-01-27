@@ -5,8 +5,10 @@ export interface VideoViewVO {
   id?: number
   name: string
   groupId?: number
+  groupIds?: number[]
   groupName?: string
   layout?: number
+  gridLayout?: number  // 兼容前端字段名
   panes?: VideoViewPaneVO[]
   isDefault?: boolean
   sortOrder?: number
@@ -17,8 +19,12 @@ export interface VideoViewVO {
 // 视图窗格 VO
 export interface VideoViewPaneVO {
   paneIndex: number
-  channelId?: number
+  channelId?: number | string | null  // WVP 通道 ID (commonGbChannelId)
+  wvpPlayId?: number | string | null  // 兼容前端字段名
   channelName?: string
+  deviceId?: number
+  channelNo?: number
+  config?: string
 }
 
 // 视图分组 VO

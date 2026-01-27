@@ -242,12 +242,14 @@ public interface ErrorCodeConstants {
     // ========== 摄像头预设点相关 1-050-051-000 ==========
     ErrorCode CAMERA_PRESET_NOT_EXISTS = new ErrorCode(1_050_051_001, "摄像头预设点不存在");
     ErrorCode CAMERA_PRESET_NO_EXISTS = new ErrorCode(1_050_051_002, "预设点编号已存在");
+    ErrorCode CAMERA_PRESET_USED_BY_CRUISE = new ErrorCode(1_050_051_003, "预设点被巡航路线使用中，无法删除");
 
     // ========== 摄像头巡航相关 1-050-052-000 ==========
     ErrorCode CAMERA_CRUISE_NOT_EXISTS = new ErrorCode(1_050_052_001, "巡航路线不存在");
     ErrorCode CAMERA_CRUISE_NAME_EXISTS = new ErrorCode(1_050_052_002, "巡航路线名称已存在");
     ErrorCode CAMERA_CRUISE_NO_POINTS = new ErrorCode(1_050_052_003, "巡航路线没有预设点");
     ErrorCode CAMERA_CRUISE_POINT_NOT_EXISTS = new ErrorCode(1_050_052_004, "巡航点不存在");
+    ErrorCode CAMERA_CRUISE_POINTS_TOO_FEW = new ErrorCode(1_050_052_005, "巡航路线至少需要2个预设点");
 
     // ========== OPC防区配置相关 1-050-053-000 ==========
     ErrorCode OPC_ZONE_CONFIG_NOT_EXISTS = new ErrorCode(1_050_053_001, "OPC防区配置不存在");

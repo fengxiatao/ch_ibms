@@ -306,9 +306,14 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
         String rtspUrl;
         // 大华设备/NVR
         if (isDahuaDevice(deviceName, productKey)) {
+            // ⚠️ 大华 RTSP URL 的 channel 参数是 0-indexed（从 0 开始）
+            // 数据库存储的 channelNo 是 1-indexed（从 1 开始），需要减 1
+            int dahuaChannel = channelNo - 1;
+            if (dahuaChannel < 0) dahuaChannel = 0;
             // subtype: 0=主码流(高清), 1=子码流(标清)
             rtspUrl = String.format("rtsp://%s:%s@%s:%d/cam/realmonitor?channel=%d&subtype=%d",
-                    username, password, ip, rtspPort, channelNo, subtype);
+                    username, password, ip, rtspPort, dahuaChannel, subtype);
+            log.info("[ZLM] 大华设备通道号转换: dbChannelNo={} -> rtspChannel={}", channelNo, dahuaChannel);
         }
         // 海康设备/NVR
         else if (isHikvisionDevice(deviceName, productKey)) {
@@ -318,14 +323,17 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
             rtspUrl = String.format("rtsp://%s:%s@%s:%d/Streaming/Channels/%d",
                     username, password, ip, rtspPort, hikChannel);
         }
-        // 通用格式（适用于大多数 NVR）- 使用大华格式作为默认
+        // 通用格式（适用于大多数 NVR）- 使用大华格式作为默认（0-indexed）
         else {
+            int genericChannel = channelNo - 1;
+            if (genericChannel < 0) genericChannel = 0;
             rtspUrl = String.format("rtsp://%s:%s@%s:%d/cam/realmonitor?channel=%d&subtype=%d",
-                    username, password, ip, rtspPort, channelNo, subtype);
+                    username, password, ip, rtspPort, genericChannel, subtype);
         }
         
         String quality = (subtype == 0) ? "主码流/高清" : "子码流/标清";
-        log.info("[ZLM] 构建 RTSP 地址: ip={}, channel={}, quality={}, url={}", ip, channelNo, quality, rtspUrl);
+        log.info("[ZLM] 构建 RTSP 地址: ip={}, dbChannel={}, rtspChannel={}, quality={}, url={}", 
+                ip, channelNo, channelNo - 1, quality, rtspUrl);
         return rtspUrl;
     }
 
@@ -360,7 +368,7 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
     // ==================== 录像回放 ====================
 
     @Override
-    public PlayUrlRespVO getPlaybackUrl(Long channelId, String startTime, String endTime) {
+    public PlayUrlRespVO getPlaybackUrl(Long channelId, String startTime, String endTime, String playId) {
         // 1. 查询通道信息
         IotDeviceChannelDO channel = channelService.getChannel(channelId);
         if (channel == null) {
@@ -373,9 +381,13 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
             throw new RuntimeException("设备不存在: deviceId=" + channel.getDeviceId());
         }
 
-        // 3. 构建回放流标识（包含时间信息的唯一标识）
-        String timeHash = String.valueOf((startTime + endTime).hashCode() & 0x7fffffff);
-        String streamKey = String.format("playback_%d_%s", channelId, timeHash);
+        // 3. 构建回放流标 hookup: 同一窗口使用固定 playId，点击时间轴会复用 streamKey 并强制刷新
+        String streamKey = buildPlaybackStreamKey(channelId, startTime, endTime, playId);
+
+        // playId 存在时，先关闭旧流与代理，避免缓存导致时间不生效
+        if (StrUtil.isNotBlank(playId)) {
+            closePlaybackStreamIfExists(streamKey);
+        }
 
         // 4. 检查流是否已存在，不存在则拉流
         if (!zlmApiClient.isStreamOnline(APP_PLAYBACK, streamKey)) {
@@ -408,6 +420,41 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
                 .webrtcUrl(urls.getWebRtcUrl())
                 .streamKey(streamKey)
                 .build();
+    }
+
+    /**
+     * 生成回放流标识
+     */
+    private String buildPlaybackStreamKey(Long channelId, String startTime, String endTime, String playId) {
+        if (StrUtil.isNotBlank(playId)) {
+            String safePlayId = playId.replaceAll("[^a-zA-Z0-9_-]", "_");
+            return String.format("playback_%d_%s", channelId, safePlayId);
+        }
+        String timeHash = String.valueOf((startTime + endTime).hashCode() & 0x7fffffff);
+        return String.format("playback_%d_%s", channelId, timeHash);
+    }
+
+    /**
+     * 关闭回放流与代理（用于窗口重复点播刷新）
+     */
+    private void closePlaybackStreamIfExists(String streamKey) {
+        try {
+            // 先关闭在线流
+            if (zlmApiClient.isStreamOnline(APP_PLAYBACK, streamKey)) {
+                boolean closed = zlmApiClient.closeStream(APP_PLAYBACK, streamKey);
+                log.info("[ZLM流服务] 关闭回放流: streamKey={}, closed={}", streamKey, closed);
+            }
+
+            // 再删除代理
+            String proxyKey = streamProxyCache.remove(streamKey);
+            if (StrUtil.isNotBlank(proxyKey) && !proxyKey.startsWith("exists:")) {
+                boolean deleted = zlmApiClient.delStreamProxy(proxyKey);
+                log.info("[ZLM流服务] 删除回放代理: streamKey={}, proxyKey={}, deleted={}",
+                        streamKey, proxyKey, deleted);
+            }
+        } catch (Exception e) {
+            log.warn("[ZLM流服务] 关闭回放流失败: streamKey={}, error={}", streamKey, e.getMessage());
+        }
     }
 
     /**
@@ -476,8 +523,8 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
             }
         }
 
-        // 📡 从设备配置中获取 RTSP 端口，默认使用 80（大华 NVR 通常使用 80 端口）
-        int rtspPort = 80;
+        // 📡 从设备配置中获取 RTSP 端口，默认使用 554（标准 RTSP 端口）
+        int rtspPort = 554;
         if (device.getConfig() != null) {
             try {
                 var configMap = device.getConfig().toMap();
@@ -493,11 +540,16 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
         String rtspUrl;
         // 大华设备/NVR - 使用大华回放格式
         if (isDahuaDevice(deviceName, productKey)) {
+            // ⚠️ 大华 RTSP URL 的 channel 参数是 0-indexed（从 0 开始）
+            // 数据库存储的 channelNo 是 1-indexed（从 1 开始），需要减 1
+            int dahuaChannel = channelNo - 1;
+            if (dahuaChannel < 0) dahuaChannel = 0;
+            log.info("[ZLM] 大华设备回放通道号转换: dbChannelNo={} -> rtspChannel={}", channelNo, dahuaChannel);
             // 大华格式时间：YYYY_MM_DD_HH_mm_ss
             String dahuaStartTime = formatToDahuaTime(startTime);
             String dahuaEndTime = formatToDahuaTime(endTime);
             rtspUrl = String.format("rtsp://%s:%s@%s:%d/cam/playback?channel=%d&subtype=0&starttime=%s&endtime=%s",
-                    username, password, ip, rtspPort, channelNo, dahuaStartTime, dahuaEndTime);
+                    username, password, ip, rtspPort, dahuaChannel, dahuaStartTime, dahuaEndTime);
         }
         // 海康设备/NVR
         else if (isHikvisionDevice(deviceName, productKey)) {
@@ -508,16 +560,18 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
             rtspUrl = String.format("rtsp://%s:%s@%s:%d/Streaming/tracks/%d?starttime=%s&endtime=%s",
                     username, password, ip, rtspPort, hikChannel, hikStartTime, hikEndTime);
         }
-        // 通用格式 - 使用大华格式
+        // 通用格式 - 使用大华格式（同样使用 0-indexed）
         else {
+            int genericChannel = channelNo - 1;
+            if (genericChannel < 0) genericChannel = 0;
             String dahuaStartTime = formatToDahuaTime(startTime);
             String dahuaEndTime = formatToDahuaTime(endTime);
             rtspUrl = String.format("rtsp://%s:%s@%s:%d/cam/playback?channel=%d&subtype=0&starttime=%s&endtime=%s",
-                    username, password, ip, rtspPort, channelNo, dahuaStartTime, dahuaEndTime);
+                    username, password, ip, rtspPort, genericChannel, dahuaStartTime, dahuaEndTime);
         }
 
-        log.info("[ZLM] 构建回放 RTSP 地址: ip={}, channel={}, startTime={}, endTime={}, url={}", 
-                ip, channelNo, startTime, endTime, rtspUrl);
+        log.info("[ZLM] 构建回放 RTSP 地址: ip={}, dbChannel={}, rtspChannel={}, startTime={}, endTime={}, url={}", 
+                ip, channelNo, channelNo - 1, startTime, endTime, rtspUrl);
         return rtspUrl;
     }
 

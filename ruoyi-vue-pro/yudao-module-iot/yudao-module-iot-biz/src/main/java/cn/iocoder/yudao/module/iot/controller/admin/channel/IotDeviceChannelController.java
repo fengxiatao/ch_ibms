@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.iot.controller.admin.channel.vo.NvrWithChannelsRe
 import cn.iocoder.yudao.module.iot.controller.admin.channel.vo.IotChannelAssignSpatialReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
+import cn.iocoder.yudao.module.iot.service.channel.SyncResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -130,6 +131,14 @@ public class IotDeviceChannelController {
     public CommonResult<Integer> syncDeviceChannels(@PathVariable("deviceId") Long deviceId) {
         Integer syncCount = channelService.syncDeviceChannels(deviceId);
         return success(syncCount);
+    }
+
+    @PostMapping("/sync-all-nvr")
+    @Operation(summary = "批量同步所有NVR通道", description = "向所有在线NVR设备发送通道查询命令，更新通道名称等信息")
+    @PreAuthorize("@ss.hasPermission('iot:channel:sync')")
+    public CommonResult<SyncResult> syncAllNvrChannels() {
+        SyncResult result = channelService.batchSyncAllNvrChannels();
+        return success(result);
     }
 
     // ========== 批量操作 ==========

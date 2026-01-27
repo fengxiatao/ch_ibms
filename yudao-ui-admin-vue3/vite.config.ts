@@ -68,6 +68,34 @@ export default ({command, mode}: ConfigEnv): UserConfig => {
                 changeOrigin: true,
                 rewrite: (path) => path.replace(/^\/RPC2_Login/, '/RPC2_Login')
               },
+              // WVP 视频平台 API 代理
+              '/wvp-api': {
+                target: 'http://127.0.0.1:18080',  // WVP 后端地址
+                ws: true,
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/wvp-api/, '/api')
+              },
+              // ZLMediaKit 流媒体代理（用于 WebSocket FLV 播放）
+              '/zlm': {
+                target: 'http://192.168.1.246:80',  // ZLMediaKit 地址
+                ws: true,
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/zlm/, '')
+              },
+              // 大华设备 WebSocket 代理 - 192.168.1.200 (NVR)
+              '/dahua-device/192.168.1.200': {
+                target: 'http://192.168.1.200:80',
+                ws: true,
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/dahua-device\/192\.168\.1\.200\/\d+/, '')
+              },
+              // 大华设备 WebSocket 代理 - 192.168.1.206 (IPC/NVR)
+              '/dahua-device/192.168.1.206': {
+                target: 'http://192.168.1.206:80',
+                ws: true,
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/dahua-device\/192\.168\.1\.206\/\d+/, '')
+              },
             },
         },
         // 项目使用的vite插件。 单独提取到build/vite/plugin中管理

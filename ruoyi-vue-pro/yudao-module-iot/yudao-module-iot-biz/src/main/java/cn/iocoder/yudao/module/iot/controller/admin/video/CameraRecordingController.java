@@ -4,6 +4,8 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.video.vo.CameraRecordingPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.video.vo.CameraRecordingRespVO;
+import cn.iocoder.yudao.module.iot.controller.admin.video.vo.DahuaRecordingFileRespVO;
+import cn.iocoder.yudao.module.iot.controller.admin.video.vo.QueryDahuaRecordingReqVO;
 import cn.iocoder.yudao.module.iot.service.video.CameraRecordingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
@@ -81,6 +84,15 @@ public class CameraRecordingController {
             @RequestParam("file") MultipartFile file) throws Exception {
         Long id = cameraRecordingService.uploadRecording(deviceId, recordingType, file);
         return success(id);
+    }
+
+    @PostMapping("/query-dahua-files")
+    @Operation(summary = "使用大华SDK查询NVR录像文件列表")
+    @PreAuthorize("@ss.hasPermission('iot:camera:query')")
+    public CommonResult<List<DahuaRecordingFileRespVO>> queryDahuaRecordingFiles(
+            @Valid @RequestBody QueryDahuaRecordingReqVO reqVO) {
+        List<DahuaRecordingFileRespVO> result = cameraRecordingService.queryDahuaRecordingFiles(reqVO);
+        return success(result);
     }
 
 }

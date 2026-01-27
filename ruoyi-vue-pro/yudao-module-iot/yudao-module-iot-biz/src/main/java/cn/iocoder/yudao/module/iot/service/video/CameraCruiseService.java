@@ -118,4 +118,12 @@ public interface CameraCruiseService {
      */
     void deleteCruisePoint(Long id);
 
+    /**
+     * 获取巡航路线的所有巡航点
+     *
+     * @param cruiseId 巡航路线ID
+     * @return 巡航点列表
+     */
+    List<cn.iocoder.yudao.module.iot.dal.dataobject.video.CameraCruisePointDO> getCruisePointListByCruiseId(Long cruiseId);
+
 }

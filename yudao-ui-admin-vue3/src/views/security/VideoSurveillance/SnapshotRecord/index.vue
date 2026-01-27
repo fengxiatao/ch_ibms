@@ -86,17 +86,6 @@
         </div>
         <div class="time-filter">
           <div class="filter-item">
-            <label>抓图类型:</label>
-            <el-select v-model="filterForm.captureType" size="small" style="width: 100%">
-              <el-option label="全部类型" :value="0" />
-              <el-option label="手动抓图" :value="1" />
-              <el-option label="定时抓图" :value="2" />
-              <el-option label="报警抓图" :value="3" />
-              <el-option label="移动侦测抓图" :value="4" />
-            </el-select>
-          </div>
-          
-          <div class="filter-item">
             <label>时间段:</label>
             <el-date-picker
               v-model="filterForm.timeRange"
@@ -152,7 +141,7 @@
             </div>
             <div class="snapshot-info">
               <div class="device-name">{{ item.channelName || '未知通道' }}</div>
-              <div class="capture-time">{{ item.captureTime }}</div>
+              <div class="capture-time">{{ formatCaptureTime(item.captureTime) }}</div>
             </div>
           </div>
         </div>
@@ -173,12 +162,9 @@
           >
             <el-table-column type="selection" width="55" />
             <el-table-column prop="channelName" label="通道名称" width="200" />
-            <el-table-column prop="captureTime" label="抓拍时间" width="180" />
-            <el-table-column label="抓图类型" width="120">
+            <el-table-column label="抓拍时间" width="200">
               <template #default="scope">
-                <el-tag :type="getSnapshotTypeTag(scope.row.snapshotType)">
-                  {{ getSnapshotTypeText(scope.row.snapshotType) }}
-                </el-tag>
+                {{ formatCaptureTime(scope.row.captureTime) }}
               </template>
             </el-table-column>
             <el-table-column label="缩略图" width="120">
@@ -222,7 +208,7 @@
         <img :src="previewImage.snapshotUrl" :alt="previewImage.channelName" class="preview-img" />
         <div class="preview-info">
           <p><strong>通道名称：</strong>{{ previewImage.channelName }}</p>
-          <p><strong>抓拍时间：</strong>{{ previewImage.captureTime }}</p>
+          <p><strong>抓拍时间：</strong>{{ formatCaptureTime(previewImage.captureTime) }}</p>
           <p><strong>图片大小：</strong>{{ previewImage.fileSize }}</p>
         </div>
       </div>
@@ -264,9 +250,40 @@ const total = ref(0) // 总记录数
 // 筛选表单数据
 const filterForm = reactive({
   deviceId: '', // 设备ID
-  timeRange: [] as string[], // 时间范围
-  captureType: 0 // 抓图类型：0-全部 1-手动 2-定时 3-报警 4-移动侦测
+  timeRange: [] as string[] // 时间范围
 })
+
+/**
+ * 格式化抓拍时间（时间戳转换为 年-月-日 时:分:秒）
+ * @param timestamp 时间戳或日期字符串
+ * @return 格式化后的时间字符串
+ */
+const formatCaptureTime = (timestamp: string | number | undefined): string => {
+  if (!timestamp) return '-'
+  
+  let date: Date
+  
+  // 处理数字类型的时间戳
+  if (typeof timestamp === 'number' || /^\d+$/.test(String(timestamp))) {
+    const ts = Number(timestamp)
+    // 兼容秒级和毫秒级时间戳
+    date = new Date(ts > 9999999999 ? ts : ts * 1000)
+  } else {
+    // 处理日期字符串
+    date = new Date(timestamp)
+  }
+  
+  if (isNaN(date.getTime())) return String(timestamp)
+  
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
 
 // 设备搜索关键字
 const deviceSearchKeyword = ref('')
@@ -792,31 +809,6 @@ const handleBatchDownload = () => {
   ElMessage.success('批量下载已开始')
 }
 
-/**
- * 获取抓图类型标签颜色
- */
-const getSnapshotTypeTag = (type: number) => {
-  const typeMap: Record<number, string> = {
-    1: 'primary',  // 手动抓图
-    2: 'success',  // 定时抓图
-    3: 'danger',   // 报警抓图
-    4: 'warning'   // 移动侦测抓图
-  }
-  return typeMap[type] || 'info'
-}
-
-/**
- * 获取抓图类型文本
- */
-const getSnapshotTypeText = (type: number) => {
-  const typeMap: Record<number, string> = {
-    1: '手动抓图',
-    2: '定时抓图',
-    3: '报警抓图',
-    4: '移动侦测'
-  }
-  return typeMap[type] || '未知类型'
-}
 
 /**
  * 处理页码变化事件
@@ -854,8 +846,7 @@ const loadSnapshotData = async () => {
         ? selectedChannels.value.map(ch => ch.channelId) 
         : undefined, // 使用所有选中通道的ID数组
       startTime: filterForm.timeRange && filterForm.timeRange[0] ? filterForm.timeRange[0] : undefined,
-      endTime: filterForm.timeRange && filterForm.timeRange[1] ? filterForm.timeRange[1] : undefined,
-      captureType: filterForm.captureType > 0 ? filterForm.captureType : undefined // 0表示全部，不传参数
+      endTime: filterForm.timeRange && filterForm.timeRange[1] ? filterForm.timeRange[1] : undefined
     }
     
     console.log('[快照记录] 查询参数:', params)

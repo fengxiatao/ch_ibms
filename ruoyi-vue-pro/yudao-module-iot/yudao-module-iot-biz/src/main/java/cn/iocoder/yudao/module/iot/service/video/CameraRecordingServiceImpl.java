@@ -5,6 +5,11 @@ import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.video.vo.CameraRecordingPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.video.vo.CameraRecordingRespVO;
+import cn.iocoder.yudao.module.iot.controller.admin.video.vo.DahuaRecordingFileRespVO;
+import cn.iocoder.yudao.module.iot.controller.admin.video.vo.QueryDahuaRecordingReqVO;
+import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageBus;
+import cn.iocoder.yudao.module.iot.core.messagebus.topics.IotMessageTopics;
+import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.dal.dataobject.camera.IotCameraRecordingDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
@@ -14,6 +19,7 @@ import cn.iocoder.yudao.module.iot.enums.device.NvrDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.mq.producer.DeviceCommandPublisher;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
 import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.mq.manager.DeviceCommandResponseManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -27,9 +33,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import static cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants.BAD_REQUEST;
 import org.springframework.web.multipart.MultipartFile;
@@ -63,6 +72,18 @@ public class CameraRecordingServiceImpl implements CameraRecordingService {
      */
     @Resource
     private DeviceCommandPublisher deviceCommandPublisher;
+    
+    /**
+     * 消息总线（用于同步等待命令响应）
+     */
+    @Resource
+    private IotMessageBus messageBus;
+    
+    /**
+     * 命令响应管理器（用于同步等待命令响应）
+     */
+    @Resource
+    private DeviceCommandResponseManager responseManager;
 
     /**
      * 录像文件存储目录（关联基础设施模块）
@@ -421,6 +442,166 @@ public class CameraRecordingServiceImpl implements CameraRecordingService {
             log.error("[录像管理] 发送录像控制命令失败: deviceId={}, command={}", deviceId, command, e);
             throw new ServiceException(BAD_REQUEST.getCode(), "发送录像控制命令失败: " + e.getMessage());
         }
+    }
+
+    @Override
+    public List<DahuaRecordingFileRespVO> queryDahuaRecordingFiles(QueryDahuaRecordingReqVO reqVO) {
+        log.info("[录像查询-大华SDK] 开始查询: channelId={}, startTime={}, endTime={}", 
+                reqVO.getChannelId(), reqVO.getStartTime(), reqVO.getEndTime());
+        
+        try {
+            // 1. 查询通道信息
+            IotDeviceChannelDO channel = channelService.getChannel(reqVO.getChannelId());
+            if (channel == null) {
+                log.warn("[录像查询-大华SDK] 通道不存在: channelId={}", reqVO.getChannelId());
+                return Collections.emptyList();
+            }
+            
+            // 2. 查询设备信息（NVR）
+            IotDeviceDO device = deviceService.getDevice(channel.getDeviceId());
+            if (device == null) {
+                log.warn("[录像查询-大华SDK] 设备不存在: deviceId={}", channel.getDeviceId());
+                return Collections.emptyList();
+            }
+            
+            // 3. 获取设备连接信息
+            String ip = DeviceConfigHelper.getIpAddress(device);
+            Integer port = DeviceConfigHelper.getPort(device);
+            if (port == null) {
+                port = 37777;  // 大华默认SDK端口
+            }
+            
+            // 从设备配置中获取用户名和密码
+            String username = "admin";
+            String password = "admin123";
+            if (device.getConfig() != null) {
+                Map<String, Object> configMap = device.getConfig().toMap();
+                if (configMap.get("username") != null) {
+                    username = configMap.get("username").toString();
+                }
+                if (configMap.get("password") != null) {
+                    password = configMap.get("password").toString();
+                }
+            }
+            
+            // 4. 生成请求ID并构建命令参数
+            String requestId = UUID.randomUUID().toString();
+            
+            Map<String, Object> params = new HashMap<>();
+            params.put(NvrDeviceTypeConstants.PARAM_IP, ip);
+            params.put(NvrDeviceTypeConstants.PARAM_PORT, port);
+            params.put(NvrDeviceTypeConstants.PARAM_USERNAME, username);
+            params.put(NvrDeviceTypeConstants.PARAM_PASSWORD, password);
+            params.put(NvrDeviceTypeConstants.PARAM_CHANNEL_NO, channel.getChannelNo());
+            params.put(NvrDeviceTypeConstants.PARAM_START_TIME, reqVO.getStartTime());
+            params.put(NvrDeviceTypeConstants.PARAM_END_TIME, reqVO.getEndTime());
+            params.put(NvrDeviceTypeConstants.PARAM_RECORD_TYPE, 
+                    reqVO.getRecordType() != null ? reqVO.getRecordType() : 0);
+            params.put("deviceType", NvrDeviceTypeConstants.NVR);
+            params.put("commandType", NvrDeviceTypeConstants.COMMAND_SEARCH_RECORDS);
+            
+            // 5. 注册请求并发送命令
+            CompletableFuture<IotDeviceMessage> future = responseManager.registerRequest(requestId);
+            
+            // 构建消息并发送到消息总线
+            IotDeviceMessage message = IotDeviceMessage.requestOf(
+                    requestId, 
+                    NvrDeviceTypeConstants.COMMAND_SEARCH_RECORDS, 
+                    params
+            );
+            message.setDeviceId(device.getId());
+            
+            messageBus.post(IotMessageTopics.DEVICE_SERVICE_INVOKE, message);
+            
+            log.info("[录像查询-大华SDK] 已发送命令: deviceId={}, channelNo={}, requestId={}", 
+                    device.getId(), channel.getChannelNo(), requestId);
+            
+            // 6. 同步等待响应（最多15秒）
+            IotDeviceMessage response;
+            try {
+                response = responseManager.waitForResponse(requestId, future, 15);
+            } catch (Exception e) {
+                log.warn("[录像查询-大华SDK] 等待响应超时或失败: requestId={}, error={}", requestId, e.getMessage());
+                return Collections.emptyList();
+            }
+            
+            // 7. 解析响应数据
+            if (response == null) {
+                log.warn("[录像查询-大华SDK] 响应为空: requestId={}", requestId);
+                return Collections.emptyList();
+            }
+            
+            // 检查响应码（code=0 表示成功）
+            Integer code = response.getCode();
+            if (code == null) {
+                // 兼容：部分网关回包未带 code，但 data 有效
+                if (response.getData() == null) {
+                    log.warn("[录像查询-大华SDK] 查询失败: requestId={}, code=null, msg={}, data为空", 
+                            requestId, response.getMsg());
+                    return Collections.emptyList();
+                }
+            } else if (code != 0) {
+                log.warn("[录像查询-大华SDK] 查询失败: requestId={}, code={}, msg={}", 
+                        requestId, code, response.getMsg());
+                return Collections.emptyList();
+            }
+            
+            Object result = response.getData();
+            if (result == null) {
+                log.warn("[录像查询-大华SDK] 响应数据为空: requestId={}", requestId);
+                return Collections.emptyList();
+            }
+            
+            // 解析响应数据
+            // 网关返回格式: {channelNo=6, files=[...], startTime=..., endTime=..., totalCount=11}
+            if (result instanceof Map) {
+                Map<String, Object> resultMap = (Map<String, Object>) result;
+                Object filesObj = resultMap.get("files");
+                if (filesObj instanceof List) {
+                    List<DahuaRecordingFileRespVO> fileList = convertToRecordingFileList(
+                            reqVO.getChannelId(), (List<Map<String, Object>>) filesObj);
+                    log.info("[录像查询-大华SDK] 查询成功: channelId={}, 文件数量={}", 
+                            reqVO.getChannelId(), fileList.size());
+                    return fileList;
+                }
+            }
+            
+            log.warn("[录像查询-大华SDK] 响应格式不正确: requestId={}, result={}", requestId, result);
+            return Collections.emptyList();
+            
+        } catch (Exception e) {
+            log.error("[录像查询-大华SDK] 查询异常: channelId={}, error={}", reqVO.getChannelId(), e.getMessage(), e);
+            return Collections.emptyList();
+        }
+    }
+    
+    /**
+     * 将网关返回的录像文件列表转换为 VO 列表
+     */
+    private List<DahuaRecordingFileRespVO> convertToRecordingFileList(Long channelId, List<Map<String, Object>> files) {
+        List<DahuaRecordingFileRespVO> result = new ArrayList<>();
+        
+        for (Map<String, Object> file : files) {
+            try {
+                DahuaRecordingFileRespVO vo = DahuaRecordingFileRespVO.builder()
+                        .channelId(channelId)
+                        .channelNo(file.get("channelNo") != null ? ((Number) file.get("channelNo")).intValue() : null)
+                        .fileName(file.get("fileName") != null ? file.get("fileName").toString() : null)
+                        .fileSize(file.get("fileSize") != null ? ((Number) file.get("fileSize")).longValue() : null)
+                        .startTime(file.get("startTime") != null ? file.get("startTime").toString() : null)
+                        .endTime(file.get("endTime") != null ? file.get("endTime").toString() : null)
+                        .duration(file.get("duration") != null ? ((Number) file.get("duration")).longValue() : null)
+                        .recordType(file.get("recordType") != null ? ((Number) file.get("recordType")).intValue() : null)
+                        .diskNo(file.get("diskNo") != null ? ((Number) file.get("diskNo")).intValue() : null)
+                        .build();
+                result.add(vo);
+            } catch (Exception e) {
+                log.warn("[录像查询-大华SDK] 转换录像文件信息失败: file={}, error={}", file, e.getMessage());
+            }
+        }
+        
+        log.info("[录像查询-大华SDK] 转换完成: channelId={}, 文件数={}", channelId, result.size());
+        return result;
     }
 
 }

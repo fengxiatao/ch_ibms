@@ -237,6 +237,35 @@ export const getRecordingTimeSegments = (params: RecordingTimeSegmentReqVO) => {
   return request.get<RecordingTimeSegmentVO[]>({ url: '/iot/camera/recording/time-segments', params })
 }
 
+/**
+ * 使用大华SDK查询录像文件列表
+ * @param channelId 通道ID
+ * @param startTime 开始时间 yyyy-MM-dd HH:mm:ss
+ * @param endTime 结束时间 yyyy-MM-dd HH:mm:ss
+ */
+export interface QueryDahuaRecordingReqVO {
+  channelId: number
+  startTime: string
+  endTime: string
+}
+
+export interface DahuaRecordingFileVO {
+  channelId: number
+  fileName: string
+  fileSize: number
+  startTime: string
+  endTime: string
+  recordType: number
+  diskNo: number
+}
+
+export const queryDahuaRecordingFiles = (params: QueryDahuaRecordingReqVO) => {
+  return request.post<DahuaRecordingFileVO[]>({
+    url: '/iot/camera/recording/query-dahua-files',
+    data: params
+  })
+}
+
 // 开始服务端录像
 export const startCameraRecording = (
   deviceId: number,
