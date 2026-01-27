@@ -431,7 +431,18 @@ export function useDahuaPlayback() {
     progress: number
     channelName: string
   }
+  // 使用 reactive 包装 Map 以支持深层响应式
   const cutTasks = ref<Map<number, CutTask>>(new Map())
+  
+  // 强制触发响应式更新的辅助函数
+  const updateCutTask = (paneIndex: number, updates: Partial<CutTask>) => {
+    const task = cutTasks.value.get(paneIndex)
+    if (task) {
+      Object.assign(task, updates)
+      // 通过重新设置来触发响应式
+      cutTasks.value = new Map(cutTasks.value)
+    }
+  }
   
   // 兼容性：当前活动窗口的裁剪状态
   const isCutting = computed(() => {
@@ -534,7 +545,9 @@ export function useDahuaPlayback() {
       progress: 0,
       channelName
     }
-    cutTasks.value.set(paneIndex, task)
+    const newMap = new Map(cutTasks.value)
+    newMap.set(paneIndex, task)
+    cutTasks.value = newMap
 
     // 记录裁剪开始的实际时间戳
     let cutActualStartTs = 0
@@ -555,15 +568,19 @@ export function useDahuaPlayback() {
         range: range // 从指定偏移开始
       })
 
-      task.player = player
+      // 保存 player 引用到任务中
+      const taskRef = cutTasks.value.get(paneIndex)
+      if (taskRef) {
+        taskRef.player = player
+      }
 
       // 文件播放结束
       player.on('FileOver', () => {
         console.log(`[大华回放] 窗口${paneIndex + 1} 录像文件播放结束`)
-        if (task.isCutting) {
+        const currentTask = cutTasks.value.get(paneIndex)
+        if (currentTask?.isCutting) {
           player.startCut(false)
-          task.isCutting = false
-          task.progress = 100
+          updateCutTask(paneIndex, { isCutting: false, progress: 100 })
           onProgress?.(100)
           onComplete?.()
           ElMessage.success(`${channelName} 录像裁剪完成，文件已下载`)
@@ -575,29 +592,32 @@ export function useDahuaPlayback() {
       // 时间戳更新（用于判断何时开始/停止裁剪）
       player.on('UpdateTimeStamp', (e: any) => {
         const currentTs = e.timestamp // 当前播放时间戳（秒）
+        const currentTask = cutTasks.value.get(paneIndex)
+        if (!currentTask) return
 
         // 到达起始时间，开始录制
-        if (currentTs >= cutStartSec && !task.isCutting) {
+        if (currentTs >= cutStartSec && !currentTask.isCutting) {
           console.log(`[大华回放] 窗口${paneIndex + 1} 到达起始时间 ${cutStartSec}，开始录制，当前时间戳: ${currentTs}`)
           player.startCut(true)
-          task.isCutting = true
           cutActualStartTs = currentTs // 记录实际开始时间
+          updateCutTask(paneIndex, { isCutting: true })
         }
 
         // 计算进度（基于裁剪开始后的实际时长）
-        if (task.isCutting && cutActualStartTs > 0) {
+        if (currentTask.isCutting && cutActualStartTs > 0) {
           const elapsed = currentTs - cutActualStartTs // 已裁剪时长
           const progress = Math.min(100, Math.max(0, Math.floor((elapsed / cutDurationSec) * 100)))
-          task.progress = progress
-          onProgress?.(progress)
+          if (progress !== currentTask.progress) {
+            updateCutTask(paneIndex, { progress })
+            onProgress?.(progress)
+          }
         }
 
         // 到达结束时间，停止录制
-        if (currentTs >= cutEndTs && task.isCutting) {
+        if (currentTs >= cutEndTs && currentTask.isCutting) {
           console.log(`[大华回放] 窗口${paneIndex + 1} 到达结束时间 ${cutEndTs}，停止录制，当前时间戳: ${currentTs}`)
           player.startCut(false)
-          task.isCutting = false
-          task.progress = 100
+          updateCutTask(paneIndex, { isCutting: false, progress: 100 })
           onProgress?.(100)
           onComplete?.()
           ElMessage.success(`${channelName} 录像裁剪完成，文件已下载`)
@@ -664,7 +684,9 @@ export function useDahuaPlayback() {
           console.warn(`[大华回放] 窗口${paneIndex + 1} 停止裁剪异常:`, e)
         }
       }
-      cutTasks.value.delete(paneIndex)
+      const newMap = new Map(cutTasks.value)
+      newMap.delete(paneIndex)
+      cutTasks.value = newMap
     } else {
       // 停止所有裁剪任务
       for (const [idx, task] of cutTasks.value.entries()) {
@@ -680,7 +702,7 @@ export function useDahuaPlayback() {
           }
         }
       }
-      cutTasks.value.clear()
+      cutTasks.value = new Map()
     }
   }
 
