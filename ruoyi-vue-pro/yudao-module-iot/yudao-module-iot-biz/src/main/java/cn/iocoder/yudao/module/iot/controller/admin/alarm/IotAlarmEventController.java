@@ -121,7 +121,9 @@ public class IotAlarmEventController {
             vo.setZoneName(item.getZoneName());
             vo.setEventDesc(item.getEventDesc());
             vo.setIsNewEvent(item.getIsNewEvent());
-            vo.setIsHandled(item.getIsHandled());
+            // 处理状态文本：0-未处理，1-已处理，2-已忽略
+            Integer status = item.getStatus() != null ? item.getStatus() : 0;
+            vo.setStatusText(status == 0 ? "未处理" : (status == 1 ? "已处理" : "已忽略"));
             vo.setHandledBy(item.getHandledBy());
             vo.setHandledTime(item.getHandledTime());
             vo.setHandleRemark(item.getHandleRemark());

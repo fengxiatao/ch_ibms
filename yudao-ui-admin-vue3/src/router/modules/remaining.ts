@@ -59,11 +59,11 @@ const remainingRouter: AppRouteRecordRaw[] = [
     children: [
       {
         path: 'index',
-        component: () => import('@/views/iot/home/index.vue'),
+        component: () => import('@/views/Home/Index.vue'),
         name: 'Index',
         meta: {
-          title: '长辉信息科技有限公司',
-          icon: 'ep:connection',
+          title: '首页',
+          icon: 'ep:home-filled',
           noCache: false,
           affix: true,
           noTagsView: true
@@ -755,13 +755,47 @@ const remainingRouter: AppRouteRecordRaw[] = [
         meta: {
           title: '建筑平面图',
           noCache: false,
-          hidden: false,  // 显示在菜单中
+          hidden: false, // 显示在菜单中
           canTo: true,
           icon: 'ep:office-building',
           activeMenu: '/iot/device/device'
         },
         component: () => import('@/views/iot/spatial/floorplan/index.vue')
       },
+      {
+        path: 'building/visual-dashboard',
+        name: 'IoTBuildingVisualDashboard',
+        meta: {
+          title: '智慧建筑可视化',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          activeMenu: '/iot/building'
+        },
+        component: () => import('@/views/iot/building/building-visual-dashboard/index.vue')
+      }
+    ]
+  },
+  {
+    path: '/building/visual-dashboard',
+    component: Layout,
+    name: 'BuildingVisualDashboard',
+    meta: {
+      hidden: true
+    },
+    children: [
+      {
+        path: '',
+        name: 'BuildingVisualDashboardRoute',
+        meta: {
+          title: '智慧建筑可视化',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          activeMenu: '/building'
+        },
+        component: () => import('@/views/iot/building/building-visual-dashboard/index.vue')
+      }
     ]
   },
   {
@@ -782,28 +816,6 @@ const remainingRouter: AppRouteRecordRaw[] = [
           canTo: true
         },
         component: () => import('@/views/security/VideoSurveillance/RealTimePreview/index.vue')
-      },
-      {
-        path: 'video-surveillance/zlm-preview',
-        name: 'ZlmPreview',
-        meta: {
-          title: '实时预览(低延迟)',
-          noCache: true,
-          hidden: false,
-          canTo: true
-        },
-        component: () => import('@/views/security/VideoSurveillance/ZlmPreview/index.vue')
-      },
-      {
-        path: 'video-surveillance/wvp-preview',
-        name: 'WvpPreview',
-        meta: {
-          title: '实时预览(WVP)',
-          noCache: true,
-          hidden: false,
-          canTo: true
-        },
-        component: () => import('@/views/security/VideoSurveillance/RealTimePreviewWvp/index.vue')
       },
       {
         path: 'video-surveillance/patrol-config',

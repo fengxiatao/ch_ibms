@@ -45,6 +45,7 @@ class AlertWebSocketManager {
 
   /**
    * 获取 WebSocket URL
+   * ⚠️ WebSocket 始终使用当前站点的 host，由 Nginx 代理到后端
    */
   private getWsUrl(): string {
     const env = (import.meta as any).env || {}
@@ -53,15 +54,9 @@ class AlertWebSocketManager {
       return fullWsUrl
     }
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    // 仅当明确设置了 VITE_ALERT_WS_HOST 时才使用环境变量，否则使用当前站点 host
     const envHost = env?.VITE_ALERT_WS_HOST as string | undefined
-    const baseUrl = env?.VITE_BASE_URL as string | undefined
-    let baseHost = ''
-    try {
-      baseHost = baseUrl ? new URL(baseUrl).host : ''
-    } catch {
-      // ignore
-    }
-    const host = envHost || baseHost || window.location.host
+    const host = envHost || window.location.host
     const path = (env?.VITE_ALERT_WS_PATH as string | undefined) || '/ws/iot/alarm/event'
     return `${protocol}//${host}${path}`
   }
@@ -186,7 +181,7 @@ class AlertWebSocketManager {
             title: 'WebSocket连接失败',
             message: '实时告警通知功能不可用，请刷新页面重试',
             type: 'error',
-            duration: 0
+            duration: 10000 // 10秒后自动关闭
           })
         }
       }

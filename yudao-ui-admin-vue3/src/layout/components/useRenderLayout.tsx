@@ -38,6 +38,21 @@ const fixedMenu = computed(() => appStore.getFixedMenu)
 // 页脚
 const footer = computed(() => appStore.getFooter)
 
+// 首页全屏模式渲染
+export const useRenderFullscreen = () => {
+  const renderFullscreen = () => {
+    return (
+      <div class={[`${prefixCls}-content`, 'w-full h-full']}>
+        <AppView class="fullscreen-view"></AppView>
+      </div>
+    )
+  }
+
+  return {
+    renderFullscreen
+  }
+}
+
 export const useRenderLayout = () => {
   const renderClassic = () => {
     return (
@@ -79,10 +94,7 @@ export const useRenderLayout = () => {
         >
           <ElScrollbar
             v-loading={pageLoading.value}
-            class={[
-              `${prefixCls}-content-scrollbar`,
-              '!h-[var(--viewport-height)]'
-            ]}
+            class={[`${prefixCls}-content-scrollbar`, '!h-[var(--viewport-height)]']}
           >
             <div
               class={[

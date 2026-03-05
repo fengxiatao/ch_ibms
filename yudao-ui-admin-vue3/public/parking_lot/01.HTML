@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧停车管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body { font-family: 'Inter', 'Microsoft YaHei', sans-serif; background-color: #f0f2f5; margin: 0; padding: 0; }
+        /* 新增顶部导航样式 */
+        .header { display: flex; justify-content: space-between; align-items: center; height: 64px; background-color: #001529; padding: 0 24px; color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .logo { display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 600; }
+        .logo-icon { font-size: 24px; }
+        .user-info { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(to-br, #1890ff, #40a9ff); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; }
+        /* 新增主容器和侧边栏样式 */
+        .main-container { display: flex; height: calc(100vh - 64px); }
+        .sidebar { width: 200px; background-color: #001529; color: #c9d1d9; height: 100%; }
+        .menu-item { display: flex; align-items: center; gap: 12px; padding: 16px 24px; cursor: pointer; transition: all 0.2s; font-size: 14px; border-left: 4px solid transparent; }
+        .menu-item:hover { background-color: rgba(255,255,255,0.1); color: #fff; }
+        .menu-item.active { background-color: #1890ff; color: #fff; border-left-color: #fff; }
+        .menu-icon { width: 20px; height: 20px; }
+        /* 原样式保留 */
+        .sidebar-item { transition: all 0.2s; }
+        .sidebar-item:hover { background-color: rgba(255,255,255,0.1); }
+        .sidebar-item.active { background-color: #096dd9; }
+        .sidebar-submenu { background-color: rgba(0,0,0,0.15); }
+        
+        .nav-tab { position: relative; transition: all 0.3s; border-bottom: 2px solid transparent; }
+        .nav-tab.active { color: #1890ff; background-color: #e6f7ff; border-bottom-color: #1890ff; }
+        
+        .data-table th { background-color: #fafafa; font-weight: 600; color: #262626; }
+        .data-table tr:hover td { background-color: #e6f7ff; }
+        
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .status-online { background-color: #52c41a; box-shadow: 0 0 0 2px rgba(82,196,26,0.2); }
+        .status-offline { background-color: #ff4d4f; box-shadow: 0 0 0 2px rgba(255,77,79,0.2); }
+        
+        .stat-card { transition: all 0.3s ease; }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        /* 预警样式 */
+        .warning-badge { animation: pulse-warning 2s infinite; }
+        @keyframes pulse-warning {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .alert-card {
+            animation: slide-in 0.3s ease-out;
+            border-left: 4px solid;
+        }
+        @keyframes slide-in {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        /* 模态框动画 */
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        .modal-content {
+            animation: modalSlideIn 0.3s ease;
+        }
+        @keyframes modalSlideIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* 图表样式 */
+        .chart-bar { transition: all 0.3s ease; }
+        .chart-bar:hover { opacity: 0.8; filter: brightness(1.1); }
+        .form-input { 
+            width: 100%; 
+            padding: 0.5rem 0.75rem; 
+            border: 1px solid #d9d9d9; 
+            border-radius: 0.375rem;
+            transition: all 0.3s;
+        }
+        .form-input:focus { 
+            outline: none; 
+            border-color: #1890ff; 
+            box-shadow: 0 0 0 2px rgba(24,144,255,0.2); 
+        }
+        /* 时段分析图表样式 */
+        .time-chart-bar { transition: all 0.3s ease; }
+        .time-chart-bar:hover { opacity: 0.8; }
+        /* 开关按钮样式 */
+        .gate-btn { transition: all 0.2s; }
+        .gate-btn:hover { transform: scale(1.05); }
+        .gate-btn:active { transform: scale(0.95); }
+        /* 数据看板样式 */
+        .dashboard-card {
+            border-radius: 0.75rem;
+            transition: all 0.3s ease;
+        }
+        .dashboard-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+        
+        /* 告警弹窗样式 */
+        .alert-modal {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        .alert-modal.active { opacity: 1; visibility: visible; }
+        .alert-modal-backdrop {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px);
+        }
+        .alert-modal-content {
+            position: relative; background-color: white; border-radius: 0.75rem;
+            width: 90%; max-width: 500px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            transform: translateY(-20px); transition: transform 0.3s ease;
+        }
+        .alert-modal.active .alert-modal-content { transform: translateY(0); }
+        
+        /* 容量卡片特殊动画 */
+        .capacity-pulse {
+            animation: capacity-breathe 3s ease-in-out infinite;
+        }
+        @keyframes capacity-breathe {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+            50% { box-shadow: 0 0 20px 5px rgba(245, 158, 11, 0.2); }
+        }
+        
+        /* 数字滚动动画 */
+        @keyframes countUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-number { animation: countUp 0.5s ease-out; }
+        
+        /* 玻璃态效果 */
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        /* 内容区域样式 */
+        .content-wrap { flex: 1; overflow-y: auto; padding: 24px; }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航 - 替换原左侧顶部logo -->
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">🚗</div>
+            <span>智慧停车管理系统</span>
+        </div>
+        <div class="user-info">
+            <span>管理员</span>
+            <div class="user-avatar">管</div>
+        </div>
+    </div>
+    
+    <!-- 主容器 - 替换原侧边栏+主内容布局 -->
+    <div class="main-container">
+        <!-- 侧边菜单 - 新导航目录 -->
+        <div class="sidebar">
+            <!-- 新增：可视化看板菜单 -->
+            <div class="menu-item active" id="menu-dashboard">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M880 112H704v-80c0-4.4-3.6-8-8-8h-64c-4.4 0-8 3.6-8 8v80H416v-80c0-4.4-3.6-8-8-8h-64c-4.4 0-8 3.6-8 8v80H144c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32zM690 396H534V240c0-4.4-3.6-8-8-8h-48c-4.4 0-8 3.6-8 8v156H334c-4.4 0-8 3.6-8 8v48c0 4.4 3.6 8 8 8h156v156c0 4.4 3.6 8 8 8h48c4.4 0 8-3.6 8-8V452h156c4.4 0 8-3.6 8-8v-48c0-4.4-3.6-8-8-8z"/>
+                </svg>
+                <span>可视化看板</span>
+            </div>
+            <div class="menu-item" id="menu-monitor">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M928 160H96c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h832c17.7 0 32-14.3 32-32V192c0-17.7-14.3-32-32-32zM480 832H160V256h320v576zm128-640H160v-64h448v64zm320 640H608V256h320v576z"/>
+                </svg>
+                <span>在场车辆监控</span>
+            </div>
+            <div class="menu-item" id="menu-records">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M832 64H192c-17.7 0-32 14.3-32 32v832c0 17.7 14.3 32 32 32h640c17.7 0 32-14.3 32-32V96c0-17.7-14.3-32-32-32zM648.3 426.8L537.9 345.5c-3.1-2.3-7.3-2.3-10.4 0L375.7 426.8a8.32 8.32 0 0 0-1.7 11.9l89.9 118.8c3.1 4.1 9.2 4.1 12.3 0l142.4-188.3a8.32 8.32 0 0 0-1.7-11.9z"/>
+                </svg>
+                <span>出入场记录</span>
+            </div>
+            <div class="menu-item" id="menu-parking">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M864 256H736v-64c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v64H416v-64c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v64H160c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h704c17.7 0 32-14.3 32-32V288c0-17.7-14.3-32-32-32zM640 832H384c-17.7 0-32-14.3-32-32V480c0-17.7 14.3-32 32-32h256c17.7 0 32 14.3 32 32v320c0 17.7-14.3 32-32 32zM352 384h320v64H352v-64z"/>
+                </svg>
+                <span>收费管理</span>
+            </div>
+            <div class="menu-item" id="menu-report">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M896 112H128c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h768c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32zM792 768H232V248h560v520zM232 168h246v48h-246v-48zm560 0h-246v48h246v-48zM232 848v48h560v-48H232z"/>
+                </svg>
+                <span>报表统计</span>
+            </div>
+            <div class="menu-item" id="menu-settings">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M928 160H96c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h832c17.7 0 32-14.3 32-32V192c0-17.7-14.3-32-32-32zm-40 656H136V240h752v576zM480 384c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm192-384c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64z"/>
+                </svg>
+                <span>系统设置</span>
+            </div>
+        </div>
+
+        <!-- 内容区域 - 保留原数据看板内容，修改名称为停车场管理 -->
+        <div class="content-wrap" id="content-area">
+            <!-- 数据看板页面 - 名称修改为停车场管理 -->
+            <div id="page-dashboard" class="page-section space-y-6">
+                <!-- 整体车辆信息监控面板 -->
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-100">
+                    <!-- 面板标题 - 修改为停车场管理 -->
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="p-2 bg-blue-100 rounded-lg">
+                                <i data-lucide="bar-chart-2" class="w-6 h-6 text-blue-600"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-bold text-gray-900">停车场管理</h2>
+                                <p class="text-sm text-gray-500">实时更新于 <span id="update-time">14:35:22</span></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="flex items-center text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                                <span class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+                                数据实时同步中
+                            </span>
+                            <button onclick="refreshAllData()" class="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="刷新数据">
+                                <i data-lucide="refresh-cw" class="w-5 h-5 text-gray-600"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 核心数据网格 - 原布局保留 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- 左侧：车场容量监控 -->
+                        <div class="lg:col-span-1">
+                            <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-5 text-white h-full relative overflow-hidden capacity-pulse">
+                                <!-- 背景装饰 -->
+                                <div class="absolute top-0 right-0 w-40 h-40 bg-blue-500/10 rounded-full -mr-20 -mt-20 blur-2xl"></div>
+                                <div class="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/10 rounded-full -ml-16 -mb-16 blur-2xl"></div>
+                                
+                                <div class="relative z-10">
+                                    <div class="flex justify-between items-start mb-4">
+                                        <div>
+                                            <p class="text-slate-300 text-sm mb-1">车场容量监控</p>
+                                            <div class="flex items-baseline space-x-2">
+                                                <h3 class="text-4xl font-bold text-white animate-number">14</h3>
+                                                <span class="text-xl text-slate-400">/ 20</span>
+                                                <span class="text-sm text-slate-400 ml-2">车位</span>
+                                            </div>
+                                        </div>
+                                        <div class="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
+                                            <i data-lucide="parking-square" class="w-6 h-6 text-blue-400"></i>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 容量进度条 -->
+                                    <div class="mb-4">
+                                        <div class="flex justify-between text-xs mb-2">
+                                            <span class="text-slate-300">使用率</span>
+                                            <span class="font-bold text-yellow-400">70%</span>
+                                        </div>
+                                        <div class="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
+                                            <div class="h-full bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full transition-all duration-1000 relative" style="width: 70%">
+                                                <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 车位分布详情 -->
+                                    <div class="grid grid-cols-3 gap-3 mb-4">
+                                        <div class="glass-effect rounded-lg p-3 text-center">
+                                            <div class="text-2xl font-bold text-green-400">6</div>
+                                            <div class="text-xs text-slate-400 mt-1">剩余空位</div>
+                                        </div>
+                                        <div class="glass-effect rounded-lg p-3 text-center">
+                                            <div class="text-2xl font-bold text-blue-400">12</div>
+                                            <div class="text-xs text-slate-400 mt-1">临时车辆</div>
+                                        </div>
+                                        <div class="glass-effect rounded-lg p-3 text-center">
+                                            <div class="text-2xl font-bold text-purple-400">2</div>
+                                            <div class="text-xs text-slate-400 mt-1">月卡车辆</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 右侧：车辆流动数据 -->
+                        <div class="lg:col-span-2">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <!-- 今日进场 -->
+                                <div class="bg-gradient-to-br from-green-50 to-green-100/50 rounded-xl p-5 border border-green-200 relative overflow-hidden group hover:shadow-md transition-all h-full">
+                                    <div class="absolute top-0 right-0 w-24 h-24 bg-green-400/10 rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform"></div>
+                                    
+                                    <div class="relative z-10">
+                                        <div class="flex justify-between items-start mb-4">
+                                            <div class="p-2 bg-green-500 rounded-lg shadow-lg shadow-green-500/30">
+                                                <i data-lucide="log-in" class="w-5 h-5 text-white"></i>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <p class="text-green-600 text-sm font-medium">今日进场车辆</p>
+                                            <h3 class="text-4xl font-bold text-gray-900 animate-number">128</h3>
+                                        </div>
+                                        
+                                        <div class="flex items-center justify-between text-sm text-gray-500">
+                                            <span>较昨日</span>
+                                            <span class="text-green-600 font-medium">+13.3%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 今日出场 -->
+                                <div class="bg-gradient-to-br from-purple-50 to-purple-100/50 rounded-xl p-5 border border-purple-200 relative overflow-hidden group hover:shadow-md transition-all h-full">
+                                    <div class="absolute top-0 right-0 w-24 h-24 bg-purple-400/10 rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform"></div>
+                                    
+                                    <div class="relative z-10">
+                                        <div class="flex justify-between items-start mb-4">
+                                            <div class="p-2 bg-purple-500 rounded-lg shadow-lg shadow-purple-500/30">
+                                                <i data-lucide="log-out" class="w-5 h-5 text-white"></i>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <p class="text-purple-600 text-sm font-medium">今日出场车辆</p>
+                                            <h3 class="text-4xl font-bold text-gray-900 animate-number">124</h3>
+                                        </div>
+                                        
+                                        <div class="flex items-center justify-between text-sm text-gray-500">
+                                            <span>较昨日</span>
+                                            <span class="text-purple-600 font-medium">+10.7%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 底部快捷操作栏 -->
+                            <div class="flex justify-center">
+                                <button onclick="switchTab('current')" class="flex items-center justify-center px-8 py-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg transition-all group w-full max-w-xs">
+                                    <i data-lucide="map-pin" class="w-4 h-4 text-gray-500 group-hover:text-blue-600 mr-2"></i>
+                                    <span class="text-sm text-gray-700 group-hover:text-blue-700 font-medium">查看在场车辆</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 第二行：收入统计和设备状态 -->
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                    <!-- 今日收入 -->
+                    <div class="col-span-12 md:col-span-3">
+                        <div class="bg-gradient-to-br from-orange-500 to-red-500 rounded-xl p-5 text-white shadow-lg h-full">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <p class="text-orange-100 text-sm mb-1">今日收入</p>
+                                    <h3 class="text-3xl font-bold">¥1,250</h3>
+                                </div>
+                                <div class="p-2 bg-white/20 rounded-lg">
+                                    <i data-lucide="banknote" class="w-6 h-6 text-white"></i>
+                                </div>
+                            </div>
+                            <div class="flex items-center text-sm text-orange-100 mb-3">
+                                <i data-lucide="arrow-up" class="w-4 h-4 mr-1"></i>
+                                <span>较昨日 +12.5%</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 预警统计 -->
+                    <div class="col-span-12 md:col-span-3">
+                        <div class="bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl p-5 text-white shadow-lg h-full">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <p class="text-yellow-100 text-sm mb-1">预警数量</p>
+                                    <h3 class="text-3xl font-bold">6</h3>
+                                </div>
+                                <div class="p-2 bg-white/20 rounded-lg">
+                                    <i data-lucide="alert-triangle" class="w-6 h-6 text-white"></i>
+                                </div>
+                            </div>
+                            <div class="flex items-center text-sm text-yellow-100 mb-3">
+                                <i data-lucide="arrow-up" class="w-4 h-4 mr-1"></i>
+                                <span>较昨日 +3</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 设备状态 -->
+                    <div class="col-span-12 md:col-span-6">
+                        <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 h-full">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-gray-900">设备运行状态</h3>
+                                <span class="text-xs text-gray-500">最后更新: 2分钟前</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="flex items-center p-3 bg-green-50 rounded-lg border border-green-200">
+                                    <div class="p-2 bg-green-500 rounded-lg mr-3">
+                                        <i data-lucide="wifi" class="w-4 h-4 text-white"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-2xl font-bold text-green-600">7</div>
+                                        <div class="text-xs text-green-700">在线设备</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center p-3 bg-red-50 rounded-lg border border-red-200">
+                                    <div class="p-2 bg-red-500 rounded-lg mr-3">
+                                        <i data-lucide="wifi-off" class="w-4 h-4 text-white"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-2xl font-bold text-red-600">1</div>
+                                        <div class="text-xs text-red-700">离线设备</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 图表区域 -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- 时段流量分析 -->
+                    <div class="col-span-12 lg:col-span-8">
+                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                            <div class="flex justify-between items-center mb-6">
+                                <div>
+                                    <h3 class="text-lg font-bold text-gray-900">今日时段流量分析</h3>
+                                    <p class="text-sm text-gray-500 mt-1">每小时车辆进出统计</p>
+                                </div>
+                                <select class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                                    <option>今日</option>
+                                    <option>昨日</option>
+                                    <option>近7天</option>
+                                </select>
+                            </div>
+                            
+                            <div class="h-80 w-full relative">
+                                <svg viewBox="0 0 900 320" class="w-full h-full">
+                                    <!-- 网格线 -->
+                                    <line x1="60" y1="280" x2="860" y2="280" stroke="#e5e7eb" stroke-width="1"/>
+                                    <line x1="60" y1="220" x2="860" y2="220" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
+                                    <line x1="60" y1="160" x2="860" y2="160" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
+                                    <line x1="60" y1="100" x2="860" y2="100" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
+                                    <line x1="60" y1="40" x2="860" y2="40" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
+                                    
+                                    <!-- Y轴标签 -->
+                                    <text x="50" y="285" text-anchor="end" class="text-xs fill-gray-500">0</text>
+                                    <text x="50" y="225" text-anchor="end" class="text-xs fill-gray-500">10</text>
+                                    <text x="50" y="165" text-anchor="end" class="text-xs fill-gray-500">20</text>
+                                    <text x="50" y="105" text-anchor="end" class="text-xs fill-gray-500">30</text>
+                                    <text x="50" y="45" text-anchor="end" class="text-xs fill-gray-500">40</text>
+                                    
+                                    <!-- 入场柱状图 -->
+                                    <rect x="85" y="240" width="25" height="40" fill="#3b82f6" class="time-chart-bar" rx="2"/>
+                                    <rect x="155" y="220" width="25" height="60" fill="#3b82f6" class="time-chart-bar" rx="2"/>
+                                    <rect x="225" y="180" width="25" height="100" fill="#3b82f6" class="time-chart-bar" rx="2"/>
+                                    <rect x="295" y="140" width="25" height="140" fill="#3b82f6" class="time-chart-bar" rx="2"/>
+                                    <rect x="365" y="120" width="25" height="160" fill="#3b82f6" class="time-chart-bar" rx="2"/>
+                                    <rect x="435" y="160" width="25" height="120" fill="#3b82f6" class="time-chart-bar" rx="2"/>
+                                    <rect x="505" y="200" width="25" height="80" fill="#3b82f6" class="time-chart-bar" rx="2"/>
+                                    <rect x="575" y="180" width="25" height="100" fill="#3b82f6" class="time-chart-bar" rx="2"/>
+                                    <rect x="645" y="140" width="25" height="140" fill="#3b82f6" class="time-chart-bar" rx="2"/>
+                                    <rect x="715" y="200" width="25" height="80" fill="#3b82f6" class="time-chart-bar" rx="2"/>
+                                    <rect x="785" y="240" width="25" height="40" fill="#3b82f6" class="time-chart-bar" rx="2"/>
+                                    
+                                    <!-- 出场柱状图 -->
+                                    <rect x="115" y="250" width="25" height="30" fill="#10b981" class="time-chart-bar" rx="2"/>
+                                    <rect x="185" y="230" width="25" height="50" fill="#10b981" class="time-chart-bar" rx="2"/>
+                                    <rect x="255" y="190" width="25" height="90" fill="#10b981" class="time-chart-bar" rx="2"/>
+                                    <rect x="325" y="150" width="25" height="130" fill="#10b981" class="time-chart-bar" rx="2"/>
+                                    <rect x="395" y="130" width="25" height="150" fill="#10b981" class="time-chart-bar" rx="2"/>
+                                    <rect x="465" y="170" width="25" height="110" fill="#10b981" class="time-chart-bar" rx="2"/>
+                                    <rect x="535" y="210" width="25" height="70" fill="#10b981" class="time-chart-bar" rx="2"/>
+                                    <rect x="605" y="190" width="25" height="90" fill="#10b981" class="time-chart-bar" rx="2"/>
+                                    <rect x="675" y="150" width="25" height="130" fill="#10b981" class="time-chart-bar" rx="2"/>
+                                    <rect x="745" y="210" width="25" height="70" fill="#10b981" class="time-chart-bar" rx="2"/>
+                                    <rect x="815" y="250" width="25" height="30" fill="#10b981" class="time-chart-bar" rx="2"/>
+                                    
+                                    <!-- X轴标签 -->
+                                    <text x="110" y="305" text-anchor="middle" class="text-xs fill-gray-600">00:00</text>
+                                    <text x="180" y="305" text-anchor="middle" class="text-xs fill-gray-600">02:00</text>
+                                    <text x="250" y="305" text-anchor="middle" class="text-xs fill-gray-600">04:00</text>
+                                    <text x="320" y="305" text-anchor="middle" class="text-xs fill-gray-600">06:00</text>
+                                    <text x="390" y="305" text-anchor="middle" class="text-xs fill-gray-600">08:00</text>
+                                    <text x="460" y="305" text-anchor="middle" class="text-xs fill-gray-600">10:00</text>
+                                    <text x="530" y="305" text-anchor="middle" class="text-xs fill-gray-600">12:00</text>
+                                    <text x="600" y="305" text-anchor="middle" class="text-xs fill-gray-600">14:00</text>
+                                    <text x="670" y="305" text-anchor="middle" class="text-xs fill-gray-600">16:00</text>
+                                    <text x="740" y="305" text-anchor="middle" class="text-xs fill-gray-600">18:00</text>
+                                    <text x="810" y="305" text-anchor="middle" class="text-xs fill-gray-600">20:00</text>
+                                    <text x="880" y="305" text-anchor="middle" class="text-xs fill-gray-600">22:00</text>
+                                </svg>
+                            </div>
+                            
+                            <div class="mt-4 flex justify-center space-x-6 text-sm">
+                                <div class="flex items-center">
+                                    <span class="w-3 h-3 bg-blue-500 rounded mr-2"></span>
+                                    <span class="text-gray-600">入场车辆</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <span class="w-3 h-3 bg-green-500 rounded mr-2"></span>
+                                    <span class="text-gray-600">出场车辆</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 收入趋势和预警分布 -->
+                    <div class="col-span-12 lg:col-span-4 space-y-6">
+                        <!-- 收入趋势 -->
+                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                            <h3 class="text-lg font-bold text-gray-900 mb-4">近7日收入趋势</h3>
+                            <div class="h-48">
+                                <svg viewBox="0 0 400 200" class="w-full h-full">
+                                    <line x1="40" y1="180" x2="380" y2="180" stroke="#e5e7eb" stroke-width="1"/>
+                                    <line x1="40" y1="140" x2="380" y2="140" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
+                                    <line x1="40" y1="100" x2="380" y2="100" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
+                                    <line x1="40" y1="60" x2="380" y2="60" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
+                                    
+                                    <text x="30" y="185" text-anchor="end" class="text-xs fill-gray-500">0</text>
+                                    <text x="30" y="145" text-anchor="end" class="text-xs fill-gray-500">500</text>
+                                    <text x="30" y="105" text-anchor="end" class="text-xs fill-gray-500">1000</text>
+                                    <text x="30" y="65" text-anchor="end" class="text-xs fill-gray-500">1500</text>
+                                    
+                                    <rect x="60" y="140" width="40" height="40" fill="#f97316" class="chart-bar" rx="4"/>
+                                    <rect x="120" y="110" width="40" height="70" fill="#f97316" class="chart-bar" rx="4"/>
+                                    <rect x="180" y="80" width="40" height="100" fill="#f97316" class="chart-bar" rx="4"/>
+                                    <rect x="240" y="130" width="40" height="50" fill="#f97316" class="chart-bar" rx="4"/>
+                                    <rect x="300" y="100" width="40" height="80" fill="#f97316" class="chart-bar" rx="4"/>
+                                    <rect x="360" y="60" width="40" height="120" fill="#fb923c" class="chart-bar" rx="4"/>
+                                    
+                                    <text x="80" y="130" text-anchor="middle" class="text-xs fill-white font-medium">¥350</text>
+                                    <text x="140" y="100" text-anchor="middle" class="text-xs fill-white font-medium">¥550</text>
+                                    <text x="200" y="70" text-anchor="middle" class="text-xs fill-white font-medium">¥700</text>
+                                    <text x="260" y="120" text-anchor="middle" class="text-xs fill-white font-medium">¥450</text>
+                                    <text x="320" y="90" text-anchor="middle" class="text-xs fill-white font-medium">¥600</text>
+                                    <text x="380" y="50" text-anchor="middle" class="text-xs fill-white font-bold">¥800</text>
+                                    
+                                    <text x="80" y="195" text-anchor="middle" class="text-xs fill-gray-600">01/10</text>
+                                    <text x="140" y="195" text-anchor="middle" class="text-xs fill-gray-600">01/11</text>
+                                    <text x="200" y="195" text-anchor="middle" class="text-xs fill-gray-600">01/12</text>
+                                    <text x="260" y="195" text-anchor="middle" class="text-xs fill-gray-600">01/13</text>
+                                    <text x="320" y="195" text-anchor="middle" class="text-xs fill-gray-600">01/14</text>
+                                    <text x="380" y="195" text-anchor="middle" class="text-xs fill-orange-700 font-bold">今日</text>
+                                </svg>
+                            </div>
+                        </div>
+                        
+                        <!-- 预警类型分布 -->
+                        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                            <h3 class="text-lg font-bold text-gray-900 mb-4">预警类型分布</h3>
+                            <div class="space-y-3">
+                                <div class="flex items-center">
+                                    <div class="w-24 text-sm text-gray-600">余位不足预警</div>
+                                    <div class="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden mx-3">
+                                        <div class="h-full bg-yellow-400 rounded-full" style="width: 40%"></div>
+                                    </div>
+                                    <div class="text-sm font-medium text-gray-700">40%</div>
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-24 text-sm text-gray-600">长时间停车预警</div>
+                                    <div class="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden mx-3">
+                                        <div class="h-full bg-orange-400 rounded-full" style="width: 25%"></div>
+                                    </div>
+                                    <div class="text-sm font-medium text-gray-700">25%</div>
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-24 text-sm text-gray-600">无牌车预警</div>
+                                    <div class="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden mx-3">
+                                        <div class="h-full bg-purple-400 rounded-full" style="width: 15%"></div>
+                                    </div>
+                                    <div class="text-sm font-medium text-gray-700">15%</div>
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-24 text-sm text-gray-600">设备异常预警</div>
+                                    <div class="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden mx-3">
+                                        <div class="h-full bg-red-400 rounded-full" style="width: 20%"></div>
+                                    </div>
+                                    <div class="text-sm font-medium text-gray-700">20%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 页面脚本 - 保留原逻辑，新增侧边菜单激活交互 -->
+    <script>
+        // 初始化图标
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            
+            // 更新时间显示
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 1000);
+
+            // 侧边菜单点击激活
+            const menuItems = document.querySelectorAll('.menu-item');
+            menuItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    menuItems.forEach(mi => mi.classList.remove('active'));
+                    item.classList.add('active');
+                    // 这里可以添加页面切换逻辑
+                    const menuId = item.id;
+                    if (menuId === 'menu-dashboard') {
+                        // 显示可视化看板页面
+                        document.getElementById('page-dashboard').style.display = 'block';
+                    } else if (menuId === 'menu-monitor') {
+                        // 这里可以添加在场车辆监控页面的显示逻辑
+                        alert('切换到在场车辆监控页面');
+                    }
+                });
+            });
+        });
+        
+        // 更新当前时间
+        function updateCurrentTime() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('update-time').textContent = `${hours}:${minutes}:${seconds}`;
+        }
+        
+        // 切换标签页
+        function switchTab(tabName) {
+            // 实际项目中这里会实现页面切换逻辑
+            alert(`切换到${tabName}标签页`);
+        }
+        
+        // 刷新所有数据
+        function refreshAllData() {
+            // 模拟数据刷新
+            alert('数据已刷新');
+            // 可以在这里添加实际的数据刷新逻辑
+        }
+    </script>
+</body>
+</html>

@@ -102,9 +102,22 @@ public class AccessDeviceConfig implements DeviceConfig {
     private Integer rtspPort;
 
     /**
+     * 门禁设备子类型（ACCESS_GEN1 或 ACCESS_GEN2）
+     * <p>
+     * 用于区分一代门禁控制器和二代门禁（人脸一体机），
+     * 决定使用哪个插件处理设备命令。
+     * </p>
+     * <ul>
+     *   <li>ACCESS_GEN1: 一代门禁控制器，使用 Recordset 操作</li>
+     *   <li>ACCESS_GEN2: 二代门禁/人脸一体机，使用标准 API</li>
+     * </ul>
+     */
+    private String accessDeviceType;
+
+    /**
      * 门禁能力快照（来自网关能力查询）
      *
-     * <p>用于业务侧进行“按能力下发/撤销”，避免默认所有设备都支持人脸/指纹等能力导致误操作。</p>
+     * <p>用于业务侧进行"按能力下发/撤销"，避免默认所有设备都支持人脸/指纹等能力导致误操作。</p>
      *
      * <p>建议结构（与 newgateway 返回字段保持一致）：</p>
      * <pre>
@@ -177,7 +190,8 @@ public class AccessDeviceConfig implements DeviceConfig {
     @Override
     public Map<String, Object> toMap() {
         Map<String, Object> map = new HashMap<>();
-        map.put("deviceType", getDeviceType());
+        // 优先使用 accessDeviceType（ACCESS_GEN1/ACCESS_GEN2），否则返回通用 "ACCESS"
+        map.put("deviceType", accessDeviceType != null ? accessDeviceType : getDeviceType());
         map.put("ipAddress", ipAddress);
         map.put("port", port);
         map.put("username", username);
@@ -207,6 +221,16 @@ public class AccessDeviceConfig implements DeviceConfig {
     public void fromMap(Map<String, Object> map) {
         if (map == null) {
             return;
+        }
+
+        // 读取设备子类型（ACCESS_GEN1/ACCESS_GEN2）
+        Object deviceTypeObj = map.get("deviceType");
+        if (deviceTypeObj instanceof String) {
+            String dt = ((String) deviceTypeObj).trim().toUpperCase();
+            // 只保存有效的门禁子类型
+            if ("ACCESS_GEN1".equals(dt) || "ACCESS_GEN2".equals(dt)) {
+                this.accessDeviceType = dt;
+            }
         }
 
         // 提取字段值，处理类型转换

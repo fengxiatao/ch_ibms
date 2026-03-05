@@ -249,12 +249,34 @@ public class AccessGen1Plugin implements ActiveDeviceHandler {
     private final AccessGen1SdkWrapper sdkWrapper;
 
     /**
+     * 门禁命令确认服务
+     * <p>基于设备事件回调的命令确认机制，解决 SDK 返回值不可靠的问题</p>
+     */
+    private final DoorCommandConfirmationService doorCommandConfirmationService;
+
+    /**
      * 门禁事件回调（EVENT_IVS_ACCESS_CTL）
      * <p>
      * 必须保持强引用，避免被 GC 导致回调失效
      * </p>
      */
     private final NetSDKLib.fAnalyzerDataCallBack accessCtlCallback = new AccessCtlAnalyzerDataCallBack(this);
+
+    /**
+     * 事件去重缓存：key = "deviceId:channelNo:eventType:result"，value = 上次事件时间戳
+     * <p>
+     * 用于过滤短时间内重复的事件（如远程开门可能触发多次回调）
+     * </p>
+     */
+    private final java.util.concurrent.ConcurrentHashMap<String, Long> eventDedupeCache = new java.util.concurrent.ConcurrentHashMap<>();
+    
+    /**
+     * 事件去重时间窗口（毫秒）
+     * <p>
+     * 在此时间窗口内，相同的事件（设备+通道+事件类型+结果）将被忽略
+     * </p>
+     */
+    private static final long EVENT_DEDUPE_WINDOW_MS = 500;
 
     /**
      * 重连调度器
@@ -280,8 +302,16 @@ public class AccessGen1Plugin implements ActiveDeviceHandler {
         });
         
         // 注册报警事件监听器
-        sdkWrapper.addAlarmListener((deviceId, alarmType, channelNo, alarmTime, alarmData) -> {
-            handleAlarmEvent(deviceId, alarmType, channelNo, alarmTime);
+        // 注意：SDK 回调中的 deviceId 实际上是 loginHandle，需要转换为业务层的 deviceId
+        sdkWrapper.addAlarmListener((loginHandle, alarmType, channelNo, alarmTime, alarmData) -> {
+            // 通过 loginHandle 反查 deviceId
+            Long realDeviceId = connectionManager.getDeviceIdByLoginHandle(loginHandle);
+            if (realDeviceId == null) {
+                // 如果找不到对应的设备ID，使用 loginHandle 作为标识（便于排查问题）
+                log.warn("{} 报警事件无法映射到设备ID: loginHandle={}, alarmType={}", LOG_PREFIX, loginHandle, alarmType);
+                realDeviceId = loginHandle;  // 降级处理：使用 loginHandle
+            }
+            handleAlarmEvent(realDeviceId, alarmType, channelNo, alarmTime);
         });
         
         log.info("{} ✅ 断线监听器和报警监听器注册完成", LOG_PREFIX);
@@ -774,8 +804,20 @@ public class AccessGen1Plugin implements ActiveDeviceHandler {
     /**
      * 执行远程开门命令
      * 
-     * <p>包含自动重连机制：当检测到"数据发送失败"等网络错误时，
-     * 会自动清除旧连接并重新建立连接，然后重试开门操作。</p>
+     * <h2>完全事件驱动设计</h2>
+     * <p>采用专业门禁产品的标准模式：<b>所有命令都等待设备事件确认</b>，
+     * SDK 返回值仅作为"命令是否发出"的参考，不作为成功依据。</p>
+     * 
+     * <h3>流程</h3>
+     * <ol>
+     *     <li>注册待确认命令</li>
+     *     <li>发送开门命令（SDK 返回值仅用于判断命令是否发出）</li>
+     *     <li>等待设备事件回调确认（远程开门事件 command=12673）</li>
+     *     <li>收到确认 → 确定成功；超时 → 确定失败</li>
+     * </ol>
+     * 
+     * <h3>设计依据</h3>
+     * <p>设备的事件回调才是"真相来源"。海康威视、大华等专业门禁产品都采用此模式。</p>
      *
      * @param deviceId 设备ID
      * @param command  命令
@@ -787,66 +829,86 @@ public class AccessGen1Plugin implements ActiveDeviceHandler {
         if (channelNo == null) {
             channelNo = 1; // 默认通道1
         }
-        // 直接传递 channelNo，SDK Wrapper 层会处理 -1 转换（SDK 内部从0开始）
 
-        log.info("{} 执行远程开门: deviceId={}, channelNo={}", LOG_PREFIX, deviceId, channelNo);
+        log.info("{} 执行远程开门（事件驱动模式）: deviceId={}, channelNo={}", LOG_PREFIX, deviceId, channelNo);
+
+        // 【步骤1】注册待确认命令（在发送命令前注册，避免事件先于命令返回）
+        String confirmationKey = doorCommandConfirmationService.registerPendingCommand(
+                deviceId, channelNo, DoorCommandConfirmationService.CMD_OPEN_DOOR);
 
         try {
             // 获取登录句柄（支持按需连接）
             Long loginHandle = ensureConnected(deviceId, command);
             if (loginHandle == null || loginHandle <= 0) {
+                doorCommandConfirmationService.cancelPendingCommand(confirmationKey);
                 return CommandResult.failure("设备未连接，无法建立连接");
             }
             
-            // 调用 SDK 开门（SDK Wrapper 内部会处理通道号转换）
+            // 【步骤2】发送开门命令
+            // SDK 返回值仅用于判断命令是否发出，不作为执行成功的依据
             AccessGen1OperationResult sdkResult = sdkWrapper.openDoor(loginHandle, channelNo);
             
-            if (sdkResult.isSuccess()) {
-                // 发布开门事件
+            // 检查是否为真正的发送失败（连接断开等）
+            if (!sdkResult.isSuccess() && isConnectionError(sdkResult.getMessage())) {
+                log.warn("{} 命令发送失败(连接错误)，尝试重连: deviceId={}, error={}", 
+                        LOG_PREFIX, deviceId, sdkResult.getMessage());
+                
+                // 重连并重试
+                connectionManager.unregister(deviceId);
+                Long newLoginHandle = ensureConnected(deviceId, command);
+                if (newLoginHandle == null || newLoginHandle <= 0) {
+                    doorCommandConfirmationService.cancelPendingCommand(confirmationKey);
+                    return CommandResult.failure("重连失败，设备无法建立连接");
+                }
+                
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+                
+                log.info("{} 重连成功，重试发送: deviceId={}", LOG_PREFIX, deviceId);
+                sdkResult = sdkWrapper.openDoor(newLoginHandle, channelNo);
+                
+                // 重连后仍然发送失败，返回错误
+                if (!sdkResult.isSuccess() && isConnectionError(sdkResult.getMessage())) {
+                    doorCommandConfirmationService.cancelPendingCommand(confirmationKey);
+                    return CommandResult.failure("命令发送失败: " + sdkResult.getMessage());
+                }
+            }
+            
+            // 【步骤3】等待设备事件确认（核心逻辑）
+            // 不管 SDK 返回成功还是特定错误（21/1218），都统一等待设备确认
+            log.info("{} 命令已发送，等待设备事件确认: deviceId={}, channelNo={}, sdkResult={}", 
+                    LOG_PREFIX, deviceId, channelNo, sdkResult.isSuccess() ? "SDK_OK" : sdkResult.getMessage());
+            
+            DoorCommandConfirmationService.ConfirmationResult confirmResult = 
+                    doorCommandConfirmationService.waitForConfirmation(confirmationKey, 5);
+            
+            if (confirmResult.isConfirmed()) {
+                // 【确定成功】设备上报了远程开门事件
+                log.info("{} ✅ 开门成功（设备已确认）: deviceId={}, channelNo={}, alarmType={}", 
+                        LOG_PREFIX, deviceId, channelNo, confirmResult.getAlarmType());
+                
                 publishAccessEvent(deviceId, EVENT_DOOR_OPEN, Map.of(
                         "channelNo", channelNo,
-                        "action", "REMOTE_OPEN"
+                        "action", "REMOTE_OPEN",
+                        "confirmedBy", "DEVICE_EVENT"
                 ));
                 
                 return CommandResult.success(Map.of(
-                        "message", "开门命令已发送",
+                        "message", "开门成功",
                         "channelNo", channelNo
                 ));
             } else {
-                // 检查是否是网络/连接相关错误（错误码 516 = 数据发送失败）
-                String errorMsg = sdkResult.getMessage();
-                if (isConnectionError(errorMsg)) {
-                    log.warn("{} 开门失败(连接错误)，尝试重连: deviceId={}, error={}", LOG_PREFIX, deviceId, errorMsg);
-                    
-                    // 清除旧连接，强制重新连接
-                    connectionManager.unregister(deviceId);
-                    
-                    // 尝试重新登录
-                    Long newLoginHandle = ensureConnected(deviceId, command);
-                    if (newLoginHandle == null || newLoginHandle <= 0) {
-                        return CommandResult.failure("重连失败，设备无法建立连接");
-                    }
-                    
-                    // 使用新连接重试开门
-                    log.info("{} 重连成功，重试开门: deviceId={}, newHandle={}", LOG_PREFIX, deviceId, newLoginHandle);
-                    AccessGen1OperationResult retryResult = sdkWrapper.openDoor(newLoginHandle, channelNo);
-                    
-                    if (retryResult.isSuccess()) {
-                        publishAccessEvent(deviceId, EVENT_DOOR_OPEN, Map.of(
-                                "channelNo", channelNo,
-                                "action", "REMOTE_OPEN"
-                        ));
-                        return CommandResult.success(Map.of(
-                                "message", "开门命令已发送（重连后成功）",
-                                "channelNo", channelNo
-                        ));
-                    } else {
-                        return CommandResult.failure("开门失败(重试): " + retryResult.getMessage());
-                    }
-                }
-                return CommandResult.failure("开门失败: " + sdkResult.getMessage());
+                // 【确定失败】超时未收到设备确认
+                log.warn("{} ❌ 开门失败（设备未确认）: deviceId={}, channelNo={}, result={}", 
+                        LOG_PREFIX, deviceId, channelNo, confirmResult);
+                return CommandResult.failure("开门失败: " + confirmResult.getMessage());
             }
+            
         } catch (Exception e) {
+            doorCommandConfirmationService.cancelPendingCommand(confirmationKey);
             log.error("{} 远程开门异常: deviceId={}, channelNo={}", LOG_PREFIX, deviceId, channelNo, e);
             return CommandResult.failure("开门异常: " + e.getMessage());
         }
@@ -865,17 +927,32 @@ public class AccessGen1Plugin implements ActiveDeviceHandler {
      * @param errorMsg 错误信息
      * @return true=连接错误，需要重连；false=其他错误
      */
+    /**
+     * 判断是否为连接/发送失败错误
+     * <p>
+     * 在完全事件驱动模式下，此方法仅用于判断命令是否发送失败（需要重连）。
+     * 命令是否执行成功由设备事件回调确认，不依赖 SDK 返回值。
+     * </p>
+     * 
+     * @param errorMsg 错误信息
+     * @return true=连接错误，命令未发出，需要重连；false=命令已发出
+     */
     private boolean isConnectionError(String errorMsg) {
         if (errorMsg == null) {
             return false;
         }
-        // 错误码 516 对应 "数据发送失败"
+        // 仅匹配真正的连接/发送失败错误
+        // 错误码 516 = 数据发送失败
+        // 错误码 385 = 获取服务器实例失败（登录句柄已失效）
         return errorMsg.contains("516") 
+                || errorMsg.contains("385")
                 || errorMsg.contains("数据发送失败") 
                 || errorMsg.contains("发送失败")
                 || errorMsg.contains("网络")
                 || errorMsg.contains("连接断开")
-                || errorMsg.contains("超时");
+                || errorMsg.contains("服务器实例")
+                || errorMsg.contains("实例失败")
+                || errorMsg.contains("句柄无效");
     }
 
     /**
@@ -958,8 +1035,9 @@ public class AccessGen1Plugin implements ActiveDeviceHandler {
             cardNo = userInfo.getCardNo();
             userId = userInfo.getUserId();
             userName = userInfo.getUserName();
-            validStartTime = normalizeValidTime(userInfo.getValidStartTime());
-            validEndTime = normalizeValidTime(userInfo.getValidEndTime());
+            // 使用双参数版本，设置默认有效期
+            validStartTime = normalizeValidTime(userInfo.getValidStartTime(), true);
+            validEndTime = normalizeValidTime(userInfo.getValidEndTime(), false);
             password = userInfo.getPassword();
             doors = userInfo.getDoors();
         } else if (userInfoObj instanceof Map) {
@@ -968,8 +1046,9 @@ public class AccessGen1Plugin implements ActiveDeviceHandler {
             cardNo = getStringFromMap(userInfo, "cardNo");
             userId = getStringFromMap(userInfo, "userId");
             userName = getStringFromMap(userInfo, "userName");
-            validStartTime = normalizeValidTime(getStringFromMap(userInfo, "validStartTime"));
-            validEndTime = normalizeValidTime(getStringFromMap(userInfo, "validEndTime"));
+            // 使用双参数版本，设置默认有效期
+            validStartTime = normalizeValidTime(getStringFromMap(userInfo, "validStartTime"), true);
+            validEndTime = normalizeValidTime(getStringFromMap(userInfo, "validEndTime"), false);
             password = getStringFromMap(userInfo, "password");
             
             // 获取门权限
@@ -987,8 +1066,9 @@ public class AccessGen1Plugin implements ActiveDeviceHandler {
             cardNo = command.getStringParam("cardNo");
             userId = command.getStringParam("userId");
             userName = command.getStringParam("userName");
-            validStartTime = normalizeValidTime(command.getStringParam("validStartTime"));
-            validEndTime = normalizeValidTime(command.getStringParam("validEndTime"));
+            // 使用双参数版本，设置默认有效期
+            validStartTime = normalizeValidTime(command.getStringParam("validStartTime"), true);
+            validEndTime = normalizeValidTime(command.getStringParam("validEndTime"), false);
             password = command.getStringParam("password");
             
             Object doorsParam = command.getParam("doors");
@@ -1039,9 +1119,13 @@ public class AccessGen1Plugin implements ActiveDeviceHandler {
             // 调用 SDK 插入卡片记录
             AccessGen1OperationResult sdkResult = sdkWrapper.insertCard(loginHandle, cardRecord);
             
-            // 如果插入失败，检查是否是"用户已存在"错误（错误码 146）
-            if (!sdkResult.isSuccess() && sdkResult.getErrorCode() != null && sdkResult.getErrorCode() == 146) {
-                log.info("{} 用户已存在，尝试更新: cardNo={}", LOG_PREFIX, cardNo);
+            // 如果插入失败，检查是否是"用户已存在"错误（错误码 146 或 1205）
+            // 错误码 146: 用户已存在
+            // 错误码 1205: 记录已存在（0x80000000|1205）
+            if (!sdkResult.isSuccess() && sdkResult.getErrorCode() != null && 
+                    (sdkResult.getErrorCode() == 146 || sdkResult.getErrorCode() == 1205)) {
+                log.info("{} 用户/卡片已存在（errorCode={}），尝试更新: cardNo={}", 
+                        LOG_PREFIX, sdkResult.getErrorCode(), cardNo);
                 
                 // 查询现有卡片记录获取 recNo
                 AccessGen1CardRecord existingCard = sdkWrapper.queryCardByCardNo(loginHandle, cardNo);
@@ -1063,6 +1147,29 @@ public class AccessGen1Plugin implements ActiveDeviceHandler {
                 // 如果是更新操作，recNo 可能在 cardRecord 中
                 if (recNo == null && cardRecord.getRecNo() != null) {
                     recNo = cardRecord.getRecNo();
+                }
+                
+                // 卡片下发成功后，设置密码（如果有）
+                // 一代门禁需要使用单独的密码记录集来设置密码
+                if (password != null && !password.isEmpty()) {
+                    log.info("{} 开始设置用户密码: userId={}, passwordLen={}", 
+                            LOG_PREFIX, userId != null ? userId : cardNo, password.length());
+                    
+                    AccessGen1OperationResult pwdResult = sdkWrapper.setPassword(
+                            loginHandle,
+                            userId != null && !userId.isEmpty() ? userId : cardNo,
+                            password,
+                            doors
+                    );
+                    
+                    if (pwdResult.isSuccess()) {
+                        log.info("{} ✅ 设置密码成功: userId={}", 
+                                LOG_PREFIX, userId != null ? userId : cardNo);
+                    } else {
+                        // 密码设置失败不影响整体结果，只记录警告
+                        log.warn("{} 设置密码失败（不影响卡片下发）: userId={}, msg={}", 
+                                LOG_PREFIX, userId != null ? userId : cardNo, pwdResult.getMessage());
+                    }
                 }
                 
                 // 发布授权下发事件
@@ -1383,23 +1490,42 @@ public class AccessGen1Plugin implements ActiveDeviceHandler {
         return null;
     }
 
+    /** 日期时间格式化器 */
+    private static final java.time.format.DateTimeFormatter DATE_TIME_FORMATTER = 
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     /**
      * 规范化有效期时间
-     * 将 epoch time (1970-01-01) 视为 null，因为这表示"未设置有效期"
+     * 将 epoch time (1970-01-01) 或空值替换为默认值
      * 
      * @param timeStr 时间字符串
-     * @return 规范化后的时间字符串，如果是 epoch time 则返回 null
+     * @param isStart 是否是开始时间（true=开始时间，使用当前时间；false=结束时间，使用当前时间+5年）
+     * @return 规范化后的时间字符串
      */
-    private String normalizeValidTime(String timeStr) {
-        if (timeStr == null || timeStr.isEmpty()) {
-            return null;
-        }
-        // 过滤 epoch time (1970-01-01)，这表示未设置有效期
-        if (timeStr.startsWith("1970-01-01")) {
-            log.debug("{} 忽略 epoch time 有效期: {}", LOG_PREFIX, timeStr);
-            return null;
+    private String normalizeValidTime(String timeStr, boolean isStart) {
+        if (timeStr == null || timeStr.isEmpty() || timeStr.startsWith("1970-01-01")) {
+            // 如果时间为空或为 epoch time，则设置默认值
+            java.time.LocalDateTime defaultTime;
+            if (isStart) {
+                defaultTime = java.time.LocalDateTime.now();
+            } else {
+                defaultTime = java.time.LocalDateTime.now().plusYears(5); // 默认有效期5年
+            }
+            log.info("{} 有效期时间为空或无效，使用默认值: original={}, isStart={}, default={}", 
+                    LOG_PREFIX, timeStr, isStart, defaultTime);
+            return defaultTime.format(DATE_TIME_FORMATTER);
         }
         return timeStr;
+    }
+    
+    /**
+     * 规范化有效期时间（兼容旧版本，单参数版本）
+     * @deprecated 请使用双参数版本 normalizeValidTime(String, boolean)
+     */
+    @Deprecated
+    private String normalizeValidTime(String timeStr) {
+        // 保持向后兼容，使用开始时间的默认逻辑
+        return normalizeValidTime(timeStr, true);
     }
 
     /**
@@ -1527,6 +1653,23 @@ public class AccessGen1Plugin implements ActiveDeviceHandler {
      */
     public void handleCardSwipeEvent(Long deviceId, String cardNo, String userId, 
                                       int channelNo, long accessTime, int result) {
+        // 事件去重：防止SDK短时间内触发多次相同事件
+        String dedupeKey = deviceId + ":" + channelNo + ":" + EVENT_CARD_SWIPE + ":" + result + ":" + cardNo;
+        Long lastEventTime = eventDedupeCache.get(dedupeKey);
+        long now = System.currentTimeMillis();
+        
+        if (lastEventTime != null && (now - lastEventTime) < EVENT_DEDUPE_WINDOW_MS) {
+            log.debug("{} 忽略重复刷卡事件（{}ms内）: deviceId={}, channel={}, cardNo={}", 
+                    LOG_PREFIX, EVENT_DEDUPE_WINDOW_MS, deviceId, channelNo, cardNo);
+            return;
+        }
+        
+        // 更新去重缓存
+        eventDedupeCache.put(dedupeKey, now);
+        
+        // 清理过期的缓存条目（避免内存泄漏）
+        cleanupExpiredDedupeEntries();
+        
         log.info("{} 收到刷卡事件: deviceId={}, cardNo={}, userId={}, channel={}, result={}", 
                 LOG_PREFIX, deviceId, cardNo, userId, channelNo, result);
 
@@ -1539,6 +1682,14 @@ public class AccessGen1Plugin implements ActiveDeviceHandler {
         eventData.put("resultDesc", result == 0 ? "成功" : "失败");
 
         publishAccessEvent(deviceId, EVENT_CARD_SWIPE, eventData);
+    }
+    
+    /**
+     * 清理过期的去重缓存条目
+     */
+    private void cleanupExpiredDedupeEntries() {
+        long expireThreshold = System.currentTimeMillis() - (EVENT_DEDUPE_WINDOW_MS * 10);
+        eventDedupeCache.entrySet().removeIf(entry -> entry.getValue() < expireThreshold);
     }
 
     /**
@@ -1597,31 +1748,117 @@ public class AccessGen1Plugin implements ActiveDeviceHandler {
      * @param alarmTime 报警时间
      */
     public void handleAlarmEvent(Long deviceId, int alarmType, int channelNo, long alarmTime) {
-        log.info("{} 收到报警事件: deviceId={}, alarmType={}, channel={}", 
-                LOG_PREFIX, deviceId, alarmType, channelNo);
+        log.info("{} 收到报警事件: deviceId={}, alarmType={}, channel={}, desc={}", 
+                LOG_PREFIX, deviceId, alarmType, channelNo, getAlarmTypeDescription(alarmType));
+
+        // 【关键】尝试确认待确认的命令（基于设备事件回调的可靠确认机制）
+        // 当设备执行开门/关门后，会上报对应的报警事件，用于确认命令是否真正执行
+        var matchResult = doorCommandConfirmationService.confirmCommand(deviceId, channelNo, alarmType);
+        
+        // 【关键】使用匹配到的 channelNo（用户实际操作的门），而不是设备上报的 channelNo（可能是 0）
+        int effectiveChannelNo = channelNo;
+        if (matchResult.isMatched() && matchResult.getChannelNo() != null) {
+            effectiveChannelNo = matchResult.getChannelNo();
+            log.info("{} 命令已通过设备事件确认: deviceId={}, alarmType={}, eventChannelNo={}, effectiveChannelNo={}", 
+                    LOG_PREFIX, deviceId, alarmType, channelNo, effectiveChannelNo);
+        }
 
         Map<String, Object> eventData = new HashMap<>();
         eventData.put("alarmType", alarmType);
-        eventData.put("channelNo", channelNo);
+        eventData.put("channelNo", effectiveChannelNo);  // 使用有效的 channelNo
         eventData.put("alarmTime", alarmTime);
         eventData.put("alarmTypeDesc", getAlarmTypeDescription(alarmType));
+        
+        // 【关键】如果是门状态变化事件（常开/常闭/取消），需要同步状态到数据库
+        if (isDoorStateChangeAlarm(alarmType)) {
+            log.info("{} 检测到门状态变化事件: deviceId={}, alarmType={}, 将触发通道状态同步", 
+                    LOG_PREFIX, deviceId, alarmType);
+            eventData.put("needSyncDoorState", true);
+            
+            // 解析新的门模式
+            String newDoorMode = parseDoorModeFromAlarm(alarmType);
+            if (newDoorMode != null) {
+                eventData.put("newDoorMode", newDoorMode);
+                log.info("{} 门模式变化: deviceId={}, channelNo={}, newDoorMode={}", 
+                        LOG_PREFIX, deviceId, channelNo, newDoorMode);
+            }
+        }
 
         publishAccessEvent(deviceId, EVENT_ALARM, eventData);
+    }
+    
+    /**
+     * 从报警类型解析新的门模式
+     * @return "常开" / "常闭" / "正常" / null(无法解析)
+     */
+    private String parseDoorModeFromAlarm(int alarmType) {
+        switch (alarmType) {
+            case 12291: // 门常开开始
+            case 12675: // 远程常开
+                return "常开";
+            case 12293: // 门常闭开始
+            case 12676: // 远程常闭
+                return "常闭";
+            case 12292: // 门常开结束
+            case 12294: // 门常闭结束
+            case 12677: // 取消常开常闭
+                return "正常";
+            default:
+                return null;
+        }
     }
 
     /**
      * 获取报警类型描述
+     * <p>参考大华门禁SDK报警类型定义（DH_ALARM_ACCESS_CTL_xxx）</p>
      */
     private String getAlarmTypeDescription(int alarmType) {
         switch (alarmType) {
+            // 基础报警类型 (0-10)
             case 0: return "门磁报警";
             case 1: return "强制开门报警";
             case 2: return "门未关报警";
             case 3: return "胁迫报警";
             case 4: return "防拆报警";
             case 5: return "非法卡报警";
+            case 6: return "欠压报警";
+            case 7: return "卡号过期";
+            case 8: return "密码错误报警";
+            case 9: return "开锁成功";
+            case 10: return "关锁成功";
+            
+            // 门状态变化事件 (12xxx)
+            case 12289: return "门打开";
+            case 12290: return "门关闭";
+            case 12291: return "门常开开始";     // 【关键】常开状态变化
+            case 12292: return "门常开结束";     // 【关键】常开取消
+            case 12293: return "门常闭开始";     // 【关键】常闭状态变化
+            case 12294: return "门常闭结束";     // 【关键】常闭取消
+            case 12300: return "门状态变化";
+            case 12658: return "关门事件";
+            case 12673: return "远程开门事件";
+            case 12674: return "远程关门事件";
+            case 12675: return "远程常开事件";
+            case 12676: return "远程常闭事件";
+            case 12677: return "取消常开常闭事件";
+            
+            // 未知报警
             default: return "未知报警(" + alarmType + ")";
         }
+    }
+    
+    /**
+     * 判断是否是门状态变化相关的报警类型
+     * <p>如果是，需要触发通道状态同步</p>
+     */
+    private boolean isDoorStateChangeAlarm(int alarmType) {
+        return alarmType == 12291  // 门常开开始
+            || alarmType == 12292  // 门常开结束
+            || alarmType == 12293  // 门常闭开始
+            || alarmType == 12294  // 门常闭结束
+            || alarmType == 12675  // 远程常开
+            || alarmType == 12676  // 远程常闭
+            || alarmType == 12677; // 取消常开常闭
     }
 
     // ==================== 新增命令实现 ====================

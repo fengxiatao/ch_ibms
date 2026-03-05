@@ -97,10 +97,13 @@ public class FaceImageLoaderImpl implements FaceImageLoader {
     @Override
     public byte[] loadFaceImage(String credentialData) {
         if (!StringUtils.hasText(credentialData)) {
+            log.warn("[FaceImageLoader] credentialData 为空");
             return null;
         }
 
         SourceType sourceType = detectSourceType(credentialData);
+        log.info("[FaceImageLoader] 检测到数据来源类型: sourceType={}, dataLength={}", 
+                sourceType, credentialData.length());
         
         switch (sourceType) {
             case FILE_PATH:
@@ -239,8 +242,11 @@ public class FaceImageLoaderImpl implements FaceImageLoader {
         try {
             // 验证图片格式
             String format = detectImageFormat(imageData);
+            log.info("[FaceImageLoader] 检测到图片格式: format={}, dataLength={}", format, imageData.length);
+            
             if (format == null) {
-                log.warn("[FaceImageLoader] 无法解析图片格式");
+                log.warn("[FaceImageLoader] 无法解析图片格式, 前8字节: {}", 
+                        imageData.length >= 8 ? bytesToHex(imageData, 8) : "数据太短");
                 return null;
             }
             
@@ -484,5 +490,17 @@ public class FaceImageLoaderImpl implements FaceImageLoader {
             }
         }
         return false;
+    }
+    
+    /**
+     * 将字节数组转换为十六进制字符串（用于日志）
+     */
+    private String bytesToHex(byte[] bytes, int maxLength) {
+        StringBuilder sb = new StringBuilder();
+        int len = Math.min(bytes.length, maxLength);
+        for (int i = 0; i < len; i++) {
+            sb.append(String.format("%02X ", bytes[i]));
+        }
+        return sb.toString().trim();
     }
 }

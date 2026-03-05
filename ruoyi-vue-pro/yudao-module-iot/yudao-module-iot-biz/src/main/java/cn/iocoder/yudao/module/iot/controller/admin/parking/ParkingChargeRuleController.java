@@ -54,6 +54,20 @@ public class ParkingChargeRuleController {
         return success(true);
     }
 
+    @PostMapping("/save-batch")
+    @Operation(summary = "批量保存收费规则")
+    @PreAuthorize("@ss.hasPermission('iot:parking:charge-rule:update')")
+    public CommonResult<Boolean> saveChargeRules(@Valid @RequestBody List<ParkingChargeRuleSaveReqVO> list) {
+        list.forEach(item -> {
+            if (item.getId() == null) {
+                parkingChargeRuleService.createChargeRule(item);
+            } else {
+                parkingChargeRuleService.updateChargeRule(item);
+            }
+        });
+        return success(true);
+    }
+
     @GetMapping("/get")
     @Operation(summary = "获得收费规则")
     @Parameter(name = "id", description = "编号", required = true)

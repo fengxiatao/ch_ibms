@@ -243,6 +243,7 @@ public class IotVisitorApplyServiceImpl implements IotVisitorApplyService {
                 reqVO.getApproveStatus(),
                 reqVO.getVisitTimeStart(),
                 reqVO.getVisitTimeEnd(),
+                reqVO.getHasVisited(),
                 reqVO.getPageNo(),
                 reqVO.getPageSize()
         );

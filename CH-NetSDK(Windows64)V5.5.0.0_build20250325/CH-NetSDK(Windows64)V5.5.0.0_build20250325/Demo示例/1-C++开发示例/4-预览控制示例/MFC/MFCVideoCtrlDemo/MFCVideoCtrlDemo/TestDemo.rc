@@ -1,0 +1,258 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#ifndef APSTUDIO_INVOKED
+#include "targetver.h"
+#endif
+#include "afxres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
+#ifdef _WIN32
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+#pragma code_page(936)
+#endif //_WIN32
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#ifndef APSTUDIO_INVOKED\r\n"
+    "#include ""targetver.h""\r\n"
+    "#endif\r\n"
+    "#include ""afxres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "#define _AFX_NO_SPLITTER_RESOURCES\r\n"
+    "#define _AFX_NO_OLE_RESOURCES\r\n"
+    "#define _AFX_NO_TRACKER_RESOURCES\r\n"
+    "#define _AFX_NO_PROPERTY_RESOURCES\r\n"
+    "\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)\r\n"
+    "LANGUAGE 4, 2\r\n"
+    "#pragma code_page(936)\r\n"
+    "#include ""res\\TestDemo.rc2"" // non-Microsoft Visual C++ edited resources\r\n"
+    "#include ""l.CHS\\afxres.rc"" // Standard components\r\n"
+    "#endif\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDR_MAINFRAME           ICON                    "res\\TestDemo.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_ABOUTBOX DIALOGEX 0, 0, 170, 62
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About TestDemo"
+FONT 9, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    ICON            IDR_MAINFRAME,IDC_STATIC,14,14,21,20
+    LTEXT "TestDemo, Version 1.0",IDC_STATIC,42,14,114,8,SS_NOPREFIX
+    LTEXT           "Copyright (C) 2018",IDC_STATIC,42,26,114,8
+    DEFPUSHBUTTON "OK",IDOK,113,41,50,14,WS_GROUP
+END
+
+IDD_TESTDEMO_DIALOG DIALOGEX 0, 0, 595, 390
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "MFC_PreView_Demo"
+FONT 9, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    GROUPBOX "Device login",IDC_STATIC_LOG,1,34,148,145
+    CTEXT "Username:",IDC_STATIC_USERNAME,7,77,44,8
+    CTEXT "Device IP: ",IDC_STATIC_DEVIP,7,52,46,8
+    CONTROL         "",IDC_IPADDRESS1,"SysIPAddress32",WS_TABSTOP,54,49,88,15
+    EDITTEXT        IDC_EDT_USERNAME,54,75,88,15,ES_AUTOHSCROLL
+    CTEXT "Password: ",IDC_STATIC_PSD,5,104,45,8
+    EDITTEXT        IDC_EDIT2,54,101,88,15,ES_PASSWORD | ES_AUTOHSCROLL
+    CTEXT "Port number: ",IDC_STATIC_PORT,13,132,35,8
+    EDITTEXT        IDC_EDIT3,54,129,88,14,ES_AUTOHSCROLL
+    PUSHBUTTON "Login",IDC_BUTTON_LOGON,15,154,50,14
+    PUSHBUTTON "Logout",IDC_BUTTON_LOGOFF,88,154,50,14
+    LTEXT           "",IDC_STATIC_VIDEO,159,5,310,293,WS_BORDER
+    GROUPBOX        "",IDC_STATIC_PTZCONTROL,473,9,120,101
+    GROUPBOX        "",IDC_STATIC,473,1,121,389
+    GROUPBOX        "",IDC_STATIC_PRESETPOS,474,105,120,101
+    GROUPBOX        "",IDC_STATIC_BRIGHT,475,201,119,114
+    GROUPBOX        "",IDC_STATIC_VIDEOCONTROL,159,298,310,38
+    CONTROL         "",IDC_LIST_LOG,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,159,338,310,49
+    CTEXT "Language: ",IDC_STATIC_LANGUAGE,7,13,37,8
+    COMBOBOX        IDC_COMBO_LANGUAGE,47,12,98,76,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON "Up",IDC_BUTTON_MOVE_UP,517,31,22,19
+    CTEXT "Number of channels:",IDC_STATIC_CHANNEL,9,187,37,8
+    COMBOBOX        IDC_CBO_CHANNEL,55,185,86,65,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CTEXT "Stream type:",IDC_STATIC_STREAMNO,8,211,43,8
+    COMBOBOX        IDC_COMBO_STREAM,54,209,87,61,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON "3D positioning on",IDC_BUTTON_3DLOCATION,396,314,64,14
+    PUSHBUTTON "Snapshot",IDC_BUTTON_SNAP,286,313,50,14
+    PUSHBUTTON "UL",IDC_BUTTON_MOVE_UPLEFT,495,31,23,19
+    PUSHBUTTON "UR",IDC_BUTTON_MOVE_UP_RIGHT,539,31,22,19
+    PUSHBUTTON "Left",IDC_BUTTON_MOVE_LEFT,495,49,23,18
+    PUSHBUTTON "Right",IDC_BUTTON_MOVE_RIGHT,539,49,22,18
+    PUSHBUTTON "DL",IDC_BUTTON_DOWN_LEFT,495,67,23,18
+    PUSHBUTTON "Down",IDC_BUTTON_DOWN,517,67,22,18
+    PUSHBUTTON "DR",IDC_BUTTON_DOWN_RIGHT,539,67,22,18
+    LTEXT "Speed",IDC_STATIC_SPEED,480,93,20,8
+    CONTROL         "",IDC_SLIDER_SPEED,"msctls_trackbar32",TBS_BOTH | TBS_NOTICKS | WS_TABSTOP,511,91,67,15
+    LTEXT           "0",IDC_STATIC_SPEEDNO,579,94,8,8
+    CONTROL         "ePTZ",IDC_CHECK_EPTZ,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,561,17,33,10
+    CONTROL         "Auto",IDC_CHECK_AUTO,"Button",BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_TABSTOP,517,49,22,18
+    LTEXT "Prefab Bit Number",IDC_STATIC_PTZLIST,488,133,35,8
+    COMBOBOX        IDC_COMBO_PRENUM,528,131,48,73,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON "Settings",IDC_BUTTON_SETPTZ,481,160,43,14
+    PUSHBUTTON "call",IDC_BUTTON_CALLPTZ,537,160,42,14
+    LTEXT "chroma",IDC_STATIC_COLOR,481,212,15,8
+    CONTROL         "",IDC_SLIDER_HUE,"msctls_trackbar32",TBS_BOTH | TBS_NOTICKS | WS_TABSTOP,511,209,66,15
+    LTEXT "Brightness",IDC_STATIC_LIANG,481,235,15,8
+    CONTROL         "",IDC_SLIDER_BRIGHTNESS,"msctls_trackbar32",TBS_BOTH | TBS_NOTICKS | WS_TABSTOP,511,232,66,15
+    LTEXT "Contrast",IDC_STATIC_COMPARE,481,257,22,8
+    CONTROL         "",IDC_SLIDER_CONTRAST,"msctls_trackbar32",TBS_BOTH | TBS_NOTICKS | WS_TABSTOP,511,255,67,15
+    LTEXT "Saturation",IDC_STATIC_SATURATION,481,281,22,8
+    CONTROL         "",IDC_SLIDER_SATURATION,"msctls_trackbar32",TBS_BOTH | TBS_NOTICKS | WS_TABSTOP,511,278,68,15
+    PUSHBUTTON "default",IDC_BUTTON_DEFAULT,509,297,50,14
+    LTEXT           "0",IDC_STATIC_VALUECOLOR,580,212,12,8
+    LTEXT           "0",IDC_STATIC_BRIGHT_VALUE,579,235,15,8
+    LTEXT           "0",IDC_STATIC_COMPARE_VALUE,579,259,15,8
+    LTEXT           "0",IDC_STATIC_SATURATIONVALUE,579,281,15,8
+    CONTROL "Record",IDC_CHECK_RECORD,"Button",BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_TABSTOP,179,313,49,13
+    GROUPBOX        "",IDC_STATIC,1,175,149,76
+    PUSHBUTTON "Connect Video",IDC_BUTTON_CONNECTVIDEO,12,231,58,14
+    PUSHBUTTON "Disconnect Video",IDC_BUTTON_DISCONNECT,81,231,60,15
+    PUSHBUTTON "Save Log",IDC_BUTTON_SAVELOG,479,351,50,14
+    PUSHBUTTON "Clear Log",IDC_BUTTON_CLEARLOG,479,371,50,14
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,1
+ PRODUCTVERSION 1,0,0,1
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x4L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080403a8"
+        BEGIN
+            VALUE "CompanyName", "TODO: <CompanyName>"
+            VALUE "FileDescription", "TODO: <file description>"
+            VALUE "FileVersion", "1.0.0.1"
+            VALUE "InternalName", "TestDemo.exe"
+            VALUE "LegalCopyright", "TODO: (C) <company name>. All rights reserved."
+            VALUE "OriginalFilename", "TestDemo.exe"
+            VALUE "ProductName", "TODO: <ProductName>"
+            VALUE "ProductVersion", "1.0.0.1"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x804, 936
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO 
+BEGIN
+    IDD_ABOUTBOX, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 163
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 55
+    END
+
+    IDD_TESTDEMO_DIALOG, DIALOG
+    BEGIN
+        RIGHTMARGIN, 594
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE 
+BEGIN
+    IDS_ABOUTBOX "&About TestDemo..."
+END
+
+#endif    // Chinese (P.R.C.) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+#define _AFX_NO_SPLITTER_RESOURCES
+#define _AFX_NO_OLE_RESOURCES
+#define _AFX_NO_TRACKER_RESOURCES
+#define _AFX_NO_PROPERTY_RESOURCES
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
+LANGUAGE 4, 2
+#pragma code_page(936)
+#include "res\TestDemo.rc2" // Resources for non-Microsoft Visual C++ editing
+#include "l.CHS\afxres.rc" // standard components
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+

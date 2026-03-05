@@ -1,0 +1,1845 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IVMS-Pro 智能视频监控管理平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap');
+        
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark-bg: #0b1120;
+            --panel-bg: #151e32;
+            --panel-light: #1e293b;
+            --border: #2d3748;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+            font-size: 13px;
+        }
+
+        /* 布局架构 */
+        .app-container {
+            display: flex;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* 左侧边栏 - 双面板设计（设备树+视图） */
+        .sidebar {
+            width: 320px;
+            background: var(--panel-bg);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            height: 48px;
+            background: rgba(0,0,0,0.2);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .sidebar-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            background: rgba(0,0,0,0.1);
+        }
+
+        .sidebar-tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .sidebar-tab:hover { color: var(--text-primary); background: rgba(255,255,255,0.03); }
+        .sidebar-tab.active { 
+            color: var(--primary); 
+            border-bottom-color: var(--primary);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        /* 设备树样式 */
+        .tree-node {
+            user-select: none;
+        }
+
+        .tree-header {
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .tree-header:hover { 
+            background: rgba(255,255,255,0.03); 
+            color: var(--text-primary);
+        }
+
+        .tree-header.active {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--primary);
+            border-left-color: var(--primary);
+        }
+
+        .tree-toggle {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 6px;
+            font-size: 10px;
+            transition: transform 0.2s;
+        }
+
+        .tree-toggle.expanded { transform: rotate(90deg); }
+
+        .tree-icon { margin-right: 8px; width: 16px; text-align: center; }
+        .tree-icon.org { color: #f59e0b; }
+        .tree-icon.floor { color: #3b82f6; }
+        .tree-icon.camera { color: #10b981; }
+        .tree-icon.camera.offline { color: #64748b; }
+
+        .tree-children {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: rgba(0,0,0,0.2);
+        }
+
+        .tree-children.expanded { max-height: 2000px; }
+
+        .tree-child {
+            padding: 6px 12px 6px 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .tree-child:hover { background: rgba(255,255,255,0.03); color: var(--text-primary); }
+        .tree-child.active { 
+            background: rgba(59, 130, 246, 0.1); 
+            color: var(--primary);
+            border-left-color: var(--primary);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-right: 6px;
+            box-shadow: 0 0 4px currentColor;
+        }
+        .status-online { background: var(--success); color: var(--success); }
+        .status-offline { background: #475569; color: #475569; }
+        .status-warning { background: var(--warning); color: var(--warning); }
+
+        /* 主内容区 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 顶部导航标签 */
+        .top-tabs {
+            height: 40px;
+            background: var(--panel-bg);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 4px;
+        }
+
+        .top-tab {
+            padding: 6px 16px;
+            border-radius: 4px 4px 0 0;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .top-tab:hover { color: var(--text-primary); background: rgba(255,255,255,0.03); }
+        .top-tab.active { 
+            color: var(--primary); 
+            border-bottom-color: var(--primary);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .top-tab .close { 
+            margin-left: 8px; 
+            opacity: 0; 
+            transition: opacity 0.2s;
+            font-size: 11px;
+        }
+        .top-tab:hover .close { opacity: 1; }
+        .top-tab .close:hover { color: var(--danger); }
+
+        /* 工具栏 */
+        .toolbar {
+            height: 44px;
+            background: rgba(0,0,0,0.2);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+        }
+
+        .tool-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tool-btn {
+            height: 32px;
+            padding: 0 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .tool-btn:hover {
+            border-color: #4b5563;
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.06);
+        }
+
+        .tool-btn.primary {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        .tool-btn.primary:hover { background: var(--primary-dark); }
+
+        .tool-btn.success {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.5);
+            color: var(--success);
+        }
+
+        .tool-btn.danger {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: var(--danger);
+        }
+
+        .divider {
+            width: 1px;
+            height: 24px;
+            background: var(--border);
+            margin: 0 8px;
+        }
+
+        /* 视频墙区域 */
+        .video-wall-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .video-wall {
+            flex: 1;
+            display: grid;
+            gap: 2px;
+            background: #000;
+            padding: 2px;
+            position: relative;
+        }
+
+        .video-cell {
+            background: #0a0a0a;
+            border: 1px solid transparent;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .video-cell:hover { border-color: var(--primary); }
+        .video-cell.selected { 
+            border-color: var(--primary); 
+            box-shadow: inset 0 0 0 2px var(--primary);
+        }
+        .video-cell.active-source { border-color: var(--success); }
+
+        .video-header {
+            height: 28px;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 8px;
+            font-size: 12px;
+            z-index: 10;
+        }
+
+        .video-title { 
+            display: flex; 
+            align-items: center; 
+            gap: 6px;
+            color: var(--text-primary);
+        }
+
+        .video-badges {
+            display: flex;
+            gap: 4px;
+        }
+
+        .badge {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        .badge-rec { background: var(--danger); color: white; animation: blink 1s infinite; }
+        .badge-live { background: var(--success); color: white; }
+        .badge-ptz { background: var(--primary); color: white; }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+        .video-content {
+            flex: 1;
+            position: relative;
+            background: #000;
+            overflow: hidden;
+        }
+
+        .video-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #475569;
+            gap: 12px;
+        }
+
+        .video-placeholder i { font-size: 48px; opacity: 0.3; }
+        .video-placeholder .hint { font-size: 12px; color: #64748b; text-align: center; }
+
+        .video-canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* 窗口编号 */
+        .win-number {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.05);
+            pointer-events: none;
+        }
+
+        /* 右侧控制面板 - 云台/预置位 */
+        .right-panel {
+            width: 280px;
+            background: var(--panel-bg);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s;
+        }
+
+        .right-panel.collapsed { width: 0; overflow: hidden; }
+
+        .panel-header {
+            height: 40px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+            font-weight: 600;
+            background: rgba(0,0,0,0.2);
+        }
+
+        .panel-section {
+            border-bottom: 1px solid var(--border);
+            padding: 12px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* 云台控制盘 */
+        .ptz-control {
+            width: 160px;
+            height: 160px;
+            margin: 0 auto;
+            position: relative;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%);
+        }
+
+        .ptz-btn {
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.05);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .ptz-btn:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .ptz-btn:active { transform: scale(0.95); }
+
+        .ptz-up { top: 0; left: 50%; transform: translateX(-50%); }
+        .ptz-down { bottom: 0; left: 50%; transform: translateX(-50%); }
+        .ptz-left { left: 0; top: 50%; transform: translateY(-50%); }
+        .ptz-right { right: 0; top: 50%; transform: translateY(-50%); }
+        .ptz-center { 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%);
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .ptz-zoom {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .ptz-zoom button {
+            width: 80px;
+            height: 32px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            font-size: 12px;
+        }
+
+        .ptz-zoom button:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+
+        /* 预置位列表 */
+        .preset-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .preset-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            margin-bottom: 4px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-item:hover { background: rgba(255,255,255,0.06); }
+        .preset-item.active { background: rgba(59,130,246,0.2); border: 1px solid var(--primary); }
+
+        .preset-name { display: flex; align-items: center; gap: 8px; }
+        .preset-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s; }
+        .preset-item:hover .preset-actions { opacity: 1; }
+        .preset-actions i { cursor: pointer; padding: 4px; color: var(--text-secondary); }
+        .preset-actions i:hover { color: var(--primary); }
+
+        /* 巡航路线 */
+        .cruise-list { margin-top: 8px; }
+        .cruise-item {
+            padding: 8px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 4px;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 底部时间轴 - 录像回放用 */
+        .timeline-container {
+            height: 120px;
+            background: var(--panel-bg);
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .timeline-toolbar {
+            height: 36px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            gap: 12px;
+        }
+
+        .timeline-main {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .timeline-ruler {
+            height: 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            position: relative;
+            background: rgba(0,0,0,0.2);
+        }
+
+        .time-marker {
+            position: absolute;
+            font-size: 11px;
+            color: var(--text-secondary);
+            transform: translateX(-50%);
+        }
+
+        .timeline-track {
+            height: 60px;
+            position: relative;
+            background: rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .timeline-cursor {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--primary);
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        .timeline-cursor::before {
+            content: '';
+            position: absolute;
+            top: -6px;
+            left: -4px;
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 6px solid var(--primary);
+        }
+
+        .record-segment {
+            position: absolute;
+            height: 100%;
+            background: rgba(59, 130, 246, 0.6);
+            border: 1px solid rgba(59, 130, 246, 0.8);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .record-segment:hover { background: rgba(59, 130, 246, 0.8); }
+
+        /* 视图管理 */
+        .view-group {
+            margin-bottom: 16px;
+        }
+
+        .view-group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .view-group-header i { transition: transform 0.2s; }
+        .view-group-header.expanded i { transform: rotate(90deg); }
+
+        .view-item {
+            padding: 10px 12px;
+            margin: 4px 0;
+            background: rgba(255,255,255,0.03);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .view-item:hover { background: rgba(255,255,255,0.06); border-color: var(--border); }
+        .view-item.active { background: rgba(59,130,246,0.15); border-color: var(--primary); color: var(--primary); }
+
+        .view-name { display: flex; align-items: center; gap: 8px; }
+        .view-layout { font-size: 11px; color: var(--text-secondary); background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; }
+
+        /* 视频上墙 - 电视墙模拟 */
+        .videowall-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 8px;
+            padding: 16px;
+            height: 100%;
+        }
+
+        .vw-screen {
+            background: rgba(0,0,0,0.5);
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .vw-screen:hover { border-color: var(--primary); }
+        .vw-screen.active { border-color: var(--success); background: rgba(16,185,129,0.1); }
+        .vw-screen.occupied { border-color: var(--primary); }
+
+        .vw-screen-number {
+            position: absolute;
+            top: 4px;
+            left: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* 轮询设置 */
+        .poll-item {
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .poll-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .poll-name { font-weight: 600; }
+        .poll-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(16,185,129,0.2); color: var(--success); }
+        .poll-status.stop { background: rgba(100,116,139,0.2); color: var(--text-secondary); }
+
+        /* 弹出菜单 */
+        .context-menu {
+            position: absolute;
+            background: var(--panel-light);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            z-index: 1000;
+            min-width: 160px;
+            display: none;
+        }
+
+        .context-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .context-item:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
+        .context-item.danger { color: var(--danger); }
+        .context-item.danger:hover { background: rgba(239,68,68,0.1); }
+
+        /* 模态框 */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show { display: flex; }
+
+        .modal-content {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            width: 500px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .modal-body { padding: 16px; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; margin-bottom: 6px; color: var(--text-secondary); font-size: 12px; }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: rgba(0,0,0,0.2);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        /* 响应式 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* 动画 */
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 左侧边栏 -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <i class="fas fa-server" style="color: var(--primary); margin-right: 8px;"></i>
+                资源管理
+            </div>
+            
+            <div class="sidebar-tabs">
+                <div class="sidebar-tab active" onclick="switchSidebarTab('device')">
+                    <i class="fas fa-video"></i> 设备
+                </div>
+                <div class="sidebar-tab" onclick="switchSidebarTab('view')">
+                    <i class="fas fa-th-large"></i> 视图
+                </div>
+                <div class="sidebar-tab" onclick="switchSidebarTab('wall')">
+                    <i class="fas fa-tv"></i> 上墙
+                </div>
+            </div>
+
+            <!-- 设备树面板 -->
+            <div class="sidebar-content" id="panel-device">
+                <div style="padding: 12px; border-bottom: 1px solid var(--border);">
+                    <div style="position: relative;">
+                        <i class="fas fa-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-size: 12px;"></i>
+                        <input type="text" placeholder="搜索通道名称..." style="width: 100%; padding: 8px 12px 8px 32px; border: 1px solid var(--border); border-radius: 4px; background: rgba(0,0,0,0.2); color: var(--text-primary); font-size: 12px;">
+                    </div>
+                </div>
+
+                <div class="tree-node" style="padding: 8px 0;">
+                    <!-- A栋智能制造中心 -->
+                    <div class="tree-header expanded" onclick="toggleTree(this)">
+                        <i class="fas fa-chevron-right tree-toggle expanded"></i>
+                        <i class="fas fa-building tree-icon org"></i>
+                        <span style="flex:1">A栋智能制造中心</span>
+                        <i class="fas fa-ellipsis-v" style="opacity:0.5; padding: 4px;" onclick="event.stopPropagation()"></i>
+                    </div>
+                    <div class="tree-children expanded">
+                        <!-- A栋1层 -->
+                        <div>
+                            <div class="tree-header expanded" onclick="toggleTree(this)" style="padding-left: 24px;">
+                                <i class="fas fa-chevron-right tree-toggle expanded"></i>
+                                <i class="fas fa-layer-group tree-icon floor"></i>
+                                <span>A栋1层</span>
+                            </div>
+                            <div class="tree-children expanded">
+                                <div class="tree-child" onclick="playCamera('cam-01', this)">
+                                    <span class="status-dot status-online"></span>
+                                    <i class="fas fa-video tree-icon camera"></i>
+                                    <span style="flex:1">球机细节相机</span>
+                                </div>
+                                <div class="tree-child" onclick="playCamera('cam-02', this)">
+                                    <span class="status-dot status-online"></span>
+                                    <i class="fas fa-video tree-icon camera"></i>
+                                    <span style="flex:1">123333</span>
+                                </div>
+                                <div class="tree-child" onclick="playCamera('cam-03', this)">
+                                    <span class="status-dot status-online"></span>
+                                    <i class="fas fa-video tree-icon camera"></i>
+                                    <span style="flex:1">云台摄像机</span>
+                                </div>
+                                <div class="tree-child" onclick="playCamera('cam-04', this)">
+                                    <span class="status-dot status-online"></span>
+                                    <i class="fas fa-video tree-icon camera"></i>
+                                    <span style="flex:1">三通道相机</span>
+                                </div>
+                                <div class="tree-child" onclick="playCamera('cam-05', this)">
+                                    <span class="status-dot status-warning"></span>
+                                    <i class="fas fa-video tree-icon camera"></i>
+                                    <span style="flex:1">IPC333</span>
+                                </div>
+                                <div class="tree-child" onclick="playCamera('cam-06', this)">
+                                    <span class="status-dot status-offline"></span>
+                                    <i class="fas fa-video tree-icon camera offline"></i>
+                                    <span style="flex:1">大堂前门444</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 其他楼层 -->
+                        <div>
+                            <div class="tree-header" onclick="toggleTree(this)" style="padding-left: 24px;">
+                                <i class="fas fa-chevron-right tree-toggle"></i>
+                                <i class="fas fa-layer-group tree-icon floor"></i>
+                                <span>A栋2层</span>
+                            </div>
+                            <div class="tree-children">
+                                <div class="tree-child" style="padding-left: 48px;">
+                                    <span class="status-dot status-online"></span>
+                                    <span>走廊东</span>
+                                </div>
+                                <div class="tree-child" style="padding-left: 48px;">
+                                    <span class="status-dot status-online"></span>
+                                    <span>走廊西</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tree-header" onclick="toggleTree(this)" style="padding-left: 24px;">
+                            <i class="fas fa-chevron-right tree-toggle"></i>
+                            <i class="fas fa-layer-group tree-icon floor"></i>
+                            <span>A栋3层</span>
+                        </div>
+                        <div class="tree-header" onclick="toggleTree(this)" style="padding-left: 24px;">
+                            <i class="fas fa-chevron-right tree-toggle"></i>
+                            <i class="fas fa-layer-group tree-icon floor"></i>
+                            <span>A栋4层</span>
+                        </div>
+                    </div>
+
+                    <!-- 其他建筑 -->
+                    <div class="tree-header" onclick="toggleTree(this)">
+                        <i class="fas fa-chevron-right tree-toggle"></i>
+                        <i class="fas fa-building tree-icon org"></i>
+                        <span>B栋研发大楼</span>
+                    </div>
+                    <div class="tree-header" onclick="toggleTree(this)">
+                        <i class="fas fa-chevron-right tree-toggle"></i>
+                        <i class="fas fa-building tree-icon org"></i>
+                        <span>C栋数据中心</span>
+                    </div>
+                    <div class="tree-header" onclick="toggleTree(this)">
+                        <i class="fas fa-chevron-right tree-toggle"></i>
+                        <i class="fas fa-building tree-icon org"></i>
+                        <span>D栋办公大楼</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 视图面板 -->
+            <div class="sidebar-content" id="panel-view" style="display:none; padding: 12px;">
+                <button class="tool-btn primary" style="width: 100%; margin-bottom: 16px;" onclick="saveCurrentView()">
+                    <i class="fas fa-plus"></i> 新建分组
+                </button>
+
+                <div class="view-group">
+                    <div class="view-group-header expanded" onclick="toggleViewGroup(this)">
+                        <div><i class="fas fa-chevron-right" style="margin-right: 8px; transition: transform 0.2s;"></i> 默认分组 (5)</div>
+                        <i class="fas fa-ellipsis-h" style="opacity: 0.5;"></i>
+                    </div>
+                    <div class="view-list">
+                        <div class="view-item" onclick="loadView('ttt', 6)">
+                            <div class="view-name">
+                                <i class="fas fa-th-large" style="color: var(--primary);"></i>
+                                <span>ttt</span>
+                            </div>
+                            <span class="view-layout">6分屏</span>
+                        </div>
+                        <div class="view-item" onclick="loadView('极大', 6)">
+                            <div class="view-name">
+                                <i class="fas fa-th-large" style="color: var(--primary);"></i>
+                                <span>极大</span>
+                            </div>
+                            <span class="view-layout">6分屏</span>
+                        </div>
+                        <div class="view-item" onclick="loadView('呵呵呵', 4)">
+                            <div class="view-name">
+                                <i class="fas fa-th-large" style="color: var(--primary);"></i>
+                                <span>呵呵呵</span>
+                            </div>
+                            <span class="view-layout">4分屏</span>
+                        </div>
+                        <div class="view-item" onclick="loadView('dsdfsdaaa', 6)">
+                            <div class="view-name">
+                                <i class="fas fa-th-large" style="color: var(--primary);"></i>
+                                <span>dsdfsdaaa</span>
+                            </div>
+                            <span class="view-layout">6分屏</span>
+                        </div>
+                        <div class="view-item" onclick="loadView('dsdsd', 4)">
+                            <div class="view-name">
+                                <i class="fas fa-th-large" style="color: var(--primary);"></i>
+                                <span>dsdsd</span>
+                            </div>
+                            <span class="view-layout">4分屏</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="view-group">
+                    <div class="view-group-header" onclick="toggleViewGroup(this)">
+                        <div><i class="fas fa-chevron-right" style="margin-right: 8px;"></i> 常用视图 (6)</div>
+                    </div>
+                </div>
+
+                <div class="view-group">
+                    <div class="view-group-header" onclick="toggleViewGroup(this)">
+                        <div><i class="fas fa-chevron-right" style="margin-right: 8px;"></i> 应急预案 (3)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 视频上墙面板 -->
+            <div class="sidebar-content" id="panel-wall" style="display:none; padding: 12px;">
+                <div class="section-title">解码器列表</div>
+                <div class="tree-child active" style="margin-bottom: 12px; border-radius: 4px;">
+                    <i class="fas fa-server" style="color: var(--primary); margin-right: 8px;"></i>
+                    <span>解码器-01 (在线)</span>
+                </div>
+                
+                <div class="section-title" style="margin-top: 16px;">电视墙配置</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
+                    <div style="padding: 8px; background: rgba(255,255,255,0.03); border-radius: 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);">
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">行×列</div>
+                        <div style="font-weight: 600;">2×3</div>
+                    </div>
+                    <div style="padding: 8px; background: rgba(255,255,255,0.03); border-radius: 4px; text-align: center; cursor: pointer; border: 1px solid transparent;">
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">行×列</div>
+                        <div style="font-weight: 600;">3×3</div>
+                    </div>
+                </div>
+
+                <div class="section-title">开窗操作</div>
+                <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                    <button class="tool-btn" style="flex: 1;" onclick="addWindow()">
+                        <i class="fas fa-plus-square"></i> 开窗
+                    </button>
+                    <button class="tool-btn danger" style="flex: 1;" onclick="clearWall()">
+                        <i class="fas fa-trash"></i> 清屏
+                    </button>
+                </div>
+
+                <div class="section-title">轮询设置</div>
+                <div class="poll-item">
+                    <div class="poll-header">
+                        <span class="poll-name">常规巡检</span>
+                        <span class="poll-status">运行中</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">
+                        间隔: 10秒 | 窗口: 1-6 | 通道: 12个
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="tool-btn danger" style="flex: 1; height: 28px; font-size: 11px;">
+                            <i class="fas fa-stop"></i> 停止
+                        </button>
+                        <button class="tool-btn" style="flex: 1; height: 28px; font-size: 11px;">
+                            <i class="fas fa-cog"></i> 配置
+                        </button>
+                    </div>
+                </div>
+
+                <button class="tool-btn primary" style="width: 100%;" onclick="showPollModal()">
+                    <i class="fas fa-plus"></i> 新建轮询方案
+                </button>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 顶部标签 -->
+            <div class="top-tabs">
+                <div class="top-tab active" onclick="switchMainTab('preview')">
+                    <i class="fas fa-eye"></i> 实时预览
+                </div>
+                <div class="top-tab" onclick="switchMainTab('playback')">
+                    <i class="fas fa-history"></i> 录像回放
+                </div>
+                <div class="top-tab" onclick="switchMainTab('capture')">
+                    <i class="fas fa-camera"></i> 抓图记录
+                </div>
+                <div class="top-tab" onclick="switchMainTab('wall')" id="tab-wall">
+                    <i class="fas fa-tv"></i> 视频上墙
+                </div>
+            </div>
+
+            <!-- 实时预览工具栏 -->
+            <div class="toolbar" id="toolbar-preview">
+                <div class="tool-group">
+                    <button class="tool-btn" onclick="setLayout(1)" title="单画面"><i class="fas fa-square"></i></button>
+                    <button class="tool-btn" onclick="setLayout(4)" title="四画面"><i class="fas fa-th-large"></i></button>
+                    <button class="tool-btn active" onclick="setLayout(6)" title="六画面"><i class="fas fa-th"></i></button>
+                    <button class="tool-btn" onclick="setLayout(9)" title="九画面"><i class="fas fa-border-all"></i></button>
+                    <button class="tool-btn" onclick="setLayout(16)" title="十六画面"><i class="fas fa-grip-horizontal"></i></button>
+                    <div class="divider"></div>
+                    <button class="tool-btn" onclick="startPoll()" id="btn-poll">
+                        <i class="fas fa-sync-alt"></i> 开始轮询
+                    </button>
+                    <button class="tool-btn" onclick="saveView()">
+                        <i class="fas fa-save"></i> 保存为视图
+                    </button>
+                </div>
+                <div class="tool-group">
+                    <button class="tool-btn" onclick="toggleRightPanel()">
+                        <i class="fas fa-sliders-h"></i> 云台控制
+                    </button>
+                    <div class="divider"></div>
+                    <span style="color: var(--text-secondary); font-size: 12px; font-family: 'Roboto Mono', monospace;" id="system-time">2026-02-04 16:11:46</span>
+                </div>
+            </div>
+
+            <!-- 录像回放工具栏 -->
+            <div class="toolbar" id="toolbar-playback" style="display: none;">
+                <div class="tool-group">
+                    <button class="tool-btn active"><i class="fas fa-calendar"></i> 2026-02-04</button>
+                    <div class="divider"></div>
+                    <button class="tool-btn" onclick="playPause()">
+                        <i class="fas fa-play" id="pb-play-icon"></i> 播放
+                    </button>
+                    <button class="tool-btn" onclick="stopPlayback()">
+                        <i class="fas fa-stop"></i> 停止
+                    </button>
+                    <select class="tool-btn" style="appearance: none; padding-right: 24px;">
+                        <option>1x</option>
+                        <option>2x</option>
+                        <option>4x</option>
+                        <option>8x</option>
+                    </select>
+                </div>
+                <div class="tool-group">
+                    <button class="tool-btn" onclick="downloadClip()">
+                        <i class="fas fa-download"></i> 下载片段
+                    </button>
+                    <button class="tool-btn primary" onclick="searchRecord()">
+                        <i class="fas fa-search"></i> 搜索录像
+                    </button>
+                </div>
+            </div>
+
+            <!-- 视频上墙工具栏 -->
+            <div class="toolbar" id="toolbar-wall" style="display: none;">
+                <div class="tool-group">
+                    <span style="color: var(--text-secondary); margin-right: 8px;">布局:</span>
+                    <button class="tool-btn active">2×3</button>
+                    <button class="tool-btn">3×3</button>
+                    <button class="tool-btn">4×4</button>
+                    <div class="divider"></div>
+                    <button class="tool-btn" onclick="openWindow()"><i class="fas fa-plus"></i> 开窗</button>
+                    <button class="tool-btn" onclick="closeWindow()"><i class="fas fa-minus"></i> 关窗</button>
+                </div>
+                <div class="tool-group">
+                    <button class="tool-btn success" onclick="startWallPoll()">
+                        <i class="fas fa-play"></i> 启动轮询
+                    </button>
+                </div>
+            </div>
+
+            <!-- 视频墙容器 -->
+            <div class="video-wall-container">
+                <div class="video-wall" id="video-wall">
+                    <!-- 动态生成视频窗口 -->
+                </div>
+
+                <!-- 右侧控制面板 -->
+                <div class="right-panel" id="right-panel">
+                    <div class="panel-header">
+                        <span><i class="fas fa-gamepad" style="margin-right: 8px;"></i>云台控制</span>
+                        <i class="fas fa-times" style="cursor: pointer;" onclick="toggleRightPanel()"></i>
+                    </div>
+
+                    <!-- 预置位 -->
+                    <div class="panel-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <span class="section-title" style="margin: 0;">预置点列表</span>
+                            <span style="font-size: 11px; color: var(--success); background: rgba(16,185,129,0.1); padding: 2px 8px; border-radius: 10px;">3/255</span>
+                        </div>
+                        <div class="preset-list">
+                            <div class="preset-item" onclick="callPreset(1)">
+                                <div class="preset-name">
+                                    <i class="fas fa-map-marker-alt" style="color: var(--primary);"></i>
+                                    <span>空调</span>
+                                </div>
+                                <div class="preset-actions">
+                                    <i class="fas fa-edit" title="编辑" onclick="event.stopPropagation(); editPreset(1)"></i>
+                                    <i class="fas fa-trash" title="删除" onclick="event.stopPropagation(); deletePreset(1)"></i>
+                                </div>
+                            </div>
+                            <div class="preset-item" onclick="callPreset(2)">
+                                <div class="preset-name">
+                                    <i class="fas fa-map-marker-alt" style="color: var(--primary);"></i>
+                                    <span>锁</span>
+                                </div>
+                                <div class="preset-actions">
+                                    <i class="fas fa-edit" onclick="event.stopPropagation()"></i>
+                                    <i class="fas fa-trash" onclick="event.stopPropagation()"></i>
+                                </div>
+                            </div>
+                            <div class="preset-item active" onclick="callPreset(3)">
+                                <div class="preset-name">
+                                    <i class="fas fa-map-marker-alt" style="color: var(--primary);"></i>
+                                    <span>盒子</span>
+                                </div>
+                                <span style="font-size: 11px; color: var(--text-secondary);">已到位</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <input type="text" placeholder="预置点名称" class="form-input" style="flex: 1;">
+                            <button class="tool-btn success" style="width: 36px; padding: 0;" onclick="addPreset()">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 巡航路线 -->
+                    <div class="panel-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <span class="section-title" style="margin: 0;">巡航路线</span>
+                            <button class="tool-btn" style="height: 28px; font-size: 11px;" onclick="manageCruise()">
+                                <i class="fas fa-cog"></i> 管理
+                            </button>
+                        </div>
+                        <select class="form-select" style="margin-bottom: 12px;">
+                            <option>选择巡航路线</option>
+                            <option>路线1 - 周界巡检</option>
+                            <option>路线2 - 楼层巡检</option>
+                        </select>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="tool-btn primary" style="flex: 1;" onclick="startCruise()">
+                                <i class="fas fa-play"></i> 开始巡航
+                            </button>
+                            <button class="tool-btn danger" style="flex: 1;" onclick="stopCruise()">
+                                <i class="fas fa-stop"></i> 停止
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 方向控制 -->
+                    <div class="panel-section">
+                        <div class="section-title">云台控制</div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <span style="font-size: 12px; color: var(--text-secondary);">当前通道:</span>
+                            <span style="font-size: 12px; color: var(--success); background: rgba(16,185,129,0.1); padding: 2px 8px; border-radius: 4px;">通道 4</span>
+                        </div>
+                        
+                        <div class="ptz-control">
+                            <button class="ptz-btn ptz-up" onmousedown="ptzStart('up')" onmouseup="ptzStop()"><i class="fas fa-chevron-up"></i></button>
+                            <button class="ptz-btn ptz-down" onmousedown="ptzStart('down')" onmouseup="ptzStop()"><i class="fas fa-chevron-down"></i></button>
+                            <button class="ptz-btn ptz-left" onmousedown="ptzStart('left')" onmouseup="ptzStop()"><i class="fas fa-chevron-left"></i></button>
+                            <button class="ptz-btn ptz-right" onmousedown="ptzStart('right')" onmouseup="ptzStop()"><i class="fas fa-chevron-right"></i></button>
+                            <button class="ptz-btn ptz-center" onclick="ptzAuto()"><i class="fas fa-sync"></i></button>
+                        </div>
+
+                        <div class="ptz-zoom">
+                            <button onmousedown="ptzStart('zoomin')" onmouseup="ptzStop()">
+                                <i class="fas fa-search-plus"></i> 放大
+                            </button>
+                            <button onmousedown="ptzStart('zoomout')" onmouseup="ptzStop()">
+                                <i class="fas fa-search-minus"></i> 缩小
+                            </button>
+                        </div>
+                        <div class="ptz-zoom" style="margin-top: 8px;">
+                            <button onmousedown="ptzStart('focusin')" onmouseup="ptzStop()">
+                                <i class="fas fa-eye"></i> 聚焦+
+                            </button>
+                            <button onmousedown="ptzStart('focusout')" onmouseup="ptzStop()">
+                                <i class="fas fa-eye-slash"></i> 聚焦-
+                            </button>
+                        </div>
+                        <div class="ptz-zoom" style="margin-top: 8px;">
+                            <button onmousedown="ptzStart('irisopen')" onmouseup="ptzStop()">
+                                <i class="fas fa-sun"></i> 光圈+
+                            </button>
+                            <button onmousedown="ptzStart('irisclose')" onmouseup="ptzStop()">
+                                <i class="fas fa-cloud"></i> 光圈-
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 底部时间轴（录像回放时显示） -->
+            <div class="timeline-container" id="timeline" style="display: none;">
+                <div class="timeline-toolbar">
+                    <button class="tool-btn" style="height: 28px;"><i class="fas fa-chevron-left"></i></button>
+                    <span style="font-weight: 600;">2026-02-04</span>
+                    <button class="tool-btn" style="height: 28px;"><i class="fas fa-chevron-right"></i></button>
+                    <div class="divider"></div>
+                    <span style="font-size: 12px; color: var(--text-secondary);">
+                        <i class="fas fa-info-circle" style="margin-right: 4px;"></i>
+                        拖动时间轴进行定位，绿色片段表示有录像
+                    </span>
+                </div>
+                <div class="timeline-main">
+                    <div class="timeline-ruler">
+                        <div class="time-marker" style="left: 0%">00:00</div>
+                        <div class="time-marker" style="left: 8.33%">02:00</div>
+                        <div class="time-marker" style="left: 16.66%">04:00</div>
+                        <div class="time-marker" style="left: 25%">06:00</div>
+                        <div class="time-marker" style="left: 33.33%">08:00</div>
+                        <div class="time-marker" style="left: 41.66%">10:00</div>
+                        <div class="time-marker" style="left: 50%">12:00</div>
+                        <div class="time-marker" style="left: 58.33%">14:00</div>
+                        <div class="time-marker" style="left: 66.66%">16:00</div>
+                        <div class="time-marker" style="left: 75%">18:00</div>
+                        <div class="time-marker" style="left: 83.33%">20:00</div>
+                        <div class="time-marker" style="left: 91.66%">22:00</div>
+                        <div class="time-marker" style="left: 100%">24:00</div>
+                    </div>
+                    <div class="timeline-track" id="timeline-track" onclick="seekTimeline(event)">
+                        <!-- 录像段 -->
+                        <div class="record-segment" style="left: 10%; width: 15%;" onclick="event.stopPropagation(); playSegment(this)"></div>
+                        <div class="record-segment" style="left: 30%; width: 20%;" onclick="event.stopPropagation(); playSegment(this)"></div>
+                        <div class="record-segment" style="left: 55%; width: 25%;" onclick="event.stopPropagation(); playSegment(this)"></div>
+                        <div class="record-segment" style="left: 85%; width: 10%;" onclick="event.stopPropagation(); playSegment(this)"></div>
+                        
+                        <!-- 时间游标 -->
+                        <div class="timeline-cursor" style="left: 66.6%;" id="time-cursor"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 状态栏 -->
+            <div class="status-bar" style="height: 28px; background: rgba(0,0,0,0.3); border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-size: 12px; color: var(--text-secondary);">
+                <div style="display: flex; gap: 16px;">
+                    <span><i class="fas fa-circle" style="color: var(--success); font-size: 8px; margin-right: 4px;"></i>在线: 24</span>
+                    <span><i class="fas fa-circle" style="color: var(--danger); font-size: 8px; margin-right: 4px;"></i>离线: 2</span>
+                    <span><i class="fas fa-circle" style="color: var(--warning); font-size: 8px; margin-right: 4px;"></i>报警: 0</span>
+                </div>
+                <div id="poll-status" style="display: none; align-items: center; gap: 8px; color: var(--primary);">
+                    <i class="fas fa-sync fa-spin"></i>
+                    <span>轮询进行中... (10s)</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div class="context-menu" id="context-menu">
+        <div class="context-item" onclick="closeWindow()"><i class="fas fa-times"></i> 关闭窗口</div>
+        <div class="context-item" onclick="startRecord()"><i class="fas fa-circle" style="color: var(--danger);"></i> 开始录像</div>
+        <div class="context-item" onclick="captureFrame()"><i class="fas fa-camera"></i> 抓图</div>
+        <div class="context-item" onclick="openAudio()"><i class="fas fa-volume-up"></i> 打开音频</div>
+        <div class="context-item" onclick="fullScreen()"><i class="fas fa-expand"></i> 全屏显示</div>
+        <div class="divider" style="margin: 4px 0; height: 1px; background: var(--border);"></div>
+        <div class="context-item danger" onclick="closeAll()"><i class="fas fa-power-off"></i> 关闭所有</div>
+    </div>
+
+    <!-- 保存视图模态框 -->
+    <div class="modal" id="modal-save-view">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>保存为视图</span>
+                <i class="fas fa-times" style="cursor: pointer;" onclick="closeModal('modal-save-view')"></i>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">视图名称</label>
+                    <input type="text" class="form-input" placeholder="请输入视图名称" id="view-name-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">所属分组</label>
+                    <select class="form-select">
+                        <option>默认分组</option>
+                        <option>常用视图</option>
+                        <option>应急预案</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">布局信息</label>
+                    <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: 4px; color: var(--text-secondary); font-size: 12px;">
+                        <i class="fas fa-info-circle" style="margin-right: 6px;"></i>
+                        当前布局: <span id="modal-layout-info">2×3</span>，已打开通道: <span id="modal-channel-count">4</span>个
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="tool-btn" onclick="closeModal('modal-save-view')">取消</button>
+                <button class="tool-btn primary" onclick="confirmSaveView()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 轮询配置模态框 -->
+    <div class="modal" id="modal-poll">
+        <div class="modal-content" style="width: 600px;">
+            <div class="modal-header">
+                <span>轮询方案配置</span>
+                <i class="fas fa-times" style="cursor: pointer;" onclick="closeModal('modal-poll')"></i>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">方案名称</label>
+                    <input type="text" class="form-input" placeholder="如：周界巡检">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label class="form-label">轮询间隔 (秒)</label>
+                        <input type="number" class="form-input" value="10" min="5" max="300">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">窗口范围</label>
+                        <select class="form-select">
+                            <option>全部窗口 (1-6)</option>
+                            <option>仅窗口1</option>
+                            <option>窗口1-4</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">选择通道 (已选12个)</label>
+                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; padding: 8px;">
+                        <div style="display: flex; align-items: center; padding: 6px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <input type="checkbox" checked style="margin-right: 8px;">
+                            <span style="flex:1;">球机细节相机</span>
+                            <span style="font-size: 11px; color: var(--text-secondary);">A栋1层</span>
+                        </div>
+                        <div style="display: flex; align-items: center; padding: 6px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <input type="checkbox" checked style="margin-right: 8px;">
+                            <span style="flex:1;">云台摄像机</span>
+                            <span style="font-size: 11px; color: var(--text-secondary);">A栋1层</span>
+                        </div>
+                        <div style="display: flex; align-items: center; padding: 6px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <input type="checkbox" checked style="margin-right: 8px;">
+                            <span style="flex:1;">三通道相机</span>
+                            <span style="font-size: 11px; color: var(--text-secondary);">A栋1层</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="tool-btn" onclick="closeModal('modal-poll')">取消</button>
+                <button class="tool-btn primary" onclick="startPollFromModal()">开始轮询</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局状态
+        const state = {
+            layout: 6, // 默认2x3
+            currentTab: 'preview',
+            selectedWindow: 0,
+            windows: new Array(6).fill(null), // 存储每个窗口的摄像头ID
+            isPolling: false,
+            pollInterval: null,
+            ptzInterval: null,
+            recording: false
+        };
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initVideoWall();
+            updateTime();
+            setInterval(updateTime, 1000);
+            
+            // 全局点击关闭右键菜单
+            document.addEventListener('click', () => {
+                document.getElementById('context-menu').style.display = 'none';
+            });
+        });
+
+        // 初始化视频墙
+        function initVideoWall() {
+            const wall = document.getElementById('video-wall');
+            wall.innerHTML = '';
+            
+            for (let i = 0; i < state.layout; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'video-cell';
+                if (i === state.selectedWindow) cell.classList.add('selected');
+                cell.dataset.index = i;
+                
+                cell.innerHTML = `
+                    <div class="video-header">
+                        <div class="video-title">
+                            <span style="opacity: 0.5; font-weight: 700;">${i + 1}</span>
+                            <span class="cam-name">窗口 ${i + 1}</span>
+                        </div>
+                        <div class="video-badges"></div>
+                    </div>
+                    <div class="video-content" oncontextmenu="showContextMenu(event, ${i})">
+                        <div class="win-number">${i + 1}</div>
+                        <div class="video-placeholder">
+                            <i class="fas fa-pause-circle"></i>
+                            <div class="hint">
+                                拖拽通道到此处播放实时视频<br>
+                                或双击通道选择窗口播放
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                cell.onclick = () => selectWindow(i);
+                wall.appendChild(cell);
+            }
+            
+            updateLayoutClass();
+        }
+
+        function updateLayoutClass() {
+            const wall = document.getElementById('video-wall');
+            wall.style.gridTemplateColumns = state.layout === 1 ? '1fr' : 
+                                             state.layout === 4 ? '1fr 1fr' : 
+                                             state.layout === 6 ? '1fr 1fr 1fr' : 
+                                             state.layout === 9 ? '1fr 1fr 1fr' : 
+                                             '1fr 1fr 1fr 1fr';
+            wall.style.gridTemplateRows = state.layout === 1 ? '1fr' : 
+                                          state.layout === 4 ? '1fr 1fr' : 
+                                          state.layout === 6 ? '1fr 1fr' : 
+                                          state.layout === 9 ? '1fr 1fr 1fr' : 
+                                          '1fr 1fr 1fr 1fr';
+        }
+
+        // 选择窗口
+        function selectWindow(index) {
+            state.selectedWindow = index;
+            document.querySelectorAll('.video-cell').forEach((cell, i) => {
+                cell.classList.toggle('selected', i === index);
+            });
+            
+            // 更新云台控制通道号
+            const cam = state.windows[index];
+            if (cam) {
+                document.querySelector('.ptz-control').style.opacity = '1';
+            } else {
+                document.querySelector('.ptz-control').style.opacity = '0.5';
+            }
+        }
+
+        // 播放摄像头
+        function playCamera(camId, element) {
+            document.querySelectorAll('.tree-child').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+            
+            const camName = element.querySelector('span:last-child').textContent;
+            const cell = document.querySelectorAll('.video-cell')[state.selectedWindow];
+            
+            // 更新窗口内容
+            state.windows[state.selectedWindow] = camId;
+            cell.querySelector('.cam-name').textContent = camName;
+            cell.classList.add('active-source');
+            
+            const content = cell.querySelector('.video-content');
+            content.innerHTML = `
+                <canvas id="canvas-${state.selectedWindow}" class="video-canvas"></canvas>
+                <div class="video-badges" style="position: absolute; top: 8px; right: 8px;">
+                    <span class="badge badge-live">LIVE</span>
+                </div>
+                <div style="position: absolute; bottom: 8px; left: 8px; font-family: 'Roboto Mono', monospace; font-size: 12px; color: white; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 3px;">
+                    2026-02-04 16:11:46
+                </div>
+            `;
+            
+            // 启动Canvas模拟
+            initCanvas(state.selectedWindow);
+            
+            // 自动选择下一个空窗口
+            const nextEmpty = state.windows.findIndex((w, i) => i > state.selectedWindow && !w);
+            if (nextEmpty !== -1) selectWindow(nextEmpty);
+        }
+
+        // Canvas视频模拟
+        function initCanvas(index) {
+            const canvas = document.getElementById(`canvas-${index}`);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            const resize = () => {
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+            };
+            resize();
+            
+            let frame = 0;
+            function draw() {
+                if (!document.getElementById(`canvas-${index}`)) return;
+                
+                ctx.fillStyle = '#0a0a0a';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // 模拟室内场景
+                ctx.fillStyle = '#1a1a1a';
+                ctx.fillRect(canvas.width*0.1, canvas.height*0.2, canvas.width*0.8, canvas.height*0.6);
+                
+                // 动态噪点
+                for (let i = 0; i < 50; i++) {
+                    ctx.fillStyle = `rgba(255,255,255,${Math.random()*0.05})`;
+                    ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 2);
+                }
+                
+                // 模拟移动物体
+                if (frame % 120 < 60) {
+                    const x = (canvas.width * 0.3) + (frame % 120) * 2;
+                    ctx.fillStyle = 'rgba(200,200,200,0.3)';
+                    ctx.fillRect(x, canvas.height*0.4, 30, 60);
+                }
+                
+                frame++;
+                requestAnimationFrame(draw);
+            }
+            draw();
+        }
+
+        // 布局切换
+        function setLayout(num) {
+            state.layout = num;
+            state.windows = new Array(num).fill(null);
+            initVideoWall();
+            
+            // 更新按钮状态
+            document.querySelectorAll('.toolbar .tool-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.closest('.tool-btn').classList.add('active');
+        }
+
+        // 侧边栏切换
+        function switchSidebarTab(tab) {
+            document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+            event.target.closest('.sidebar-tab').classList.add('active');
+            
+            document.querySelectorAll('.sidebar-content').forEach(c => c.style.display = 'none');
+            document.getElementById(`panel-${tab}`).style.display = 'block';
+        }
+
+        // 主标签切换
+        function switchMainTab(tab) {
+            state.currentTab = tab;
+            document.querySelectorAll('.top-tab').forEach(t => t.classList.remove('active'));
+            event.target.closest('.top-tab').classList.add('active');
+            
+            // 隐藏所有工具栏和特殊区域
+            document.getElementById('toolbar-preview').style.display = 'none';
+            document.getElementById('toolbar-playback').style.display = 'none';
+            document.getElementById('toolbar-wall').style.display = 'none';
+            document.getElementById('timeline').style.display = 'none';
+            document.getElementById('right-panel').style.display = 'flex';
+            
+            if (tab === 'preview') {
+                document.getElementById('toolbar-preview').style.display = 'flex';
+                initVideoWall();
+            } else if (tab === 'playback') {
+                document.getElementById('toolbar-playback').style.display = 'flex';
+                document.getElementById('timeline').style.display = 'flex';
+                document.getElementById('right-panel').style.display = 'none';
+                initPlaybackGrid();
+            } else if (tab === 'wall') {
+                document.getElementById('toolbar-wall').style.display = 'flex';
+                document.getElementById('right-panel').style.display = 'none';
+                initVideoWall(); // 实际应该初始化电视墙布局
+            }
+        }
+
+        // 初始化回放网格
+        function initPlaybackGrid() {
+            const wall = document.getElementById('video-wall');
+            wall.style.gridTemplateColumns = '1fr 1fr 1fr';
+            wall.style.gridTemplateRows = '1fr 1fr';
+            wall.innerHTML = '';
+            
+            for (let i = 0; i < 6; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'video-cell';
+                cell.innerHTML = `
+                    <div class="video-header">
+                        <div class="video-title">窗口 ${i+1}</div>
+                    </div>
+                    <div class="video-content">
+                        <div class="video-placeholder">
+                            <i class="fas fa-history"></i>
+                            <div class="hint">拖拽通道到此处<br>或选择通道后点击时间轴播放</div>
+                        </div>
+                    </div>
+                `;
+                wall.appendChild(cell);
+            }
+        }
+
+        // 树形控制
+        function toggleTree(header) {
+            header.classList.toggle('expanded');
+            const children = header.nextElementSibling;
+            if (children && children.classList.contains('tree-children')) {
+                children.classList.toggle('expanded');
+            }
+        }
+
+        // 视图组切换
+        function toggleViewGroup(header) {
+            header.classList.toggle('expanded');
+        }
+
+        // 右键菜单
+        function showContextMenu(e, index) {
+            e.preventDefault();
+            const menu = document.getElementById('context-menu');
+            menu.style.display = 'block';
+            menu.style.left = e.pageX + 'px';
+            menu.style.top = e.pageY + 'px';
+        }
+
+        // 云台控制
+        function ptzStart(direction) {
+            console.log('PTZ Start:', direction);
+            // 模拟持续发送命令
+        }
+
+        function ptzStop() {
+            console.log('PTZ Stop');
+        }
+
+        function ptzAuto() {
+            showToast('云台控制', '开始自动巡航');
+        }
+
+        function callPreset(id) {
+            document.querySelectorAll('.preset-item').forEach(p => p.classList.remove('active'));
+            event.target.closest('.preset-item').classList.add('active');
+            showToast('预置位', `正在转到预置位 ${id}`);
+        }
+
+        function addPreset() {
+            showToast('预置位', '已添加当前位置为新预置位');
+        }
+
+        function startCruise() {
+            showToast('巡航', '开始巡航路线');
+        }
+
+        function stopCruise() {
+            showToast('巡航', '已停止巡航');
+        }
+
+        // 时间轴控制
+        function seekTimeline(e) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
+            document.getElementById('time-cursor').style.left = (percent * 100) + '%';
+        }
+
+        function playSegment(el) {
+            showToast('录像回放', '开始播放选定片段');
+        }
+
+        function playPause() {
+            const icon = document.getElementById('pb-play-icon');
+            if (icon.classList.contains('fa-play')) {
+                icon.classList.remove('fa-play');
+                icon.classList.add('fa-pause');
+            } else {
+                icon.classList.remove('fa-pause');
+                icon.classList.add('fa-play');
+            }
+        }
+
+        // 轮询功能
+        function startPoll() {
+            const btn = document.getElementById('btn-poll');
+            const status = document.getElementById('poll-status');
+            
+            if (state.isPolling) {
+                clearInterval(state.pollInterval);
+                state.isPolling = false;
+                btn.innerHTML = '<i class="fas fa-sync-alt"></i> 开始轮询';
+                btn.classList.remove('danger');
+                status.style.display = 'none';
+                showToast('轮询', '已停止轮询');
+            } else {
+                state.isPolling = true;
+                btn.innerHTML = '<i class="fas fa-stop"></i> 停止轮询';
+                btn.classList.add('danger');
+                status.style.display = 'flex';
+                showToast('轮询', '开始视频轮询 (10秒间隔)');
+                
+                let current = 0;
+                state.pollInterval = setInterval(() => {
+                    selectWindow(current % state.layout);
+                    current++;
+                }, 10000);
+            }
+        }
+
+        function showPollModal() {
+            document.getElementById('modal-poll').classList.add('show');
+        }
+
+        // 视图管理
+        function saveView() {
+            document.getElementById('modal-layout-info').textContent = 
+                state.layout === 1 ? '1×1' : 
+                state.layout === 4 ? '2×2' : 
+                state.layout === 6 ? '2×3' : 
+                state.layout === 9 ? '3×3' : '4×4';
+            document.getElementById('modal-channel-count').textContent = state.windows.filter(w => w).length;
+            document.getElementById('modal-save-view').classList.add('show');
+        }
+
+        function confirmSaveView() {
+            const name = document.getElementById('view-name-input').value;
+            if (name) {
+                showToast('视图管理', `视图 "${name}" 保存成功`);
+                closeModal('modal-save-view');
+            }
+        }
+
+        function loadView(name, layout) {
+            showToast('视图管理', `正在加载视图: ${name}`);
+            setLayout(layout);
+        }
+
+        // 模态框控制
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        // 工具函数
+        function toggleRightPanel() {
+            document.getElementById('right-panel').classList.toggle('collapsed');
+        }
+
+        function updateTime() {
+            const now = new Date();
+            const str = now.getFullYear() + '-' + 
+                       String(now.getMonth()+1).padStart(2,'0') + '-' + 
+                       String(now.getDate()).padStart(2,'0') + ' ' + 
+                       String(now.getHours()).padStart(2,'0') + ':' + 
+                       String(now.getMinutes()).padStart(2,'0') + ':' + 
+                       String(now.getSeconds()).padStart(2,'0');
+            document.getElementById('system-time').textContent = str;
+        }
+
+        function showToast(title, msg) {
+            const div = document.createElement('div');
+            div.style.cssText = 'position: fixed; top: 60px; right: 20px; background: var(--panel-bg); border: 1px solid var(--border); padding: 12px 16px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 3000; min-width: 200px; animation: slideIn 0.3s;';
+            div.innerHTML = `<div style="font-weight: 600; margin-bottom: 4px; color: var(--primary);">${title}</div><div style="font-size: 12px; color: var(--text-secondary);">${msg}</div>`;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 3000);
+        }
+
+        // 其他功能占位
+        function closeWindow() { showToast('窗口', '关闭当前窗口'); }
+        function startRecord() { showToast('录像', '开始录像'); }
+        function captureFrame() { showToast('抓图', '已保存抓图'); }
+        function openAudio() { showToast('音频', '打开音频通道'); }
+        function fullScreen() { showToast('全屏', '进入全屏模式'); }
+        function closeAll() { 
+            state.windows.fill(null);
+            initVideoWall();
+            showToast('窗口', '已关闭所有窗口');
+        }
+        function searchRecord() { showToast('搜索', '正在搜索录像文件...'); }
+        function downloadClip() { showToast('下载', '准备下载录像片段'); }
+        function stopPlayback() { showToast('回放', '停止播放'); }
+        function manageCruise() { showToast('巡航', '打开巡航管理'); }
+        function editPreset(id) { showToast('预置位', `编辑预置位 ${id}`); }
+        function deletePreset(id) { showToast('预置位', `删除预置位 ${id}`); }
+        function openWindow() { showToast('上墙', '在电视墙开窗'); }
+        function clearWall() { showToast('上墙', '清空电视墙'); }
+        function startWallPoll() { showToast('上墙', '启动电视墙轮询'); }
+        function addWindow() { showToast('上墙', '添加解码窗口'); }
+    </script>
+</body>
+</html>

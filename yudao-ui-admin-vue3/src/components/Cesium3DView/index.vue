@@ -179,9 +179,12 @@ const initCesium = async () => {
     }
     
     // 🔧 不使用Ion Token，使用免费的地图服务
-    // 使用OpenStreetMap作为底图，不需要Token
-    const osmProvider = new Cesium.OpenStreetMapImageryProvider({
-      url: 'https://a.tile.openstreetmap.org/'
+    // 使用高德地图瓦片，国内访问更稳定
+    const gaodeProvider = new Cesium.UrlTemplateImageryProvider({
+      url: 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+      subdomains: ['1', '2', '3', '4'],
+      minimumLevel: 1,
+      maximumLevel: 18
     })
 
     // 创建Cesium Viewer
@@ -198,7 +201,7 @@ const initCesium = async () => {
       selectionIndicator: true,
       navigationHelpButton: true, // 启用导航帮助
       baseLayerPicker: false, // 禁用底图选择器，避免使用Ion服务
-      imageryProvider: osmProvider, // 使用OpenStreetMap底图
+      imageryProvider: gaodeProvider, // 使用高德地图底图，国内访问更稳定
       // 启用所有鼠标控制
       scene3DOnly: false, // 允许2D/3D切换
       shouldAnimate: true // 启用动画

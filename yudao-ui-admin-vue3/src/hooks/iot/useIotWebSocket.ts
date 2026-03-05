@@ -102,10 +102,11 @@ class IotWebSocketManager {
 
   /**
    * 构建 WebSocket 基础地址（不包含 userId 参数）
+   * ⚠️ WebSocket 始终使用当前站点的 host，由 Nginx 代理到后端
    *
    * 优先级：
    * 1) VITE_IOT_WS_URL（完整 ws/wss URL，可包含查询参数）
-   * 2) VITE_IOT_WS_HOST / VITE_BASE_URL / window.location.host + VITE_IOT_WS_PATH(/ws/iot)
+   * 2) VITE_IOT_WS_HOST / window.location.host + VITE_IOT_WS_PATH(/ws/iot)
    */
   private getWsBaseUrl(): string {
     const env = (import.meta as any).env || {}
@@ -115,15 +116,9 @@ class IotWebSocketManager {
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    // 仅当明确设置了 VITE_IOT_WS_HOST 时才使用环境变量，否则使用当前站点 host
     const envHost = env?.VITE_IOT_WS_HOST as string | undefined
-    const baseUrl = env?.VITE_BASE_URL as string | undefined
-    let baseHost = ''
-    try {
-      baseHost = baseUrl ? new URL(baseUrl).host : ''
-    } catch {
-      // ignore
-    }
-    const host = envHost || baseHost || window.location.host
+    const host = envHost || window.location.host
     const path = (env?.VITE_IOT_WS_PATH as string | undefined) || '/ws/iot'
     return `${protocol}//${host}${path}`
   }
@@ -347,11 +342,17 @@ class IotWebSocketManager {
     this.stopHeartbeat()
 
     // 关闭连接（使用特殊的关闭码和原因，避免触发重连）
-    if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
-      try {
-        this.ws.close(1000, 'User disconnected')
-      } catch (e) {
-        console.error('[IoT WebSocket Manager] 关闭连接失败:', e)
+    // ✅ 只有在 OPEN 状态才正常关闭，CONNECTING 状态直接置空让浏览器自动处理
+    if (this.ws) {
+      if (this.ws.readyState === WebSocket.OPEN) {
+        try {
+          this.ws.close(1000, 'User disconnected')
+        } catch (e) {
+          console.error('[IoT WebSocket Manager] 关闭连接失败:', e)
+        }
+      } else if (this.ws.readyState === WebSocket.CONNECTING) {
+        // 正在连接中，直接清空引用，让浏览器自动处理
+        console.log('[IoT WebSocket Manager] ⏳ 连接中，直接清理引用')
       }
       this.ws = null
     }

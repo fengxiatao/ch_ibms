@@ -17,7 +17,7 @@ export interface IotAlarmEventVO {
   isAlarm?: boolean
   isRestore?: boolean
   needRecord?: boolean
-  status?: string // pending, processing, completed, ignored
+  status?: number // 0-未处理，1-已处理，2-已忽略
   processor?: string
   processTime?: string
   processRemark?: string
@@ -34,9 +34,8 @@ export interface IotAlarmEventPageReqVO {
   createTime?: string[]
   eventLevel?: string
   hostId?: number
-  // 前端状态：pending/completed/ignored，会在请求前转换为 isHandled
-  status?: string
-  isHandled?: boolean
+  // 处理状态：0-未处理，1-已处理，2-已忽略
+  status?: number
   eventCode?: string
 }
 
@@ -56,18 +55,13 @@ export interface IotAlarmEventStatsVO {
 // 查询报警事件记录分页
 export const getAlarmEventPage = (params: IotAlarmEventPageReqVO) => {
   const req: any = { ...params }
-  // 兼容后端字段：createTime / isHandled
+  // 兼容后端字段：createTime
   if (!req.createTime && (req.startTime || req.endTime)) {
     req.createTime = [req.startTime, req.endTime].filter(Boolean)
   }
-  if (req.isHandled === undefined && req.status) {
-    if (req.status === 'pending') req.isHandled = false
-    else if (req.status === 'completed' || req.status === 'ignored') req.isHandled = true
-  }
-  // 清理前端字段，避免后端忽略导致误解
+  // 清理前端便捷字段
   delete req.startTime
   delete req.endTime
-  delete req.status
   return request.get({ url: '/iot/alarm/event/page', params: req })
 }
 
@@ -102,12 +96,7 @@ export const exportAlarmEvent = (params: IotAlarmEventPageReqVO) => {
   if (!req.createTime && (req.startTime || req.endTime)) {
     req.createTime = [req.startTime, req.endTime].filter(Boolean)
   }
-  if (req.isHandled === undefined && req.status) {
-    if (req.status === 'pending') req.isHandled = false
-    else if (req.status === 'completed' || req.status === 'ignored') req.isHandled = true
-  }
   delete req.startTime
   delete req.endTime
-  delete req.status
   return request.download({ url: '/iot/alarm/event/export', params: req })
 }

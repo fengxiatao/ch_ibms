@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧楼宇建筑设备监控系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #1890ff;
+            --success: #52c41a;
+            --warning: #faad14;
+            --danger: #f5222d;
+            --text: #303133;
+            --text-regular: #606266;
+            --border: #ebeef5;
+            --bg: #f0f2f5;
+            --sidebar-bg: #001529;
+            --sidebar-text: #a6adb4;
+            --light-bg: #f5f7fa;
+            --water-primary: #13c2c2; /* 给排水系统青色 */
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        .container { display: flex; min-height: 100vh; }
+        
+        /* 侧边栏 */
+        .sidebar {
+            width: 220px;
+            background-color: var(--sidebar-bg);
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+        .logo {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+        }
+        .menu { padding: 10px 0; }
+        .menu-item {
+            padding: 0 20px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            color: var(--sidebar-text);
+            cursor: pointer;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+            justify-content: space-between;
+        }
+        .menu-item:hover, .menu-item.active {
+            background-color: rgba(24, 144, 255, 0.1);
+            color: white;
+            border-left-color: var(--primary);
+        }
+        .menu-icon-text { display: flex; align-items: center; }
+        .menu-icon { width: 20px; margin-right: 10px; text-align: center; font-size: 16px; }
+        .arrow { transition: transform 0.3s; font-size: 12px; }
+        .arrow.expanded { transform: rotate(90deg); }
+        .submenu {
+            background-color: rgba(0,0,0,0.15);
+            overflow: hidden;
+            max-height: 0;
+            transition: max-height 0.3s;
+        }
+        .submenu.expanded { max-height: 400px; }
+        .submenu-item {
+            padding: 12px 20px 12px 50px;
+            color: var(--sidebar-text);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .submenu-item:hover, .submenu-item.active {
+            color: var(--primary);
+            background: rgba(24, 144, 255, 0.05);
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: 220px;
+            padding: 20px;
+        }
+
+        .top-header {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .breadcrumb { color: #606266; font-size: 14px; }
+
+        .view-section { display: none; }
+        .view-section.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 设备监控样式 */
+        .device-management {
+            background: white;
+            border-radius: 4px;
+            padding: 20px;
+            min-height: calc(100vh - 140px);
+        }
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-select, .filter-input {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            outline: none;
+        }
+        .filter-input { width: 200px; }
+        .filter-btn {
+            padding: 8px 16px;
+            border: none;
+            background: var(--primary);
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .reset-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .group-tabs {
+            display: flex;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 20px;
+        }
+        .group-tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            color: var(--text-regular);
+            position: relative;
+        }
+        .group-tab.active {
+            color: var(--primary);
+            font-weight: 600;
+        }
+        .group-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--primary);
+        }
+
+        /* 设备网格 */
+        .device-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        @media (max-width: 1400px) { .device-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 1200px) { .device-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 768px) { .device-grid { grid-template-columns: 1fr; } }
+
+        .device-card {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            background: white;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .device-card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            border-color: var(--primary);
+        }
+        .device-card.running {
+            border-left: 4px solid var(--success);
+        }
+        .device-card.fault {
+            border-left: 4px solid var(--danger);
+        }
+        .device-card.stop {
+            border-left: 4px solid #8c8c8c;
+        }
+        /* 给排水系统特殊样式 */
+        .device-card.water {
+            border-left: 4px solid var(--water-primary);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .device-name {
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .status-tag {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .status-running { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+        .status-stop { background: #f5f5f5; color: #8c8c8c; border: 1px solid #d9d9d9; }
+        .status-fault { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
+        .status-standby { background: #e6f7ff; color: #096dd9; border: 1px solid #91d5ff; }
+        
+        .card-body {
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+        .info-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            color: #606266;
+            font-size: 13px;
+        }
+        .info-icon {
+            width: 24px;
+            text-align: center;
+            margin-right: 5px;
+        }
+        
+        .env-params {
+            display: flex;
+            gap: 15px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--border);
+        }
+        .env-param {
+            flex: 1;
+            text-align: center;
+        }
+        .param-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        /* 给排水参数颜色 */
+        .param-value.water {
+            color: var(--water-primary);
+        }
+        .param-value.warning {
+            color: var(--warning);
+        }
+        .param-value.danger {
+            color: var(--danger);
+        }
+        .param-label {
+            font-size: 12px;
+            color: #909399;
+            margin-top: 4px;
+        }
+
+        /* 表格样式 */
+        .device-table-container {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .data-table th {
+            background: #f5f7fa;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #606266;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            color: #303133;
+        }
+        .data-table tr:hover td { background: #f5f7fa; }
+        
+        .device-type-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .type-ac { background: #e6f7ff; color: #1890ff; }
+        .type-fresh { background: #f6ffed; color: #52c41a; }
+        .type-supply { background: #fff7e6; color: #fa8c16; }
+        .type-exhaust { background: #f9f0ff; color: #722ed1; }
+        .type-water { background: #e6fffb; color: #13c2c2; } /* 给排水标签 */
+        
+        .status-dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        .dot-run { background: #52c41a; }
+        .dot-stop { background: #8c8c8c; }
+        .dot-fault { background: #f5222d; }
+
+        /* 日志和告警样式 */
+        .log-container {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .log-table { width: 100%; border-collapse: collapse; }
+        .log-table th {
+            padding: 12px 16px;
+            text-align: left;
+            background: #fafafa;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            color: #606266;
+            font-size: 13px;
+        }
+        .log-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+        .log-type-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .log-type-system { background: #e6f7ff; color: #1890ff; }
+        .log-type-control { background: #fff7e6; color: #fa8c16; }
+        
+        .alarm-level {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .level-high { background: #fff1f0; color: #cf1322; }
+        .level-medium { background: #fff7e6; color: #fa8c16; }
+        .level-low { background: #e6f7ff; color: #1890ff; }
+
+        .log-filter-bar {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: white;
+        }
+
+        .pagination-bar {
+            padding: 16px;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            border-top: 1px solid var(--border);
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            z-index: 9999;
+            font-size: 14px;
+            animation: fadeIn 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="logo">🏢 智慧楼宇系统</div>
+            <div class="menu">
+                <div class="menu-item" onclick="switchView('dashboard')">
+                    <div class="menu-icon-text">
+                        <span class="menu-icon">📊</span>
+                        <span>智慧楼宇</span>
+                    </div>
+                </div>
+                
+                <div class="menu-item active" onclick="toggleSubmenu(this)">
+                    <div class="menu-icon-text">
+                        <span class="menu-icon">🏗️</span>
+                        <span>建筑设备监控</span>
+                    </div>
+                    <span class="arrow expanded">▶</span>
+                </div>
+                
+                <div class="submenu expanded" id="hvacSubmenu">
+                    <div class="submenu-item active" onclick="switchToDevice()">设备监控</div>
+                    <div class="submenu-item" onclick="switchToDeviceManagement()">设备台账</div>
+                    <div class="submenu-item" onclick="switchToAlarmInfo()">告警信息</div>
+                    <div class="submenu-item" onclick="switchToSystemLog()">系统日志</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主内容 -->
+        <main class="main-content">
+            
+            <!-- 1. 设备监控视图 -->
+            <div id="deviceView" class="view-section active">
+                <div class="top-header">
+                    <div class="breadcrumb">首页 / 建筑设备监控 / 设备监控</div>
+                    <div style="color: #606266;">👤 管理员</div>
+                </div>
+
+                <div class="device-management">
+                    <div class="filter-bar">
+                        <select class="filter-select" id="areaFilter" onchange="filterDevices()">
+                            <option value="all">全部区域</option>
+                            <option value="F1">1层大堂</option>
+                            <option value="F2">2层办公区</option>
+                            <option value="F3">3层办公区</option>
+                            <option value="B1">地下机房</option>
+                            <option value="B2">地下二层泵房</option>
+                            <option value="roof">屋顶机房</option>
+                        </select>
+                        <select class="filter-select" id="statusFilter" onchange="filterDevices()">
+                            <option value="all">全部状态</option>
+                            <option value="running">运行中</option>
+                            <option value="stop">停止</option>
+                            <option value="standby">待机</option>
+                            <option value="fault">故障</option>
+                        </select>
+                        <input type="text" class="filter-input" placeholder="请输入设备名称或编号" id="searchInput">
+                        <button class="filter-btn" onclick="filterDevices()">查询</button>
+                        <button class="reset-btn" onclick="resetFilter()">重置</button>
+                    </div>
+
+                    <div class="group-tabs">
+                        <div class="group-tab active" onclick="switchDeviceTab('ac')">空调机组</div>
+                        <div class="group-tab" onclick="switchDeviceTab('fresh')">新风机组</div>
+                        <div class="group-tab" onclick="switchDeviceTab('fan')">送/排风机</div>
+                        <!-- 新增给排水系统标签 -->
+                        <div class="group-tab" onclick="switchDeviceTab('water')">给排水系统</div>
+                    </div>
+
+                    <div class="device-grid" id="deviceGrid"></div>
+                </div>
+            </div>
+
+            <!-- 2. 设备台账视图 -->
+            <div id="deviceManagementView" class="view-section">
+                <div class="top-header">
+                    <div class="breadcrumb">首页 / 建筑设备监控 / 设备台账</div>
+                    <div style="color: #606266;">👤 管理员</div>
+                </div>
+
+                <div class="device-management">
+                    <div class="filter-bar">
+                        <select class="filter-select" id="mgmtTypeFilter" onchange="filterDeviceManagement()">
+                            <option value="all">全部设备</option>
+                            <option value="ac">空调机组</option>
+                            <option value="fresh">新风机组</option>
+                            <option value="supply">送风机</option>
+                            <option value="exhaust">排风机</option>
+                            <option value="water-pump">生活水泵</option>
+                            <option value="drain-pump">排污泵</option>
+                            <option value="tank">水箱水池</option>
+                        </select>
+                        <select class="filter-select" id="mgmtStatusFilter" onchange="filterDeviceManagement()">
+                            <option value="all">全部状态</option>
+                            <option value="running">运行中</option>
+                            <option value="standby">待机</option>
+                            <option value="stop">停止</option>
+                            <option value="fault">故障</option>
+                        </select>
+                        <select class="filter-select" id="mgmtAreaFilter" onchange="filterDeviceManagement()">
+                            <option value="all">全部区域</option>
+                            <option value="F1">1层大堂</option>
+                            <option value="F2">2层办公区</option>
+                            <option value="F3">3层办公区</option>
+                            <option value="B1">地下机房</option>
+                            <option value="B2">地下二层泵房</option>
+                            <option value="roof">屋顶机房</option>
+                        </select>
+                        <input type="text" class="filter-input" placeholder="搜索设备名称/编号" id="mgmtSearchInput" oninput="filterDeviceManagement()">
+                        <button class="filter-btn" onclick="filterDeviceManagement()">查询</button>
+                        <button class="reset-btn" onclick="resetDeviceManagementFilter()">重置</button>
+                        <button class="btn btn-primary" onclick="exportDeviceManagement()" style="margin-left: auto;">📥 导出</button>
+                    </div>
+
+                    <div class="device-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>设备编号</th>
+                                    <th>设备名称</th>
+                                    <th>设备类型</th>
+                                    <th>所属区域</th>
+                                    <th>当前状态</th>
+                                    <th>关键参数</th>
+                                    <th>累计运行</th>
+                                    <th>维护状态</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deviceManagementTableBody"></tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="pagination-bar">
+                        <span style="color: #606266;">共 <span id="mgmtTotalCount">0</span> 条</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn" style="padding: 5px 12px;">←</button>
+                            <button class="btn btn-primary" style="padding: 5px 12px;">1</button>
+                            <button class="btn" style="padding: 5px 12px;">2</button>
+                            <button class="btn" style="padding: 5px 12px;">3</button>
+                            <button class="btn" style="padding: 5px 12px;">→</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. 告警信息视图 -->
+            <div id="alarmInfoView" class="view-section">
+                <div class="top-header">
+                    <div class="breadcrumb">首页 / 建筑设备监控 / 告警信息</div>
+                    <div style="color: #606266;">👤 管理员</div>
+                </div>
+
+                <div class="device-management">
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px; max-width: 600px;">
+                        <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+                            <div style="font-size: 32px; font-weight: bold; color: var(--danger);">2</div>
+                            <div style="color: #606266; margin-top: 8px;">紧急告警</div>
+                        </div>
+                        <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+                            <div style="font-size: 32px; font-weight: bold; color: var(--warning);">3</div>
+                            <div style="color: #606266; margin-top: 8px;">重要告警</div>
+                        </div>
+                    </div>
+
+                    <div class="log-filter-bar">
+                        <select class="filter-select">
+                            <option value="all">全部级别</option>
+                            <option value="high">紧急</option>
+                            <option value="medium">重要</option>
+                            <option value="low">提示</option>
+                        </select>
+                        <input type="date" class="filter-select" value="2026-01-30">
+                        <input type="text" class="filter-input" placeholder="搜索设备名称/告警内容">
+                        <button class="filter-btn">查询</button>
+                        <button class="reset-btn">重置</button>
+                        <button class="btn btn-primary" style="margin-left: auto;">📥 导出</button>
+                    </div>
+
+                    <div class="log-container">
+                        <table class="log-table">
+                            <thead>
+                                <tr>
+                                    <th>告警时间</th>
+                                    <th>告警级别</th>
+                                    <th>设备名称</th>
+                                    <th>告警内容</th>
+                                    <th>持续时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alarmTableBody"></tbody>
+                        </table>
+                        <div class="pagination-bar">
+                            <span style="color: #606266;">共 32 条</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn" style="padding: 5px 12px;">←</button>
+                                <button class="btn btn-primary" style="padding: 5px 12px;">1</button>
+                                <button class="btn" style="padding: 5px 12px;">2</button>
+                                <button class="btn" style="padding: 5px 12px;">→</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. 系统日志视图 -->
+            <div id="systemLogView" class="view-section">
+                <div class="top-header">
+                    <div class="breadcrumb">首页 / 建筑设备监控 / 系统日志</div>
+                    <div style="color: #606266;">👤 管理员</div>
+                </div>
+
+                <div class="device-management">
+                    <div class="log-filter-bar">
+                        <input type="date" class="filter-select" value="2026-01-30">
+                        <input type="date" class="filter-select" value="2026-01-30">
+                        <select class="filter-select">
+                            <option value="all">全部类型</option>
+                            <option value="control">远程控制</option>
+                            <option value="system">系统事件</option>
+                        </select>
+                        <select class="filter-select">
+                            <option value="all">全部设备</option>
+                            <option value="ac">空调机组</option>
+                            <option value="fresh">新风机组</option>
+                            <option value="fan">送/排风机</option>
+                            <option value="water">给排水系统</option>
+                        </select>
+                        <input type="text" class="filter-input" placeholder="搜索设备名称/事件内容">
+                        <button class="filter-btn">查询</button>
+                        <button class="reset-btn">重置</button>
+                        <button class="btn btn-primary" style="margin-left: auto;">📥 导出</button>
+                    </div>
+
+                    <div class="log-container">
+                        <table class="log-table">
+                            <thead>
+                                <tr>
+                                    <th>时间</th>
+                                    <th>事件类型</th>
+                                    <th>设备名称</th>
+                                    <th>事件描述</th>
+                                    <th>数值/状态</th>
+                                </tr>
+                            </thead>
+                            <tbody id="systemLogTableBody"></tbody>
+                        </table>
+                        <div class="pagination-bar">
+                            <span style="color: #606266;">共 156 条</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn" style="padding: 5px 12px;">←</button>
+                                <button class="btn btn-primary" style="padding: 5px 12px;">1</button>
+                                <button class="btn" style="padding: 5px 12px;">2</button>
+                                <button class="btn" style="padding: 5px 12px;">3</button>
+                                <button class="btn" style="padding: 5px 12px;">→</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // 暖通设备数据
+        const acUnits = Array.from({length: 6}, (_, i) => ({
+            id: `AC-${String(Math.floor(i/2)+1)}F-${String(i%2+1).padStart(2, '0')}`,
+            name: `空调机组-${String(i+1).padStart(2, '0')}`,
+            pos: ['1层大堂', '2层东区', '2层西区', '3层东区', '3层西区', '会议室'][i],
+            area: ['F1', 'F2', 'F2', 'F3', 'F3', 'F3'][i],
+            type: 'ac',
+            status: ['running', 'standby', 'running', 'running', 'stop', 'standby'][i],
+            mode: ['cool', 'cool', 'cool', 'heat', 'stop', 'fan'][i],
+            setTemp: 24,
+            roomTemp: 23 + Math.floor(Math.random() * 3),
+            runTime: Math.floor(Math.random() * 5000) + 500 + 'h',
+            maintainStatus: ['正常', '正常', '需保养', '正常', '正常', '正常'][i],
+            nextMaintain: ['2026-03-15', '2026-04-20', '2026-02-01', '2026-05-10', '2026-04-15', '2026-06-01'][i],
+            lastUpdate: '2026-01-30 14:32'
+        }));
+
+        const freshAirUnits = Array.from({length: 4}, (_, i) => ({
+            id: `FA-${String(i+1).padStart(2, '0')}`,
+            name: `新风机组-${String(i+1).padStart(2, '0')}`,
+            pos: ['1层新风机房', '2层新风机房', '3层新风机房', 'B1机房'][i],
+            area: ['F1', 'F2', 'F3', 'B1'][i],
+            type: 'fresh',
+            status: i === 3 ? 'fault' : 'running',
+            pressure: [120, 135, 128, 150][i],
+            filterStatus: ['正常', '正常', '需更换', '正常'][i],
+            runTime: Math.floor(Math.random() * 8000) + 1000 + 'h',
+            maintainStatus: '正常',
+            nextMaintain: '2026-04-20',
+            lastUpdate: '2026-01-30 14:30'
+        }));
+
+        const fans = Array.from({length: 8}, (_, i) => ({
+            id: i < 4 ? `SF-${String(i+1).padStart(2, '0')}` : `EF-${String(i-3).padStart(2, '0')}`,
+            name: i < 4 ? `送风机-${String(i+1).padStart(2, '0')}` : `排风机-${String(i-3).padStart(2, '0')}`,
+            pos: i < 4 ? ['卫生间', '走廊', '电梯厅', '茶水间'][i] : ['卫生间', '厨房', '机房', '吸烟室'][i-4],
+            area: ['F1', 'F2', 'F3', 'F1'][i % 4],
+            type: i < 4 ? 'supply' : 'exhaust',
+            status: Math.random() > 0.2 ? 'running' : 'stop',
+            runTime: Math.floor(Math.random() * 3000) + 200 + 'h',
+            maintainStatus: '正常',
+            nextMaintain: '2026-05-15',
+            lastUpdate: '2026-01-30 14:28'
+        }));
+
+        // 给排水系统数据（已删除液位和下次维护数据）
+        const waterDevices = [
+            // 生活水泵
+            {
+                id: 'WP-B2-01',
+                name: '生活水泵-1#',
+                type: 'water-pump',
+                subType: 'supply',
+                pos: 'B2生活泵房',
+                area: 'B2',
+                status: 'running',
+                pressure: 0.35, // 出口压力MPa
+                runTime: '3,240h',
+                maintainStatus: '正常'
+            },
+            {
+                id: 'WP-B2-02',
+                name: '生活水泵-2#',
+                type: 'water-pump',
+                subType: 'supply',
+                pos: 'B2生活泵房',
+                area: 'B2',
+                status: 'standby',
+                pressure: 0.0,
+                runTime: '1,560h',
+                maintainStatus: '正常'
+            },
+            // 排污泵
+            {
+                id: 'DP-B2-01',
+                name: '集水坑排污泵-1#',
+                type: 'drain-pump',
+                subType: 'drain',
+                pos: 'B2集水坑',
+                area: 'B2',
+                status: 'running',
+                mode: 'auto', // 自动/手动
+                runTime: '890h',
+                maintainStatus: '正常'
+            },
+            {
+                id: 'DP-B2-02',
+                name: '集水坑排污泵-2#',
+                type: 'drain-pump',
+                subType: 'drain',
+                pos: 'B2集水坑',
+                area: 'B2',
+                status: 'stop',
+                mode: 'auto',
+                runTime: '420h',
+                maintainStatus: '正常'
+            },
+            {
+                id: 'DP-B1-01',
+                name: '消防电梯排污泵',
+                type: 'drain-pump',
+                subType: 'drain',
+                pos: 'B1电梯基坑',
+                area: 'B1',
+                status: 'running',
+                mode: 'auto',
+                runTime: '1,200h',
+                maintainStatus: '需保养'
+            },
+            // 水箱
+            {
+                id: 'TK-RF-01',
+                name: '屋顶生活水箱',
+                type: 'tank',
+                subType: 'tank',
+                pos: '屋顶水箱间',
+                area: 'roof',
+                status: 'normal',
+                maintainStatus: '正常'
+            },
+            {
+                id: 'TK-B2-01',
+                name: '地下消防水池',
+                type: 'tank',
+                subType: 'tank',
+                pos: 'B2水池间',
+                area: 'B2',
+                status: 'normal',
+                maintainStatus: '正常'
+            },
+            {
+                id: 'TK-B2-02',
+                name: '地下低区水箱',
+                type: 'tank',
+                subType: 'tank',
+                pos: 'B2水箱间',
+                area: 'B2',
+                status: 'normal',
+                maintainStatus: '正常'
+            }
+        ];
+
+        // 系统日志数据
+        const systemLogs = [
+            { time: '2026-01-30 14:32:15', type: 'control', device: '空调机组-01', desc: '设定温度调节', value: '24°C→25°C' },
+            { time: '2026-01-30 14:30:00', type: 'system', device: '生活水泵-1#', desc: '压力低于设定值', value: '0.30MPa' },
+            { time: '2026-01-30 14:28:05', type: 'system', device: '空调机组-03', desc: '周期性除霜完成', value: '运行正常' },
+            { time: '2026-01-30 14:25:33', type: 'control', device: '排风机-02', desc: '远程启停操作', value: '停止→运行' },
+            { time: '2026-01-30 14:20:18', type: 'system', device: '集水坑排污泵-1#', desc: '自动运行启动', value: '自动模式' },
+            { time: '2026-01-30 14:15:42', type: 'control', device: '空调机组-02', desc: '模式切换', value: '制冷→通风' }
+        ];
+
+        // 告警数据
+        const alarms = [
+            { time: '2026-01-30 14:30:00', level: 'high', device: '新风机组-04', content: '过滤网压差过大，需要立即更换', duration: '30分钟' },
+            { time: '2026-01-30 14:28:00', level: 'medium', device: '地下低区水箱', content: '传感器通讯异常', duration: '15分钟' },
+            { time: '2026-01-30 14:25:00', level: 'medium', device: '空调机组-03', content: '盘管温度过低，防冻保护预警', duration: '15分钟' },
+            { time: '2026-01-30 14:20:00', level: 'low', device: '排风机-02', content: '运行电流异常波动', duration: '已恢复' },
+            { time: '2026-01-30 14:15:00', level: 'medium', device: '送风机-03', content: '皮带打滑，风量不足', duration: '2小时' },
+            { time: '2026-01-30 14:10:00', level: 'medium', device: '消防电梯排污泵', content: '连续运行超时', duration: '45分钟' }
+        ];
+
+        let currentTab = 'ac';
+
+        function getAllDevices() {
+            return [...acUnits, ...freshAirUnits, ...fans, ...waterDevices];
+        }
+
+        function getDevicesByTab(tab) {
+            if(tab === 'ac') return acUnits;
+            if(tab === 'fresh') return freshAirUnits;
+            if(tab === 'fan') return fans;
+            if(tab === 'water') return waterDevices;
+            return [];
+        }
+
+        function renderDevices() {
+            const grid = document.getElementById('deviceGrid');
+            grid.innerHTML = '';
+            
+            const devices = getDevicesByTab(currentTab);
+            const area = document.getElementById('areaFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            
+            let filtered = devices.filter(dev => {
+                if(area !== 'all' && dev.area !== area) return false;
+                if(status !== 'all' && dev.status !== status) return false;
+                return true;
+            });
+
+            filtered.forEach((dev) => {
+                // 给排水系统特殊处理
+                if(currentTab === 'water') {
+                    renderWaterDeviceCard(grid, dev);
+                    return;
+                }
+
+                // 暖通设备处理（原有逻辑）
+                const statusClass = dev.status === 'running' ? 'status-running' : 
+                                   dev.status === 'fault' ? 'status-fault' : 
+                                   dev.status === 'standby' ? 'status-standby' : 'status-stop';
+                const statusText = dev.status === 'running' ? '运行中' : 
+                                  dev.status === 'fault' ? '故障' : 
+                                  dev.status === 'standby' ? '待机' : '停止';
+                
+                const isRunning = dev.status === 'running';
+                const cardClass = dev.status === 'running' ? 'running' : 
+                                  dev.status === 'fault' ? 'fault' : 
+                                  dev.status === 'stop' ? 'stop' : '';
+                const icon = dev.type === 'ac' ? '❄️' : dev.type === 'fresh' ? '🌪️' : '🌀';
+                
+                const card = document.createElement('div');
+                card.className = `device-card ${cardClass}`;
+                
+                let envInfo = '';
+                if(dev.type === 'ac') {
+                    envInfo = `
+                        <div class="env-params">
+                            <div class="env-param">
+                                <div class="param-value">${dev.roomTemp}°</div>
+                                <div class="param-label">室内温度</div>
+                            </div>
+                            <div class="env-param">
+                                <div class="param-value">${dev.setTemp}°</div>
+                                <div class="param-label">设定温度</div>
+                            </div>
+                        </div>
+                    `;
+                } else if(dev.type === 'fresh') {
+                    envInfo = `
+                        <div class="env-params">
+                            <div class="env-param">
+                                <div class="param-value">${dev.pressure}</div>
+                                <div class="param-label">风压Pa</div>
+                            </div>
+                            <div class="env-param">
+                                <div class="param-value" style="color: ${dev.filterStatus === '需更换' ? '#f5222d' : '#52c41a'}; font-size: 14px;">${dev.filterStatus}</div>
+                                <div class="param-label">滤网状态</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                let statusRow = '';
+                if(dev.type === 'ac') {
+                    statusRow = `
+                        <div class="info-row">
+                            <span class="info-icon">🌡️</span>
+                            <span>模式：${dev.mode === 'cool' ? '制冷' : dev.mode === 'heat' ? '制热' : '通风'}</span>
+                        </div>
+                    `;
+                } else if(dev.type === 'fresh') {
+                    statusRow = `
+                        <div class="info-row">
+                            <span class="info-icon">💨</span>
+                            <span>送风状态：${dev.status === 'running' ? '正常运行' : '停止'}</span>
+                        </div>
+                    `;
+                } else {
+                    statusRow = `
+                        <div class="info-row">
+                            <span class="info-icon">🌀</span>
+                            <span>运行状态：${dev.status === 'running' ? '正常运行' : '停止'}</span>
+                        </div>
+                    `;
+                }
+                
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="device-name">
+                            <span style="filter: ${isRunning ? 'none' : 'grayscale(100%)'}; opacity: ${isRunning ? '1' : '0.6'};">${icon}</span>
+                            ${dev.name}
+                        </div>
+                        <span class="status-tag ${statusClass}">${statusText}</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="info-row"><span class="info-icon">📍</span><span>${dev.pos}</span></div>
+                        <div class="info-row"><span class="info-icon">🕐</span><span>累计运行：${dev.runTime}</span></div>
+                        ${statusRow}
+                    </div>
+                    ${envInfo}
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // 给排水设备卡片渲染（已删除液位和下次维护显示）
+        function renderWaterDeviceCard(grid, dev) {
+            const icon = dev.type === 'water-pump' ? '💧' : dev.type === 'drain-pump' ? '🔧' : '🏊';
+            const cardClass = dev.status === 'running' ? 'water' : 
+                              dev.status === 'fault' ? 'fault' : '';
+            
+            let statusText, statusClass, paramDisplay;
+
+            if(dev.type === 'water-pump') {
+                statusText = dev.status === 'running' ? '运行中' : dev.status === 'fault' ? '故障' : '待机';
+                statusClass = dev.status === 'running' ? 'status-running' : dev.status === 'fault' ? 'status-fault' : 'status-stop';
+                paramDisplay = `
+                    <div class="env-params">
+                        <div class="env-param">
+                            <div class="param-value water">${dev.pressure.toFixed(2)}</div>
+                            <div class="param-label">出口压力MPa</div>
+                        </div>
+                        <div class="env-param">
+                            <div class="param-value">${dev.runTime}</div>
+                            <div class="param-label">累计运行</div>
+                        </div>
+                    </div>
+                `;
+            } else if(dev.type === 'drain-pump') {
+                statusText = dev.status === 'running' ? '排水中' : dev.status === 'fault' ? '故障' : '待机';
+                statusClass = dev.status === 'running' ? 'status-running' : dev.status === 'fault' ? 'status-fault' : 'status-stop';
+                paramDisplay = `
+                    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); text-align: center; color: #606266; font-size: 13px;">
+                        <div style="margin-bottom: 8px;"><strong>控制模式：</strong>${dev.mode === 'auto' ? '自动' : '手动'}</div>
+                        <div><strong>累计运行：</strong>${dev.runTime}</div>
+                    </div>
+                `;
+            } else if(dev.type === 'tank') {
+                statusText = '正常';
+                statusClass = 'status-running';
+                paramDisplay = `
+                    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); text-align: center; color: #606266; font-size: 13px;">
+                        <div style="color: #13c2c2; font-weight: 600; font-size: 16px;">${dev.pos}</div>
+                        <div style="margin-top: 8px;">设备运行正常</div>
+                    </div>
+                `;
+            }
+
+            const card = document.createElement('div');
+            card.className = `device-card ${cardClass}`;
+            card.innerHTML = `
+                <div class="card-header">
+                    <div class="device-name">
+                        <span style="color: #13c2c2;">${icon}</span>
+                        ${dev.name}
+                    </div>
+                    <span class="status-tag ${statusClass}">${statusText}</span>
+                </div>
+                <div class="card-body">
+                    <div class="info-row"><span class="info-icon">📍</span><span>${dev.pos}</span></div>
+                    <div class="info-row" style="display: none;"><span class="info-icon">🔧</span><span>${dev.maintainStatus}</span></div>
+                </div>
+                ${paramDisplay}
+            `;
+            grid.appendChild(card);
+        }
+
+        function switchDeviceTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.group-tab').forEach(el => el.classList.remove('active'));
+            event.target.classList.add('active');
+            renderDevices();
+        }
+
+        function filterDevices() {
+            renderDevices();
+        }
+
+        function resetFilter() {
+            document.getElementById('areaFilter').value = 'all';
+            document.getElementById('statusFilter').value = 'all';
+            document.getElementById('searchInput').value = '';
+            renderDevices();
+        }
+
+        // 设备台账（已删除给排水设备的液位和下次维护显示）
+        function renderDeviceManagement() {
+            const tbody = document.getElementById('deviceManagementTableBody');
+            const allDevs = getAllDevices();
+            
+            const type = document.getElementById('mgmtTypeFilter').value;
+            const status = document.getElementById('mgmtStatusFilter').value;
+            const area = document.getElementById('mgmtAreaFilter').value;
+            const search = document.getElementById('mgmtSearchInput').value.toLowerCase();
+            
+            let filtered = allDevs.filter(dev => {
+                if(type !== 'all') {
+                    if(type === 'water-pump' && dev.type !== 'water-pump') return false;
+                    if(type === 'drain-pump' && dev.type !== 'drain-pump') return false;
+                    if(type === 'tank' && dev.type !== 'tank') return false;
+                    if(['ac','fresh','supply','exhaust'].includes(type) && dev.type !== type) return false;
+                }
+                if(status !== 'all' && dev.status !== status) return false;
+                if(area !== 'all' && dev.area !== area) return false;
+                if(search && !dev.name.toLowerCase().includes(search) && !dev.id.toLowerCase().includes(search)) return false;
+                return true;
+            });
+            
+            document.getElementById('mgmtTotalCount').textContent = filtered.length;
+            
+            tbody.innerHTML = filtered.map(dev => {
+                const statusText = dev.status === 'running' ? '运行中' : 
+                                  dev.status === 'standby' ? '待机' : 
+                                  dev.status === 'fault' ? '故障' : '停止';
+                const statusDot = dev.status === 'running' ? 'dot-run' : 
+                                 dev.status === 'standby' ? 'dot-standby' : 
+                                 dev.status === 'fault' ? 'dot-fault' : 'dot-stop';
+                
+                let typeClass, typeText, params;
+                if(dev.type === 'ac') {
+                    typeClass = 'type-ac';
+                    typeText = '空调机组';
+                    const modeText = dev.mode === 'cool' ? '制冷' : dev.mode === 'heat' ? '制热' : '通风';
+                    params = `${modeText} · 设定${dev.setTemp}°C`;
+                } else if(dev.type === 'fresh') {
+                    typeClass = 'type-fresh';
+                    typeText = '新风机组';
+                    params = `风压${dev.pressure}Pa · ${dev.filterStatus}`;
+                } else if(dev.type === 'supply') {
+                    typeClass = 'type-supply';
+                    typeText = '送风机';
+                    params = dev.status === 'running' ? '运行中' : '停止';
+                } else if(dev.type === 'exhaust') {
+                    typeClass = 'type-exhaust';
+                    typeText = '排风机';
+                    params = dev.status === 'running' ? '运行中' : '停止';
+                } else if(dev.type === 'water-pump') {
+                    typeClass = 'type-water';
+                    typeText = '生活水泵';
+                    params = dev.status === 'running' ? `压力${dev.pressure}MPa` : '待机';
+                } else if(dev.type === 'drain-pump') {
+                    typeClass = 'type-water';
+                    typeText = '排污泵';
+                    params = `模式：${dev.mode === 'auto' ? '自动' : '手动'}`;
+                } else if(dev.type === 'tank') {
+                    typeClass = 'type-water';
+                    typeText = '水箱水池';
+                    params = '运行正常';
+                }
+                
+                // 给排水设备不显示下次维护时间
+                const isWaterDevice = ['water-pump', 'drain-pump', 'tank'].includes(dev.type);
+                
+                return `
+                    <tr>
+                        <td style="font-family: monospace; color: #606266;">${dev.id}</td>
+                        <td style="font-weight: 600;">${dev.name}</td>
+                        <td><span class="device-type-tag ${typeClass}">${typeText}</span></td>
+                        <td>${dev.pos}</td>
+                        <td><span class="status-dot ${statusDot}"></span>${statusText}</td>
+                        <td>${params}</td>
+                        <td style="font-size: 13px; color: #909399;">${dev.runTime || '-'}</td>
+                        <td style="font-size: 13px; color: ${dev.maintainStatus === '需保养' ? '#faad14' : '#52c41a'};">
+                            ${dev.maintainStatus}
+                            ${isWaterDevice ? '' : `<br><span style="font-size: 12px; color: #909399;">下次：${dev.nextMaintain || '-'}</span>`}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterDeviceManagement() {
+            renderDeviceManagement();
+        }
+
+        function resetDeviceManagementFilter() {
+            document.getElementById('mgmtTypeFilter').value = 'all';
+            document.getElementById('mgmtStatusFilter').value = 'all';
+            document.getElementById('mgmtAreaFilter').value = 'all';
+            document.getElementById('mgmtSearchInput').value = '';
+            renderDeviceManagement();
+        }
+
+        function exportDeviceManagement() {
+            showToast('正在导出设备台账...');
+        }
+
+        function renderAlarms() {
+            const tbody = document.getElementById('alarmTableBody');
+            tbody.innerHTML = alarms.map(alarm => {
+                const levelClass = alarm.level === 'high' ? 'level-high' : 
+                                  alarm.level === 'medium' ? 'level-medium' : 'level-low';
+                const levelText = alarm.level === 'high' ? '紧急' : 
+                                 alarm.level === 'medium' ? '重要' : '提示';
+                
+                return `
+                    <tr>
+                        <td style="font-family: monospace;">${alarm.time}</td>
+                        <td><span class="alarm-level ${levelClass}">${levelText}</span></td>
+                        <td>${alarm.device}</td>
+                        <td>${alarm.content}</td>
+                        <td style="color: #606266;">${alarm.duration}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderSystemLogs() {
+            const tbody = document.getElementById('systemLogTableBody');
+            tbody.innerHTML = systemLogs.map(log => {
+                const typeClass = log.type === 'control' ? 'log-type-control' : 'log-type-system';
+                const typeText = log.type === 'control' ? '远程控制' : '系统事件';
+                return `
+                    <tr>
+                        <td style="font-family: monospace; color: #606266;">${log.time}</td>
+                        <td><span class="log-type-tag ${typeClass}">${typeText}</span></td>
+                        <td>${log.device}</td>
+                        <td>${log.desc}</td>
+                        <td style="color: #1890ff; font-weight: 500;">${log.value}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 导航切换
+        function toggleSubmenu(element) {
+            const arrow = element.querySelector('.arrow');
+            const submenu = document.getElementById('hvacSubmenu');
+            submenu.classList.toggle('expanded');
+            arrow.classList.toggle('expanded');
+        }
+
+        function clearAllActive() {
+            document.querySelectorAll('.submenu-item').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        }
+
+        function switchToDevice() {
+            clearAllActive();
+            event.target.classList.add('active');
+            document.getElementById('deviceView').classList.add('active');
+            currentTab = 'ac';
+            renderDevices();
+        }
+
+        function switchToDeviceManagement() {
+            clearAllActive();
+            event.target.classList.add('active');
+            document.getElementById('deviceManagementView').classList.add('active');
+            renderDeviceManagement();
+        }
+
+        function switchToAlarmInfo() {
+            clearAllActive();
+            event.target.classList.add('active');
+            document.getElementById('alarmInfoView').classList.add('active');
+            renderAlarms();
+        }
+
+        function switchToSystemLog() {
+            clearAllActive();
+            event.target.classList.add('active');
+            document.getElementById('systemLogView').classList.add('active');
+            renderSystemLogs();
+        }
+
+        function showToast(message) {
+            const existing = document.querySelector('.toast');
+            if(existing) existing.remove();
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        function switchView(view) {}
+
+        // 初始化
+        renderDevices();
+        renderDeviceManagement();
+        renderAlarms();
+    </script>
+</body>
+</html>

@@ -309,18 +309,18 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .patrol-config-page { display: flex; height: 100%; }
-.sidebar { width: 220px; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
-.sidebar-header { display: flex; gap: 8px; padding: 10px; border-bottom: 1px solid #e5e7eb; }
+.sidebar { width: 220px; border-right: 1px solid var(--el-border-color-lighter); display: flex; flex-direction: column; }
+.sidebar-header { display: flex; gap: 8px; padding: 10px; border-bottom: 1px solid var(--el-border-color-lighter); }
 .sidebar-list { flex: 1; }
 .content { flex: 1; display: flex; flex-direction: column; }
-.content-header { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-weight: 600; }
+.content-header { padding: 10px 12px; border-bottom: 1px solid var(--el-border-color-lighter); font-weight: 600; }
 .grid { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 12px; padding: 12px; }
-.grid-item { border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; padding: 10px; display: flex; flex-direction: column; align-items: center; }
-.grid-item.add { display: grid; place-items: center; color: #94a3b8; }
+.grid-item { border: 1px solid var(--el-border-color-lighter); border-radius: 6px; background: var(--el-bg-color-overlay); padding: 10px; display: flex; flex-direction: column; align-items: center; }
+.grid-item.add { display: grid; place-items: center; color: var(--el-text-color-secondary); }
 .task-info { display: flex; gap: 4px; margin-bottom: 8px; }
 .layout-preview { width: 100%; height: 90px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 4px; }
-.layout-preview .cell { background: #eef2f7; border: 1px solid #d9e1ea; border-radius: 3px; }
+.layout-preview .cell { background: var(--el-fill-color-light); border: 1px solid var(--el-border-color-lighter); border-radius: 3px; }
 .layout-actions { display: flex; gap: 8px; margin-top: 8px; }
-.layout-name { margin-top: 4px; color: #64748b; }
-.footer { display: flex; justify-content: flex-end; padding: 12px; border-top: 1px solid #e5e7eb; }
+.layout-name { margin-top: 4px; color: var(--el-text-color-secondary); }
+.footer { display: flex; justify-content: flex-end; padding: 12px; border-top: 1px solid var(--el-border-color-lighter); }
 </style>

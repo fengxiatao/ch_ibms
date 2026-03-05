@@ -774,15 +774,15 @@ onUnmounted(() => {
 }
 
 .camera-card {
-  border: 2px solid #ddd;
+  border: 2px solid var(--el-border-color);
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   transition: all 0.3s;
-  background: #fff;
+  background: var(--el-bg-color-overlay);
 
   &.selected {
-    border-color: #409EFF;
+    border-color: var(--el-color-primary);
     box-shadow: 0 4px 15px rgba(64, 158, 255, 0.3);
   }
 

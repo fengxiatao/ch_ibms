@@ -490,7 +490,7 @@ public class AlarmPlugin implements PassiveDeviceHandler {
             return;
         }
 
-        log.debug("{} 收到数据: deviceId={}, length={}", LOG_PREFIX, deviceId, data.readableBytes());
+        log.info("{} 收到数据: deviceId={}, length={}", LOG_PREFIX, deviceId, data.readableBytes());
 
         try {
             // 更新最后活跃时间
@@ -518,7 +518,7 @@ public class AlarmPlugin implements PassiveDeviceHandler {
      * @param message  消息内容
      */
     private void handleMessage(Long deviceId, String message) {
-        log.debug("{} 处理消息: deviceId={}, message={}", LOG_PREFIX, deviceId, message);
+        log.info("{} 处理消息: deviceId={}, message={}", LOG_PREFIX, deviceId, message);
         
         // 首先尝试使用 OPC 协议解析（IP9500 格式）
         AlarmProtocolCodec.OpcParseResult opcResult = protocolCodec.parseOpcMessage(message);
@@ -722,7 +722,7 @@ public class AlarmPlugin implements PassiveDeviceHandler {
         
         // 心跳消息（事件码为 0000）
         if (opcResult.isHeartbeat()) {
-            log.trace("{} 收到 OPC 心跳: deviceId={}, seq={}", LOG_PREFIX, deviceId, sequence);
+            log.debug("{} 收到 OPC 心跳: deviceId={}, seq={}", LOG_PREFIX, deviceId, sequence);
             HeartbeatData heartbeatData = HeartbeatData.builder()
                     .deviceId(deviceId)
                     .timestamp(System.currentTimeMillis())

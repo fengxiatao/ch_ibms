@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.iot.controller.admin.epatrol.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -28,9 +29,11 @@ public class EpatrolPlanRespVO {
     private String routeName;
 
     @Schema(description = "开始日期", example = "2024-01-01")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate startDate;
 
     @Schema(description = "结束日期", example = "2024-12-31")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate endDate;
 
     @Schema(description = "星期选择", example = "[1,2,3,4,5]")
@@ -43,6 +46,7 @@ public class EpatrolPlanRespVO {
     private String remark;
 
     @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
 
     @Schema(description = "时段列表")
@@ -50,6 +54,9 @@ public class EpatrolPlanRespVO {
 
     @Schema(description = "巡更人员姓名列表（用于列表展示）")
     private List<String> personNames;
+
+    @Schema(description = "巡更路线名称列表（用于列表展示）")
+    private List<String> routeNames;
 
     @Schema(description = "执行时间段描述（用于列表展示）")
     private String timeRangeDesc;
@@ -61,10 +68,18 @@ public class EpatrolPlanRespVO {
         @Schema(description = "时段ID", example = "1")
         private Long id;
 
-        @Schema(description = "开始时间", example = "08:00")
+        @Schema(description = "巡更路线ID", example = "1")
+        private Long routeId;
+
+        @Schema(description = "巡更路线名称", example = "A栋巡更路线")
+        private String routeName;
+
+        @Schema(description = "开始时间", example = "08:00:00")
+        @JsonFormat(pattern = "HH:mm:ss")
         private LocalTime startTime;
 
-        @Schema(description = "结束时间", example = "09:00")
+        @Schema(description = "结束时间", example = "09:00:00")
+        @JsonFormat(pattern = "HH:mm:ss")
         private LocalTime endTime;
 
         @Schema(description = "巡更时长（分钟）", example = "60")

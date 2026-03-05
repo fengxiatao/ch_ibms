@@ -25,6 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * 门禁一代设备 SDK 封装
@@ -100,8 +102,38 @@ public class AccessGen1SdkWrapper implements AccessGen1SdkOperations {
     private final ThreadLocal<Integer> lastErrorCode = ThreadLocal.withInitial(() -> 0);
     private final ThreadLocal<String> lastErrorMessage = ThreadLocal.withInitial(() -> "");
     
+    /** 
+     * 设备锁映射表 - 按登录句柄存储锁，确保同一设备的操作串行化
+     * <p>大华 SDK 对同一登录句柄的并发操作可能导致数据校验错误（错误码 21），
+     * 因此需要对同一设备的操作进行串行化控制。</p>
+     */
+    private final ConcurrentHashMap<Long, ReentrantLock> deviceLocks = new ConcurrentHashMap<>();
+    
+    /** 设备锁等待超时时间（秒） */
+    private static final int DEVICE_LOCK_TIMEOUT_SECONDS = 15;
+    
     /** 断线监听器列表 */
     private final List<DisconnectListener> disconnectListeners = new ArrayList<>();
+    
+    /**
+     * 获取设备锁（按登录句柄）
+     * <p>如果锁不存在则创建一个新的锁</p>
+     *
+     * @param loginHandle 登录句柄
+     * @return 对应的设备锁
+     */
+    private ReentrantLock getDeviceLock(long loginHandle) {
+        return deviceLocks.computeIfAbsent(loginHandle, k -> new ReentrantLock(true)); // 使用公平锁
+    }
+    
+    /**
+     * 移除设备锁（在设备登出时调用）
+     *
+     * @param loginHandle 登录句柄
+     */
+    public void removeDeviceLock(long loginHandle) {
+        deviceLocks.remove(loginHandle);
+    }
     
     /**
      * 断线监听器接口
@@ -357,10 +389,15 @@ public class AccessGen1SdkWrapper implements AccessGen1SdkOperations {
                 log.warn("{} 登出失败: handle={}, error={}", LOG_PREFIX, loginHandle, ToolKits.getErrorCodePrint());
             }
             
+            // 清理设备锁
+            removeDeviceLock(loginHandle);
+            
             return result;
             
         } catch (Exception e) {
             log.error("{} 登出异常: handle={}, error={}", LOG_PREFIX, loginHandle, e.getMessage(), e);
+            // 即使登出失败，也尝试清理设备锁
+            removeDeviceLock(loginHandle);
             return false;
         }
     }
@@ -369,6 +406,8 @@ public class AccessGen1SdkWrapper implements AccessGen1SdkOperations {
 
     /**
      * 远程开门
+     * 
+     * <p>注意：此方法使用设备锁确保同一设备的操作串行化，避免并发操作导致的数据校验错误（错误码 21）。</p>
      * 
      * @param loginHandle 登录句柄
      * @param channelNo   通道号（从 1 开始，如：1=第一个门，2=第二个门）
@@ -379,15 +418,30 @@ public class AccessGen1SdkWrapper implements AccessGen1SdkOperations {
             return AccessGen1OperationResult.failure("无效的登录句柄");
         }
         
+        // 获取设备锁，确保同一设备的操作串行化
+        ReentrantLock lock = getDeviceLock(loginHandle);
+        boolean lockAcquired = false;
+        
         try {
-            // 根据测试结果和官方文档：
-            // - nChannelID 直接使用业务层的 channelNo（从 1 开始）
-            // - 官方示例中 nChannelID=0 表示"开全部门"（特殊值），实际门编号从 1 开始
-            // - 如果某个门开门失败，需要检查设备的门通道配置
-            log.info("{} 远程开门: handle={}, channelNo={}", LOG_PREFIX, loginHandle, channelNo);
+            // 尝试获取锁，带超时
+            lockAcquired = lock.tryLock(DEVICE_LOCK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!lockAcquired) {
+                log.warn("{} 获取设备锁超时，设备可能正忙: handle={}, channelNo={}", LOG_PREFIX, loginHandle, channelNo);
+                return AccessGen1OperationResult.failure("设备忙，请稍后重试");
+            }
+            
+            // 【重要】通道号转换：
+            // - 业务层使用从 1 开始的通道号（channelNo=1 表示第一个门）
+            // - SDK 的 nChannelID 从 0 开始（nChannelID=0 表示第一个门）
+            // - 因此需要将 channelNo - 1 传给 SDK
+            int sdkChannelId = channelNo - 1;
+            if (sdkChannelId < 0) {
+                sdkChannelId = 0;  // 保护性处理
+            }
+            log.info("{} 远程开门: handle={}, channelNo={}, sdkChannelId={}", LOG_PREFIX, loginHandle, channelNo, sdkChannelId);
             
             NET_CTRL_ACCESS_OPEN openInfo = new NET_CTRL_ACCESS_OPEN();
-            openInfo.nChannelID = channelNo;
+            openInfo.nChannelID = sdkChannelId;
             openInfo.emOpenDoorType = EM_OPEN_DOOR_TYPE.EM_OPEN_DOOR_TYPE_REMOTE;
             // 使用标准方式：write() + getPointer()
             openInfo.write();
@@ -410,14 +464,24 @@ public class AccessGen1SdkWrapper implements AccessGen1SdkOperations {
                 return AccessGen1OperationResult.failure("开门失败: " + errorMsg);
             }
             
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("{} 开门被中断: channelNo={}", LOG_PREFIX, channelNo);
+            return AccessGen1OperationResult.failure("操作被中断");
         } catch (Exception e) {
             log.error("{} 开门异常: channelNo={}, error={}", LOG_PREFIX, channelNo, e.getMessage(), e);
             return AccessGen1OperationResult.failure("开门异常: " + e.getMessage());
+        } finally {
+            if (lockAcquired) {
+                lock.unlock();
+            }
         }
     }
 
     /**
      * 远程关门
+     * 
+     * <p>注意：此方法使用设备锁确保同一设备的操作串行化，避免并发操作导致的数据校验错误（错误码 21）。</p>
      * 
      * @param loginHandle 登录句柄
      * @param channelNo   通道号（从 1 开始，如：1=第一个门，2=第二个门）
@@ -428,12 +492,27 @@ public class AccessGen1SdkWrapper implements AccessGen1SdkOperations {
             return AccessGen1OperationResult.failure("无效的登录句柄");
         }
         
+        // 获取设备锁，确保同一设备的操作串行化
+        ReentrantLock lock = getDeviceLock(loginHandle);
+        boolean lockAcquired = false;
+        
         try {
-            // 注意：门禁一代设备的 nChannelID 从 1 开始（与业务层的 channelNo 一致）
-            log.info("{} 远程关门: handle={}, channelNo={}", LOG_PREFIX, loginHandle, channelNo);
+            // 尝试获取锁，带超时
+            lockAcquired = lock.tryLock(DEVICE_LOCK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!lockAcquired) {
+                log.warn("{} 获取设备锁超时，设备可能正忙: handle={}, channelNo={}", LOG_PREFIX, loginHandle, channelNo);
+                return AccessGen1OperationResult.failure("设备忙，请稍后重试");
+            }
+            
+            // 【重要】通道号转换：业务层从 1 开始，SDK 从 0 开始
+            int sdkChannelId = channelNo - 1;
+            if (sdkChannelId < 0) {
+                sdkChannelId = 0;
+            }
+            log.info("{} 远程关门: handle={}, channelNo={}, sdkChannelId={}", LOG_PREFIX, loginHandle, channelNo, sdkChannelId);
             
             NET_CTRL_ACCESS_CLOSE closeInfo = new NET_CTRL_ACCESS_CLOSE();
-            closeInfo.nChannelID = channelNo;
+            closeInfo.nChannelID = sdkChannelId;
             closeInfo.write();
             
             boolean result = getNetSdk().CLIENT_ControlDeviceEx(
@@ -454,9 +533,17 @@ public class AccessGen1SdkWrapper implements AccessGen1SdkOperations {
                 return AccessGen1OperationResult.failure("关门失败: " + errorMsg);
             }
             
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("{} 关门被中断: channelNo={}", LOG_PREFIX, channelNo);
+            return AccessGen1OperationResult.failure("操作被中断");
         } catch (Exception e) {
             log.error("{} 关门异常: channelNo={}, error={}", LOG_PREFIX, channelNo, e.getMessage(), e);
             return AccessGen1OperationResult.failure("关门异常: " + e.getMessage());
+        } finally {
+            if (lockAcquired) {
+                lock.unlock();
+            }
         }
     }
 
@@ -703,6 +790,201 @@ public class AccessGen1SdkWrapper implements AccessGen1SdkOperations {
         }
     }
 
+
+    // ==================== 密码设置操作 ====================
+
+    /**
+     * 设置用户密码（使用密码记录集方式：NET_RECORDSET_ACCESS_CTL_PWD）
+     * 
+     * <p>大华一代门禁设备的密码需要通过密码记录集来设置，而不是通过卡片记录的 szPsw 字段。
+     * 使用 CLIENT_ControlDevice + CTRLTYPE_CTRL_RECORDSET_INSERT + NET_RECORD_ACCESSCTLPWD</p>
+     * 
+     * @param loginHandle 登录句柄
+     * @param userId      用户ID（与卡号对应）
+     * @param password    密码
+     * @param doors       门权限数组（从0开始）
+     * @return 操作结果
+     */
+    public AccessGen1OperationResult setPassword(long loginHandle, String userId, String password, int[] doors) {
+        if (!validateHandle(loginHandle)) {
+            return AccessGen1OperationResult.failure("无效的登录句柄");
+        }
+        if (!StringUtils.hasText(userId)) {
+            return AccessGen1OperationResult.failure("userId 不能为空");
+        }
+        if (!StringUtils.hasText(password)) {
+            return AccessGen1OperationResult.failure("password 不能为空");
+        }
+        
+        try {
+            log.info("{} 设置用户密码（记录集方式）: userId={}, passwordLen={}, doors={}", 
+                    LOG_PREFIX, userId, password.length(), doors != null ? java.util.Arrays.toString(doors) : "[]");
+            
+            // 构建密码记录集结构体
+            NET_RECORDSET_ACCESS_CTL_PWD pwdRecord = new NET_RECORDSET_ACCESS_CTL_PWD();
+            
+            // 设置用户ID
+            fillBytes(pwdRecord.szUserID, userId);
+            
+            // 设置开门密码
+            fillBytes(pwdRecord.szDoorOpenPwd, password);
+            
+            // 设置门权限
+            if (doors != null && doors.length > 0) {
+                pwdRecord.nDoorNum = Math.min(doors.length, pwdRecord.sznDoors.length);
+                for (int i = 0; i < pwdRecord.nDoorNum; i++) {
+                    pwdRecord.sznDoors[i] = doors[i];
+                }
+            } else {
+                // 默认第一道门
+                pwdRecord.nDoorNum = 1;
+                pwdRecord.sznDoors[0] = 0;
+            }
+            
+            // 设置时间段（255表示全天有效）
+            pwdRecord.nTimeSectionNum = pwdRecord.nDoorNum;
+            for (int i = 0; i < pwdRecord.nTimeSectionNum; i++) {
+                pwdRecord.nTimeSectionIndex[i] = 255;
+            }
+            
+            // 设置有效期（默认5年）
+            java.time.LocalDateTime now = java.time.LocalDateTime.now();
+            java.time.LocalDateTime endTime = now.plusYears(5);
+            
+            pwdRecord.stuValidStartTime = new NET_TIME();
+            pwdRecord.stuValidStartTime.dwYear = now.getYear();
+            pwdRecord.stuValidStartTime.dwMonth = now.getMonthValue();
+            pwdRecord.stuValidStartTime.dwDay = now.getDayOfMonth();
+            pwdRecord.stuValidStartTime.dwHour = now.getHour();
+            pwdRecord.stuValidStartTime.dwMinute = now.getMinute();
+            pwdRecord.stuValidStartTime.dwSecond = now.getSecond();
+            
+            pwdRecord.stuValidEndTime = new NET_TIME();
+            pwdRecord.stuValidEndTime.dwYear = endTime.getYear();
+            pwdRecord.stuValidEndTime.dwMonth = endTime.getMonthValue();
+            pwdRecord.stuValidEndTime.dwDay = endTime.getDayOfMonth();
+            pwdRecord.stuValidEndTime.dwHour = endTime.getHour();
+            pwdRecord.stuValidEndTime.dwMinute = endTime.getMinute();
+            pwdRecord.stuValidEndTime.dwSecond = endTime.getSecond();
+            
+            // 构建记录集操作参数
+            NET_CTRL_RECORDSET_INSERT_PARAM insertParam = new NET_CTRL_RECORDSET_INSERT_PARAM();
+            insertParam.stuCtrlRecordSetInfo.emType = EM_NET_RECORD_TYPE.NET_RECORD_ACCESSCTLPWD; // 门禁密码记录类型
+            insertParam.stuCtrlRecordSetInfo.pBuf = pwdRecord.getPointer();
+            
+            pwdRecord.write();
+            insertParam.write();
+            
+            // 调用设备控制接口插入密码记录
+            boolean result = getNetSdk().CLIENT_ControlDevice(
+                    new LLong(loginHandle),
+                    CtrlType.CTRLTYPE_CTRL_RECORDSET_INSERT,
+                    insertParam.getPointer(),
+                    TIMEOUT_MS
+            );
+            
+            insertParam.read();
+            pwdRecord.read();
+            
+            if (result) {
+                int recNo = insertParam.stuCtrlRecordSetResult.nRecNo;
+                log.info("{} ✅ 设置用户密码成功（记录集方式）: userId={}, recNo={}", LOG_PREFIX, userId, recNo);
+                return AccessGen1OperationResult.success("设置密码成功")
+                        .withData("recNo", recNo);
+            } else {
+                int errorCode = getNetSdk().CLIENT_GetLastError();
+                String errorMsg = ToolKits.getErrorCodePrint();
+                
+                // 错误码 1205 表示记录已存在，尝试更新
+                if (errorCode == (0x80000000 | 1205) || (errorCode & 0x7FFFFFFF) == 1205) {
+                    log.info("{} 密码记录已存在，尝试更新: userId={}", LOG_PREFIX, userId);
+                    return updatePassword(loginHandle, userId, password, doors);
+                }
+                
+                log.error("{} 设置用户密码失败（记录集方式）: userId={}, errorCode={}, error={}", 
+                        LOG_PREFIX, userId, errorCode, errorMsg);
+                return AccessGen1OperationResult.failure("设置密码失败: " + errorMsg, errorCode);
+            }
+        } catch (Exception e) {
+            log.error("{} 设置用户密码异常: userId={}, error={}", LOG_PREFIX, userId, e.getMessage(), e);
+            return AccessGen1OperationResult.failure("设置密码异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 更新用户密码（先删除后插入）
+     */
+    private AccessGen1OperationResult updatePassword(long loginHandle, String userId, String password, int[] doors) {
+        try {
+            // 先查询密码记录获取 recNo
+            NET_IN_FIND_RECORD_PARAM inParam = new NET_IN_FIND_RECORD_PARAM();
+            inParam.emType = EM_NET_RECORD_TYPE.NET_RECORD_ACCESSCTLPWD;
+            
+            FIND_RECORD_ACCESSCTLPWD_CONDITION condition = new FIND_RECORD_ACCESSCTLPWD_CONDITION();
+            fillBytes(condition.szUserID, userId);
+            condition.write();
+            inParam.pQueryCondition = condition.getPointer();
+            
+            NET_OUT_FIND_RECORD_PARAM outParam = new NET_OUT_FIND_RECORD_PARAM();
+            
+            inParam.write();
+            if (!getNetSdk().CLIENT_FindRecord(new LLong(loginHandle), inParam, outParam, TIMEOUT_MS)) {
+                log.warn("{} 查询密码记录失败，尝试直接插入: userId={}", LOG_PREFIX, userId);
+                // 查询失败，可能是不存在，直接返回原始错误
+                return AccessGen1OperationResult.failure("密码记录不存在，无法更新");
+            }
+            
+            LLong findHandle = outParam.lFindeHandle;
+            Integer recNoToDelete = null;
+            
+            try {
+                // 获取记录
+                NET_RECORDSET_ACCESS_CTL_PWD pwdRecord = new NET_RECORDSET_ACCESS_CTL_PWD();
+                NET_IN_FIND_NEXT_RECORD_PARAM nextIn = new NET_IN_FIND_NEXT_RECORD_PARAM();
+                nextIn.lFindeHandle = findHandle;
+                nextIn.nFileCount = 1;
+                
+                NET_OUT_FIND_NEXT_RECORD_PARAM nextOut = new NET_OUT_FIND_NEXT_RECORD_PARAM();
+                nextOut.pRecordList = pwdRecord.getPointer();
+                nextOut.nMaxRecordNum = 1;
+                
+                pwdRecord.write();
+                if (getNetSdk().CLIENT_FindNextRecord(nextIn, nextOut, TIMEOUT_MS)) {
+                    pwdRecord.read();
+                    if (nextOut.nRetRecordNum > 0) {
+                        recNoToDelete = pwdRecord.nRecNo;
+                    }
+                }
+            } finally {
+                if (findHandle.longValue() > 0) {
+                    getNetSdk().CLIENT_FindRecordClose(findHandle);
+                }
+            }
+            
+            // 删除旧记录
+            if (recNoToDelete != null) {
+                log.info("{} 删除旧密码记录: userId={}, recNo={}", LOG_PREFIX, userId, recNoToDelete);
+                NET_CTRL_RECORDSET_PARAM deleteParam = new NET_CTRL_RECORDSET_PARAM();
+                deleteParam.emType = EM_NET_RECORD_TYPE.NET_RECORD_ACCESSCTLPWD;
+                deleteParam.pBuf = new com.sun.jna.ptr.IntByReference(recNoToDelete).getPointer();
+                
+                deleteParam.write();
+                getNetSdk().CLIENT_ControlDevice(
+                        new LLong(loginHandle),
+                        CtrlType.CTRLTYPE_CTRL_RECORDSET_REMOVE,
+                        deleteParam.getPointer(),
+                        TIMEOUT_MS
+                );
+            }
+            
+            // 重新插入
+            return setPassword(loginHandle, userId, password, doors);
+            
+        } catch (Exception e) {
+            log.error("{} 更新密码记录异常: userId={}, error={}", LOG_PREFIX, userId, e.getMessage(), e);
+            return AccessGen1OperationResult.failure("更新密码异常: " + e.getMessage());
+        }
+    }
 
     // ==================== Recordset 查询操作 ====================
 

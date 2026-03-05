@@ -511,14 +511,14 @@ watch(() => props.taskData, (newVal) => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #f5f5f5;
+  background: var(--el-bg-color-page, var(--el-bg-color));
 }
 
 // 顶部配置区
 .top-config {
-  background: #fff;
+  background: var(--el-bg-color);
   padding: 14px 20px;
-  border-bottom: 1px solid #dcdfe6;
+  border-bottom: 1px solid var(--el-border-color);
   
   .config-form {
     display: flex;
@@ -530,7 +530,7 @@ watch(() => props.taskData, (newVal) => {
       margin-right: 0;
       
       .el-form-item__label {
-        color: #606266;
+        color: var(--el-text-color-regular);
         font-weight: normal;
       }
     }
@@ -542,25 +542,25 @@ watch(() => props.taskData, (newVal) => {
   flex: 1;
   display: flex;
   gap: 1px;
-  background: #e0e0e0;
+  background: var(--el-border-color-lighter);
   overflow: hidden;
 }
 
 // 左侧设备树
 .left-tree-panel {
   width: 280px;
-  background: #fff;
+  background: var(--el-bg-color);
   display: flex;
   flex-direction: column;
   
   .tree-header {
     padding: 12px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--el-border-color-lighter);
   }
   
   .tree-search {
     padding: 12px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--el-border-color-lighter);
   }
   
   .tree-content {
@@ -589,7 +589,7 @@ watch(() => props.taskData, (newVal) => {
   }
   
   .tree-footer {
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--el-border-color-lighter);
     
     :deep(.el-collapse) {
       border: none;
@@ -605,7 +605,7 @@ watch(() => props.taskData, (newVal) => {
       border-radius: 4px;
       
       &:hover {
-        background: #f5f5f5;
+        background: var(--el-fill-color-light);
       }
     }
   }
@@ -715,21 +715,21 @@ watch(() => props.taskData, (newVal) => {
 // 右侧面板
 .right-panel {
   width: 200px;
-  background: #fff;
+  background: var(--el-bg-color);
   padding: 16px;
 }
 
 // 底部通道列表
 .bottom-channel-list {
-  background: #fff;
-  border-top: 1px solid #e0e0e0;
+  background: var(--el-bg-color);
+  border-top: 1px solid var(--el-border-color-lighter);
   
   .channel-table-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 12px 16px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--el-border-color-lighter);
     font-weight: 600;
     
     .table-actions {
@@ -746,7 +746,7 @@ watch(() => props.taskData, (newVal) => {
       }
       
       &::-webkit-scrollbar-thumb {
-        background: #ccc;
+        background: var(--el-border-color);
         border-radius: 4px;
       }
     }

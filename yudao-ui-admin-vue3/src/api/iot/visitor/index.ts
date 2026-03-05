@@ -108,8 +108,9 @@ export interface VisitorApplyPageReqVO {
   visitReason?: string
   visitStatus?: number
   approveStatus?: number
-  visitTimeStart?: Date
-  visitTimeEnd?: Date
+  visitTimeStart?: string
+  visitTimeEnd?: string
+  hasVisited?: boolean // 是否已签到（用于来访记录查询）
 }
 
 export interface VisitorAuthDispatchReqVO {
@@ -175,6 +176,44 @@ export const GenderOptions = [
 ]
 
 // ==================== API ====================
+
+// ==================== 来访事由 API ====================
+
+export const VisitorReasonApi = {
+  // 获取来访事由列表
+  getReasonList: async () => {
+    return await request.get({ url: '/iot/visitor/reason/list' })
+  },
+  // 获取来访事由分页
+  getReasonPage: async (params: any) => {
+    return await request.get({ url: '/iot/visitor/reason/page', params })
+  },
+  // 创建来访事由
+  createReason: async (data: any) => {
+    return await request.post({ url: '/iot/visitor/reason/create', data })
+  },
+  // 更新来访事由
+  updateReason: async (data: any) => {
+    return await request.put({ url: '/iot/visitor/reason/update', data })
+  },
+  // 删除来访事由
+  deleteReason: async (id: number) => {
+    return await request.delete({ url: '/iot/visitor/reason/delete', params: { id } })
+  }
+}
+
+// ==================== 访客开门记录 API ====================
+
+export const VisitorAccessRecordApi = {
+  // 获取访客开门记录
+  getAccessRecords: async (applyId: number) => {
+    return await request.get({ url: '/iot/visitor/access-record/list', params: { applyId } })
+  },
+  // 获取访客开门记录分页
+  getAccessRecordPage: async (params: any) => {
+    return await request.get({ url: '/iot/visitor/access-record/page', params })
+  }
+}
 
 export const VisitorApplyApi = {
   // 创建访客申请

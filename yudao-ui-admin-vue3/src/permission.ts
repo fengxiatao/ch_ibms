@@ -8,6 +8,8 @@ import { usePageLoading } from '@/hooks/web/usePageLoading'
 import { useDictStoreWithOut } from '@/store/modules/dict'
 import { useUserStoreWithOut } from '@/store/modules/user'
 import { usePermissionStoreWithOut } from '@/store/modules/permission'
+import { useAppStoreWithOut } from '@/store/modules/app'
+import { initIotWebSocket } from '@/utils/iotWebSocket'
 
 const { start, done } = useNProgress()
 
@@ -76,6 +78,8 @@ router.beforeEach(async (to, from, next) => {
           isRelogin.show = true
           await userStore.setUserInfoAction()
           isRelogin.show = false
+          // 初始化 IoT WebSocket 连接（用于接收设备状态、报警事件等实时推送）
+          initIotWebSocket()
           // 后端过滤菜单
           await permissionStore.generateRoutes()
           permissionStore.getAddRouters.forEach((route) => {
@@ -109,4 +113,17 @@ router.afterEach((to) => {
   useTitle(to?.meta?.title as string)
   done() // 结束Progress
   loadDone()
+  
+  // 首页全屏模式控制：进入首页时启用，离开首页时关闭
+  const appStore = useAppStoreWithOut()
+  const isHomePage = to.path === '/' || to.path === '/index'
+  
+  if (isHomePage) {
+    // 进入首页，启用全屏模式
+    appStore.setHomeFullscreen(true)
+    appStore.setFooter(false)
+  } else {
+    // 离开首页，关闭全屏模式
+    appStore.setHomeFullscreen(false)
+  }
 })

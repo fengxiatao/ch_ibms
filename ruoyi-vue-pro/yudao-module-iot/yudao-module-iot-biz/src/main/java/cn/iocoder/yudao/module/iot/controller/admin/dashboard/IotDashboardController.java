@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.iot.controller.admin.dashboard;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.iot.controller.admin.dashboard.vo.AlertStatisticsRespVO;
 import cn.iocoder.yudao.module.iot.controller.admin.dashboard.vo.DeviceStatisticsRespVO;
+import cn.iocoder.yudao.module.iot.controller.admin.dashboard.vo.HomeScreenRespVO;
 import cn.iocoder.yudao.module.iot.controller.admin.dashboard.vo.RealTimeMonitorRespVO;
 import cn.iocoder.yudao.module.iot.service.dashboard.IotDashboardService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,6 +52,13 @@ public class IotDashboardController {
     @PermitAll
     public CommonResult<RealTimeMonitorRespVO> getRealTimeMonitor() {
         return success(dashboardService.getRealTimeMonitor());
+    }
+
+    @GetMapping("/home-screen")
+    @Operation(summary = "获取首页大屏统计数据")
+    @PermitAll
+    public CommonResult<HomeScreenRespVO> getHomeScreenData() {
+        return success(dashboardService.getHomeScreenData());
     }
 }
 

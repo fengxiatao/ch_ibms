@@ -41,15 +41,13 @@
           />
         </el-form-item>
         <el-form-item label="操作类型" prop="operationType">
-          <el-select v-model="queryParams.operationType" placeholder="请选择操作类型" clearable>
+          <el-select v-model="queryParams.operationType" placeholder="请选择操作类型" clearable style="width: 180px">
             <el-option label="外出布防" value="ARM_ALL" />
             <el-option label="居家布防" value="ARM_EMERGENCY" />
             <el-option label="撤防" value="DISARM" />
             <el-option label="消警" value="CLEAR_ALARM" />
             <el-option label="旁路" value="BYPASS" />
             <el-option label="撤销旁路" value="UNBYPASS" />
-            <el-option label="查询" value="QUERY" />
-            <el-option label="刷新" value="REFRESH" />
             <el-option label="重命名" value="RENAME" />
           </el-select>
         </el-form-item>
@@ -284,8 +282,6 @@ const getOperationTypeTag = (type: string) => {
     CLEAR_ALARM: 'warning',
     BYPASS: 'primary',
     UNBYPASS: 'primary',
-    QUERY: '',
-    REFRESH: '',
     RENAME: 'primary'
   }
   return tagMap[type] || ''
@@ -300,8 +296,6 @@ const getOperationTypeText = (type: string) => {
     CLEAR_ALARM: '消警',
     BYPASS: '旁路',
     UNBYPASS: '撤销旁路',
-    QUERY: '查询',
-    REFRESH: '刷新',
     RENAME: '重命名'
   }
   return textMap[type] || type

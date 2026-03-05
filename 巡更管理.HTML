@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电子巡更管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        body {
+            background-color: #0f172a;
+            color: #e2e8f0;
+        }
+        
+        .sidebar-item {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .sidebar-item:hover {
+            transform: translateX(4px);
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        
+        .sidebar-item.active {
+            background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            color: white;
+        }
+        
+        .glass-effect {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .content-fade {
+            animation: fadeIn 0.4s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .hover-lift {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .hover-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+        
+        .table-row-hover:hover {
+            background-color: rgba(59, 130, 246, 0.05);
+        }
+        
+        .tag-blue {
+            color: #60a5fa;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        .tag-green {
+            color: #4ade80;
+            background: rgba(74, 222, 128, 0.1);
+            border: 1px solid rgba(74, 222, 128, 0.3);
+        }
+        
+        .tag-red {
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.1);
+            border: 1px solid rgba(248, 113, 113, 0.3);
+        }
+        
+        .tag-orange {
+            color: #fb923c;
+            background: rgba(251, 146, 60, 0.1);
+            border: 1px solid rgba(251, 146, 60, 0.3);
+        }
+        
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+        
+        .slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        
+        .status-badge {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+    </style>
+</head>
+<body class="antialiased overflow-hidden h-screen">
+
+    <div class="flex h-screen">
+        <!-- 侧边栏 -->
+        <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col flex-shrink-0">
+            <!-- Logo -->
+            <div class="h-16 flex items-center px-6 bg-slate-950 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-white tracking-tight">智慧安防</h1>
+                        <p class="text-xs text-slate-500">Patrol System</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 导航菜单 -->
+            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1 custom-scrollbar">
+                <div class="px-3 py-2 text-xs text-slate-500 uppercase tracking-wider font-semibold">电子巡更</div>
+                
+                <button onclick="switchTab('personnel')" id="nav-personnel" class="sidebar-item active w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                    </svg>
+                    <span>巡更人员</span>
+                    <span class="ml-auto bg-blue-400/30 text-blue-200 text-xs px-2 py-0.5 rounded-full">3</span>
+                </button>
+
+                <button onclick="switchTab('points')" id="nav-points" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span>巡更点管理</span>
+                    <span class="ml-auto bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full">13</span>
+                </button>
+
+                <button onclick="switchTab('routes')" id="nav-routes" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 7m0 13V7"></path>
+                    </svg>
+                    <span>巡更路线</span>
+                    <span class="ml-auto bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full">4</span>
+                </button>
+
+                <button onclick="switchTab('plans')" id="nav-plans" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <span>巡更计划</span>
+                    <span class="ml-auto bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full">4</span>
+                </button>
+
+                <button onclick="switchTab('tasks')" id="nav-tasks" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                    </svg>
+                    <span>巡更任务</span>
+                    <span class="ml-auto bg-green-500/20 text-green-400 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full status-badge"></span>
+                        10
+                    </span>
+                </button>
+
+                <button onclick="switchTab('import')" id="nav-import" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                    </svg>
+                    <span>导入巡更棒数据</span>
+                </button>
+            </nav>
+
+            <!-- 用户信息 -->
+            <div class="p-4 border-t border-slate-800 bg-slate-900/50">
+                <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800 cursor-pointer transition-colors">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center text-sm font-bold text-white">
+                        AD
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-white truncate">系统管理员</p>
+                        <p class="text-xs text-slate-500 truncate">admin@patrol.com</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="flex-1 flex flex-col overflow-hidden bg-slate-950">
+            <!-- 顶部栏 -->
+            <header class="h-16 glass-effect flex items-center justify-between px-8 sticky top-0 z-10">
+                <div class="flex items-center gap-4">
+                    <h2 id="pageTitle" class="text-xl font-bold text-white">巡更人员管理</h2>
+                    <span class="px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs border border-blue-500/20">实时数据</span>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <div class="relative">
+                        <input type="text" id="globalSearch" placeholder="全局搜索..." class="pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 w-64 transition-all">
+                        <svg class="w-5 h-5 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                    <button class="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors relative">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                        </svg>
+                        <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full status-badge"></span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- 内容区域 -->
+            <div class="flex-1 overflow-auto p-6 custom-scrollbar" id="contentArea">
+                
+                <!-- 1. 巡更人员 -->
+                <div id="tab-personnel" class="content-fade space-y-6">
+                    <!-- 统计卡片 -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 hover-lift">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 rounded-xl bg-blue-500/10 text-blue-400">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                    </svg>
+                                </div>
+                                <span class="text-xs text-slate-500">总人数</span>
+                            </div>
+                            <div class="text-2xl font-bold text-white">3</div>
+                            <div class="text-sm text-slate-400 mt-1">在岗 3 人</div>
+                        </div>
+                        
+                        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 hover-lift">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 rounded-xl bg-green-500/10 text-green-400">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                                <span class="text-xs text-slate-500">巡更棒数量</span>
+                            </div>
+                            <div class="text-2xl font-bold text-white">3</div>
+                            <div class="text-sm text-green-400 mt-1">全部正常</div>
+                        </div>
+
+                        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 hover-lift">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 rounded-xl bg-purple-500/10 text-purple-400">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                                <span class="text-xs text-slate-500">人员卡</span>
+                            </div>
+                            <div class="text-2xl font-bold text-white">3</div>
+                            <div class="text-sm text-slate-400 mt-1">已绑定</div>
+                        </div>
+
+                        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 hover-lift">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 rounded-xl bg-orange-500/10 text-orange-400">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                    </svg>
+                                </div>
+                                <span class="text-xs text-slate-500">异常事件</span>
+                            </div>
+                            <div class="text-2xl font-bold text-white">0</div>
+                            <div class="text-sm text-green-400 mt-1">今日无异常</div>
+                        </div>
+                    </div>
+
+                    <!-- 搜索区域 -->
+                    <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
+                        <div class="flex flex-wrap items-center gap-4">
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm text-slate-400 whitespace-nowrap">巡更人员姓名</label>
+                                <input type="text" id="searchPersonName" placeholder="请输入姓名" class="bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm w-48 focus:outline-none focus:border-blue-500 transition-colors">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm text-slate-400 whitespace-nowrap">联系电话</label>
+                                <input type="text" id="searchPersonPhone" placeholder="请输入电话" class="bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm w-48 focus:outline-none focus:border-blue-500 transition-colors">
+                            </div>
+                            <div class="flex gap-2 ml-auto">
+                                <button onclick="searchPersonnel()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    </svg>
+                                    搜索
+                                </button>
+                                <button onclick="resetPersonnelSearch()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors">重置</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 表格 -->
+                    <div class="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden">
+                        <div class="flex justify-between items-center p-6 border-b border-slate-800">
+                            <h3 class="text-white font-semibold flex items-center gap-2">
+                                <span class="w-1 h-5 bg-blue-500 rounded-full"></span>
+                                巡更人员列表
+                            </h3>
+                            <button onclick="showAddPersonnelModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                                新增人员
+                            </button>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-slate-950 text-slate-400">
+                                    <tr>
+                                        <th class="px-6 py-4 font-medium">序号</th>
+                                        <th class="px-6 py-4 font-medium">人员姓名</th>
+                                        <th class="px-6 py-4 font-medium">联系电话</th>
+                                        <th class="px-6 py-4 font-medium">巡更棒编号</th>
+                                        <th class="px-6 py-4 font-medium">人员卡编号</th>
+                                        <th class="px-6 py-4 font-medium text-center">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800" id="personnelTable">
+                                    <tr class="table-row-hover transition-colors">
+                                        <td class="px-6 py-4 text-slate-400">1</td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-xs font-bold text-white">C</div>
+                                                <span class="font-medium text-white">C君</span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 text-slate-400">13914725899</td>
+                                        <td class="px-6 py-4 text-slate-400 font-mono">PT191817161</td>
+                                        <td class="px-6 py-4 text-slate-400 font-mono">MG125809</td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex justify-center gap-3">
+                                                <button onclick="editPersonnel(1)" class="text-blue-400 hover:text-blue-300 transition-colors">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                    </svg>
+                                                </button>
+                                                <button onclick="deletePersonnel(1)" class="text-red-400 hover:text-red-300 transition-colors">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors bg-slate-900/30">
+                                        <td class="px-6 py-4 text-slate-400">2</td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white">B</div>
+                                                <span class="font-medium text-white">B君</span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 text-slate-400">18087654321</td>
+                                        <td class="px-6 py-4 text-slate-400 font-mono">PT121314151</td>
+                                        <td class="px-6 py-4 text-slate-400 font-mono">MG123456</td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex justify-center gap-3">
+                                                <button onclick="editPersonnel(2)" class="text-blue-400 hover:text-blue-300 transition-colors">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                    </svg>
+                                                </button>
+                                                <button onclick="deletePersonnel(2)" class="text-red-400 hover:text-red-300 transition-colors">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors">
+                                        <td class="px-6 py-4 text-slate-400">3</td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-xs font-bold text-white">A</div>
+                                                <span class="font-medium text-white">A君</span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 text-slate-400">13812345678</td>
+                                        <td class="px-6 py-4 text-slate-400 font-mono">PT123456789</td>
+                                        <td class="px-6 py-4 text-slate-400 font-mono">MG147258</td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex justify-center gap-3">
+                                                <button onclick="editPersonnel(3)" class="text-blue-400 hover:text-blue-300 transition-colors">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                    </svg>
+                                                </button>
+                                                <button onclick="deletePersonnel(3)" class="text-red-400 hover:text-red-300 transition-colors">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- 分页 -->
+                        <div class="flex justify-between items-center p-6 border-t border-slate-800">
+                            <span class="text-sm text-slate-400">共 3 条</span>
+                            <div class="flex items-center gap-2">
+                                <select class="bg-slate-950 border border-slate-700 text-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500">
+                                    <option>20条/页</option>
+                                    <option>50条/页</option>
+                                </select>
+                                <button class="px-3 py-1.5 border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:border-slate-600 disabled:opacity-50" disabled>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                    </svg>
+                                </button>
+                                <button class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">1</button>
+                                <button class="px-3 py-1.5 border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:border-slate-600 disabled:opacity-50" disabled>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. 巡更点管理 -->
+                <div id="tab-points" class="content-fade hidden space-y-6">
+                    <div class="flex justify-between items-center">
+                        <div class="flex gap-4">
+                            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">全部点位</button>
+                            <button class="px-4 py-2 bg-slate-900/50 text-slate-400 hover:text-white border border-slate-800 rounded-lg text-sm transition-colors">正常</button>
+                            <button class="px-4 py-2 bg-slate-900/50 text-slate-400 hover:text-white border border-slate-800 rounded-lg text-sm transition-colors">故障</button>
+                        </div>
+                        <button onclick="showAddPointModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            新增巡更点
+                        </button>
+                    </div>
+
+                    <!-- 搜索 -->
+                    <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
+                        <div class="flex flex-wrap items-center gap-4">
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm text-slate-400 whitespace-nowrap">点位名称</label>
+                                <input type="text" id="searchPointName" placeholder="请输入点位名称" class="bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm w-48 focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm text-slate-400 whitespace-nowrap">点位位置</label>
+                                <input type="text" id="searchPointLocation" placeholder="请输入点位位置" class="bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm w-48 focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div class="flex gap-2 ml-auto">
+                                <button onclick="searchPoints()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors">搜索</button>
+                                <button onclick="resetPointsSearch()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors">重置</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 表格 -->
+                    <div class="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden">
+                        <div class="p-6 border-b border-slate-800">
+                            <h3 class="text-white font-semibold flex items-center gap-2">
+                                <span class="w-1 h-5 bg-blue-500 rounded-full"></span>
+                                巡更点位列表
+                            </h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-slate-950 text-slate-400">
+                                    <tr>
+                                        <th class="px-6 py-4 font-medium">序号</th>
+                                        <th class="px-6 py-4 font-medium">点位编号</th>
+                                        <th class="px-6 py-4 font-medium">点位名称</th>
+                                        <th class="px-6 py-4 font-medium">点位位置</th>
+                                        <th class="px-6 py-4 font-medium">创建时间</th>
+                                        <th class="px-6 py-4 font-medium text-center">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800" id="pointsTable">
+                                    <!-- 动态生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="flex justify-between items-center p-6 border-t border-slate-800">
+                            <span class="text-sm text-slate-400">共 13 条</span>
+                            <div class="flex items-center gap-2">
+                                <select class="bg-slate-950 border border-slate-700 text-slate-300 rounded-lg px-3 py-1.5 text-sm">
+                                    <option>20条/页</option>
+                                </select>
+                                <div class="flex gap-1">
+                                    <button class="px-3 py-1.5 border border-slate-700 rounded-lg text-slate-400 hover:text-white" disabled>
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                        </svg>
+                                    </button>
+                                    <button class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">1</button>
+                                    <button class="px-3 py-1.5 border border-slate-700 rounded-lg text-slate-400 hover:text-white">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. 巡更路线 -->
+                <div id="tab-routes" class="content-fade hidden space-y-6">
+                    <div class="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden">
+                        <div class="flex justify-between items-center p-6 border-b border-slate-800">
+                            <h3 class="text-white font-semibold flex items-center gap-2">
+                                <span class="w-1 h-5 bg-blue-500 rounded-full"></span>
+                                巡更路线列表
+                            </h3>
+                            <button onclick="showAddRouteModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                                新增路线
+                            </button>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-slate-950 text-slate-400">
+                                    <tr>
+                                        <th class="px-6 py-4 font-medium">序号</th>
+                                        <th class="px-6 py-4 font-medium">路线名称</th>
+                                        <th class="px-6 py-4 font-medium">巡更点位</th>
+                                        <th class="px-6 py-4 font-medium">巡更时长</th>
+                                        <th class="px-6 py-4 font-medium text-center">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800">
+                                    <tr class="table-row-hover transition-colors">
+                                        <td class="px-6 py-4 text-slate-400">1</td>
+                                        <td class="px-6 py-4 font-medium text-white">CXC</td>
+                                        <td class="px-6 py-4">
+                                            <button onclick="showRouteDetail('CXC', ['物资仓库', 'B栋机房', 'C栋主入口'])" class="text-blue-400 hover:text-blue-300 transition-colors">物资仓库、B栋机房、C栋主入口</button>
+                                        </td>
+                                        <td class="px-6 py-4 text-slate-400">20分钟</td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex justify-center gap-3">
+                                                <button onclick="viewRouteDetail()" class="text-slate-400 hover:text-white transition-colors" title="查看">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                    </svg>
+                                                </button>
+                                                <button onclick="editRoute(1)" class="text-blue-400 hover:text-blue-300 transition-colors" title="编辑">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                    </svg>
+                                                </button>
+                                                <button onclick="deleteRoute(1)" class="text-red-400 hover:text-red-300 transition-colors" title="删除">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors bg-slate-900/30">
+                                        <td class="px-6 py-4 text-slate-400">2</td>
+                                        <td class="px-6 py-4 font-medium text-white">B栋巡更路线</td>
+                                        <td class="px-6 py-4">
+                                            <button onclick="showRouteDetail('B栋巡更路线', ['B栋主入口', 'B栋机房', 'B栋财务室门口', 'B栋天面'])" class="text-blue-400 hover:text-blue-300 transition-colors">B栋主入口、B栋机房、B栋财务室门口、B栋天面</button>
+                                        </td>
+                                        <td class="px-6 py-4 text-slate-400">32分钟</td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex justify-center gap-3">
+                                                <button class="text-slate-400 hover:text-white transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></button>
+                                                <button class="text-blue-400 hover:text-blue-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+                                                <button class="text-red-400 hover:text-red-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors">
+                                        <td class="px-6 py-4 text-slate-400">3</td>
+                                        <td class="px-6 py-4 font-medium text-white">A栋巡更路线</td>
+                                        <td class="px-6 py-4">
+                                            <button onclick="showRouteDetail('A栋巡更路线', ['A栋主入口', 'A栋1楼', 'A栋2楼', 'A栋3楼', 'A栋4楼', 'A栋天面'])" class="text-blue-400 hover:text-blue-300 transition-colors">A栋主入口、A栋1楼、A栋2楼、A栋3楼、A栋4楼、A栋天面</button>
+                                        </td>
+                                        <td class="px-6 py-4 text-slate-400">1小时20分钟</td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex justify-center gap-3">
+                                                <button class="text-slate-400 hover:text-white transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></button>
+                                                <button class="text-blue-400 hover:text-blue-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+                                                <button class="text-red-400 hover:text-red-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors bg-slate-900/30">
+                                        <td class="px-6 py-4 text-slate-400">4</td>
+                                        <td class="px-6 py-4 font-medium text-white">出入口路线</td>
+                                        <td class="px-6 py-4">
+                                            <button onclick="showRouteDetail('出入口路线', ['园区大门口', 'A栋主入口', 'B栋主入口', 'C栋主入口', '园区后门'])" class="text-blue-400 hover:text-blue-300 transition-colors">园区大门口、A栋主入口、B栋主入口、C栋主入口、园区后门</button>
+                                        </td>
+                                        <td class="px-6 py-4 text-slate-400">1小时</td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex justify-center gap-3">
+                                                <button class="text-slate-400 hover:text-white transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></button>
+                                                <button class="text-blue-400 hover:text-blue-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+                                                <button class="text-red-400 hover:text-red-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="flex justify-between items-center p-6 border-t border-slate-800">
+                            <span class="text-sm text-slate-400">共 4 条</span>
+                            <div class="flex items-center gap-2">
+                                <button class="px-3 py-1.5 border border-slate-700 rounded-lg text-slate-400 hover:text-white" disabled>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                    </svg>
+                                </button>
+                                <button class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">1</button>
+                                <button class="px-3 py-1.5 border border-slate-700 rounded-lg text-slate-400 hover:text-white" disabled>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. 巡更计划 -->
+                <div id="tab-plans" class="content-fade hidden space-y-6">
+                    <div class="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden">
+                        <div class="flex justify-between items-center p-6 border-b border-slate-800">
+                            <h3 class="text-white font-semibold flex items-center gap-2">
+                                <span class="w-1 h-5 bg-blue-500 rounded-full"></span>
+                                巡更计划列表
+                            </h3>
+                            <button onclick="showAddPlanModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                                新增计划
+                            </button>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-slate-950 text-slate-400">
+                                    <tr>
+                                        <th class="px-6 py-4 font-medium">序号</th>
+                                        <th class="px-6 py-4 font-medium">计划编号</th>
+                                        <th class="px-6 py-4 font-medium">计划名称</th>
+                                        <th class="px-6 py-4 font-medium">巡更人员</th>
+                                        <th class="px-6 py-4 font-medium">计划时间段</th>
+                                        <th class="px-6 py-4 font-medium">巡更路线</th>
+                                        <th class="px-6 py-4 font-medium">状态</th>
+                                        <th class="px-6 py-4 font-medium text-center">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800">
+                                    <tr class="table-row-hover transition-colors">
+                                        <td class="px-6 py-4 text-slate-400">1</td>
+                                        <td class="px-6 py-4 text-slate-400 font-mono">PL202601120001</td>
+                                        <td class="px-6 py-4 font-medium text-white">日间巡更01</td>
+                                        <td class="px-6 py-4">C君、B君</td>
+                                        <td class="px-6 py-4 text-slate-400">2026-01-28~2026-01-31</td>
+                                        <td class="px-6 py-4">
+                                            <button onclick="showPlanDetail()" class="text-blue-400 hover:text-blue-300 transition-colors">B栋巡更路线、A栋巡更路线、出入口路线</button>
+                                        </td>
+                                        <td class="px-6 py-4"><span class="tag-red px-2 py-1 rounded text-xs">已过期</span></td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex justify-center gap-2">
+                                                <button onclick="viewPlanDetail()" class="text-slate-400 hover:text-white transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></button>
+                                                <button class="text-blue-400 hover:text-blue-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+                                                <button class="text-red-400 hover:text-red-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors bg-slate-900/30">
+                                        <td class="px-6 py-4 text-slate-400">2</td>
+                                        <td class="px-6 py-4 text-slate-400 font-mono">PL202601100002</td>
+                                        <td class="px-6 py-4 font-medium text-white">日间巡更02</td>
+                                        <td class="px-6 py-4">A君、B君</td>
+                                        <td class="px-6 py-4 text-slate-400">2026-01-11~2026-01-20</td>
+                                        <td class="px-6 py-4"><button class="text-blue-400 hover:text-blue-300 transition-colors">出入口路线</button></td>
+                                        <td class="px-6 py-4"><span class="tag-red px-2 py-1 rounded text-xs">已过期</span></td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex justify-center gap-2">
+                                                <button class="text-slate-400 hover:text-white transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></button>
+                                                <button class="text-blue-400 hover:text-blue-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+                                                <button class="text-red-400 hover:text-red-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors">
+                                        <td class="px-6 py-4 text-slate-400">3</td>
+                                        <td class="px-6 py-4 text-slate-400 font-mono">PL202601100001</td>
+                                        <td class="px-6 py-4 font-medium text-white">夜间巡更02</td>
+                                        <td class="px-6 py-4">C君、A君、B君</td>
+                                        <td class="px-6 py-4 text-slate-400">2026-01-11~2026-01-15</td>
+                                        <td class="px-6 py-4"><button class="text-blue-400 hover:text-blue-300 transition-colors">出入口路线、A栋巡更路线</button></td>
+                                        <td class="px-6 py-4"><span class="tag-red px-2 py-1 rounded text-xs">已过期</span></td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex justify-center gap-2">
+                                                <button class="text-slate-400 hover:text-white transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></button>
+                                                <button class="text-blue-400 hover:text-blue-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+                                                <button class="text-red-400 hover:text-red-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors bg-slate-900/30">
+                                        <td class="px-6 py-4 text-slate-400">4</td>
+                                        <td class="px-6 py-4 text-slate-400 font-mono">PL202512280001</td>
+                                        <td class="px-6 py-4 font-medium text-white">日常巡更01</td>
+                                        <td class="px-6 py-4">A君、B君</td>
+                                        <td class="px-6 py-4 text-slate-400">2025-12-29~2025-12-29</td>
+                                        <td class="px-6 py-4"><button class="text-blue-400 hover:text-blue-300 transition-colors">出入口路线</button></td>
+                                        <td class="px-6 py-4"><span class="tag-red px-2 py-1 rounded text-xs">已过期</span></td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex justify-center gap-2">
+                                                <button class="text-slate-400 hover:text-white transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></button>
+                                                <button class="text-blue-400 hover:text-blue-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+                                                <button class="text-red-400 hover:text-red-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="flex justify-between items-center p-6 border-t border-slate-800">
+                            <span class="text-sm text-slate-400">共 4 条</span>
+                            <div class="flex items-center gap-2">
+                                <button class="px-3 py-1.5 border border-slate-700 rounded-lg text-slate-400 hover:text-white" disabled>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                    </svg>
+                                </button>
+                                <button class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">1</button>
+                                <button class="px-3 py-1.5 border border-slate-700 rounded-lg text-slate-400 hover:text-white" disabled>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. 巡更任务 -->
+                <div id="tab-tasks" class="content-fade hidden space-y-6">
+                    <!-- 搜索 -->
+                    <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
+                        <div class="flex flex-wrap items-center gap-4">
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm text-slate-400 whitespace-nowrap">任务编号</label>
+                                <input type="text" placeholder="请输入任务编号" class="bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm w-40 focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm text-slate-400 whitespace-nowrap">任务日期</label>
+                                <input type="text" placeholder="请选择日期" class="bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm w-32 focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm text-slate-400 whitespace-nowrap">巡更人员</label>
+                                <select class="bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm w-32 focus:outline-none focus:border-blue-500">
+                                    <option>全部</option>
+                                    <option>C君</option>
+                                    <option>B君</option>
+                                    <option>A君</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm text-slate-400 whitespace-nowrap">任务状态</label>
+                                <select class="bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm w-24 focus:outline-none focus:border-blue-500">
+                                    <option>全部</option>
+                                    <option>未巡</option>
+                                    <option>已巡</option>
+                                </select>
+                            </div>
+                            <div class="flex gap-2 ml-auto">
+                                <button onclick="searchTasks()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors">搜索</button>
+                                <button onclick="resetTasksSearch()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors">重置</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 统计卡片 -->
+                    <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 flex flex-wrap items-center gap-8">
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-400 font-medium">总体统计</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-500 text-sm">任务总数:</span>
+                            <span class="text-white font-bold text-lg">10</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-500 text-sm">已完成:</span>
+                            <span class="text-green-400 font-bold text-lg">3</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-500 text-sm">未完成:</span>
+                            <span class="text-orange-400 font-bold text-lg">7</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-500 text-sm">完成率:</span>
+                            <span class="text-orange-400 font-bold text-lg">30%</span>
+                        </div>
+                        <div class="w-px h-6 bg-slate-700 mx-2"></div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-blue-400 font-medium">今日统计</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-500 text-sm">今日任务:</span>
+                            <span class="text-white font-bold">0</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-500 text-sm">今日完成:</span>
+                            <span class="text-green-400 font-bold">0</span>
+                        </div>
+                    </div>
+
+                    <!-- 任务列表 -->
+                    <div class="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden">
+                        <div class="p-6 border-b border-slate-800">
+                            <h3 class="text-white font-semibold flex items-center gap-2">
+                                <span class="w-1 h-5 bg-blue-500 rounded-full"></span>
+                                巡更任务列表
+                            </h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-slate-950 text-slate-400">
+                                    <tr>
+                                        <th class="px-4 py-4 font-medium">序号</th>
+                                        <th class="px-4 py-4 font-medium">任务编号</th>
+                                        <th class="px-4 py-4 font-medium">关联计划</th>
+                                        <th class="px-4 py-4 font-medium">任务日期</th>
+                                        <th class="px-4 py-4 font-medium">时间段</th>
+                                        <th class="px-4 py-4 font-medium">巡更人员</th>
+                                        <th class="px-4 py-4 font-medium">巡更路线</th>
+                                        <th class="px-4 py-4 font-medium">状态</th>
+                                        <th class="px-4 py-4 font-medium text-center">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800">
+                                    <tr class="table-row-hover transition-colors">
+                                        <td class="px-4 py-4 text-slate-400">1</td>
+                                        <td class="px-4 py-4 text-slate-400 font-mono text-xs">RW20260130654398976</td>
+                                        <td class="px-4 py-4 text-white">日间巡更01</td>
+                                        <td class="px-4 py-4 text-slate-400">2026.01.30</td>
+                                        <td class="px-4 py-4 text-slate-400">12:00~13:00</td>
+                                        <td class="px-4 py-4">C君</td>
+                                        <td class="px-4 py-4"><button class="text-blue-400 hover:text-blue-300 transition-colors">出入口路线</button></td>
+                                        <td class="px-4 py-4"><span class="tag-orange px-2 py-1 rounded text-xs">未巡</span></td>
+                                        <td class="px-4 py-4">
+                                            <div class="flex justify-center gap-2">
+                                                <button onclick="viewTaskDetail()" class="text-slate-400 hover:text-white transition-colors" title="查看">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                    </svg>
+                                                </button>
+                                                <button class="text-blue-400 hover:text-blue-300 transition-colors" title="记录">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors bg-slate-900/30">
+                                        <td class="px-4 py-4 text-slate-400">2</td>
+                                        <td class="px-4 py-4 text-slate-400 font-mono text-xs">RW20260130646010368</td>
+                                        <td class="px-4 py-4 text-white">日间巡更01</td>
+                                        <td class="px-4 py-4 text-slate-400">2026.01.30</td>
+                                        <td class="px-4 py-4 text-slate-400">11:31~12:01</td>
+                                        <td class="px-4 py-4">B君</td>
+                                        <td class="px-4 py-4"><button class="text-blue-400 hover:text-blue-300 transition-colors">A栋巡更路线</button></td>
+                                        <td class="px-4 py-4"><span class="tag-orange px-2 py-1 rounded text-xs">未巡</span></td>
+                                        <td class="px-4 py-4">
+                                            <div class="flex justify-center gap-2">
+                                                <button class="text-slate-400 hover:text-white transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></button>
+                                                <button class="text-blue-400 hover:text-blue-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors">
+                                        <td class="px-4 py-4 text-slate-400">8</td>
+                                        <td class="px-4 py-4 text-slate-400 font-mono text-xs">TA2026011110002</td>
+                                        <td class="px-4 py-4 text-white">日间巡更02</td>
+                                        <td class="px-4 py-4 text-slate-400">2026.01.11</td>
+                                        <td class="px-4 py-4 text-slate-400">14:00~15:00</td>
+                                        <td class="px-4 py-4">B君</td>
+                                        <td class="px-4 py-4"><button class="text-blue-400 hover:text-blue-300 transition-colors">出入口路线</button></td>
+                                        <td class="px-4 py-4"><span class="tag-green px-2 py-1 rounded text-xs">已巡</span></td>
+                                        <td class="px-4 py-4">
+                                            <div class="flex justify-center gap-2">
+                                                <button class="text-slate-400 hover:text-white transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></button>
+                                                <button class="text-blue-400 hover:text-blue-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors bg-slate-900/30">
+                                        <td class="px-4 py-4 text-slate-400">9</td>
+                                        <td class="px-4 py-4 text-slate-400 font-mono text-xs">TA2026011110001</td>
+                                        <td class="px-4 py-4 text-white">夜间巡更02</td>
+                                        <td class="px-4 py-4 text-slate-400">2026.01.11</td>
+                                        <td class="px-4 py-4 text-slate-400">08:00~08:30</td>
+                                        <td class="px-4 py-4">A君</td>
+                                        <td class="px-4 py-4"><button class="text-blue-400 hover:text-blue-300 transition-colors">A栋巡更路线</button></td>
+                                        <td class="px-4 py-4"><span class="tag-green px-2 py-1 rounded text-xs">已巡</span></td>
+                                        <td class="px-4 py-4">
+                                            <div class="flex justify-center gap-2">
+                                                <button class="text-slate-400 hover:text-white transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></button>
+                                                <button class="text-blue-400 hover:text-blue-300 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="flex justify-between items-center p-6 border-t border-slate-800">
+                            <span class="text-sm text-slate-400">共 10 条</span>
+                            <div class="flex items-center gap-2">
+                                <button class="px-3 py-1.5 border border-slate-700 rounded-lg text-slate-400 hover:text-white" disabled>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                    </svg>
+                                </button>
+                                <button class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">1</button>
+                                <button class="px-3 py-1.5 border border-slate-700 rounded-lg text-slate-400 hover:text-white">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. 导入巡更棒数据 -->
+                <div id="tab-import" class="content-fade hidden">
+                    <div class="max-w-2xl mx-auto bg-slate-900/50 border border-slate-800 rounded-2xl p-8">
+                        <h2 class="text-2xl font-bold text-white text-center mb-8">提交巡更结果</h2>
+                        
+                        <div class="space-y-6">
+                            <div class="flex items-center gap-4">
+                                <label class="w-28 text-right text-sm text-slate-300">
+                                    <span class="text-red-400 mr-1">*</span>巡更棒编号
+                                </label>
+                                <div class="flex-1 flex gap-2">
+                                    <input type="text" id="patrolStickId" placeholder="请输入巡更棒编号" class="flex-1 bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors">
+                                    <button onclick="readStickData()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                        </svg>
+                                        读取巡更棒
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-4">
+                                <label class="w-28 text-right text-sm text-slate-300">
+                                    <span class="text-red-400 mr-1">*</span>巡更日期
+                                </label>
+                                <div class="flex-1 relative">
+                                    <input type="text" value="2026-02-04" class="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-lg text-sm focus:outline-none focus:border-blue-500 pl-11">
+                                    <svg class="w-5 h-5 text-slate-500 absolute left-4 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-4 pt-4">
+                                <div class="w-28"></div>
+                                <div class="flex gap-3">
+                                    <button onclick="cancelImport()" class="px-6 py-3 rounded-lg text-sm border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white transition-colors">取消</button>
+                                    <button onclick="submitImport()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        提交
+                                    </button>
+                                    <button onclick="clearStick()" class="px-6 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-lg text-sm transition-colors">清空巡更棒</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 读取结果展示区域（默认隐藏） -->
+                        <div id="stickDataResult" class="mt-8 hidden">
+                            <h4 class="text-sm font-medium text-slate-300 mb-4 flex items-center gap-2">
+                                <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                读取到的巡更数据
+                            </h4>
+                            <div class="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden">
+                                <table class="w-full text-sm">
+                                    <thead class="bg-slate-900 text-slate-400">
+                                        <tr>
+                                            <th class="text-left px-4 py-3 font-medium">时间</th>
+                                            <th class="text-left px-4 py-3 font-medium">点位</th>
+                                            <th class="text-left px-4 py-3 font-medium">状态</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-800">
+                                        <tr>
+                                            <td class="px-4 py-3 text-slate-400">2026-02-04 08:30:15</td>
+                                            <td class="px-4 py-3 text-white">A栋主入口</td>
+                                            <td class="px-4 py-4"><span class="text-green-400 flex items-center gap-1"><span class="w-1.5 h-1.5 bg-green-400 rounded-full"></span>正常</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="px-4 py-3 text-slate-400">2026-02-04 08:45:22</td>
+                                            <td class="px-4 py-3 text-white">B栋机房</td>
+                                            <td class="px-4 py-4"><span class="text-green-400 flex items-center gap-1"><span class="w-1.5 h-1.5 bg-green-400 rounded-full"></span>正常</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- 路线详情弹窗 -->
+    <div id="routeModal" class="fixed inset-0 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden slide-in shadow-2xl">
+            <div class="flex justify-between items-center p-6 border-b border-slate-800">
+                <h3 class="text-lg font-bold text-white">路线详情</h3>
+                <button onclick="closeModal('routeModal')" class="text-slate-400 hover:text-white transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-auto max-h-[60vh] custom-scrollbar">
+                <div class="grid grid-cols-3 gap-4 mb-6 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <div>
+                        <span class="text-slate-500 text-sm">路线名称</span>
+                        <div class="text-white font-medium mt-1" id="routeNameDisplay">CXC</div>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 text-sm">巡更时长</span>
+                        <div class="text-white font-medium mt-1">20分钟</div>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 text-sm">点位数量</span>
+                        <div class="text-white font-medium mt-1">3 个</div>
+                    </div>
+                </div>
+                
+                <h4 class="text-sm font-medium text-slate-300 mb-4">巡更点位列表</h4>
+                <div class="border border-slate-800 rounded-xl overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-950 text-slate-400">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-medium">顺序</th>
+                                <th class="px-4 py-3 text-left font-medium">点位编号</th>
+                                <th class="px-4 py-3 text-left font-medium">点位名称</th>
+                                <th class="px-4 py-3 text-left font-medium">点位位置</th>
+                            </tr>
+                        </thead>
+                        <tbody id="routePointsList" class="divide-y divide-slate-800 bg-slate-900/50">
+                            <!-- 动态填充 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 计划详情弹窗 -->
+    <div id="planModal" class="fixed inset-0 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl max-h-[80vh] overflow-hidden slide-in shadow-2xl">
+            <div class="flex justify-between items-center p-6 border-b border-slate-800">
+                <h3 class="text-lg font-bold text-white">计划详情</h3>
+                <button onclick="closeModal('planModal')" class="text-slate-400 hover:text-white transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-auto max-h-[60vh] custom-scrollbar">
+                <div class="grid grid-cols-2 gap-4 mb-6 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <div>
+                        <span class="text-slate-500 text-sm">计划编号</span>
+                        <div class="text-white font-medium mt-1">PL202601120001</div>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 text-sm">计划名称</span>
+                        <div class="text-white font-medium mt-1">日间巡更01</div>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 text-sm">计划时间段</span>
+                        <div class="text-white font-medium mt-1">2026-01-28 ~ 2026-01-31</div>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 text-sm">状态</span>
+                        <div class="mt-1"><span class="tag-red px-2 py-1 rounded text-xs">已过期</span></div>
+                    </div>
+                    <div class="col-span-2">
+                        <span class="text-slate-500 text-sm">执行星期</span>
+                        <div class="text-white font-medium mt-1">星期一、星期二、星期三、星期四、星期五</div>
+                    </div>
+                </div>
+                
+                <h4 class="text-sm font-medium text-slate-300 mb-4">时段与人员分配</h4>
+                <div class="border border-slate-800 rounded-xl overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-950 text-slate-400">
+                            <tr>
+                                <th class="px-4 py-3 text-center font-medium">序号</th>
+                                <th class="px-4 py-3 text-center font-medium">开始时间</th>
+                                <th class="px-4 py-3 text-center font-medium">巡更时长</th>
+                                <th class="px-4 py-3 text-center font-medium">巡更路线</th>
+                                <th class="px-4 py-3 text-center font-medium">巡更人员</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800 bg-slate-900/50">
+                            <tr>
+                                <td class="px-4 py-3 text-center text-slate-400">1</td>
+                                <td class="px-4 py-3 text-center text-white">09:31</td>
+                                <td class="px-4 py-3 text-center text-slate-400">30分钟</td>
+                                <td class="px-4 py-3 text-center text-blue-400">B栋巡更路线</td>
+                                <td class="px-4 py-3 text-center text-white">C君</td>
+                            </tr>
+                            <tr class="bg-slate-900/30">
+                                <td class="px-4 py-3 text-center text-slate-400">2</td>
+                                <td class="px-4 py-3 text-center text-white">11:31</td>
+                                <td class="px-4 py-3 text-center text-slate-400">30分钟</td>
+                                <td class="px-4 py-3 text-center text-blue-400">A栋巡更路线</td>
+                                <td class="px-4 py-3 text-center text-white">B君</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 text-center text-slate-400">3</td>
+                                <td class="px-4 py-3 text-center text-white">12:00</td>
+                                <td class="px-4 py-3 text-center text-slate-400">1小时</td>
+                                <td class="px-4 py-3 text-center text-blue-400">出入口路线</td>
+                                <td class="px-4 py-3 text-center text-white">C君</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 任务详情弹窗 -->
+    <div id="taskModal" class="fixed inset-0 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden slide-in shadow-2xl">
+            <div class="flex justify-between items-center p-6 border-b border-slate-800">
+                <h3 class="text-lg font-bold text-white">巡更任务详情</h3>
+                <button onclick="closeModal('taskModal')" class="text-slate-400 hover:text-white transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-auto max-h-[60vh] custom-scrollbar">
+                <div class="space-y-4 mb-6 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <div class="flex">
+                        <span class="w-24 text-slate-500 text-sm">任务编号:</span>
+                        <span class="text-blue-400 text-sm font-mono">RW20260130654398976</span>
+                    </div>
+                    <div class="flex">
+                        <span class="w-24 text-slate-500 text-sm">关联计划:</span>
+                        <span class="text-blue-400 text-sm cursor-pointer hover:underline">日间巡更01</span>
+                    </div>
+                    <div class="flex">
+                        <span class="w-24 text-slate-500 text-sm">任务时间:</span>
+                        <span class="text-white text-sm">2026-01-30 12:00~13:00</span>
+                    </div>
+                    <div class="flex">
+                        <span class="w-24 text-slate-500 text-sm">巡更人员:</span>
+                        <span class="text-blue-400 text-sm cursor-pointer hover:underline">C君</span>
+                    </div>
+                    <div class="flex">
+                        <span class="w-24 text-slate-500 text-sm">任务状态:</span>
+                        <span class="tag-orange px-2 py-1 rounded text-xs">未巡</span>
+                    </div>
+                </div>
+                
+                <h4 class="text-sm font-medium text-slate-300 mb-4">巡更打卡情况</h4>
+                <div class="border border-slate-800 rounded-xl overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-950 text-slate-400">
+                            <tr>
+                                <th class="px-4 py-3 text-center font-medium">序号</th>
+                                <th class="px-4 py-3 text-center font-medium">巡更点位</th>
+                                <th class="px-4 py-3 text-center font-medium">打卡情况</th>
+                                <th class="px-4 py-3 text-center font-medium">打卡时间</th>
+                                <th class="px-4 py-3 text-center font-medium">打卡状态</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-slate-900/50">
+                            <tr>
+                                <td colspan="5" class="px-4 py-12 text-center text-slate-500">
+                                    <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                    </svg>
+                                    暂无数据
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-8 right-8 bg-slate-900 border border-slate-800 text-white px-6 py-4 rounded-xl shadow-2xl transform translate-y-24 transition-transform duration-300 z-50 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+            <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+        </div>
+        <div>
+            <h4 class="font-medium" id="toastTitle">操作成功</h4>
+            <p class="text-sm text-slate-400" id="toastMessage">数据已保存</p>
+        </div>
+    </div>
+
+    <script>
+        // 点位数据
+        const pointsData = [
+            { id: 'XD20261234012', name: '物资仓库', location: '物资仓库', time: '2026-01-08' },
+            { id: 'XD20261234011', name: 'B栋财务室门口', location: 'B栋财务室门口', time: '2026-01-08' },
+            { id: 'XD20261234010', name: 'B栋机房', location: 'B栋机房', time: '2026-01-08' },
+            { id: 'XD20261234009', name: '园区后门', location: '园区后门', time: '2026-01-08' },
+            { id: 'XD20261234008', name: 'C栋主入口', location: 'C栋大门口', time: '2026-01-08' },
+            { id: 'XD20261234007', name: 'B栋天面', location: 'B栋天面', time: '2026-01-08' },
+            { id: 'XD20261234006', name: 'A栋天面', location: 'A栋天面', time: '2026-01-08' },
+            { id: 'XD20261234005', name: 'A栋4楼', location: 'A栋4楼走廊', time: '2026-01-08' },
+            { id: 'XD20261234004', name: 'A栋3楼', location: 'A栋3楼走廊', time: '2026-01-08' },
+            { id: 'XD20261234003', name: 'A栋2楼', location: 'A栋2楼走廊', time: '2026-01-08' },
+            { id: 'XD20261234002', name: 'A栋1楼', location: 'A栋1楼大厅', time: '2026-01-08' },
+            { id: 'XD20261234001', name: 'A栋主入口', location: 'A栋大门口', time: '2026-01-08' },
+            { id: 'XD13593369861', name: 'B栋主入口', location: 'B栋主入口', time: '2026-01-10' },
+        ];
+
+        // 渲染点位表格
+        function renderPointsTable() {
+            const tbody = document.getElementById('pointsTable');
+            if (!tbody) return;
+            tbody.innerHTML = pointsData.map((point, index) => `
+                <tr class="table-row-hover transition-colors ${index % 2 === 1 ? 'bg-slate-900/30' : ''}">
+                    <td class="px-6 py-4 text-slate-400">${index + 1}</td>
+                    <td class="px-6 py-4 text-slate-400 font-mono">${point.id}</td>
+                    <td class="px-6 py-4 font-medium text-white">${point.name}</td>
+                    <td class="px-6 py-4 text-slate-400">${point.location}</td>
+                    <td class="px-6 py-4 text-slate-400">${point.time}</td>
+                    <td class="px-6 py-4">
+                        <div class="flex justify-center gap-3">
+                            <button onclick="editPoint(${index})" class="text-blue-400 hover:text-blue-300 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                            </button>
+                            <button onclick="deletePoint(${index})" class="text-red-400 hover:text-red-300 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        renderPointsTable();
+
+        // 标签切换
+        function switchTab(tabName) {
+            // 隐藏所有标签页
+            document.querySelectorAll('[id^="tab-"]').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            // 显示选中标签页
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            
+            // 更新导航激活状态
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+                item.classList.remove('active', 'text-white');
+                item.classList.add('text-slate-400');
+            });
+            
+            const activeNav = document.getElementById(`nav-${tabName}`);
+            if (activeNav) {
+                activeNav.classList.add('active');
+                activeNav.classList.remove('text-slate-400');
+            }
+            
+            // 更新页面标题
+            const titles = {
+                'personnel': '巡更人员管理',
+                'points': '巡更点管理',
+                'routes': '巡更路线规划',
+                'plans': '巡更计划',
+                'tasks': '巡更任务监控',
+                'import': '导入巡更棒数据'
+            };
+            document.getElementById('pageTitle').textContent = titles[tabName] || '管理系统';
+        }
+
+        // 显示路线详情
+        function showRouteDetail(routeName, points) {
+            document.getElementById('routeNameDisplay').textContent = routeName;
+            const tbody = document.getElementById('routePointsList');
+            
+            const pointIds = {
+                '物资仓库': 'XD20261234012',
+                'B栋机房': 'XD20261234010',
+                'C栋主入口': 'XD20261234008',
+                'B栋主入口': 'XD13593369861',
+                'B栋财务室门口': 'XD20261234011',
+                'B栋天面': 'XD20261234007',
+                'A栋主入口': 'XD20261234001',
+                'A栋1楼': 'XD20261234002',
+                'A栋2楼': 'XD20261234003',
+                'A栋3楼': 'XD20261234004',
+                'A栋4楼': 'XD20261234005',
+                'A栋天面': 'XD20261234006',
+                '园区大门口': 'XD20261234009',
+                '园区后门': 'XD20261234009',
+                'C栋主入口': 'XD20261234008'
+            };
+            
+            const pointLocations = {
+                '物资仓库': '物资仓库',
+                'B栋机房': 'B栋机房',
+                'C栋主入口': 'C栋大门口',
+                'B栋主入口': 'B栋主入口',
+                'B栋财务室门口': 'B栋财务室门口',
+                'B栋天面': 'B栋天面',
+                'A栋主入口': 'A栋大门口',
+                'A栋1楼': 'A栋1楼大厅',
+                'A栋2楼': 'A栋2楼走廊',
+                'A栋3楼': 'A栋3楼走廊',
+                'A栋4楼': 'A栋4楼走廊',
+                'A栋天面': 'A栋天面',
+                '园区大门口': '园区大门口',
+                '园区后门': '园区后门',
+                'C栋主入口': 'C栋大门口'
+            };
+            
+            tbody.innerHTML = points.map((point, index) => `
+                <tr class="${index % 2 === 1 ? 'bg-slate-900/30' : ''}">
+                    <td class="px-4 py-3 text-slate-400">${index + 1}</td>
+                    <td class="px-4 py-3 text-slate-400 font-mono">${pointIds[point] || 'XD0000000000'}</td>
+                    <td class="px-4 py-3 text-white">${point}</td>
+                    <td class="px-4 py-3 text-slate-400">${pointLocations[point] || point}</td>
+                </tr>
+            `).join('');
+            
+            document.getElementById('routeModal').classList.remove('hidden');
+        }
+
+        // 查看计划详情
+        function viewPlanDetail() {
+            document.getElementById('planModal').classList.remove('hidden');
+        }
+
+        showPlanDetail = viewPlanDetail;
+
+        // 查看任务详情
+        function viewTaskDetail() {
+            document.getElementById('taskModal').classList.remove('hidden');
+        }
+
+        // 关闭弹窗
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        // 搜索功能
+        function searchPersonnel() {
+            showToast('搜索成功', '已根据条件筛选巡更人员数据');
+        }
+
+        function resetPersonnelSearch() {
+            document.getElementById('searchPersonName').value = '';
+            document.getElementById('searchPersonPhone').value = '';
+            showToast('重置成功', '搜索条件已清空');
+        }
+
+        function searchPoints() {
+            showToast('搜索成功', '已根据条件筛选巡更点数据');
+        }
+
+        function resetPointsSearch() {
+            document.getElementById('searchPointName').value = '';
+            document.getElementById('searchPointLocation').value = '';
+            showToast('重置成功', '搜索条件已清空');
+        }
+
+        function searchTasks() {
+            showToast('搜索成功', '已根据条件筛选任务数据');
+        }
+
+        function resetTasksSearch() {
+            showToast('重置成功', '搜索条件已清空');
+        }
+
+        // 人员管理
+        function showAddPersonnelModal() {
+            showToast('打开表单', '新增巡更人员');
+        }
+
+        function editPersonnel(id) {
+            showToast('编辑', `正在编辑人员 ID: ${id}`);
+        }
+
+        function deletePersonnel(id) {
+            if (confirm('确定要删除这条记录吗？')) {
+                showToast('删除成功', '人员记录已删除');
+            }
+        }
+
+        // 点位管理
+        function showAddPointModal() {
+            showToast('打开表单', '新增巡更点');
+        }
+
+        function editPoint(index) {
+            showToast('编辑', `正在编辑点位: ${pointsData[index].name}`);
+        }
+
+        function deletePoint(index) {
+            if (confirm('确定要删除这个巡更点吗？')) {
+                showToast('删除成功', '巡更点已删除');
+            }
+        }
+
+        // 路线管理
+        function showAddRouteModal() {
+            showToast('打开表单', '新增巡更路线');
+        }
+
+        function viewRouteDetail() {
+            showToast('查看详情', '显示路线详细信息');
+        }
+
+        function editRoute(id) {
+            showToast('编辑', `正在编辑路线 ID: ${id}`);
+        }
+
+        function deleteRoute(id) {
+            if (confirm('确定要删除这条路线吗？')) {
+                showToast('删除成功', '路线已删除');
+            }
+        }
+
+        // 计划管理
+        function showAddPlanModal() {
+            showToast('打开表单', '新增巡更计划');
+        }
+
+        // 导入功能
+        function readStickData() {
+            const id = document.getElementById('patrolStickId').value;
+            if (!id) {
+                showToast('错误', '请输入巡更棒编号', 'error');
+                return;
+            }
+            showToast('读取成功', `已读取巡更棒 ${id} 的数据`);
+            document.getElementById('stickDataResult').classList.remove('hidden');
+        }
+
+        function submitImport() {
+            showToast('提交成功', '巡更结果已提交');
+            document.getElementById('stickDataResult').classList.add('hidden');
+            document.getElementById('patrolStickId').value = '';
+        }
+
+        function cancelImport() {
+            document.getElementById('patrolStickId').value = '';
+            document.getElementById('stickDataResult').classList.add('hidden');
+            showToast('已取消', '操作已取消');
+        }
+
+        function clearStick() {
+            if (confirm('确定要清空巡更棒数据吗？')) {
+                document.getElementById('patrolStickId').value = '';
+                document.getElementById('stickDataResult').classList.add('hidden');
+                showToast('清空成功', '巡更棒数据已清空');
+            }
+        }
+
+        // Toast 提示
+        function showToast(title, message, type = 'success') {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastTitle').textContent = title;
+            document.getElementById('toastMessage').textContent = message;
+            
+            toast.classList.remove('translate-y-24');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-24');
+            }, 3000);
+        }
+
+        // 点击弹窗外部关闭
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal-backdrop')) {
+                event.target.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>

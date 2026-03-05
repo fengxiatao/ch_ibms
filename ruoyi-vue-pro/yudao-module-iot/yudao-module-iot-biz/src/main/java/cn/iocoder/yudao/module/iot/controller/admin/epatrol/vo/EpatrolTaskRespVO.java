@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.iot.controller.admin.epatrol.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -20,6 +21,9 @@ public class EpatrolTaskRespVO {
     @Schema(description = "计划ID", example = "1")
     private Long planId;
 
+    @Schema(description = "计划编号", example = "PL20240101001")
+    private String planCode;
+
     @Schema(description = "计划名称", example = "日常巡更计划")
     private String planName;
 
@@ -30,12 +34,15 @@ public class EpatrolTaskRespVO {
     private String routeName;
 
     @Schema(description = "任务日期", example = "2024-01-01")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate taskDate;
 
     @Schema(description = "计划开始时间", example = "2024-01-01 08:00:00")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime plannedStartTime;
 
     @Schema(description = "计划结束时间", example = "2024-01-01 09:00:00")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime plannedEndTime;
 
     @Schema(description = "计划时间描述", example = "08:00-09:00")
@@ -47,16 +54,21 @@ public class EpatrolTaskRespVO {
     @Schema(description = "巡更人员姓名列表", example = "[\"张三\",\"李四\"]")
     private List<String> personNames;
 
+    @Schema(description = "巡更人员姓名（逗号分隔）", example = "张三、李四")
+    private String personName;
+
     @Schema(description = "任务状态：0-未巡，1-已巡", example = "0")
     private Integer status;
 
     @Schema(description = "提交时间", example = "2024-01-01 09:05:00")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime submitTime;
 
     @Schema(description = "备注", example = "备注")
     private String remark;
 
     @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
 
     @Schema(description = "任务记录列表（用于详情展示）")

@@ -15,8 +15,14 @@
           </el-button>
         </div>
 
-        <el-table :data="cruiseList" v-loading="loading" size="small" max-height="200"
-                  highlight-current-row @current-change="handleSelectCruise">
+        <el-table
+          :data="cruiseList"
+          v-loading="loading"
+          size="small"
+          max-height="200"
+          highlight-current-row
+          @current-change="handleSelectCruise"
+        >
           <el-table-column prop="cruiseName" label="名称" min-width="120" />
           <el-table-column prop="dwellTime" label="默认停留(秒)" width="100" align="center" />
           <el-table-column prop="status" label="状态" width="80" align="center">
@@ -109,8 +115,12 @@
       <el-form :model="pointForm" :rules="pointRules" ref="pointFormRef" label-width="100px">
         <el-form-item label="预设点" prop="presetId">
           <el-select v-model="pointForm.presetId" placeholder="请选择预设点" style="width: 100%">
-            <el-option v-for="preset in presetList" :key="preset.id" 
-                       :label="`${preset.presetNo} - ${preset.presetName}`" :value="preset.id" />
+            <el-option
+              v-for="preset in presetList"
+              :key="preset.id"
+              :label="`${preset.presetNo} - ${preset.presetName}`"
+              :value="preset.id"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="停留时间" prop="dwellTime">

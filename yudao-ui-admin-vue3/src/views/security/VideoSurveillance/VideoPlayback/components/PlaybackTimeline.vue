@@ -145,20 +145,29 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
   // 转换为时间轴片段
   const segments: TimelineSegment[] = []
   mergedIntervals.forEach((interval) => {
-    const left = ((interval.start - rangeStart) / rangeMs) * 100
-    const width = ((interval.end - interval.start) / rangeMs) * 100
+    // 将录像段的开始和结束时间限制在筛选时间范围内
+    const clampedStart = Math.max(interval.start, rangeStart)
+    const clampedEnd = Math.min(interval.end, rangeEnd)
+    
+    // 如果限制后的时间段无效（开始>=结束），跳过
+    if (clampedStart >= clampedEnd) return
+    
+    // 基于限制后的时间计算位置和宽度
+    const left = ((clampedStart - rangeStart) / rangeMs) * 100
+    const width = ((clampedEnd - clampedStart) / rangeMs) * 100
 
     if (width > 0) {
-      const clampedLeft = Math.max(0, Math.min(100, left))
-      const clampedWidth = Math.min(width, 100 - clampedLeft)
+      // 再次确保在 0-100% 范围内
+      const finalLeft = Math.max(0, Math.min(100, left))
+      const finalWidth = Math.max(0, Math.min(width, 100 - finalLeft))
 
-      if (clampedWidth > 0) {
+      if (finalWidth > 0) {
         segments.push({
-          left: clampedLeft,
-          width: clampedWidth,
-          label: `${new Date(interval.start).toLocaleTimeString()} ~ ${new Date(interval.end).toLocaleTimeString()}`,
-          startTime: interval.start,
-          endTime: interval.end
+          left: finalLeft,
+          width: finalWidth,
+          label: `${new Date(clampedStart).toLocaleTimeString()} ~ ${new Date(clampedEnd).toLocaleTimeString()}`,
+          startTime: clampedStart,
+          endTime: clampedEnd
         })
       }
     }

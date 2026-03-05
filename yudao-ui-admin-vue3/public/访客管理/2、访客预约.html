@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>访客预约管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .card-shadow {
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+            }
+            .card-hover {
+                transition: all 0.2s ease;
+            }
+            .card-hover:hover {
+                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+                transform: translateY(-1px);
+            }
+            .table-hover-row {
+                transition: background-color 0.2s ease;
+            }
+            .table-hover-row:hover {
+                background-color: rgba(22, 119, 255, 0.03);
+            }
+            .form-input-focus {
+                @apply focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary;
+            }
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1677ff',
+                        success: '#52c41a',
+                        warning: '#faad14',
+                        danger: '#ff4d4f',
+                        neutral: '#f0f2f5',
+                        pending: '#faad14',
+                        approved: '#52c41a',
+                        rejected: '#ff4d4f',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    spacing: {
+                        '4.5': '1.125rem',
+                    }
+                }
+            }
+        };
+    </script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <!-- 页面标题 -->
+        <div class="mb-6">
+            <h1 class="text-[clamp(1.25rem,2vw,1.5rem)] font-semibold text-gray-800">访客预约管理</h1>
+            <p class="text-sm text-gray-500 mt-1">管理所有访客预约申请，支持筛选、审批等操作</p>
+        </div>
+
+        <!-- 筛选区域 - 重新调整日期筛选布局 -->
+        <div class="bg-white rounded-xl p-5 sm:p-6 mb-6 card-shadow card-hover">
+            <!-- 日期筛选单独一行 -->
+            <div class="mb-5 flex flex-wrap items-center gap-4">
+                <label class="block text-sm font-medium text-gray-600 min-w-[70px]">日期筛选</label>
+                
+                <!-- 快捷日期按钮 -->
+                <div class="flex flex-wrap gap-2">
+                    <button class="px-4 py-1.5 text-sm rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">今日</button>
+                    <button class="px-4 py-1.5 text-sm rounded-full bg-primary text-white">近一周</button>
+                    <button class="px-4 py-1.5 text-sm rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">近一月</button>
+                </div>
+                
+                <!-- 自定义日期选择 - 横向展开 -->
+                <div class="flex items-center gap-3 flex-grow max-w-md">
+                    <input type="text" placeholder="开始日期" class="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg form-input-focus">
+                    <span class="text-gray-400 text-sm">至</span>
+                    <input type="text" placeholder="结束日期" class="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg form-input-focus">
+                </div>
+            </div>
+
+            <!-- 其他筛选项网格 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-5">
+                <!-- 基础筛选项 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1.5">访客姓名</label>
+                    <input type="text" placeholder="请输入访客姓名" class="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg form-input-focus">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1.5">访客车辆</label>
+                    <input type="text" placeholder="请输入车牌号" class="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg form-input-focus">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1.5">来访事由</label>
+                    <select class="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg form-input-focus appearance-none bg-white">
+                        <option value="">请选择来访事由</option>
+                        <option value="visit">参观</option>
+                        <option value="meet">拜访</option>
+                        <option value="interview">面试开会</option>
+                        <option value="other">其他</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1.5">被访人姓名</label>
+                    <input type="text" placeholder="请输入被访人姓名" class="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg form-input-focus">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1.5">审批状态</label>
+                    <select class="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg form-input-focus appearance-none bg-white">
+                        <option value="">请选择状态</option>
+                        <option value="pending">待审批</option>
+                        <option value="approved">已通过</option>
+                        <option value="rejected">已拒绝</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 操作按钮区域 -->
+            <div class="flex flex-wrap items-center gap-3 pt-1">
+                <button class="px-4 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1">
+                    <i class="fa fa-search text-xs"></i> 搜索
+                </button>
+                
+                <button class="px-4 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1">
+                    <i class="fa fa-refresh text-xs"></i> 重置
+                </button>
+                
+                <button class="ml-auto px-4 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1 shadow-sm">
+                    <i class="fa fa-plus text-xs"></i> 新增预约
+                </button>
+            </div>
+        </div>
+
+        <!-- 表格区域 -->
+        <div class="bg-white rounded-xl card-shadow card-hover overflow-hidden">
+            <!-- 表格标题 -->
+            <div class="px-5 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/70">
+                <h3 class="text-base font-medium text-gray-800">访客预约列表</h3>
+                <div class="text-xs text-gray-500">共 <span class="text-primary font-medium">3</span> 条记录</div>
+            </div>
+            
+            <!-- 表格内容 -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="px-4 sm:px-5 py-3 text-left text-gray-600 font-medium text-xs">序号</th>
+                            <th class="px-4 sm:px-5 py-3 text-left text-gray-600 font-medium text-xs">访客姓名</th>
+                            <th class="px-4 sm:px-5 py-3 text-left text-gray-600 font-medium text-xs">联系电话</th>
+                            <th class="px-4 sm:px-5 py-3 text-left text-gray-600 font-medium text-xs">预约车辆</th>
+                            <th class="px-4 sm:px-5 py-3 text-left text-gray-600 font-medium text-xs">被访人</th>
+                            <th class="px-4 sm:px-5 py-3 text-left text-gray-600 font-medium text-xs">来访事由</th>
+                            <th class="px-4 sm:px-5 py-3 text-left text-gray-600 font-medium text-xs">审批状态</th>
+                            <th class="px-4 sm:px-5 py-3 text-left text-gray-600 font-medium text-xs">预计来访时间</th>
+                            <th class="px-4 sm:px-5 py-3 text-left text-gray-600 font-medium text-xs">申请日期</th>
+                            <th class="px-4 sm:px-5 py-3 text-left text-gray-600 font-medium text-xs">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-gray-100 table-hover-row">
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">1</td>
+                            <td class="px-4 sm:px-5 py-3.5 font-medium text-gray-800">A君</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">13812345678</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">粤A·AB1253</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">张三</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">参观</td>
+                            <td class="px-4 sm:px-5 py-3.5">
+                                <span class="px-2 py-0.5 text-xs rounded-full bg-yellow-50 text-pending">待审批</span>
+                            </td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700 text-xs">2025/12/24 10:00-12:00</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700 text-xs">2025/12/21</td>
+                            <td class="px-4 sm:px-5 py-3.5">
+                                <div class="flex gap-2">
+                                    <button class="text-primary hover:text-primary/80 text-xs transition-colors">详情</button>
+                                    <button class="text-success hover:text-success/80 text-xs transition-colors">通过</button>
+                                    <button class="text-danger hover:text-danger/80 text-xs transition-colors">拒绝</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="border-b border-gray-100 table-hover-row">
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">2</td>
+                            <td class="px-4 sm:px-5 py-3.5 font-medium text-gray-800">B君</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">18087654321</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">-</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">李四</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">拜访</td>
+                            <td class="px-4 sm:px-5 py-3.5">
+                                <span class="px-2 py-0.5 text-xs rounded-full bg-green-50 text-approved">已通过</span>
+                            </td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700 text-xs">2025/12/22 13:30-14:30</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700 text-xs">2025/12/20</td>
+                            <td class="px-4 sm:px-5 py-3.5">
+                                <div class="flex gap-2">
+                                    <button class="text-primary hover:text-primary/80 text-xs transition-colors">详情</button>
+                                    <button class="text-success hover:text-success/80 text-xs transition-colors">通过</button>
+                                    <button class="text-danger hover:text-danger/80 text-xs transition-colors">拒绝</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="table-hover-row">
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">3</td>
+                            <td class="px-4 sm:px-5 py-3.5 font-medium text-gray-800">C君</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">13914725899</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">桂A·C1688</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">张三</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700">面试开会</td>
+                            <td class="px-4 sm:px-5 py-3.5">
+                                <span class="px-2 py-0.5 text-xs rounded-full bg-red-50 text-rejected">已拒绝</span>
+                            </td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700 text-xs">2025/12/20 09:30-11:30</td>
+                            <td class="px-4 sm:px-5 py-3.5 text-gray-700 text-xs">2025/12/19</td>
+                            <td class="px-4 sm:px-5 py-3.5">
+                                <div class="flex gap-2">
+                                    <button class="text-primary hover:text-primary/80 text-xs transition-colors">详情</button>
+                                    <button class="text-success hover:text-success/80 text-xs transition-colors">通过</button>
+                                    <button class="text-danger hover:text-danger/80 text-xs transition-colors">拒绝</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页区域 -->
+            <div class="px-5 py-3 flex justify-between items-center border-t border-gray-100 bg-gray-50/50">
+                <div class="text-xs text-gray-500">
+                    显示 <span class="text-primary">1</span> - <span class="text-primary">3</span> 条，共 <span class="text-primary">3</span> 条
+                </div>
+                <div class="flex items-center gap-1">
+                    <button class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:border-primary hover:text-primary transition-colors text-xs">
+                        <i class="fa fa-angle-left"></i>
+                    </button>
+                    <button class="w-7 h-7 flex items-center justify-center rounded-lg bg-primary text-white text-xs">1</button>
+                    <button class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-primary hover:text-primary transition-colors text-xs">2</button>
+                    <button class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-primary hover:text-primary transition-colors text-xs">3</button>
+                    <button class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-primary hover:text-primary transition-colors text-xs">
+                        <i class="fa fa-angle-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

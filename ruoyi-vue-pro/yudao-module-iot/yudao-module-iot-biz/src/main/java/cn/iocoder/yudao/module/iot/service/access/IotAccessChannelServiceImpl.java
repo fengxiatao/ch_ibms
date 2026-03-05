@@ -80,7 +80,9 @@ public class IotAccessChannelServiceImpl implements IotAccessChannelService {
     private String getDeviceType(IotDeviceDO device) {
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
-            return AccessDeviceTypeConstants.getDeviceType(config.getSupportVideo());
+            String configDeviceType = config.getAccessDeviceType();
+            Boolean supportVideo = config.getSupportVideo();
+            return AccessDeviceTypeConstants.resolveDeviceType(configDeviceType, supportVideo);
         }
         // 兼容 GenericDeviceConfig：优先读取 config.deviceType（ACCESS_GEN1/ACCESS_GEN2）
         if (device.getConfig() instanceof GenericDeviceConfig) {
@@ -333,6 +335,7 @@ public class IotAccessChannelServiceImpl implements IotAccessChannelService {
 
         // 构建命令参数
         Map<String, Object> params = new HashMap<>();
+        params.put("deviceType", deviceType);  // 【关键】传递正确的设备类型
         params.put("channelId", channelId);
         params.put("channelNo", channel.getChannelNo());
         params.put("ipAddress", ip);

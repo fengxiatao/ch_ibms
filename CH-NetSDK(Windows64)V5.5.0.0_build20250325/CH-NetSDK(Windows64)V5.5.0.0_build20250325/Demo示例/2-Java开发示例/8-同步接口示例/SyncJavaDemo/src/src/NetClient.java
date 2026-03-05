@@ -1,0 +1,175 @@
+package src;
+
+import java.awt.Component;
+
+import src.NVSSDK.ALARM_NOTIFY;
+import src.NVSSDK.CLIENTINFO;
+import src.NVSSDK.ENCODERINFO;
+import src.NVSSDK.MAIN_NOTIFY;
+import src.NVSSDK.NetClientPara;
+import src.NVSSDK.NetPicPara;
+import src.NVSSDK.PARACHANGE_NOTIFY;
+import src.NVSSDK.RAWFRAME_NOTIFY;
+import src.NVSSDK.RECT;
+import src.NVSSDK.RECVDATA_NOTIFY;
+import src.NVSSDK.SDK_VERSION;
+import src.NVSSDK.NVS_FILE_DATA_EX;
+
+import com.sun.jna.Native;
+import com.sun.jna.Pointer;
+import com.sun.jna.ptr.IntByReference;
+
+public class NetClient {
+
+	private static NVSSDK nvssdk = (NVSSDK)(System.getProperty("os.name").toLowerCase().startsWith("win")?Native.loadLibrary("NVSSDK.dll",NVSSDK.class):Native.loadLibrary("libnvssdk.so",NVSSDK.class));
+	
+	public static int GetVersion(SDK_VERSION _ver) {
+		return nvssdk.NetClient_GetVersion(_ver);
+	}
+
+	public static int SetNotifyFunction(MAIN_NOTIFY _cbkMainNotify,
+			ALARM_NOTIFY _cbkAlarmNotify,PARACHANGE_NOTIFY _cbkParaChangeNotify) {
+		return nvssdk.NetClient_SetNotifyFunction_V4(_cbkMainNotify, _cbkAlarmNotify, _cbkParaChangeNotify, null, null);
+	}
+
+	public static int SetPort(int _iServerPort, int _iClientPort) {
+		return nvssdk.NetClient_SetPort(_iServerPort, _iClientPort);
+	}
+
+	public static int Startup() {
+		return nvssdk.NetClient_Startup_V4(0, 0, 0);
+	}
+
+	public static int Cleanup() {
+		return nvssdk.NetClient_Cleanup();
+	}
+	
+	public static int SetDsmConfig(int _iCommand, Pointer _pvBuf, int _iBufSize) {
+		return nvssdk.NetClient_SetDsmConfig(_iCommand, _pvBuf, _iBufSize);
+	}
+	
+	public static int GetDsmRegstierInfo(int _iCommand, Pointer _pvBuf, int _iBufSize) {
+		return nvssdk.NetClient_GetDsmRegstierInfo(_iCommand, _pvBuf, _iBufSize);
+	}
+
+	public static int Logon(String _cProxy, String _cIP, String _cUserName,
+			String _cPassword, String _pcProID, int _iPort) {
+		return nvssdk.NetClient_Logon(_cProxy, _cIP, _cUserName,
+				_cPassword, _pcProID, _iPort);
+	}
+	
+	public static int SyncLogon(int _iLogonType, Pointer _pvPara, int _iParaSize) {
+		return nvssdk.NetClient_SyncLogon(_iLogonType, _pvPara, _iParaSize);
+	}
+
+	public static int Logoff(int _iLogonID) {
+		return nvssdk.NetClient_Logoff(_iLogonID);
+	}
+	
+	public static int GetChannelNum(int _iLogonID, IntByReference _piChanNum) {
+		return nvssdk.NetClient_GetChannelNum(_iLogonID, _piChanNum);
+	}
+	
+	public static int GetDigitalChannelNum(int _iLogonID, IntByReference _piDigitChannelNum) {
+		return nvssdk.NetClient_GetDigitalChannelNum(_iLogonID, _piDigitChannelNum);
+	}
+
+	public static int StartRecv(IntByReference _ulConID, CLIENTINFO _cltInfo,
+			RECVDATA_NOTIFY _cbkDataNotify) {
+		return nvssdk.NetClient_StartRecvEx(_ulConID, _cltInfo,
+				_cbkDataNotify, Pointer.NULL);
+	}
+
+	public static int StopRecv(int _ulConID) {
+		return nvssdk.NetClient_StopRecv(_ulConID);
+	}
+	
+	public static int SyncRealPlay(IntByReference _puiRecvID, NetClientPara _ptPara, int _iParaSize) {
+		return nvssdk.NetClient_SyncRealPlay(_puiRecvID, _ptPara, _iParaSize);
+	}
+	
+	public static int StopRealPlay(int _uiRecvID, int _iParam) {
+		return nvssdk.NetClient_StopRealPlay(_uiRecvID, _iParam);
+	}
+
+	public static int StartCaptureData(int _ulConID) {
+		return nvssdk.NetClient_StartCaptureData(_ulConID);
+	}
+
+	public static int StartPlay(int _ulConID, Component _hWnd, int _iDecflag) {
+		int hWnd = (int) Native.getComponentID(_hWnd);
+		RECT rcShow = new RECT();
+		return nvssdk.NetClient_StartPlay(_ulConID, hWnd, rcShow,
+				_iDecflag);
+	}
+
+	public static int StopPlay(int _ulConID) {
+		return nvssdk.NetClient_StopPlay(_ulConID);
+	}
+
+	public static int StartCaptureFile(int _ulConID, String _cFileName,
+			int _iRecFileType) {
+		return nvssdk.NetClient_StartCaptureFile(_ulConID,
+				_cFileName, _iRecFileType);
+	}
+
+	public static int StopCaptureFile(int _ulConID) {
+		return nvssdk.NetClient_StopCaptureFile(_ulConID);
+	}
+	
+	public static int StartRecvNetPicStream(int _iLogonID, NetPicPara _ptPara, int _iBufLen, IntByReference _puiRecvID) {
+		return nvssdk.NetClient_StartRecvNetPicStream(_iLogonID, _ptPara, _iBufLen,  _puiRecvID);
+	}
+	
+	public static int GetLogonStatus(int _iLogonID) {
+		return nvssdk.NetClient_GetLogonStatus(_iLogonID);
+	}
+	
+	public static int GetDevInfo(int _iLogonID ,ENCODERINFO _pEncoderInfo) {
+		return nvssdk.NetClient_GetDevInfo(_iLogonID, _pEncoderInfo);
+	}
+	
+	public static int Query_V4(int _iLogonID, int _iCmd, int _iChannel, Pointer _pvCmdBuf, int _iBufLen) {
+		return nvssdk.NetClient_Query_V4(_iLogonID, _iCmd, _iChannel, _pvCmdBuf, _iBufLen);
+	}
+	
+	public static int NetFileGetFileCount(int _iLogonID, IntByReference _piTotalCount, IntByReference _piCurrentCount) {
+		return nvssdk.NetClient_NetFileGetFileCount(_iLogonID, _piTotalCount, _piCurrentCount);
+	}
+	
+	public static int NetFileGetQueryfileEx(int _iLogonID, int _iFileIndex, NVS_FILE_DATA_EX _pFileInfo) {
+		return nvssdk.NetClient_NetFileGetQueryfileEx(_iLogonID, _iFileIndex,  _pFileInfo);
+	}
+	
+	public static int NetFileDownload(IntByReference _uiConID, int _iLogonID, int _iCmd, Pointer _pvBuf, int _iBufSize) {
+		return nvssdk.NetClient_NetFileDownload(_uiConID, _iLogonID, _iCmd, _pvBuf, _iBufSize);
+	}
+	
+	public static int  NetFileStopDownloadFile(int _uiConID) {
+		return nvssdk.NetClient_NetFileStopDownloadFile(_uiConID);
+	}
+	
+	public static int SetRawFrameCallBack(int _uiConID, RAWFRAME_NOTIFY _cbkGetFrame, Pointer _pContext) {
+		return nvssdk.NetClient_SetRawFrameCallBack(_uiConID, _cbkGetFrame, _pContext);
+	}
+	
+	public static int NetFileGetDownloadPos(int _uiConID, IntByReference _piPos, IntByReference _piDLSize) {
+		return nvssdk.NetClient_NetFileGetDownloadPos(_uiConID, _piPos, _piDLSize);
+	}
+	
+	public static int SyncQuery(int _iLogonID, int _iChanNo, int _iCmd, Pointer _pvInPara, int _iInLen, Pointer _pvOutPara, int _iOutTotalLen, int _iSingleLen) {
+		return nvssdk.NetClient_SyncQuery(_iLogonID, _iChanNo, _iCmd, _pvInPara, _iInLen, _pvOutPara, _iOutTotalLen, _iSingleLen);
+	}
+	
+	public static int NetLogGetLogCount(int _iLogonID, IntByReference _iTotalCount, IntByReference _iCurrentCount) {
+		return nvssdk.NetClient_NetLogGetLogCount(_iLogonID, _iTotalCount, _iCurrentCount);
+	}
+	
+	public static int SyncSetDevCfg(int _iLogonID, int _iChanNo, int _iCmd, Pointer _pvInPara, int _iInLen, Pointer _pvOutRet, int _iOutLen) {
+		return nvssdk.NetClient_SyncSetDevCfg(_iLogonID, _iChanNo, _iCmd, _pvInPara, _iInLen, _pvOutRet, _iOutLen);
+	}
+	
+	public static int SetSDKInitConfig(int _iCmd, Pointer _lpInBuffer, int _iInLen){
+		return nvssdk.NetClient_SetSDKInitConfig(_iCmd, _lpInBuffer, _iInLen);
+	}
+}

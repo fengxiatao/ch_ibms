@@ -72,6 +72,15 @@ public interface IotDeviceChannelService {
     IotDeviceChannelDO getChannelByDeviceIdAndChannelNo(Long deviceId, Integer channelNo);
 
     /**
+     * 更新通道配置
+     * <p>用于更新通道的 config JSON 字段（如门模式、常开/常闭状态等）</p>
+     *
+     * @param channelId 通道ID
+     * @param config    配置信息
+     */
+    void updateChannelConfig(Long channelId, java.util.Map<String, Object> config);
+
+    /**
      * 获取视频通道列表
      *
      * @param deviceType   设备类型

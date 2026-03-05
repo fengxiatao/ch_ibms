@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageBus;
 import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageSubscriber;
 import cn.iocoder.yudao.module.iot.core.messagebus.topics.IotMessageTopics;
 import cn.iocoder.yudao.module.iot.dal.dataobject.alarm.IotAlarmHostDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.alarm.IotAlarmHostMapper;
 import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.enums.device.AlarmDeviceTypeConstants;
@@ -496,27 +497,39 @@ public class DeviceStateChangeConsumer implements IotMessageSubscriber<DeviceSta
      * <p>Requirements: 9.6, 9.9 - 门禁设备上线时自动触发通道同步</p>
      * <p>延迟2秒等待设备就绪后发送 QUERY_CHANNELS 命令</p>
      * 
+     * <p>注意：deviceType 从数据库重新获取，而不是使用消息中的值，
+     * 因为消息中的 deviceType 可能是 Gateway 层根据错误的命令参数设置的。</p>
+     * 
      * @param deviceId 设备ID
-     * @param deviceType 设备类型
+     * @param messageDeviceType 消息中的设备类型（仅用于日志对比，不实际使用）
      */
     @Async
-    void triggerChannelSync(Long deviceId, String deviceType) {
+    void triggerChannelSync(Long deviceId, String messageDeviceType) {
         try {
             // 延迟等待设备就绪
             Thread.sleep(CHANNEL_SYNC_DELAY_MS);
 
-            // 发送 QUERY_CHANNELS 命令
-            String requestId = commandPublisher.publishCommand(deviceType, deviceId, CMD_QUERY_CHANNELS);
+            // 【重要】从数据库获取正确的设备类型，不依赖消息中可能错误的值
+            IotDeviceDO device = deviceService.getDevice(deviceId);
+            String correctDeviceType = AccessDeviceTypeConstants.getAccessDeviceType(device);
+            
+            if (!correctDeviceType.equals(messageDeviceType)) {
+                log.warn("[DeviceStateChangeConsumer] 消息中的deviceType与数据库不一致，已修正: deviceId={}, " +
+                        "messageDeviceType={}, correctDeviceType={}", deviceId, messageDeviceType, correctDeviceType);
+            }
+
+            // 发送 QUERY_CHANNELS 命令（使用正确的设备类型）
+            String requestId = commandPublisher.publishCommand(correctDeviceType, deviceId, CMD_QUERY_CHANNELS);
 
             log.info("[DeviceStateChangeConsumer] 已触发通道同步: deviceId={}, deviceType={}, requestId={}",
-                    deviceId, deviceType, requestId);
+                    deviceId, correctDeviceType, requestId);
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("[DeviceStateChangeConsumer] 通道同步被中断: deviceId={}", deviceId);
         } catch (Exception e) {
-            log.error("[DeviceStateChangeConsumer] 触发通道同步失败: deviceId={}, deviceType={}, error={}",
-                    deviceId, deviceType, e.getMessage(), e);
+            log.error("[DeviceStateChangeConsumer] 触发通道同步失败: deviceId={}, error={}",
+                    deviceId, e.getMessage(), e);
         }
     }
     

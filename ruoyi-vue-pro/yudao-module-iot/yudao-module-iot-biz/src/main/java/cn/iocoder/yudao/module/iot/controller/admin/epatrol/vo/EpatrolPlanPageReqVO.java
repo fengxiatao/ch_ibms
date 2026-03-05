@@ -18,6 +18,9 @@ public class EpatrolPlanPageReqVO extends PageParam {
     @Schema(description = "计划名称", example = "日常巡更计划")
     private String planName;
 
+    @Schema(description = "巡更人员ID", example = "1")
+    private Long personId;
+
     @Schema(description = "巡更路线ID", example = "1")
     private Long routeId;
 

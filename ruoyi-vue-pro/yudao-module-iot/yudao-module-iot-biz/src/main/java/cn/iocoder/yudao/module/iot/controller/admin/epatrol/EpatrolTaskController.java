@@ -43,8 +43,7 @@ public class EpatrolTaskController {
     @Operation(summary = "获得巡更任务分页")
     @PreAuthorize("@ss.hasPermission('iot:epatrol-task:query')")
     public CommonResult<PageResult<EpatrolTaskRespVO>> getTaskPage(@Valid EpatrolTaskPageReqVO pageReqVO) {
-        PageResult<EpatrolTaskDO> pageResult = taskService.getTaskPage(pageReqVO);
-        return success(BeanUtils.toBean(pageResult, EpatrolTaskRespVO.class));
+        return success(taskService.getTaskPageWithDetails(pageReqVO));
     }
 
     @PostMapping("/submit")
@@ -53,6 +52,13 @@ public class EpatrolTaskController {
     public CommonResult<Boolean> submitTask(@Valid @RequestBody EpatrolTaskSubmitReqVO submitReqVO) {
         taskService.submitTask(submitReqVO);
         return success(true);
+    }
+
+    @GetMapping("/statistics")
+    @Operation(summary = "获取巡更任务统计")
+    @PreAuthorize("@ss.hasPermission('iot:epatrol-task:query')")
+    public CommonResult<EpatrolTaskStatisticsVO> getTaskStatistics(@Valid EpatrolTaskPageReqVO reqVO) {
+        return success(taskService.getTaskStatistics(reqVO));
     }
 
 }

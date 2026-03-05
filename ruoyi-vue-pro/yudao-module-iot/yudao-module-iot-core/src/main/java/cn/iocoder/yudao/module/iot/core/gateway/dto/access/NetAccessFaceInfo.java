@@ -30,8 +30,12 @@ public class NetAccessFaceInfo {
     /** 人脸数据长度 */
     private Integer faceDataLen;
     
-    /** 人脸图片数据（JPEG格式） */
+    /** 人脸图片数据（JPEG格式） - 已废弃，改用 faceUrl */
+    @Deprecated
     private byte[] faceData;
+    
+    /** 人脸图片 URL（推荐使用，避免消息总线传输大量二进制数据） */
+    private String faceUrl;
     
     // ==================== 人脸特征（可选，由设备提取） ====================
     

@@ -22,6 +22,9 @@ public class EpatrolRouteSaveReqVO {
     @NotEmpty(message = "路线点位不能为空")
     private List<RoutePointItem> points;
 
+    @Schema(description = "路线总耗时（分钟）", example = "30")
+    private Integer totalDuration;
+
     @Schema(description = "备注", example = "备注")
     private String remark;
 

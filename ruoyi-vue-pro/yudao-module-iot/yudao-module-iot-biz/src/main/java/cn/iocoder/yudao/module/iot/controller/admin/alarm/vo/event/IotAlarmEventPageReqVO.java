@@ -31,8 +31,8 @@ public class IotAlarmEventPageReqVO extends PageParam {
     @Schema(description = "事件级别：INFO-信息, WARNING-警告, ERROR-错误, CRITICAL-严重", example = "CRITICAL")
     private String eventLevel;
 
-    @Schema(description = "是否已处理", example = "false")
-    private Boolean isHandled;
+    @Schema(description = "处理状态：0-未处理，1-已处理，2-已忽略", example = "0")
+    private Integer status;
 
     @Schema(description = "分区号", example = "1")
     private Integer areaNo;

@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧停车管理系统 - 收费管理</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft Yahei", sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        
+        /* 顶部导航样式 */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            height: 64px;
+            background-color: #fff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            font-size: 18px;
+            font-weight: 600;
+            color: #1890ff;
+        }
+        
+        .logo-icon {
+            font-size: 24px;
+            margin-right: 8px;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: #1890ff;
+            color: #fff;
+            text-align: center;
+            line-height: 32px;
+            margin-left: 12px;
+            font-size: 14px;
+        }
+        
+        /* 主容器样式 */
+        .main-container {
+            display: flex;
+            padding-top: 64px;
+            min-height: 100vh;
+        }
+        
+        /* 侧边菜单样式 */
+        .sidebar {
+            width: 200px;
+            background-color: #fff;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+            padding-top: 20px;
+            height: calc(100vh - 64px);
+            position: fixed;
+            overflow-y: auto;
+        }
+        
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            cursor: pointer;
+            color: #666;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .menu-item.active {
+            background-color: #e6f7ff;
+            color: #1890ff;
+            border-right: 3px solid #1890ff;
+        }
+        
+        .menu-item:hover:not(.active) {
+            background-color: #f5f5f5;
+        }
+        
+        .menu-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+        }
+        
+        /* 收费管理内容区域样式 */
+        .content {
+            flex: 1;
+            margin-left: 200px;
+            padding: 20px;
+        }
+        
+        .content-header {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .content-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        /* 表单样式 */
+        .form-row {
+            display: flex;
+            margin-bottom: 16px;
+        }
+        
+        .form-item {
+            flex: 1;
+            margin-right: 20px;
+        }
+        
+        .form-item:last-child {
+            margin-right: 0;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .form-input {
+            width: 100%;
+            height: 36px;
+            padding: 0 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border 0.3s;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #1890ff;
+        }
+        
+        /* 折扣组合控件样式 */
+        .discount-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .discount-select {
+            flex: 2;
+        }
+        .discount-custom {
+            flex: 1;
+            display: none;
+        }
+        .discount-custom.show {
+            display: block;
+        }
+        
+        /* 按钮样式 */
+        .btn {
+            height: 36px;
+            padding: 0 16px;
+            border-radius: 4px;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background-color: #1890ff;
+            color: #fff;
+        }
+        
+        .btn-primary:hover {
+            background-color: #40a9ff;
+        }
+        
+        .btn-default {
+            background-color: #f5f5f5;
+            color: #666;
+            margin-right: 8px;
+        }
+        
+        .btn-default:hover {
+            background-color: #e6e6e6;
+        }
+        
+        .btn-export {
+            background-color: #52c41a;
+            color: #fff;
+            margin-left: 8px;
+        }
+        
+        .btn-export:hover {
+            background-color: #73d13d;
+        }
+        
+        /* 表格样式 */
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        
+        .table th, .table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .table th {
+            background-color: #fafafa;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .table tr:hover {
+            background-color: #f9f9f9;
+        }
+        
+        /* 费用计算结果样式 */
+        .fee-result {
+            margin-top: 20px;
+            padding: 16px;
+            background-color: #f6ffed;
+            border: 1px solid #b7eb8f;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .fee-result.show {
+            display: block;
+        }
+        
+        .fee-amount {
+            font-size: 18px;
+            font-weight: 600;
+            color: #52c41a;
+            margin-top: 8px;
+        }
+    </style>
+    <!-- 引入SheetJS库用于Excel导出 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">🚗</div>
+            <span>智慧停车管理系统</span>
+        </div>
+        <div class="user-info">
+            <span>管理员</span>
+            <div class="user-avatar">管</div>
+        </div>
+    </div>
+    
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 侧边菜单 -->
+        <div class="sidebar">
+            <div class="menu-item" id="menu-monitor">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M928 160H96c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h832c17.7 0 32-14.3 32-32V192c0-17.7-14.3-32-32-32zM480 832H160V256h320v576zm128-640H160v-64h448v64zm320 640H608V256h320v576z"/>
+                </svg>
+                <span>在场车辆监控</span>
+            </div>
+            <div class="menu-item" id="menu-records">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M832 64H192c-17.7 0-32 14.3-32 32v832c0 17.7 14.3 32 32 32h640c17.7 0 32-14.3 32-32V96c0-17.7-14.3-32-32-32zM648.3 426.8L537.9 345.5c-3.1-2.3-7.3-2.3-10.4 0L375.7 426.8a8.32 8.32 0 0 0-1.7 11.9l89.9 118.8c3.1 4.1 9.2 4.1 12.3 0l142.4-188.3a8.32 8.32 0 0 0-1.7-11.9z"/>
+                </svg>
+                <span>出入场记录</span>
+            </div>
+            <div class="menu-item active" id="menu-parking">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M864 256H736v-64c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v64H416v-64c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v64H160c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h704c17.7 0 32-14.3 32-32V288c0-17.7-14.3-32-32-32zM640 832H384c-17.7 0-32-14.3-32-32V480c0-17.7 14.3-32 32-32h256c17.7 0 32 14.3 32 32v320c0 17.7-14.3 32-32 32zM352 384h320v64H352v-64z"/>
+                </svg>
+                <span>收费管理</span>
+            </div>
+            <div class="menu-item" id="menu-report">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M896 112H128c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h768c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32zM792 768H232V248h560v520zM232 168h246v48h-246v-48zm560 0h-246v48h246v-48zM232 848v48h560v-48H232z"/>
+                </svg>
+                <span>报表统计</span>
+            </div>
+            <div class="menu-item" id="menu-settings">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M928 160H96c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h832c17.7 0 32-14.3 32-32V192c0-17.7-14.3-32-32-32zm-40 656H136V240h752v576zM480 384c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm192-384c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64z"/>
+                </svg>
+                <span>系统设置</span>
+            </div>
+        </div>
+
+        <!-- 收费管理内容区域 -->
+        <div class="content">
+            <div class="content-header">
+                <h1 class="content-title">收费管理</h1>
+            </div>
+
+            <!-- 费用计算卡片 -->
+            <div class="card">
+                <h2 class="card-title">停车费用计算</h2>
+                <div class="form-row">
+                    <div class="form-item">
+                        <label class="form-label">车牌号</label>
+                        <input type="text" class="form-input" id="carNumber" placeholder="请输入车牌号">
+                    </div>
+                    <div class="form-item">
+                        <label class="form-label">入场时间</label>
+                        <input type="datetime-local" class="form-input" id="inTime">
+                    </div>
+                    <div class="form-item">
+                        <label class="form-label">出场时间</label>
+                        <input type="datetime-local" class="form-input" id="outTime">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-item">
+                        <label class="form-label">车辆类型</label>
+                        <select class="form-input" id="carType">
+                            <option value="small">小型车 (首小时5元，后续每小时2元)</option>
+                            <option value="medium">中型车 (首小时8元，后续每小时3元)</option>
+                            <option value="large">大型车 (首小时10元，后续每小时4元)</option>
+                        </select>
+                    </div>
+                    <div class="form-item">
+                        <label class="form-label">优惠折扣</label>
+                        <!-- 修改折扣控件为组合形式 -->
+                        <div class="discount-group">
+                            <select class="form-input discount-select" id="discountSelect">
+                                <option value="1">无折扣</option>
+                                <option value="0.9">VIP会员 (9折)</option>
+                                <option value="0.8">节假日优惠 (8折)</option>
+                                <option value="custom">自定义折扣</option>
+                            </select>
+                            <input type="number" class="form-input discount-custom" id="discountCustom" 
+                                   placeholder="输入折扣系数" min="0.1" max="1" step="0.01">
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <button class="btn btn-default" id="calculateFee">计算费用</button>
+                    <button class="btn btn-primary" id="confirmPayment">确认缴费</button>
+                </div>
+                <div class="fee-result" id="feeResult">
+                    <div>费用计算结果：</div>
+                    <div class="fee-amount" id="feeAmount">¥ 0.00</div>
+                </div>
+            </div>
+
+            <!-- 收费标准设置卡片 -->
+            <div class="card">
+                <h2 class="card-title">收费标准设置</h2>
+                <div class="form-row">
+                    <div class="form-item">
+                        <label class="form-label">小型车首小时费用 (元)</label>
+                        <input type="number" class="form-input" id="smallFirstHour" value="5" min="0" step="0.5">
+                    </div>
+                    <div class="form-item">
+                        <label class="form-label">小型车后续每小时费用 (元)</label>
+                        <input type="number" class="form-input" id="smallPerHour" value="2" min="0" step="0.5">
+                    </div>
+                    <div class="form-item">
+                        <label class="form-label">小型车每日封顶费用 (元)</label>
+                        <input type="number" class="form-input" id="smallDailyCap" value="30" min="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-item">
+                        <label class="form-label">中型车首小时费用 (元)</label>
+                        <input type="number" class="form-input" id="mediumFirstHour" value="8" min="0" step="0.5">
+                    </div>
+                    <div class="form-item">
+                        <label class="form-label">中型车后续每小时费用 (元)</label>
+                        <input type="number" class="form-input" id="mediumPerHour" value="3" min="0" step="0.5">
+                    </div>
+                    <div class="form-item">
+                        <label class="form-label">中型车每日封顶费用 (元)</label>
+                        <input type="number" class="form-input" id="mediumDailyCap" value="50" min="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-item">
+                        <label class="form-label">大型车首小时费用 (元)</label>
+                        <input type="number" class="form-input" id="largeFirstHour" value="10" min="0" step="0.5">
+                    </div>
+                    <div class="form-item">
+                        <label class="form-label">大型车后续每小时费用 (元)</label>
+                        <input type="number" class="form-input" id="largePerHour" value="4" min="0" step="0.5">
+                    </div>
+                    <div class="form-item">
+                        <label class="form-label">大型车每日封顶费用 (元)</label>
+                        <input type="number" class="form-input" id="largeDailyCap" value="80" min="0">
+                    </div>
+                </div>
+                <button class="btn btn-primary" id="saveFeeSettings">保存收费标准</button>
+            </div>
+
+            <!-- 缴费记录查询卡片 -->
+            <div class="card">
+                <h2 class="card-title">缴费记录查询</h2>
+                <div class="form-row">
+                    <div class="form-item">
+                        <label class="form-label">查询日期范围 - 开始</label>
+                        <input type="date" class="form-input" id="queryStartDate">
+                    </div>
+                    <div class="form-item">
+                        <label class="form-label">查询日期范围 - 结束</label>
+                        <input type="date" class="form-input" id="queryEndDate">
+                    </div>
+                    <div class="form-item">
+                        <label class="form-label">车牌号 (选填)</label>
+                        <input type="text" class="form-input" id="queryCarNumber" placeholder="请输入车牌号">
+                    </div>
+                </div>
+                <div>
+                    <button class="btn btn-primary" id="queryRecords">查询记录</button>
+                    <!-- 新增导出按钮 -->
+                    <button class="btn btn-export" id="exportRecords">导出Excel报表</button>
+                </div>
+                
+                <!-- 缴费记录表格 -->
+                <div style="margin-top: 20px;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>序号</th>
+                                <th>车牌号</th>
+                                <th>入场时间</th>
+                                <th>出场时间</th>
+                                <th>停车时长(小时)</th>
+                                <th>车辆类型</th>
+                                <th>应缴费用(元)</th>
+                                <th>实缴费用(元)</th>
+                                <th>缴费时间</th>
+                                <th>操作人</th>
+                            </tr>
+                        </thead>
+                        <tbody id="paymentRecords">
+                            <tr>
+                                <td colspan="10" style="text-align: center; color: #999;">暂无缴费记录</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化当前日期
+        const today = new Date();
+        const formattedDate = today.toISOString().split('T')[0];
+        document.getElementById('queryStartDate').value = formattedDate;
+        document.getElementById('queryEndDate').value = formattedDate;
+
+        // 折扣选择框切换逻辑
+        const discountSelect = document.getElementById('discountSelect');
+        const discountCustom = document.getElementById('discountCustom');
+        
+        discountSelect.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                discountCustom.classList.add('show');
+                discountCustom.focus();
+            } else {
+                discountCustom.classList.remove('show');
+            }
+        });
+
+        // 费用计算功能
+        document.getElementById('calculateFee').addEventListener('click', function() {
+            const carNumber = document.getElementById('carNumber').value.trim();
+            const inTime = document.getElementById('inTime').value;
+            const outTime = document.getElementById('outTime').value;
+            const carType = document.getElementById('carType').value;
+            
+            // 获取折扣值（兼容固定选项和自定义输入）
+            let discount;
+            if (discountSelect.value === 'custom') {
+                discount = parseFloat(discountCustom.value);
+                // 验证自定义折扣
+                if (isNaN(discount) || discount < 0.1 || discount > 1) {
+                    alert('自定义折扣系数必须在0.1-1之间');
+                    discountCustom.focus();
+                    return;
+                }
+            } else {
+                discount = parseFloat(discountSelect.value);
+            }
+
+            // 验证输入
+            if (!carNumber) {
+                alert('请输入车牌号');
+                return;
+            }
+            if (!inTime || !outTime) {
+                alert('请选择入场和出场时间');
+                return;
+            }
+
+            const inDateTime = new Date(inTime);
+            const outDateTime = new Date(outTime);
+            
+            if (outDateTime <= inDateTime) {
+                alert('出场时间必须晚于入场时间');
+                return;
+            }
+
+            // 计算停车时长（小时）
+            const durationHours = (outDateTime - inDateTime) / (1000 * 60 * 60);
+            const hoursCeiled = Math.ceil(durationHours); // 向上取整
+
+            // 获取对应车型的收费标准
+            let firstHourFee, perHourFee, dailyCap;
+            switch(carType) {
+                case 'small':
+                    firstHourFee = parseFloat(document.getElementById('smallFirstHour').value);
+                    perHourFee = parseFloat(document.getElementById('smallPerHour').value);
+                    dailyCap = parseFloat(document.getElementById('smallDailyCap').value);
+                    break;
+                case 'medium':
+                    firstHourFee = parseFloat(document.getElementById('mediumFirstHour').value);
+                    perHourFee = parseFloat(document.getElementById('mediumPerHour').value);
+                    dailyCap = parseFloat(document.getElementById('mediumDailyCap').value);
+                    break;
+                case 'large':
+                    firstHourFee = parseFloat(document.getElementById('largeFirstHour').value);
+                    perHourFee = parseFloat(document.getElementById('largePerHour').value);
+                    dailyCap = parseFloat(document.getElementById('largeDailyCap').value);
+                    break;
+            }
+
+            // 计算费用
+            let fee;
+            if (hoursCeiled <= 1) {
+                fee = firstHourFee;
+            } else {
+                fee = firstHourFee + (hoursCeiled - 1) * perHourFee;
+            }
+
+            // 应用每日封顶
+            const days = Math.ceil(hoursCeiled / 24);
+            const capFee = days * dailyCap;
+            fee = Math.min(fee, capFee);
+
+            // 应用折扣
+            fee = fee * discount;
+
+            // 显示计算结果
+            const feeResult = document.getElementById('feeResult');
+            const feeAmount = document.getElementById('feeAmount');
+            feeAmount.textContent = `¥ ${fee.toFixed(2)}`;
+            feeResult.classList.add('show');
+        });
+
+        // 确认缴费功能
+        document.getElementById('confirmPayment').addEventListener('click', function() {
+            const carNumber = document.getElementById('carNumber').value.trim();
+            const feeAmount = document.getElementById('feeAmount').textContent.replace('¥ ', '');
+            
+            if (!carNumber || feeAmount === '0.00') {
+                alert('请先计算停车费用');
+                return;
+            }
+
+            if (confirm(`确认收取 ${carNumber} 的停车费 ${feeAmount} 元吗？`)) {
+                // 模拟添加缴费记录
+                const paymentRecords = document.getElementById('paymentRecords');
+                const inTime = document.getElementById('inTime').value.replace('T', ' ');
+                const outTime = document.getElementById('outTime').value.replace('T', ' ');
+                const carTypeText = document.getElementById('carType').options[document.getElementById('carType').selectedIndex].text.split(' ')[0];
+                
+                // 移除暂无记录提示
+                if (paymentRecords.querySelector('td[colspan="10"]')) {
+                    paymentRecords.innerHTML = '';
+                }
+
+                // 添加新记录
+                const newRecord = document.createElement('tr');
+                const now = new Date().toLocaleString();
+                newRecord.innerHTML = `
+                    <td>${paymentRecords.children.length + 1}</td>
+                    <td>${carNumber}</td>
+                    <td>${inTime}</td>
+                    <td>${outTime}</td>
+                    <td>${Math.ceil((new Date(outTime) - new Date(inTime)) / (1000 * 60 * 60))}</td>
+                    <td>${carTypeText}</td>
+                    <td>${feeAmount}</td>
+                    <td>${feeAmount}</td>
+                    <td>${now}</td>
+                    <td>管理员</td>
+                `;
+                paymentRecords.appendChild(newRecord);
+
+                // 重置表单
+                alert('缴费成功！');
+                document.getElementById('carNumber').value = '';
+                document.getElementById('inTime').value = '';
+                document.getElementById('outTime').value = '';
+                document.getElementById('feeResult').classList.remove('show');
+                discountSelect.value = '1';
+                discountCustom.classList.remove('show');
+                discountCustom.value = '';
+            }
+        });
+
+        // 保存收费标准
+        document.getElementById('saveFeeSettings').addEventListener('click', function() {
+            if (confirm('确认保存收费标准吗？')) {
+                alert('收费标准保存成功！');
+            }
+        });
+
+        // 查询缴费记录
+        document.getElementById('queryRecords').addEventListener('click', function() {
+            // 这里只是模拟查询，实际项目中需要对接后端接口
+            alert('查询功能已触发，实际项目中需对接后端API获取真实数据');
+        });
+
+        // 新增：导出Excel报表功能
+        document.getElementById('exportRecords').addEventListener('click', function() {
+            const paymentRecords = document.getElementById('paymentRecords');
+            const rows = paymentRecords.querySelectorAll('tr');
+            
+            // 检查是否有数据
+            if (rows.length === 0 || (rows.length === 1 && rows[0].querySelector('td[colspan="10"]'))) {
+                alert('暂无缴费记录可导出');
+                return;
+            }
+            
+            // 准备Excel数据
+            const headers = ['序号', '车牌号', '入场时间', '出场时间', '停车时长(小时)', '车辆类型', '应缴费用(元)', '实缴费用(元)', '缴费时间', '操作人'];
+            const data = [headers];
+            
+            // 遍历表格行，收集数据
+            rows.forEach(row => {
+                const rowData = [];
+                const cells = row.querySelectorAll('td');
+                cells.forEach(cell => {
+                    rowData.push(cell.textContent.trim());
+                });
+                if (rowData.length > 0) {
+                    data.push(rowData);
+                }
+            });
+            
+            // 创建工作簿和工作表
+            const workbook = XLSX.utils.book_new();
+            const worksheet = XLSX.utils.aoa_to_sheet(data);
+            
+            // 设置列宽（可选优化）
+            const columnWidths = [
+                { wch: 6 },  // 序号
+                { wch: 12 }, // 车牌号
+                { wch: 20 }, // 入场时间
+                { wch: 20 }, // 出场时间
+                { wch: 12 }, // 停车时长
+                { wch: 10 }, // 车辆类型
+                { wch: 12 }, // 应缴费用
+                { wch: 12 }, // 实缴费用
+                { wch: 20 }, // 缴费时间
+                { wch: 10 }  // 操作人
+            ];
+            worksheet['!cols'] = columnWidths;
+            
+            // 将工作表添加到工作簿
+            XLSX.utils.book_append_sheet(workbook, worksheet, '停车缴费记录');
+            
+            // 生成并下载Excel文件
+            const exportDate = new Date().toLocaleDateString().replace(/\//g, '-');
+            const fileName = `停车缴费记录_${exportDate}.xlsx`;
+            XLSX.writeFile(workbook, fileName);
+            
+            alert(`报表导出成功！文件已保存为：${fileName}`);
+        });
+
+        // 侧边菜单切换
+        const menuItems = document.querySelectorAll('.menu-item');
+        menuItems.forEach(item => {
+            item.addEventListener('click', function() {
+                // 移除所有active类
+                menuItems.forEach(mi => mi.classList.remove('active'));
+                // 给当前点击的添加active类
+                this.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

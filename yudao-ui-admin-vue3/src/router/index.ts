@@ -11,6 +11,21 @@ const router = createRouter({
   scrollBehavior: () => ({ left: 0, top: 0 })
 })
 
+router.onError((error) => {
+  const message = (error as any)?.message || ''
+  const isDynamicImportError =
+    /Failed to fetch dynamically imported module/i.test(message) ||
+    /Importing a module script failed/i.test(message) ||
+    /Loading chunk .* failed/i.test(message)
+  if (!isDynamicImportError) return
+
+  const currentUrl = window.location.href
+  const reloadKey = `router:reload-on-import-error:${currentUrl}`
+  if (sessionStorage.getItem(reloadKey)) return
+  sessionStorage.setItem(reloadKey, '1')
+  window.location.reload()
+})
+
 export const resetRouter = (): void => {
   const resetWhiteNameList = ['Redirect', 'Login', 'NoFound', 'Home']
   router.getRoutes().forEach((route) => {

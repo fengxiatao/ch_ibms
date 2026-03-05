@@ -49,12 +49,12 @@ spring:
       primary: master
       datasource:
         master:
-          url: jdbc:mysql://127.0.0.1:3306/ch_ibms?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true # MySQL Connector/J 8.X 连接的示例
+          url: jdbc:mysql://127.0.0.1:3306/ch_ibms?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true&useUnicode=true&characterEncoding=UTF-8 # MySQL Connector/J 8.X 连接的示例
           username: root
           password: 123456
         slave: # 模拟从库，可根据自己需要修改 # 模拟从库，可根据自己需要修改
           lazy: true # 开启懒加载，保证启动速度
-          url: jdbc:mysql://127.0.0.1:3306/ch_ibms?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true # MySQL Connector/J 8.X 连接的示例
+          url: jdbc:mysql://127.0.0.1:3306/ch_ibms?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true&useUnicode=true&characterEncoding=UTF-8 # MySQL Connector/J 8.X 连接的示例
           username: root
           password: 123456
         tdengine: # IoT 数据库（暂停使用 - 长辉设备不需要）
@@ -101,6 +101,7 @@ spring:
           jobStore:
             # JobStore 实现类。可见博客：https://blog.csdn.net/weixin_42458219/article/details/122247162
             class: org.springframework.scheduling.quartz.LocalDataSourceJobStore
+            tablePrefix: QRTZ_ # 表前缀（大写），保持与 quartz.sql 脚本一致
             isClustered: false # 是集群模式
             clusterCheckinInterval: 15000 # 集群检查频率，单位：毫秒。默认为 15000，即 15 秒
             misfireThreshold: 60000 # misfire 阀值，单位：毫秒。

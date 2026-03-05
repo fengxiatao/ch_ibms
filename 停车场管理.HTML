@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧通行 - 停车场管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body { font-family: 'Inter', 'Microsoft YaHei', sans-serif; background-color: #f0f2f5; }
+        
+        .sidebar-item { transition: all 0.2s; }
+        .sidebar-item:hover { background-color: rgba(255,255,255,0.1); }
+        .sidebar-item.active { background-color: #096dd9; }
+        .sidebar-submenu { background-color: rgba(0,0,0,0.15); }
+        
+        .nav-tab { position: relative; transition: all 0.3s; border-bottom: 2px solid transparent; }
+        .nav-tab.active { color: #1890ff; background-color: #e6f7ff; border-bottom-color: #1890ff; }
+        
+        .data-table th { background-color: #fafafa; font-weight: 600; color: #262626; }
+        .data-table tr:hover td { background-color: #e6f7ff; }
+        
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .status-online { background-color: #52c41a; box-shadow: 0 0 0 2px rgba(82,196,26,0.2); }
+        .status-offline { background-color: #ff4d4f; box-shadow: 0 0 0 2px rgba(255,77,79,0.2); }
+        
+        .stat-card { transition: all 0.3s ease; }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+        /* 模态框动画 */
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        .modal-content {
+            animation: modalSlideIn 0.3s ease;
+        }
+        @keyframes modalSlideIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 抽屉动画 */
+        .drawer {
+            transition: transform 0.3s ease;
+        }
+        .drawer-open {
+            transform: translateX(0);
+        }
+        .drawer-closed {
+            transform: translateX(100%);
+        }
+
+        /* 图表样式 */
+        .chart-bar {
+            transition: all 0.3s ease;
+        }
+        .chart-bar:hover {
+            opacity: 0.8;
+            filter: brightness(1.1);
+        }
+
+        .form-input { 
+            width: 100%; 
+            padding: 0.5rem 0.75rem; 
+            border: 1px solid #d9d9d9; 
+            border-radius: 0.375rem;
+            transition: all 0.3s;
+        }
+        .form-input:focus { 
+            outline: none; 
+            border-color: #1890ff; 
+            box-shadow: 0 0 0 2px rgba(24,144,255,0.2); 
+        }
+        .form-label { 
+            display: block; 
+            font-size: 0.875rem; 
+            font-weight: 500; 
+            color: #374151; 
+            margin-bottom: 0.5rem; 
+        }
+    </style>
+</head>
+<body class="h-screen flex overflow-hidden">
+
+    <!-- 左侧侧边栏 -->
+    <aside class="w-64 bg-[#001529] text-gray-300 flex flex-col flex-shrink-0 h-full overflow-y-auto">
+        <div class="h-16 flex items-center px-6 bg-[#002140] shadow-md">
+            <i data-lucide="layout-grid" class="w-6 h-6 text-blue-400 mr-3"></i>
+            <span class="text-white font-bold text-lg">智慧建筑管理系统</span>
+        </div>
+
+        <nav class="flex-1 py-2">
+            <div class="sidebar-item active">
+                <div class="flex items-center justify-between px-4 py-3 text-white cursor-pointer bg-[#1890ff]">
+                    <div class="flex items-center">
+                        <i data-lucide="traffic-cone" class="w-5 h-5 mr-3"></i>
+                        <span class="font-medium">智慧通行</span>
+                    </div>
+                    <i data-lucide="chevron-up" class="w-4 h-4"></i>
+                </div>
+                
+                <div class="sidebar-submenu">
+                    <div class="mt-1">
+                        <div class="flex items-center justify-between px-8 py-2.5 text-sm text-white cursor-pointer bg-[#000c17]/30">
+                            <div class="flex items-center">
+                                <i data-lucide="car" class="w-4 h-4 mr-3"></i>
+                                停车场管理
+                            </div>
+                            <i data-lucide="chevron-up" class="w-3 h-3"></i>
+                        </div>
+                        
+                        <div class="bg-[#000c17]/50 py-1">
+                            <div class="mt-1">
+                                <div class="flex items-center justify-between pl-12 pr-4 py-2.5 text-sm text-white cursor-pointer bg-[#1890ff]/30 border-l-2 border-[#1890ff]">
+                                    <div class="flex items-center">
+                                        <i data-lucide="file-text" class="w-4 h-4 mr-3"></i>
+                                        记录查询
+                                    </div>
+                                    <i data-lucide="chevron-up" class="w-3 h-3"></i>
+                                </div>
+                                
+                                <div class="bg-[#000c17]/30 py-1">
+                                    <button onclick="switchTab('current')" class="w-full text-left pl-16 pr-4 py-2 text-sm text-white bg-[#1890ff]/40 border-l-2 border-[#1890ff] flex items-center">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-white mr-2"></span>
+                                        在场车辆
+                                    </button>
+                                    <button onclick="switchTab('records')" class="w-full text-left pl-16 pr-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#1890ff]/20 transition-colors flex items-center">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-500 mr-2"></span>
+                                        进出记录
+                                    </button>
+                                    <button onclick="switchTab('revenue')" class="w-full text-left pl-16 pr-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#1890ff]/20 transition-colors flex items-center">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-500 mr-2"></span>
+                                        收费统计
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button onclick="switchTab('devices')" class="w-full text-left pl-12 pr-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-[#1890ff]/20 transition-colors flex items-center mt-1">
+                                <i data-lucide="monitor" class="w-4 h-4 mr-3 opacity-70"></i>
+                                设备状态
+                            </button>
+
+                            <div class="mt-1">
+                                <div class="flex items-center justify-between pl-12 pr-4 py-2.5 text-sm text-gray-300 hover:text-white cursor-pointer hover:bg-[#1890ff]/20 transition-colors" onclick="toggleSystemSettings()">
+                                    <div class="flex items-center">
+                                        <i data-lucide="settings" class="w-4 h-4 mr-3 opacity-70"></i>
+                                        系统设置
+                                    </div>
+                                    <i data-lucide="chevron-down" class="w-3 h-3 transition-transform" id="settings-chevron"></i>
+                                </div>
+                                
+                                <div class="bg-[#000c17]/30 py-1 hidden" id="system-settings-submenu">
+                                    <button onclick="switchTab('config')" class="w-full text-left pl-16 pr-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#1890ff]/20 transition-colors flex items-center">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-500 mr-2"></span>
+                                        停车场配置
+                                    </button>
+                                    <button onclick="switchTab('monthly')" class="w-full text-left pl-16 pr-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#1890ff]/20 transition-colors flex items-center">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-500 mr-2"></span>
+                                        月卡车辆
+                                    </button>
+                                    <button onclick="switchTab('blacklist')" class="w-full text-left pl-16 pr-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#1890ff]/20 transition-colors flex items-center">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-500 mr-2"></span>
+                                        黑名单车辆
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="p-4 border-t border-gray-800 bg-[#002140]">
+            <div class="flex items-center">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm font-bold">
+                    管
+                </div>
+                <div class="ml-3">
+                    <div class="text-sm text-white font-medium">管理员</div>
+                    <div class="text-xs text-gray-500">长辉信息</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 flex flex-col h-full overflow-hidden">
+        <header class="h-16 bg-white shadow-sm border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0 z-20">
+            <div class="flex items-center text-sm text-gray-500">
+                <i data-lucide="home" class="w-4 h-4 mr-2"></i>
+                <span class="mx-2">/</span>
+                <span>智慧通行</span>
+                <span class="mx-2">/</span>
+                <span>停车场管理</span>
+                <span class="mx-2">/</span>
+                <span id="breadcrumb-parent" class="text-gray-600">记录查询</span>
+                <span class="mx-2" id="breadcrumb-separator">/</span>
+                <span id="breadcrumb-current" class="text-gray-900 font-medium">在场车辆</span>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <button class="p-2 text-gray-400 hover:text-gray-600 relative">
+                    <i data-lucide="bell" class="w-5 h-5"></i>
+                    <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                </button>
+                <div class="h-6 w-px bg-gray-300"></div>
+                <button class="flex items-center text-gray-600 hover:text-gray-900">
+                    <span class="text-sm mr-2">管理员</span>
+                    <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- 标签页导航 -->
+        <div class="bg-white border-b border-gray-200 px-6 flex items-center space-x-1 overflow-x-auto flex-shrink-0">
+            <button class="nav-tab active px-4 py-3 text-sm font-medium flex items-center" data-tab="current" onclick="switchTab('current')">
+                <i data-lucide="map-pin" class="w-4 h-4 mr-2"></i>
+                在场车辆
+            </button>
+            <button class="nav-tab px-4 py-3 text-sm font-medium flex items-center text-gray-600" data-tab="records" onclick="switchTab('records')">
+                <i data-lucide="history" class="w-4 h-4 mr-2"></i>
+                进出记录
+            </button>
+            <button class="nav-tab px-4 py-3 text-sm font-medium flex items-center text-gray-600" data-tab="revenue" onclick="switchTab('revenue')">
+                <i data-lucide="banknote" class="w-4 h-4 mr-2"></i>
+                收费统计
+            </button>
+            <button class="nav-tab px-4 py-3 text-sm font-medium flex items-center text-gray-600" data-tab="devices" onclick="switchTab('devices')">
+                <i data-lucide="monitor" class="w-4 h-4 mr-2"></i>
+                设备状态
+            </button>
+        </div>
+
+        <!-- 内容滚动区 -->
+        <div class="flex-1 overflow-y-auto p-6 bg-gray-50" id="content-area">
+            
+            <!-- 1. 在场车辆页面 -->
+            <div id="page-current" class="page-section space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="stat-card bg-white rounded-lg p-6 shadow-sm border-l-4 border-blue-500">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm text-gray-500 mb-1">当前在场车辆</p>
+                                <h3 class="text-3xl font-bold text-gray-900">4</h3>
+                            </div>
+                            <div class="p-3 bg-blue-50 rounded-lg">
+                                <i data-lucide="car" class="w-6 h-6 text-blue-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card bg-white rounded-lg p-6 shadow-sm border-l-4 border-yellow-500">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm text-gray-500 mb-1">月卡车辆</p>
+                                <h3 class="text-3xl font-bold text-gray-900">1</h3>
+                            </div>
+                            <div class="p-3 bg-yellow-50 rounded-lg">
+                                <i data-lucide="credit-card" class="w-6 h-6 text-yellow-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card bg-white rounded-lg p-6 shadow-sm border-l-4 border-red-500">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm text-gray-500 mb-1">停车超24小时</p>
+                                <h3 class="text-3xl font-bold text-gray-900">0</h3>
+                            </div>
+                            <div class="p-3 bg-red-50 rounded-lg">
+                                <i data-lucide="alert-circle" class="w-6 h-6 text-red-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card bg-white rounded-lg p-6 shadow-sm border-l-4 border-green-500">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm text-gray-500 mb-1">剩余车位</p>
+                                <h3 class="text-3xl font-bold text-gray-900">16<span class="text-lg text-gray-400 font-normal">/20</span></h3>
+                            </div>
+                            <div class="p-3 bg-green-50 rounded-lg">
+                                <i data-lucide="layout-grid" class="w-6 h-6 text-green-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">车牌号码</label>
+                            <input type="text" placeholder="请输入车牌号" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">月卡类型</label>
+                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
+                                <option>全部类型</option>
+                                <option>临时车</option>
+                                <option>月卡车</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">进场时间</label>
+                            <input type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">停车时长</label>
+                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
+                                <option>全部时长</option>
+                                <option>&lt; 1小时</option>
+                                <option>1-2小时</option>
+                                <option>2-5小时</option>
+                                <option>&gt; 5小时</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end space-x-2">
+                            <button class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm font-medium flex items-center justify-center">
+                                <i data-lucide="search" class="w-4 h-4 mr-2"></i>
+                                搜索
+                            </button>
+                            <button class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm text-gray-600">
+                                重置
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold text-gray-900">在场车辆列表</h3>
+                        <div class="flex space-x-2">
+                            <button class="px-3 py-1.5 text-sm text-blue-600 border border-blue-600 rounded hover:bg-blue-50 flex items-center">
+                                <i data-lucide="download" class="w-4 h-4 mr-1"></i>
+                                导出
+                            </button>
+                        </div>
+                    </div>
+                    <table class="w-full data-table">
+                        <thead>
+                            <tr class="text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                                <th class="px-6 py-3">序号</th>
+                                <th class="px-6 py-3">车牌号码</th>
+                                <th class="px-6 py-3">月卡类型</th>
+                                <th class="px-6 py-3">进场时间</th>
+                                <th class="px-6 py-3">停车时长</th>
+                                <th class="px-6 py-3">车位位置</th>
+                                <th class="px-6 py-3">当前费用</th>
+                                <th class="px-6 py-3 text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 text-sm">
+                            <tr class="hover:bg-blue-50/50 transition-colors">
+                                <td class="px-6 py-4">1</td>
+                                <td class="px-6 py-4 font-bold text-blue-600 text-base">粤BD12345</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-gray-100 rounded text-xs">临时车</span></td>
+                                <td class="px-6 py-4">2026-01-16 14:23:15</td>
+                                <td class="px-6 py-4 text-green-600">30分钟</td>
+                                <td class="px-6 py-4">A区-12号</td>
+                                <td class="px-6 py-4 font-bold text-orange-600">¥5.00</td>
+                                <td class="px-6 py-4 text-right">
+                                    <button onclick="openVehicleDetail('粤BD12345')" class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-1.5 rounded">
+                                        <i data-lucide="eye" class="w-4 h-4 inline mr-1"></i>
+                                        查看
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-blue-50/50 transition-colors">
+                                <td class="px-6 py-4">2</td>
+                                <td class="px-6 py-4 font-bold text-blue-600 text-base">粤KTU5558</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">月卡车</span></td>
+                                <td class="px-6 py-4">2026-01-16 13:53:22</td>
+                                <td class="px-6 py-4 text-yellow-600">1小时0分</td>
+                                <td class="px-6 py-4">B区-05号</td>
+                                <td class="px-6 py-4 font-bold text-green-600">¥0.00</td>
+                                <td class="px-6 py-4 text-right">
+                                    <button onclick="openVehicleDetail('粤KTU5558')" class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-1.5 rounded">
+                                        <i data-lucide="eye" class="w-4 h-4 inline mr-1"></i>
+                                        查看
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-blue-50/50 transition-colors">
+                                <td class="px-6 py-4">3</td>
+                                <td class="px-6 py-4 font-bold text-blue-600 text-base">粤BA12345</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-gray-100 rounded text-xs">临时车</span></td>
+                                <td class="px-6 py-4">2026-01-16 12:53:45</td>
+                                <td class="px-6 py-4 text-orange-600">2小时0分</td>
+                                <td class="px-6 py-4">A区-08号</td>
+                                <td class="px-6 py-4 font-bold text-orange-600">¥10.00</td>
+                                <td class="px-6 py-4 text-right">
+                                    <button onclick="openVehicleDetail('粤BA12345')" class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-1.5 rounded">
+                                        <i data-lucide="eye" class="w-4 h-4 inline mr-1"></i>
+                                        查看
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-blue-50/50 transition-colors">
+                                <td class="px-6 py-4">4</td>
+                                <td class="px-6 py-4 font-bold text-blue-600 text-base">粤B123458</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-gray-100 rounded text-xs">临时车</span></td>
+                                <td class="px-6 py-4">2026-01-16 09:53:12</td>
+                                <td class="px-6 py-4 text-red-600 font-bold">5小时0分</td>
+                                <td class="px-6 py-4">C区-15号</td>
+                                <td class="px-6 py-4 font-bold text-red-600">¥35.00</td>
+                                <td class="px-6 py-4 text-right">
+                                    <button onclick="openVehicleDetail('粤B123458')" class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-1.5 rounded">
+                                        <i data-lucide="eye" class="w-4 h-4 inline mr-1"></i>
+                                        查看
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 2. 进出记录页面 -->
+            <div id="page-records" class="page-section hidden space-y-6">
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+                        <div class="md:col-span-2">
+                            <input type="text" placeholder="车牌号码" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                        </div>
+                        <div>
+                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white">
+                                <option>全部类型</option>
+                                <option>临时车</option>
+                                <option>月卡车</option>
+                            </select>
+                        </div>
+                        <div>
+                            <input type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                        </div>
+                        <div>
+                            <input type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                        </div>
+                        <div>
+                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white">
+                                <option>全部状态</option>
+                                <option>正常放行</option>
+                                <option>已缴费</option>
+                                <option>免费放行</option>
+                                <option>异常放行</option>
+                                <option>拦截报警</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm font-medium">
+                                搜索
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <table class="w-full data-table">
+                        <thead>
+                            <tr class="text-left text-xs font-semibold text-gray-600 uppercase bg-gray-50">
+                                <th class="px-6 py-3">车牌号码</th>
+                                <th class="px-6 py-3">月卡类型</th>
+                                <th class="px-6 py-3">进场时间</th>
+                                <th class="px-6 py-3">离场时间</th>
+                                <th class="px-6 py-3">停车时长</th>
+                                <th class="px-6 py-3">停车费用</th>
+                                <th class="px-6 py-3">状态</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 text-sm">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-medium">粤B88888</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">月卡车</span></td>
+                                <td class="px-6 py-4 text-gray-600">2026-01-16 08:30:15</td>
+                                <td class="px-6 py-4 text-gray-600">2026-01-16 18:45:22</td>
+                                <td class="px-6 py-4">10小时15分</td>
+                                <td class="px-6 py-4 font-medium">¥0.00</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">正常放行</span></td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-medium">粤B12345</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">临时车</span></td>
+                                <td class="px-6 py-4 text-gray-600">2026-01-16 09:15:30</td>
+                                <td class="px-6 py-4 text-gray-600">2026-01-16 11:30:45</td>
+                                <td class="px-6 py-4">2小时15分</td>
+                                <td class="px-6 py-4 font-medium">¥15.00</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">已缴费</span></td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-medium">粤B66666</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">临时车</span></td>
+                                <td class="px-6 py-4 text-gray-600">2026-01-16 07:00:00</td>
+                                <td class="px-6 py-4 text-gray-600">2026-01-16 19:20:10</td>
+                                <td class="px-6 py-4">12小时20分</td>
+                                <td class="px-6 py-4 font-medium">¥50.00</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">免费放行</span></td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-medium">粤B77777</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">临时车</span></td>
+                                <td class="px-6 py-4 text-gray-600">2026-01-16 10:30:00</td>
+                                <td class="px-6 py-4 text-gray-600">2026-01-16 13:45:22</td>
+                                <td class="px-6 py-4">3小时15分</td>
+                                <td class="px-6 py-4 font-medium">¥20.00</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">异常放行</span></td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-medium text-red-600">粤B99999</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs">黑名单</span></td>
+                                <td class="px-6 py-4 text-gray-600">2026-01-16 10:00:00</td>
+                                <td class="px-6 py-4 text-gray-600">2026-01-16 10:05:30</td>
+                                <td class="px-6 py-4">5分30秒</td>
+                                <td class="px-6 py-4 font-medium">¥0.00</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs">拦截报警</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 3. 收费统计页面（带趋势分析柱状图） -->
+            <div id="page-revenue" class="page-section hidden space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-6 text-white shadow-lg">
+                        <p class="text-blue-100 text-sm mb-1">今日收入</p>
+                        <h3 class="text-3xl font-bold">¥1,250.00</h3>
+                        <p class="text-xs text-blue-100 mt-2">↑ 较昨日 +12.5%</p>
+                    </div>
+                    <div class="bg-white rounded-lg p-6 shadow-sm border">
+                        <p class="text-sm text-gray-500 mb-1">本周收入</p>
+                        <h3 class="text-2xl font-bold text-gray-900">¥8,450.00</h3>
+                    </div>
+                    <div class="bg-white rounded-lg p-6 shadow-sm border">
+                        <p class="text-sm text-gray-500 mb-1">本月收入</p>
+                        <h3 class="text-2xl font-bold text-gray-900">¥32,180.00</h3>
+                    </div>
+                    <div class="bg-white rounded-lg p-6 shadow-sm border">
+                        <p class="text-sm text-gray-500 mb-1">未结算金额</p>
+                        <h3 class="text-2xl font-bold text-yellow-600">¥320.00</h3>
+                    </div>
+                </div>
+
+                <!-- 趋势分析柱状图 -->
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900">收入趋势分析</h3>
+                            <p class="text-sm text-gray-500 mt-1">近7日收入统计（单位：元）</p>
+                        </div>
+                        <select class="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option>最近7天</option>
+                            <option>最近30天</option>
+                            <option>本月</option>
+                            <option>上月</option>
+                        </select>
+                    </div>
+                    
+                    <div class="h-80 w-full relative">
+                        <svg viewBox="0 0 900 320" class="w-full h-full">
+                            <!-- 网格线 -->
+                            <line x1="60" y1="280" x2="860" y2="280" stroke="#e5e7eb" stroke-width="1"/>
+                            <line x1="60" y1="220" x2="860" y2="220" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
+                            <line x1="60" y1="160" x2="860" y2="160" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
+                            <line x1="60" y1="100" x2="860" y2="100" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
+                            <line x1="60" y1="40" x2="860" y2="40" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
+                            
+                            <!-- Y轴标签 -->
+                            <text x="50" y="285" text-anchor="end" class="text-xs fill-gray-500">0</text>
+                            <text x="50" y="225" text-anchor="end" class="text-xs fill-gray-500">500</text>
+                            <text x="50" y="165" text-anchor="end" class="text-xs fill-gray-500">1000</text>
+                            <text x="50" y="105" text-anchor="end" class="text-xs fill-gray-500">1500</text>
+                            <text x="50" y="45" text-anchor="end" class="text-xs fill-gray-500">2000</text>
+                            
+                            <!-- 柱状图 -->
+                            <rect x="100" y="200" width="60" height="80" fill="#3b82f6" class="chart-bar" rx="4"/>
+                            <rect x="200" y="170" width="60" height="110" fill="#3b82f6" class="chart-bar" rx="4"/>
+                            <rect x="300" y="140" width="60" height="140" fill="#3b82f6" class="chart-bar" rx="4"/>
+                            <rect x="400" y="190" width="60" height="90" fill="#3b82f6" class="chart-bar" rx="4"/>
+                            <rect x="500" y="160" width="60" height="120" fill="#3b82f6" class="chart-bar" rx="4"/>
+                            <rect x="600" y="120" width="60" height="160" fill="#3b82f6" class="chart-bar" rx="4"/>
+                            <rect x="700" y="145" width="60" height="135" fill="#60a5fa" class="chart-bar" rx="4"/>
+                            
+                            <!-- 数值标签 -->
+                            <text x="130" y="190" text-anchor="middle" class="text-xs fill-gray-700 font-medium">¥350</text>
+                            <text x="230" y="160" text-anchor="middle" class="text-xs fill-gray-700 font-medium">¥550</text>
+                            <text x="330" y="130" text-anchor="middle" class="text-xs fill-gray-700 font-medium">¥700</text>
+                            <text x="430" y="180" text-anchor="middle" class="text-xs fill-gray-700 font-medium">¥450</text>
+                            <text x="530" y="150" text-anchor="middle" class="text-xs fill-gray-700 font-medium">¥600</text>
+                            <text x="630" y="110" text-anchor="middle" class="text-xs fill-gray-700 font-medium">¥800</text>
+                            <text x="730" y="135" text-anchor="middle" class="text-xs fill-blue-700 font-bold">¥675</text>
+                            
+                            <!-- X轴标签 -->
+                            <text x="130" y="305" text-anchor="middle" class="text-xs fill-gray-600">01/10</text>
+                            <text x="230" y="305" text-anchor="middle" class="text-xs fill-gray-600">01/11</text>
+                            <text x="330" y="305" text-anchor="middle" class="text-xs fill-gray-600">01/12</text>
+                            <text x="430" y="305" text-anchor="middle" class="text-xs fill-gray-600">01/13</text>
+                            <text x="530" y="305" text-anchor="middle" class="text-xs fill-gray-600">01/14</text>
+                            <text x="630" y="305" text-anchor="middle" class="text-xs fill-gray-600">01/15</text>
+                            <text x="730" y="305" text-anchor="middle" class="text-xs fill-blue-700 font-bold">今日</text>
+                        </svg>
+                    </div>
+                    
+                    <div class="mt-4 flex justify-center space-x-6 text-sm">
+                        <div class="flex items-center">
+                            <span class="w-3 h-3 bg-blue-500 rounded mr-2"></span>
+                            <span class="text-gray-600">临时车收入</span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="w-3 h-3 bg-blue-300 rounded mr-2"></span>
+                            <span class="text-gray-600">月卡收入</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900">今日收费明细</h3>
+                    </div>
+                    <table class="w-full data-table">
+                        <thead>
+                            <tr class="text-left text-xs font-semibold text-gray-600 uppercase bg-gray-50">
+                                <th class="px-6 py-3">车牌号码</th>
+                                <th class="px-6 py-3">进场时间</th>
+                                <th class="px-6 py-3">出场时间</th>
+                                <th class="px-6 py-3">停车时长</th>
+                                <th class="px-6 py-3">应收金额</th>
+                                <th class="px-6 py-3">优惠金额</th>
+                                <th class="px-6 py-3">实收金额</th>
+                                <th class="px-6 py-3">状态</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 text-sm">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-medium">粤B12345</td>
+                                <td class="px-6 py-4 text-gray-600">09:15:30</td>
+                                <td class="px-6 py-4 text-gray-600">11:30:45</td>
+                                <td class="px-6 py-4">2小时15分</td>
+                                <td class="px-6 py-4">¥15.00</td>
+                                <td class="px-6 py-4 text-gray-500">¥0.00</td>
+                                <td class="px-6 py-4 font-bold">¥15.00</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">已结算</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 4. 设备状态页面 -->
+            <div id="page-devices" class="page-section hidden space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="bg-white rounded-lg p-6 shadow-sm border">
+                        <p class="text-sm text-gray-500 mb-1">设备总数</p>
+                        <h3 class="text-2xl font-bold text-gray-900">8</h3>
+                    </div>
+                    <div class="bg-white rounded-lg p-6 shadow-sm border">
+                        <p class="text-sm text-gray-500 mb-1">在线设备</p>
+                        <h3 class="text-2xl font-bold text-green-600">7</h3>
+                    </div>
+                    <div class="bg-white rounded-lg p-6 shadow-sm border">
+                        <p class="text-sm text-gray-500 mb-1">离线设备</p>
+                        <h3 class="text-2xl font-bold text-red-600">1</h3>
+                    </div>
+                    <div class="bg-white rounded-lg p-6 shadow-sm border">
+                        <p class="text-sm text-gray-500 mb-1">故障告警</p>
+                        <h3 class="text-2xl font-bold text-yellow-600">0</h3>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold text-gray-900">设备监控列表</h3>
+                        <button class="px-3 py-1.5 text-sm text-blue-600 border border-blue-600 rounded hover:bg-blue-50 flex items-center" onclick="refreshDevices()">
+                            <i data-lucide="refresh-cw" class="w-4 h-4 mr-1"></i>
+                            刷新状态
+                        </button>
+                    </div>
+                    <table class="w-full data-table">
+                        <thead>
+                            <tr class="text-left text-xs font-semibold text-gray-600 uppercase bg-gray-50">
+                                <th class="px-6 py-3">设备名称</th>
+                                <th class="px-6 py-3">设备类型</th>
+                                <th class="px-6 py-3">IP地址</th>
+                                <th class="px-6 py-3">安装位置</th>
+                                <th class="px-6 py-3">运行状态</th>
+                                <th class="px-6 py-3">最后在线时间</th>
+                                <th class="px-6 py-3 text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 text-sm">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-medium">入口相机-01</td>
+                                <td class="px-6 py-4">车牌识别相机</td>
+                                <td class="px-6 py-4 font-mono text-gray-600">192.168.1.101</td>
+                                <td class="px-6 py-4 text-gray-600">A入口车道</td>
+                                <td class="px-6 py-4"><span class="flex items-center text-green-600"><span class="status-dot status-online"></span>在线</span></td>
+                                <td class="px-6 py-4 text-gray-600">2026-01-16 14:32:18</td>
+                                <td class="px-6 py-4 text-right">
+                                    <button class="text-blue-600 hover:text-blue-800 text-sm mr-3">远程重启</button>
+                                    <button class="text-gray-600 hover:text-gray-800 text-sm">配置</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50 bg-red-50/30">
+                                <td class="px-6 py-4 font-medium">出口道闸-01</td>
+                                <td class="px-6 py-4">自动道闸</td>
+                                <td class="px-6 py-4 font-mono text-gray-600">192.168.1.202</td>
+                                <td class="px-6 py-4 text-gray-600">B出口车道</td>
+                                <td class="px-6 py-4"><span class="flex items-center text-red-600"><span class="status-dot status-offline animate-pulse"></span>离线</span></td>
+                                <td class="px-6 py-4 text-gray-600">2026-01-16 12:15:30</td>
+                                <td class="px-6 py-4 text-right">
+                                    <button class="text-blue-600 hover:text-blue-800 text-sm mr-3">远程重启</button>
+                                    <button class="text-red-600 hover:text-red-800 text-sm">故障上报</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 5. 系统设置 - 停车场配置 -->
+            <div id="page-config" class="page-section hidden space-y-6">
+                <!-- 基础信息配置 -->
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <div class="flex justify-between items-center mb-6 border-b border-gray-200 pb-4">
+                        <h3 class="text-lg font-semibold text-gray-900">基础信息配置</h3>
+                        <button class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center">
+                            <i data-lucide="save" class="w-4 h-4 mr-2"></i>
+                            保存设置
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="form-label">车场名称 <span class="text-red-500">*</span></label>
+                            <input type="text" value="长辉停车场" class="form-input">
+                        </div>
+                        <div>
+                            <label class="form-label">车场地址</label>
+                            <input type="text" placeholder="请输入车场详细地址" class="form-input">
+                        </div>
+                        <div>
+                            <label class="form-label">车位总数 <span class="text-red-500">*</span></label>
+                            <input type="number" value="20" class="form-input">
+                        </div>
+                        <div>
+                            <label class="form-label">免费时长（分钟）</label>
+                            <input type="number" value="15" class="form-input">
+                        </div>
+                        <div>
+                            <label class="form-label">负责人</label>
+                            <input type="text" placeholder="请输入负责人姓名" class="form-input">
+                        </div>
+                        <div>
+                            <label class="form-label">负责人电话</label>
+                            <input type="tel" placeholder="请输入联系电话" class="form-input">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 收费规则配置 -->
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <div class="flex justify-between items-center mb-6 border-b border-gray-200 pb-4">
+                        <h3 class="text-lg font-semibold text-gray-900">收费规则配置</h3>
+                        <button onclick="openFeeRuleModal()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center">
+                            <i data-lucide="plus" class="w-4 h-4 mr-2"></i>
+                            添加收费规则
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-4" id="fee-rules-container">
+                        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-center bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div>
+                                <span class="text-xs text-gray-500">车辆类型</span>
+                                <p class="font-medium text-gray-900">临时车</p>
+                            </div>
+                            <div>
+                                <span class="text-xs text-gray-500">首小时价格</span>
+                                <p class="font-medium text-gray-900">¥5.00</p>
+                            </div>
+                            <div>
+                                <span class="text-xs text-gray-500">每小时递增</span>
+                                <p class="font-medium text-gray-900">¥3.00</p>
+                            </div>
+                            <div>
+                                <span class="text-xs text-gray-500">24小时封顶</span>
+                                <p class="font-medium text-gray-900">¥50.00</p>
+                            </div>
+                            <div class="text-right space-x-2">
+                                <button onclick="editFeeRule(this)" class="text-blue-600 hover:text-blue-800 text-sm">编辑</button>
+                                <button class="text-red-600 hover:text-red-800 text-sm">删除</button>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-center bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div>
+                                <span class="text-xs text-gray-500">车辆类型</span>
+                                <p class="font-medium text-gray-900">月卡车</p>
+                            </div>
+                            <div>
+                                <span class="text-xs text-gray-500">月卡费用</span>
+                                <p class="font-medium text-gray-900">¥300.00/月</p>
+                            </div>
+                            <div>
+                                <span class="text-xs text-gray-500">季度优惠</span>
+                                <p class="font-medium text-gray-900">¥800.00/季</p>
+                            </div>
+                            <div>
+                                <span class="text-xs text-gray-500">年卡优惠</span>
+                                <p class="font-medium text-gray-900">¥2800.00/年</p>
+                            </div>
+                            <div class="text-right space-x-2">
+                                <button onclick="editFeeRule(this)" class="text-blue-600 hover:text-blue-800 text-sm">编辑</button>
+                                <button class="text-red-600 hover:text-red-800 text-sm">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 车道配置 -->
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <div class="flex justify-between items-center mb-6 border-b border-gray-200 pb-4">
+                        <h3 class="text-lg font-semibold text-gray-900">车道配置</h3>
+                        <button onclick="openLaneModal()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center">
+                            <i data-lucide="plus" class="w-4 h-4 mr-2"></i>
+                            添加车道
+                        </button>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full border border-gray-200 rounded-lg">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">通道名称</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">通道类型</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">关联相机</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">关联道闸</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">状态</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 text-sm">
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3 font-medium">A-入口</td>
+                                    <td class="px-4 py-3"><span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">入口</span></td>
+                                    <td class="px-4 py-3 text-gray-600">入口相机-01</td>
+                                    <td class="px-4 py-3 text-gray-600">入口道闸-01</td>
+                                    <td class="px-4 py-3"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">启用</span></td>
+                                    <td class="px-4 py-3 text-right space-x-2">
+                                        <button onclick="editLane('A-入口', '入口', '入口相机-01', '入口道闸-01')" class="text-blue-600 hover:text-blue-800 text-sm">编辑</button>
+                                        <button class="text-red-600 hover:text-red-800 text-sm">删除</button>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3 font-medium">B-出口</td>
+                                    <td class="px-4 py-3"><span class="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">出口</span></td>
+                                    <td class="px-4 py-3 text-gray-600">出口相机-01</td>
+                                    <td class="px-4 py-3 text-gray-600">出口道闸-01</td>
+                                    <td class="px-4 py-3"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">启用</span></td>
+                                    <td class="px-4 py-3 text-right space-x-2">
+                                        <button onclick="editLane('B-出口', '出口', '出口相机-01', '出口道闸-01')" class="text-blue-600 hover:text-blue-800 text-sm">编辑</button>
+                                        <button class="text-red-600 hover:text-red-800 text-sm">删除</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. 系统设置 - 月卡车辆 -->
+            <div id="page-monthly" class="page-section hidden space-y-6">
+                <!-- 搜索区域 -->
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">车牌号码</label>
+                            <input type="text" placeholder="请输入车牌号" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">车主姓名</label>
+                            <input type="text" placeholder="请输入车主姓名" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">月卡状态</label>
+                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
+                                <option>全部状态</option>
+                                <option>有效</option>
+                                <option>即将过期</option>
+                                <option>已过期</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm font-medium">
+                                <i data-lucide="search" class="w-4 h-4 inline mr-2"></i>
+                                搜索
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="flex justify-end">
+                    <button onclick="openMonthlyModal()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center shadow-sm">
+                        <i data-lucide="plus" class="w-4 h-4 mr-2"></i>
+                        新增月卡
+                    </button>
+                </div>
+
+                <!-- 月卡列表 -->
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900">月卡车辆列表</h3>
+                    </div>
+                    <table class="w-full data-table">
+                        <thead>
+                            <tr class="text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200 bg-gray-50">
+                                <th class="px-6 py-3">序号</th>
+                                <th class="px-6 py-3">车牌号码</th>
+                                <th class="px-6 py-3">车主姓名</th>
+                                <th class="px-6 py-3">车主电话</th>
+                                <th class="px-6 py-3">月卡有效期</th>
+                                <th class="px-6 py-3">月卡状态</th>
+                                <th class="px-6 py-3 text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 text-sm">
+                            <tr class="hover:bg-blue-50/50 transition-colors">
+                                <td class="px-6 py-4">1</td>
+                                <td class="px-6 py-4 font-bold text-blue-600 text-base">粤K3522552</td>
+                                <td class="px-6 py-4">有机硅工</td>
+                                <td class="px-6 py-4 text-gray-600">138****8888</td>
+                                <td class="px-6 py-4 text-gray-600">2026-01-01 至 2026-12-31</td>
+                                <td class="px-6 py-4">
+                                    <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">有效</span>
+                                </td>
+                                <td class="px-6 py-4 text-right space-x-2">
+                                    <button onclick="editMonthlyCard('粤K3522552', '有机硅工', '13800138000', '2026-01-01', '2026-12-31')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">编辑</button>
+                                    <button class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-2 py-1 rounded">续费</button>
+                                    <button class="text-red-600 hover:text-red-800 text-sm font-medium">删除</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-blue-50/50 transition-colors">
+                                <td class="px-6 py-4">2</td>
+                                <td class="px-6 py-4 font-bold text-blue-600 text-base">粤B12345</td>
+                                <td class="px-6 py-4">张三</td>
+                                <td class="px-6 py-4 text-gray-600">139****6666</td>
+                                <td class="px-6 py-4 text-gray-600">2025-06-01 至 2026-05-31</td>
+                                <td class="px-6 py-4">
+                                    <span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">即将过期</span>
+                                </td>
+                                <td class="px-6 py-4 text-right space-x-2">
+                                    <button onclick="editMonthlyCard('粤B12345', '张三', '13900139000', '2025-06-01', '2026-05-31')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">编辑</button>
+                                    <button class="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-2 py-1 rounded">续费</button>
+                                    <button class="text-red-600 hover:text-red-800 text-sm font-medium">删除</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 7. 系统设置 - 黑名单车辆 -->
+            <div id="page-blacklist" class="page-section hidden space-y-6">
+                <!-- 搜索区域 -->
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">车牌号码</label>
+                            <input type="text" placeholder="请输入车牌号" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">结束时间</label>
+                            <input type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        </div>
+                        <div class="flex items-end">
+                            <button class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm font-medium">
+                                <i data-lucide="search" class="w-4 h-4 inline mr-2"></i>
+                                搜索
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="flex justify-end">
+                    <button onclick="openBlacklistModal()" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium flex items-center shadow-sm">
+                        <i data-lucide="plus" class="w-4 h-4 mr-2"></i>
+                        新增黑名单
+                    </button>
+                </div>
+
+                <!-- 黑名单列表 -->
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900">黑名单车辆列表</h3>
+                    </div>
+                    <table class="w-full data-table">
+                        <thead>
+                            <tr class="text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200 bg-gray-50">
+                                <th class="px-6 py-3">序号</th>
+                                <th class="px-6 py-3">车牌号码</th>
+                                <th class="px-6 py-3">黑名单原因</th>
+                                <th class="px-6 py-3">加入时间</th>
+                                <th class="px-6 py-3">结束时间</th>
+                                <th class="px-6 py-3">状态</th>
+                                <th class="px-6 py-3 text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 text-sm">
+                            <tr class="hover:bg-red-50/30 transition-colors">
+                                <td class="px-6 py-4">1</td>
+                                <td class="px-6 py-4 font-bold text-red-600 text-base">粤B99999</td>
+                                <td class="px-6 py-4 text-gray-700">恶意逃费，多次未缴费</td>
+                                <td class="px-6 py-4 text-gray-600">2026-01-10 09:30:00</td>
+                                <td class="px-6 py-4 text-gray-600">2026-07-10 09:30:00</td>
+                                <td class="px-6 py-4">
+                                    <span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">生效中</span>
+                                </td>
+                                <td class="px-6 py-4 text-right space-x-2">
+                                    <button onclick="editBlacklist('粤B99999', '恶意逃费，多次未缴费', '2026-01-10', '2026-07-10')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">编辑</button>
+                                    <button class="text-green-600 hover:text-green-800 text-sm font-medium">解除</button>
+                                    <button class="text-red-600 hover:text-red-800 text-sm font-medium">删除</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- 在场车辆详情抽屉 -->
+    <div id="vehicleDetailDrawer" class="fixed inset-y-0 right-0 w-[480px] bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-50 overflow-y-auto">
+        <div class="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-bold text-gray-900">车辆详情</h3>
+            <button onclick="closeVehicleDetail()" class="text-gray-400 hover:text-gray-600">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+        <div class="p-6 space-y-6">
+            <!-- 车辆基本信息 -->
+            <div class="text-center pb-6 border-b border-gray-200">
+                <div class="inline-block p-4 bg-blue-50 rounded-full mb-3">
+                    <i data-lucide="car" class="w-12 h-12 text-blue-600"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-1" id="detailPlate">粤BD12345</h2>
+                <span class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm" id="detailType">临时车</span>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="flex justify-between py-3 border-b border-gray-100">
+                    <span class="text-gray-500">进场时间</span>
+                    <span class="font-medium text-gray-900" id="detailEntryTime">2026-01-16 14:23:15</span>
+                </div>
+                <div class="flex justify-between py-3 border-b border-gray-100">
+                    <span class="text-gray-500">停车时长</span>
+                    <span class="font-medium text-green-600" id="detailDuration">30分钟</span>
+                </div>
+                <div class="flex justify-between py-3 border-b border-gray-100">
+                    <span class="text-gray-500">车位位置</span>
+                    <span class="font-medium text-gray-900">A区-12号</span>
+                </div>
+                <div class="flex justify-between py-3 border-b border-gray-100">
+                    <span class="text-gray-500">当前费用</span>
+                    <span class="font-bold text-xl text-red-600" id="detailFee">¥5.00</span>
+                </div>
+            </div>
+
+            <!-- 进场照片 -->
+            <div>
+                <h4 class="font-medium text-gray-900 mb-3">进场照片</h4>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="aspect-video bg-gray-200 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500">
+                        <img src="https://via.placeholder.com/300x200/3b82f6/ffffff?text=车辆全景" class="w-full h-full object-cover">
+                    </div>
+                    <div class="aspect-video bg-gray-200 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500">
+                        <img src="https://via.placeholder.com/300x200/10b981/ffffff?text=车牌特写" class="w-full h-full object-cover">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 历史记录 -->
+            <div>
+                <h4 class="font-medium text-gray-900 mb-3">近7天进场记录</h4>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between py-2 px-3 bg-gray-50 rounded">
+                        <span class="text-gray-600">2026-01-15 09:30</span>
+                        <span class="text-gray-500">停车2小时30分</span>
+                    </div>
+                    <div class="flex justify-between py-2 px-3 bg-gray-50 rounded">
+                        <span class="text-gray-600">2026-01-14 14:20</span>
+                        <span class="text-gray-500">停车1小时15分</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 收费规则添加/编辑模态框 -->
+    <div id="feeRuleModal" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg w-full max-w-2xl modal-content shadow-xl">
+            <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-900" id="feeRuleModalTitle">添加收费规则</h3>
+                <button onclick="closeFeeRuleModal()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label">车辆类型 <span class="text-red-500">*</span></label>
+                        <select class="form-input" id="feeRuleType">
+                            <option>临时车</option>
+                            <option>月卡车</option>
+                            <option>VIP车</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">计费方式 <span class="text-red-500">*</span></label>
+                        <select class="form-input" id="feeRuleMethod">
+                            <option>按小时计费</option>
+                            <option>按次计费</option>
+                            <option>包月计费</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="form-label">首小时价格（元）</label>
+                        <input type="number" class="form-input" id="feeRuleFirstHour" placeholder="0.00" step="0.01">
+                    </div>
+                    <div>
+                        <label class="form-label">每小时递增（元）</label>
+                        <input type="number" class="form-input" id="feeRuleIncrement" placeholder="0.00" step="0.01">
+                    </div>
+                    <div>
+                        <label class="form-label">24小时封顶（元）</label>
+                        <input type="number" class="form-input" id="feeRuleCap" placeholder="0.00" step="0.01">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="form-label">免费时长（分钟）</label>
+                    <input type="number" class="form-input" id="feeRuleFreeTime" placeholder="15" value="15">
+                </div>
+
+                <div>
+                    <label class="form-label">备注说明</label>
+                    <textarea class="form-input" rows="3" placeholder="请输入备注信息..."></textarea>
+                </div>
+            </div>
+            <div class="p-6 border-t border-gray-200 flex justify-end space-x-3">
+                <button onclick="closeFeeRuleModal()" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-medium">取消</button>
+                <button onclick="saveFeeRule()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 车道添加/编辑模态框 -->
+    <div id="laneModal" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg w-full max-w-lg modal-content shadow-xl">
+            <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-900" id="laneModalTitle">添加车道</h3>
+                <button onclick="closeLaneModal()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="form-label">通道名称 <span class="text-red-500">*</span></label>
+                    <input type="text" class="form-input" id="laneName" placeholder="如：A-入口">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label">通道类型 <span class="text-red-500">*</span></label>
+                        <select class="form-input" id="laneType">
+                            <option value="入口">入口</option>
+                            <option value="出口">出口</option>
+                            <option value="双向">双向</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">通道状态</label>
+                        <select class="form-input" id="laneStatus">
+                            <option value="启用">启用</option>
+                            <option value="禁用">禁用</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label">关联相机</label>
+                    <select class="form-input" id="laneCamera">
+                        <option>入口相机-01</option>
+                        <option>入口相机-02</option>
+                        <option>出口相机-01</option>
+                        <option>出口相机-02</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">关联道闸</label>
+                    <select class="form-input" id="laneBarrier">
+                        <option>入口道闸-01</option>
+                        <option>入口道闸-02</option>
+                        <option>出口道闸-01</option>
+                        <option>出口道闸-02</option>
+                    </select>
+                </div>
+            </div>
+            <div class="p-6 border-t border-gray-200 flex justify-end space-x-3">
+                <button onclick="closeLaneModal()" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-medium">取消</button>
+                <button onclick="saveLane()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 月卡添加/编辑模态框 -->
+    <div id="monthlyModal" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg w-full max-w-lg modal-content shadow-xl">
+            <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-900" id="monthlyModalTitle">新增月卡</h3>
+                <button onclick="closeMonthlyModal()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label">车牌号码 <span class="text-red-500">*</span></label>
+                        <input type="text" class="form-input" id="monthlyPlate" placeholder="如：粤B12345">
+                    </div>
+                    <div>
+                        <label class="form-label">车主姓名 <span class="text-red-500">*</span></label>
+                        <input type="text" class="form-input" id="monthlyOwner" placeholder="请输入车主姓名">
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label">联系电话 <span class="text-red-500">*</span></label>
+                    <input type="tel" class="form-input" id="monthlyPhone" placeholder="请输入联系电话">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label">开始日期 <span class="text-red-500">*</span></label>
+                        <input type="date" class="form-input" id="monthlyStartDate">
+                    </div>
+                    <div>
+                        <label class="form-label">结束日期 <span class="text-red-500">*</span></label>
+                        <input type="date" class="form-input" id="monthlyEndDate">
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label">月卡类型</label>
+                    <select class="form-input" id="monthlyCardType">
+                        <option>月卡（300元/月）</option>
+                        <option>季卡（800元/季）</option>
+                        <option>年卡（2800元/年）</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">备注</label>
+                    <textarea class="form-input" rows="2" placeholder="请输入备注信息..."></textarea>
+                </div>
+            </div>
+            <div class="p-6 border-t border-gray-200 flex justify-end space-x-3">
+                <button onclick="closeMonthlyModal()" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-medium">取消</button>
+                <button onclick="saveMonthlyCard()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 黑名单添加/编辑模态框 -->
+    <div id="blacklistModal" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg w-full max-w-lg modal-content shadow-xl">
+            <div class="p-6 border-b border-gray-200 flex justify-between items-center bg-red-50">
+                <h3 class="text-lg font-bold text-red-700" id="blacklistModalTitle">新增黑名单</h3>
+                <button onclick="closeBlacklistModal()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="form-label">车牌号码 <span class="text-red-500">*</span></label>
+                    <input type="text" class="form-input border-red-300 focus:border-red-500 focus:ring-red-200" id="blacklistPlate" placeholder="如：粤B12345">
+                </div>
+                <div>
+                    <label class="form-label">黑名单原因 <span class="text-red-500">*</span></label>
+                    <select class="form-input" id="blacklistReason">
+                        <option>恶意逃费</option>
+                        <option>车辆被盗</option>
+                        <option>违规停车</option>
+                        <option>其他原因</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">详细说明</label>
+                    <textarea class="form-input" rows="3" id="blacklistDetail" placeholder="请详细说明拉黑原因..."></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label">开始时间 <span class="text-red-500">*</span></label>
+                        <input type="datetime-local" class="form-input" id="blacklistStartTime">
+                    </div>
+                    <div>
+                        <label class="form-label">结束时间</label>
+                        <input type="datetime-local" class="form-input" id="blacklistEndTime">
+                        <p class="text-xs text-gray-500 mt-1">留空表示永久有效</p>
+                    </div>
+                </div>
+            </div>
+            <div class="p-6 border-t border-gray-200 flex justify-end space-x-3">
+                <button onclick="closeBlacklistModal()" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-medium">取消</button>
+                <button onclick="saveBlacklist()" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium">确认添加</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // 页面切换
+        function switchTab(tabName) {
+            document.querySelectorAll('.page-section').forEach(page => {
+                page.classList.add('hidden');
+            });
+            
+            const targetPage = document.getElementById('page-' + tabName);
+            if (targetPage) {
+                targetPage.classList.remove('hidden');
+            }
+            
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+                tab.classList.add('text-gray-600');
+                if (tab.dataset.tab === tabName) {
+                    tab.classList.add('active');
+                    tab.classList.remove('text-gray-600');
+                }
+            });
+            
+            const breadcrumbs = {
+                'current': { parent: '记录查询', current: '在场车辆' },
+                'records': { parent: '记录查询', current: '进出记录' },
+                'revenue': { parent: '记录查询', current: '收费统计' },
+                'devices': { parent: '设备状态', current: '设备状态' },
+                'config': { parent: '系统设置', current: '停车场配置' },
+                'monthly': { parent: '系统设置', current: '月卡车辆' },
+                'blacklist': { parent: '系统设置', current: '黑名单车辆' }
+            };
+            
+            const bc = breadcrumbs[tabName] || { parent: '停车场管理', current: tabName };
+            document.getElementById('breadcrumb-parent').textContent = bc.parent;
+            document.getElementById('breadcrumb-current').textContent = bc.current;
+            
+            setTimeout(() => lucide.createIcons(), 100);
+        }
+
+        // 系统设置展开/收起
+        function toggleSystemSettings() {
+            const submenu = document.getElementById('system-settings-submenu');
+            const chevron = document.getElementById('settings-chevron');
+            
+            if (submenu.classList.contains('hidden')) {
+                submenu.classList.remove('hidden');
+                chevron.style.transform = 'rotate(180deg)';
+            } else {
+                submenu.classList.add('hidden');
+                chevron.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // 在场车辆详情抽屉
+        function openVehicleDetail(plate) {
+            document.getElementById('detailPlate').textContent = plate;
+            document.getElementById('vehicleDetailDrawer').classList.remove('translate-x-full');
+            setTimeout(() => lucide.createIcons(), 100);
+        }
+
+        function closeVehicleDetail() {
+            document.getElementById('vehicleDetailDrawer').classList.add('translate-x-full');
+        }
+
+        // 收费规则模态框
+        function openFeeRuleModal() {
+            document.getElementById('feeRuleModalTitle').textContent = '添加收费规则';
+            document.getElementById('feeRuleModal').classList.remove('hidden');
+            document.getElementById('feeRuleModal').classList.add('flex');
+            setTimeout(() => lucide.createIcons(), 100);
+        }
+
+        function editFeeRule(btn) {
+            document.getElementById('feeRuleModalTitle').textContent = '编辑收费规则';
+            document.getElementById('feeRuleModal').classList.remove('hidden');
+            document.getElementById('feeRuleModal').classList.add('flex');
+            setTimeout(() => lucide.createIcons(), 100);
+        }
+
+        function closeFeeRuleModal() {
+            document.getElementById('feeRuleModal').classList.add('hidden');
+            document.getElementById('feeRuleModal').classList.remove('flex');
+        }
+
+        function saveFeeRule() {
+            alert('收费规则保存成功！');
+            closeFeeRuleModal();
+        }
+
+        // 车道模态框
+        function openLaneModal() {
+            document.getElementById('laneModalTitle').textContent = '添加车道';
+            document.getElementById('laneName').value = '';
+            document.getElementById('laneModal').classList.remove('hidden');
+            document.getElementById('laneModal').classList.add('flex');
+            setTimeout(() => lucide.createIcons(), 100);
+        }
+
+        function editLane(name, type, camera, barrier) {
+            document.getElementById('laneModalTitle').textContent = '编辑车道';
+            document.getElementById('laneName').value = name;
+            document.getElementById('laneType').value = type;
+            document.getElementById('laneModal').classList.remove('hidden');
+            document.getElementById('laneModal').classList.add('flex');
+            setTimeout(() => lucide.createIcons(), 100);
+        }
+
+        function closeLaneModal() {
+            document.getElementById('laneModal').classList.add('hidden');
+            document.getElementById('laneModal').classList.remove('flex');
+        }
+
+        function saveLane() {
+            alert('车道保存成功！');
+            closeLaneModal();
+        }
+
+        // 月卡模态框
+        function openMonthlyModal() {
+            document.getElementById('monthlyModalTitle').textContent = '新增月卡';
+            document.getElementById('monthlyPlate').value = '';
+            document.getElementById('monthlyModal').classList.remove('hidden');
+            document.getElementById('monthlyModal').classList.add('flex');
+            setTimeout(() => lucide.createIcons(), 100);
+        }
+
+        function editMonthlyCard(plate, owner, phone, startDate, endDate) {
+            document.getElementById('monthlyModalTitle').textContent = '编辑月卡';
+            document.getElementById('monthlyPlate').value = plate;
+            document.getElementById('monthlyOwner').value = owner;
+            document.getElementById('monthlyModal').classList.remove('hidden');
+            document.getElementById('monthlyModal').classList.add('flex');
+            setTimeout(() => lucide.createIcons(), 100);
+        }
+
+        function closeMonthlyModal() {
+            document.getElementById('monthlyModal').classList.add('hidden');
+            document.getElementById('monthlyModal').classList.remove('flex');
+        }
+
+        function saveMonthlyCard() {
+            alert('月卡保存成功！');
+            closeMonthlyModal();
+        }
+
+        // 黑名单模态框
+        function openBlacklistModal() {
+            document.getElementById('blacklistModalTitle').textContent = '新增黑名单';
+            document.getElementById('blacklistPlate').value = '';
+            document.getElementById('blacklistModal').classList.remove('hidden');
+            document.getElementById('blacklistModal').classList.add('flex');
+            setTimeout(() => lucide.createIcons(), 100);
+        }
+
+        function editBlacklist(plate, reason, startTime, endTime) {
+            document.getElementById('blacklistModalTitle').textContent = '编辑黑名单';
+            document.getElementById('blacklistPlate').value = plate;
+            document.getElementById('blacklistModal').classList.remove('hidden');
+            document.getElementById('blacklistModal').classList.add('flex');
+            setTimeout(() => lucide.createIcons(), 100);
+        }
+
+        function closeBlacklistModal() {
+            document.getElementById('blacklistModal').classList.add('hidden');
+            document.getElementById('blacklistModal').classList.remove('flex');
+        }
+
+        function saveBlacklist() {
+            alert('黑名单保存成功！');
+            closeBlacklistModal();
+        }
+
+        function refreshDevices() {
+            const btn = event.currentTarget;
+            const icon = btn.querySelector('svg');
+            icon.classList.add('animate-spin');
+            setTimeout(() => {
+                icon.classList.remove('animate-spin');
+                alert('设备状态已更新');
+            }, 1000);
+        }
+
+        // ESC关闭所有模态框
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeVehicleDetail();
+                closeFeeRuleModal();
+                closeLaneModal();
+                closeMonthlyModal();
+                closeBlacklistModal();
+            }
+        });
+
+        // 点击模态框背景关闭
+        document.querySelectorAll('.modal-backdrop').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

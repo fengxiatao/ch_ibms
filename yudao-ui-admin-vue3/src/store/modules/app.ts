@@ -38,6 +38,8 @@ interface AppState {
   footer: boolean
   theme: ThemeTypes
   fixedMenu: boolean
+  // 首页全屏模式（隐藏侧边栏、顶栏等）
+  homeFullscreen: boolean
 }
 
 export const useAppStore = defineStore('app', {
@@ -67,13 +69,13 @@ export const useAppStore = defineStore('app', {
       footer: true, // 显示页脚
       greyMode: false, // 是否开始灰色模式，用于特殊悼念日
       fixedMenu: wsCache.get('fixedMenu') || false, // 是否固定菜单
+      homeFullscreen: false, // 首页全屏模式
 
       layout: wsCache.get(CACHE_KEY.LAYOUT) || 'classic', // layout布局
-      isDark: wsCache.get(CACHE_KEY.IS_DARK) || false, // 是否是暗黑模式
+      isDark: wsCache.get(CACHE_KEY.IS_DARK) ?? true, // 是否是暗黑模式（默认深色）
       currentSize: wsCache.get('default') || 'default', // 组件尺寸
       theme: wsCache.get(CACHE_KEY.THEME) || {
         // 主题色
-        elColorPrimary: '#409eff',
         // 左侧菜单边框颜色
         leftMenuBorderColor: 'inherit',
         // 左侧菜单背景颜色
@@ -181,6 +183,9 @@ export const useAppStore = defineStore('app', {
     },
     getFooter(): boolean {
       return this.footer
+    },
+    getHomeFullscreen(): boolean {
+      return this.homeFullscreen
     }
   },
   actions: {
@@ -312,6 +317,9 @@ export const useAppStore = defineStore('app', {
     },
     setFooter(footer: boolean) {
       this.footer = footer
+    },
+    setHomeFullscreen(homeFullscreen: boolean) {
+      this.homeFullscreen = homeFullscreen
     }
   },
   persist: false

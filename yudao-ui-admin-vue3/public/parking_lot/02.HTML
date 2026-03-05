@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在场车辆管理系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        body {
+            background-color: #f5f7fa;
+            padding: 0;
+            color: #303133;
+            position: relative;
+            min-height: 100vh;
+        }
+        /* 新增：弹窗通用样式 */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: #fff;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e8e8e8;
+        }
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .modal-title-yellow {
+            color: #e6a23c;
+        }
+        .modal-title-red {
+            color: #f56c6c;
+        }
+        .modal-title-purple {
+            color: #722ed1;
+        }
+        .modal-title-blue {
+            color: #409eff;
+        }
+        .modal-close {
+            cursor: pointer;
+            font-size: 20px;
+            color: #909399;
+        }
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e8e8e8;
+        }
+        /* 预警悬浮提示栏 */
+        .warning-alert {
+            position: fixed;
+            top: 60px;
+            left: 0;
+            right: 0;
+            z-index: 999;
+            padding: 12px 20px;
+            color: #fff;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            transform: translateY(-100%);
+            transition: transform 0.3s ease;
+        }
+        .warning-alert.show {
+            transform: translateY(0);
+        }
+        .alert-yellow {
+            background-color: #e6a23c;
+        }
+        .alert-red {
+            background-color: #f56c6c;
+        }
+        .alert-purple {
+            background-color: #722ed1;
+        }
+        .alert-blue {
+            background-color: #409eff;
+        }
+        .alert-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .alert-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .alert-btn {
+            padding: 4px 12px;
+            border: 1px solid #fff;
+            border-radius: 4px;
+            background: transparent;
+            color: #fff;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .alert-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        /* 顶部导航 */
+        .header {
+            background-color: #1e293b;
+            color: #fff;
+            padding: 0 20px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 100;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background-color: #409eff;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: #409eff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+        
+        /* 主容器 */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 60px);
+            padding-top: 0;
+            transition: padding-top 0.3s ease;
+        }
+        .main-container.with-alert {
+            padding-top: 48px;
+        }
+        /* 侧边菜单 */
+        .sidebar {
+            width: 200px;
+            background-color: #fff;
+            border-right: 1px solid #e8e8e8;
+            padding-top: 20px;
+        }
+        .menu-item {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            color: #606266;
+            transition: all 0.2s;
+        }
+        .menu-item.active {
+            background-color: #ecf5ff;
+            color: #409eff;
+            border-right: 3px solid #409eff;
+        }
+        .menu-item:hover {
+            background-color: #f5f7fa;
+        }
+        .menu-icon {
+            width: 18px;
+            height: 18px;
+        }
+        
+        /* 内容区域 */
+        .content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .page-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* 数据统计卡片 */
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            position: relative;
+        }
+        .stat-card.warning::after {
+            content: "!";
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #f56c6c;
+            color: #fff;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .stat-title {
+            font-size: 14px;
+            color: #606266;
+            margin-bottom: 8px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #303133;
+        }
+        .stat-value.primary {
+            color: #409eff;
+        }
+        .stat-value.success {
+            color: #67c23a;
+        }
+        .stat-value.warning {
+            color: #e6a23c;
+            animation: flash 1.5s infinite alternate;
+        }
+        .stat-value.danger {
+            color: #f56c6c;
+            animation: flash 1.5s infinite alternate;
+        }
+        @keyframes flash {
+            from { opacity: 1; }
+            to { opacity: 0.6; }
+        }
+        .stat-desc {
+            font-size: 12px;
+            color: #909399;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        /* 搜索栏优化 */
+        .search-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .search-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .search-item label {
+            font-size: 14px;
+            color: #606266;
+        }
+        .search-item input,
+        .search-item select {
+            height: 40px;
+            padding: 0 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #606266;
+            background-color: #fff;
+            min-width: 180px;
+        }
+        .search-item input:focus,
+        .search-item select:focus {
+            border-color: #409eff;
+            outline: none;
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .btn {
+            height: 40px;
+            padding: 0 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background-color: #409eff;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background-color: #66b1ff;
+        }
+        .btn-default {
+            background-color: #fff;
+            color: #606266;
+            border: 1px solid #dcdfe6;
+        }
+        .btn-default:hover {
+            color: #409eff;
+            border-color: #c6e2ff;
+        }
+        .btn-danger {
+            background-color: #f56c6c;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background-color: #f78989;
+        }
+        .batch-btn {
+            height: 40px;
+            padding: 0 16px;
+            border: 1px solid #f56c6c;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: #fff;
+            color: #f56c6c;
+        }
+        .batch-btn:hover {
+            background: #fef0f0;
+        }
+        
+        /* 表格区域 */
+        .table-section {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid #e8e8e8;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .table-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 18px;
+            font-weight: 500;
+            color: #303133;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background-color: #ecf5ff;
+            color: #409eff;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .warning-badge {
+            background-color: #fef0f0;
+            color: #f56c6c;
+        }
+        .table-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        thead {
+            background-color: #fafafa;
+        }
+        th.check-col, td.check-col {
+            text-align: center;
+            width: 60px;
+        }
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #ebeef5;
+        }
+        th {
+            font-weight: 500;
+            color: #606266;
+        }
+        tbody tr:hover {
+            background-color: #f5f7fa;
+        }
+        tbody tr.warning-row {
+            background-color: #fef0f030;
+        }
+        
+        /* 状态样式 */
+        .status-normal {
+            display: inline-block;
+            padding: 4px 8px;
+            background-color: #f0f9ff;
+            color: #13c2c2;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-warning {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background-color: #fdf6ec;
+            color: #e6a23c;
+            border-radius: 4px;
+            font-size: 12px;
+            animation: flash 1.5s infinite alternate;
+        }
+        .status-danger {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background-color: #fef0f0;
+            color: #f56c6c;
+            border-radius: 4px;
+            font-size: 12px;
+            animation: flash 1.5s infinite alternate;
+        }
+        .status-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background-color: #f4f4ff;
+            color: #722ed1;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-info .count {
+            background-color: #722ed1;
+            color: #fff;
+            padding: 0 4px;
+            border-radius: 2px;
+            font-size: 11px;
+        }
+        .status-device {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background-color: #fff0f6;
+            color: #eb4d5d;
+            border-radius: 4px;
+            font-size: 12px;
+            animation: flash 1.5s infinite alternate;
+        }
+        .status-noplate {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background-color: #f5f0ff;
+            color: #9254de;
+            border-radius: 4px;
+            font-size: 12px;
+            animation: flash 1.5s infinite alternate;
+        }
+        .status-processed {
+            display: inline-block;
+            padding: 4px 8px;
+            background-color: #f0f9ff;
+            color: #67c23a;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        /* 自定义样式 */
+        .plate-number {
+            color: #409eff;
+            font-weight: 500;
+        }
+        .plate-number-none {
+            color: #9254de;
+            font-weight: 500;
+            font-style: italic;
+        }
+        .vehicle-type {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .vehicle-temp {
+            background-color: #f0f9ff;
+            color: #13c2c2;
+        }
+        .vehicle-monthly {
+            background-color: #f9f0ff;
+            color: #722ed1;
+        }
+        .vehicle-inner {
+            background-color: #e8f4ec;
+            color: #52c41a;
+        }
+        .vehicle-visitor {
+            background-color: #fff7e6;
+            color: #fa8c16;
+        }
+        .vehicle-noplate {
+            background-color: #f5f0ff;
+            color: #9254de;
+        }
+        .duration-green {
+            color: #67c23a;
+        }
+        .duration-red {
+            color: #f56c6c;
+            font-weight: 500;
+        }
+        .duration-orange {
+            color: #e6a23c;
+        }
+        .fee {
+            color: #f56c6c;
+            font-weight: 500;
+        }
+        .fee-free {
+            color: #67c23a;
+        }
+        .fee-noplate {
+            color: #9254de;
+            font-weight: 500;
+        }
+        .photo-placeholder {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #c0c4cc;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .photo-placeholder:hover {
+            border-color: #409eff;
+        }
+        .btn-link {
+            color: #409eff;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 4px;
+        }
+        .btn-link:hover {
+            color: #66b1ff;
+        }
+        .btn-handle {
+            color: #f56c6c;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 4px;
+        }
+        .btn-handle:hover {
+            color: #f78989;
+        }
+        .btn-handled {
+            color: #67c23a;
+            background: none;
+            border: none;
+            cursor: default;
+            font-size: 14px;
+            padding: 0 4px;
+        }
+        
+        /* 预警处理表单样式 */
+        .warning-form-item {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .warning-form-item label {
+            font-size: 14px;
+            color: #303133;
+            font-weight: 500;
+        }
+        .warning-form-item input,
+        .warning-form-item select,
+        .warning-form-item textarea {
+            padding: 10px 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #606266;
+        }
+        .warning-form-item textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        .warning-detail {
+            padding: 15px;
+            background: #f5f7fa;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .warning-detail p {
+            margin-bottom: 8px;
+        }
+        .warning-detail p:last-child {
+            margin-bottom: 0;
+        }
+        
+        /* 图片预览 */
+        .photo-preview {
+            max-width: 100%;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        /* 详情页面样式 */
+        .detail-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .detail-label {
+            font-size: 14px;
+            color: #909399;
+            margin-bottom: 4px;
+        }
+        .detail-value {
+            font-size: 16px;
+            color: #303133;
+            font-weight: 500;
+        }
+        
+        /* 批量处理弹窗样式 */
+        .batch-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        /* 异常记录表格样式 */
+        .abnormal-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .abnormal-table th, .abnormal-table td {
+            padding: 10px;
+            border: 1px solid #ebeef5;
+            text-align: left;
+        }
+        .abnormal-table th {
+            background-color: #fafafa;
+            font-weight: 500;
+        }
+        
+        /* 响应式适配 */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 60px;
+            }
+            .menu-item span {
+                display: none;
+            }
+            .stats-cards {
+                grid-template-columns: 1fr;
+            }
+            .search-bar {
+                gap: 10px;
+            }
+            .search-item {
+                width: 100%;
+            }
+            .alert-actions {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 预警悬浮提示栏 -->
+    <div class="warning-alert alert-yellow" id="spaceWarnAlert">
+        <div class="alert-info">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span><strong>余位不足预警</strong>：临时车位剩余不足10%，当前仅剩余8个，请及时引导车辆！</span>
+        </div>
+        <div class="alert-actions">
+            <button class="alert-btn" onclick="handleWarn('space')">立即处理</button>
+            <button class="alert-btn" onclick="closeAlert('spaceWarnAlert')">关闭</button>
+        </div>
+    </div>
+    <div class="warning-alert alert-red" id="longtimeWarnAlert">
+        <div class="alert-info">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span><strong>长时间停车预警</strong>：发现1辆车辆停车超24小时，车牌号粤B66666，需及时联系车主！</span>
+        </div>
+        <div class="alert-actions">
+            <button class="alert-btn" onclick="handleWarn('longtime', 2)">立即处理</button>
+            <button class="alert-btn" onclick="closeAlert('longtimeWarnAlert')">关闭</button>
+        </div>
+    </div>
+    <div class="warning-alert alert-purple" id="noplateWarnAlert">
+        <div class="alert-info">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span><strong>无牌车预警</strong>：发现1辆无牌车辆进场（东门），未登记信息，需人工核实！</span>
+        </div>
+        <div class="alert-actions">
+            <button class="alert-btn" onclick="handleWarn('noplate', 5)">立即处理</button>
+            <button class="alert-btn" onclick="closeAlert('noplateWarnAlert')">关闭</button>
+        </div>
+    </div>
+    <div class="warning-alert alert-red" id="deviceWarnAlert">
+        <div class="alert-info">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span><strong>设备异常预警</strong>：南门道闸识别设备离线（已离线20分钟），请运维人员检修！</span>
+        </div>
+        <div class="alert-actions">
+            <button class="alert-btn" onclick="handleWarn('device')">立即处理</button>
+            <button class="alert-btn" onclick="closeAlert('deviceWarnAlert')">关闭</button>
+        </div>
+    </div>
+
+    <!-- 顶部导航 -->
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">🚗</div>
+            <span>智慧停车管理系统</span>
+        </div>
+        <div class="user-info">
+            <span>管理员</span>
+            <div class="user-avatar">管</div>
+        </div>
+    </div>
+    
+    <!-- 主容器 -->
+    <div class="main-container" id="mainContainer">
+        <!-- 侧边菜单 -->
+        <div class="sidebar">
+            <div class="menu-item active">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M928 160H96c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h832c17.7 0 32-14.3 32-32V192c0-17.7-14.3-32-32-32zM480 832H160V256h320v576zm128-640H160v-64h448v64zm320 640H608V256h320v576z"/>
+                </svg>
+                <span>在场车辆监控</span>
+            </div>
+            <div class="menu-item">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M832 64H192c-17.7 0-32 14.3-32 32v832c0 17.7 14.3 32 32 32h640c17.7 0 32-14.3 32-32V96c0-17.7-14.3-32-32-32zM648.3 426.8L537.9 345.5c-3.1-2.3-7.3-2.3-10.4 0L375.7 426.8a8.32 8.32 0 0 0-1.7 11.9l89.9 118.8c3.1 4.1 9.2 4.1 12.3 0l142.4-188.3a8.32 8.32 0 0 0-1.7-11.9z"/>
+                </svg>
+                <span>出入场记录</span>
+            </div>
+            <div class="menu-item">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M864 256H736v-64c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v64H416v-64c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v64H160c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h704c17.7 0 32-14.3 32-32V288c0-17.7-14.3-32-32-32zM640 832H384c-17.7 0-32-14.3-32-32V480c0-17.7 14.3-32 32-32h256c17.7 0 32 14.3 32 32v320c0 17.7-14.3 32-32 32zM352 384h320v64H352v-64z"/>
+                </svg>
+                <span>收费管理</span>
+            </div>
+            <div class="menu-item">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M896 112H128c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h768c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32zM792 768H232V248h560v520zM232 168h246v48h-246v-48zm560 0h-246v48h246v-48zM232 848v48h560v-48H232z"/>
+                </svg>
+                <span>报表统计</span>
+            </div>
+            <div class="menu-item">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M928 160H96c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h832c17.7 0 32-14.3 32-32V192c0-17.7-14.3-32-32-32zm-40 656H136V240h752v576zM480 384c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm192-384c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64z"/>
+                </svg>
+                <span>系统设置</span>
+            </div>
+        </div>
+        
+        <!-- 内容区域 -->
+        <div class="content">
+            <div class="page-title">在场车辆监控</div>
+            
+            <!-- 数据统计卡片 -->
+              <div class="stats-cards">
+                <div class="stat-card">
+    
+                    <div class="stat-title">总车位数</div>
+                    <div class="stat-value">500</div>
+                    <div class="stat-desc">固定车位：450 · 临时车位：50</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">在用车位</div>
+                    <div class="stat-value primary" id="totalVehicles">400</div>
+                    <div class="stat-desc">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 19V5M5 12l7 7 7-7"/>
+                        </svg>
+                        实时更新 · 最后更新：<span id="lastUpdateTime">2026-01-16 15:00:00</span>
+                    </div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-title">剩余车位</div>
+                    <div class="stat-value danger" id="remainingSpaces">50</div>
+                    <div class="stat-desc">临时车位剩余：<span id="tempRemaining">50</span> <strong>（不足10%）</strong></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">今日收费总额</div>
+                    <div class="stat-value danger">¥12,856.00</div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-title">今日异常记录</div>
+                    <div class="stat-value danger">5</div>
+                 </div>
+                </div>
+            <!-- 搜索栏 -->
+            <div class="search-bar">
+                <div class="search-item">
+                    <label>车牌号码</label>
+                    <input type="text" placeholder="请输入车牌号（无牌车填：无）" id="plateNumberInput">
+                </div>
+                <div class="search-item">
+                    <label>车辆类型</label>
+                    <select id="vehicleTypeSelect">
+                        <option value="all">全部类型</option>
+                        <option value="temp">临时车</option>
+                        <option value="monthly">月卡车</option>
+                        <option value="inner">内部车</option>
+                        <option value="visitor">访客车</option>
+                        <option value="noplate">无牌车</option>
+                    </select>
+                </div>
+                <div class="search-item">
+                    <label>预警类型</label>
+                    <select id="warningTypeSelect">
+                        <option value="all">全部类型</option>
+                        <option value="space">余位不足预警</option>
+                        <option value="blacklist">黑名单预警</option>
+                        <option value="repeat">反复进场预警</option>
+                        <option value="longtime">长时间停车预警</option>
+                        <option value="noplate">无牌车预警</option>
+                        <option value="device">设备离线预警</option>
+                    </select>
+                </div>
+                <div class="search-item">
+                    <label>出入口</label>
+                    <select id="entranceSelect">
+                        <option value="all">全部出入口</option>
+                        <option value="east">东门</option>
+                        <option value="west">西门</option>
+                        <option value="south">南门</option>
+                        <option value="north">北门</option>
+                    </select>
+                </div>
+                <div class="search-item">
+                    <label>进场时间</label>
+                    <input type="text" placeholder="年/月/日" onfocus="(this.type='date')" onblur="if(!this.value) this.type='text'" id="entranceTimeInput">
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="searchBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M11 19C15.4183 19 19 15.4183 19 11C19 6.58172 15.4183 3 11 3C6.58172 3 3 6.58172 3 11C3 15.4183 6.58172 19 11 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M21 21L16.65 16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        搜索
+                    </button>
+                    <button class="btn btn-default" id="resetBtn">重置</button>
+                    <button class="btn btn-default" id="remoteControlBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M18 9.5V6C18 5.46957 17.7893 4.96086 17.4142 4.58579C17.0391 4.21071 16.5304 4 16 4H8C7.46957 4 6.96086 4.21071 6.58579 4.58579C6.21071 4.96086 6 5.46957 6 6V9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M6 14.5V18C6 18.5304 6.21071 19.0391 6.58579 19.4142C6.96086 19.7893 7.46957 20 8 20H16C16.5304 20 17.0391 19.7893 17.4142 19.4142C17.7893 19.0391 18 18.5304 18 18V14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M3 12H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        远程开闸
+                    </button>
+                    </div>
+                </div>                 
+            <!-- 表格区域 -->
+            <div class="table-section">
+                <div class="table-header">
+                    <div class="table-title">
+                        在场车辆列表
+                        <span class="badge">实时更新</span>
+                        <span class="badge warning-badge">当前预警：4条</span>
+                    </div>
+                    <div class="table-actions">
+                        <button class="btn btn-default" id="exportBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            导出清单
+                        </button>
+                        <button class="btn btn-default" id="refreshBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M23 4V10H17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M1 20V14H7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M3.51 9.51C6.39999 6.63 11.28 6.63 14.16 9.51C16.33 11.68 17.41 14.42 17.41 16.18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M20.49 14.49C17.6 17.37 12.72 17.37 9.84 14.49C7.67 12.32 6.59 9.58 6.59 7.82" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            刷新数据
+                        </button>
+                        <button class="btn btn-danger" id="abnormalRecordBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            异常记录
+                        </button>
+                        <button class="batch-btn" id="batchHandleBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M7 11H17M7 16H17M7 6H17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            批量处理
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 表格内容 -->
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="check-col"><input type="checkbox" id="checkAll"></th>
+                                <th>车牌号码</th>
+                                <th>车辆类型</th>
+                                <th>进场时间</th>
+                                <th>停车时长</th>
+                                <th>出入口</th>
+                                <th>车位号</th>
+                                <th>应缴费用</th>
+                                <th>车辆状态</th>
+                                <th>进场照片</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- 正常车辆 -->
+                            <tr data-id="1" data-plate="粤A12345" data-type="monthly">
+                                <td class="check-col"><input type="checkbox" name="vehicleItem" value="1"></td>
+                                <td><span class="plate-number">粤A12345</span></td>
+                                <td><span class="vehicle-type vehicle-monthly">月卡车</span></td>
+                                <td>2026-01-16 08:30:25</td>
+                                <td><span class="duration-green">6小时30分</span></td>
+                                <td>东门</td>
+                                <td>A区-012</td>
+                                <td><span class="fee-free">¥0.00</span></td>
+                                <td><span class="status-normal">正常</span></td>
+                                <td><div class="photo-placeholder" onclick="viewPhoto('粤A12345')">查看</div></td>
+                                <td>
+                                    <button class="btn-link" onclick="viewDetail(1)">详情</button> | 
+                                    <button class="btn-link" onclick="exitVehicle(1)">出场</button>
+                                </td>
+                            </tr>
+                            <!-- 长时间停车预警车辆 -->
+                            <tr class="warning-row" data-id="2" data-plate="粤B66666" data-type="temp">
+                                <td class="check-col"><input type="checkbox" name="vehicleItem" value="2"></td>
+                                <td><span class="plate-number">粤B66666</span></td>
+                                <td><span class="vehicle-type vehicle-temp">临时车</span></td>
+                                <td>2026-01-15 10:15:40</td>
+                                <td><span class="duration-red">28小时45分</span></td>
+                                <td>西门</td>
+                                <td>B区-088</td>
+                                <td><span class="fee">¥186.00</span></td>
+                                <td>
+                                    <span class="status-danger">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                        长时间停车
+                                    </span>
+                                </td>
+                                <td><div class="photo-placeholder" onclick="viewPhoto('粤B66666')">查看</div></td>
+                                <td>
+                                    <button class="btn-link" onclick="viewDetail(2)">详情</button> | 
+                                    <button class="btn-handle" onclick="handleWarn('longtime', 2)">处理预警</button>
+                                </td>
+                            </tr>
+                            <!-- 内部车辆 -->
+                            <tr data-id="3" data-plate="粤C88888" data-type="inner">
+                                <td class="check-col"><input type="checkbox" name="vehicleItem" value="3"></td>
+                                <td><span class="plate-number">粤C88888</span></td>
+                                <td><span class="vehicle-type vehicle-inner">内部车</span></td>
+                                <td>2026-01-16 09:45:10</td>
+                                <td><span class="duration-green">5小时15分</span></td>
+                                <td>北门</td>
+                                <td>C区-001</td>
+                                <td><span class="fee-free">¥0.00</span></td>
+                                <td><span class="status-normal">正常</span></td>
+                                <td><div class="photo-placeholder" onclick="viewPhoto('粤C88888')">查看</div></td>
+                                <td>
+                                    <button class="btn-link" onclick="viewDetail(3)">详情</button> | 
+                                    <button class="btn-link" onclick="exitVehicle(3)">出场</button>
+                                </td>
+                            </tr>
+                            <!-- 访客车辆 -->
+                            <tr data-id="4" data-plate="粤D99999" data-type="visitor">
+                                <td class="check-col"><input type="checkbox" name="vehicleItem" value="4"></td>
+                                <td><span class="plate-number">粤D99999</span></td>
+                                <td><span class="vehicle-type vehicle-visitor">访客车</span></td>
+                                <td>2026-01-16 11:20:30</td>
+                                <td><span class="duration-green">3小时40分</span></td>
+                                <td>东门</td>
+                                <td>D区-056</td>
+                                <td><span class="fee-free">¥0.00</span></td>
+                                <td><span class="status-normal">正常</span></td>
+                                <td><div class="photo-placeholder" onclick="viewPhoto('粤D99999')">查看</div></td>
+                                <td>
+                                    <button class="btn-link" onclick="viewDetail(4)">详情</button> | 
+                                    <button class="btn-link" onclick="exitVehicle(4)">出场</button>
+                                </td>
+                            </tr>
+                            <!-- 无牌车预警 -->
+                            <tr class="warning-row" data-id="5" data-plate="无牌车" data-type="noplate">
+                                <td class="check-col"><input type="checkbox" name="vehicleItem" value="5"></td>
+                                <td><span class="plate-number-none">无牌车</span></td>
+                                <td><span class="vehicle-type vehicle-noplate">无牌车</span></td>
+                                <td>2026-01-16 13:10:15</td>
+                                <td><span class="duration-orange">1小时50分</span></td>
+                                <td>东门</td>
+                                <td>临时-008</td>
+                                <td><span class="fee-noplate">待核实</span></td>
+                                <td>
+                                    <span class="status-noplate">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                        无牌车预警
+                                    </span>
+                                </td>
+                                <td><div class="photo-placeholder" onclick="viewPhoto('无牌车')">查看</div></td>
+                                <td>
+                                    <button class="btn-link" onclick="viewDetail(5)">详情</button> | 
+                                    <button class="btn-handle" onclick="handleWarn('noplate', 5)">处理预警</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 预警处理弹窗 -->
+    <div class="modal" id="warningModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">预警处理</h3>
+                <span class="modal-close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="warning-detail" id="warningDetail">
+                    <!-- 预警详情内容会通过JS动态填充 -->
+                </div>
+                <div class="warning-form-item">
+                    <label>处理状态</label>
+                    <select id="handleStatus">
+                        <option value="pending">待处理</option>
+                        <option value="processing">处理中</option>
+                        <option value="completed">已完成</option>
+                        <option value="ignored">已忽略</option>
+                    </select>
+                </div>
+                <div class="warning-form-item">
+                    <label>处理人</label>
+                    <input type="text" id="handlerName" placeholder="请输入处理人姓名" value="管理员">
+                </div>
+                <div class="warning-form-item">
+                    <label>处理备注</label>
+                    <textarea id="handleRemark" placeholder="请输入处理情况说明..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveWarningHandle()">保存处理结果</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 车辆详情弹窗 -->
+    <div class="modal" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="detailTitle">车辆详情</h3>
+                <span class="modal-close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body" id="detailContent">
+                <!-- 详情内容会通过JS动态填充 -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 远程开闸弹窗 -->
+    <div class="modal" id="remoteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title modal-title-blue">远程开闸操作</h3>
+                <span class="modal-close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="warning-detail">
+                    <p><strong>操作说明：</strong>远程开闸将直接控制对应出入口道闸开启，请注意核实车辆信息！</p>
+                </div>
+                <div class="warning-form-item">
+                    <label>车牌号</label>
+                    <input type="text" id="remotePlateNumber" placeholder="请输入车牌号" required>
+                </div>
+                <div class="warning-form-item">
+                    <label>选择出入口</label>
+                    <select id="remoteEntrance">
+                        <option value="east">东门</option>
+                        <option value="west">西门</option>
+                        <option value="south">南门</option>
+                        <option value="north">北门</option>
+                    </select>
+                </div>
+                <div class="warning-form-item">
+                    <label>开闸原因</label>
+                    <select id="remoteReason">
+                        <option value="normal">正常出场</option>
+                        <option value="emergency">紧急情况</option>
+                        <option value="system">系统故障</option>
+                        <option value="other">其他原因</option>
+                    </select>
+                </div>
+                <div class="warning-form-item">
+                    <label>操作备注</label>
+                    <textarea id="remoteRemark" placeholder="请输入操作备注（选填）"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="confirmRemoteControl()">确认开闸</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量处理弹窗 -->
+    <div class="modal" id="batchModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title modal-title-red">批量处理操作</h3>
+                <span class="modal-close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="warning-detail" id="batchInfo">
+                    <p><strong>已选择车辆数量：</strong><span id="selectedCount">0</span> 辆</p>
+                    <p><strong>操作说明：</strong>批量处理将对选中的车辆执行统一操作，请谨慎选择！</p>
+                </div>
+                <div class="batch-form">
+                    <div class="warning-form-item">
+                        <label>批量操作类型</label>
+                        <select id="batchActionType">
+                            <option value="warn">批量处理预警</option>
+                            <option value="exit">批量出场</option>
+                            <option value="ignore">批量忽略预警</option>
+                            <option value="export">批量导出信息</option>
+                        </select>
+                    </div>
+                    <div class="warning-form-item">
+                        <label>处理状态</label>
+                        <select id="batchHandleStatus">
+                            <option value="completed">已完成</option>
+                            <option value="processing">处理中</option>
+                            <option value="ignored">已忽略</option>
+                        </select>
+                    </div>
+                    <div class="warning-form-item">
+                        <label>批量操作备注</label>
+                        <textarea id="batchRemark" placeholder="请输入批量操作备注..."></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="confirmBatchHandle()">执行批量操作</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 异常记录弹窗 -->
+    <div class="modal" id="abnormalModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title modal-title-red">异常记录查询</h3>
+                <span class="modal-close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="search-bar" style="margin-bottom: 20px;">
+                    <div class="search-item">
+                        <label>异常类型</label>
+                        <select id="abnormalTypeSelect">
+<script>
+    // 页面加载完成后执行
+    document.addEventListener('DOMContentLoaded', function() {
+        // 显示预警提示
+        showAlerts();
+        
+        // 全选/取消全选
+        document.getElementById('checkAll').addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('input[name="vehicleItem"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateSelectedCount();
+        });
+        
+        // 监听车辆选择框变化
+        const vehicleCheckboxes = document.querySelectorAll('input[name="vehicleItem"]');
+        vehicleCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateSelectedCount);
+        });
+        
+        // 绑定按钮事件
+        document.getElementById('searchBtn').addEventListener('click', searchVehicles);
+        document.getElementById('resetBtn').addEventListener('click', resetSearch);
+        document.getElementById('remoteControlBtn').addEventListener('click', () => openModal('remoteModal'));
+        document.getElementById('exportBtn').addEventListener('click', exportVehicles);
+        document.getElementById('refreshBtn').addEventListener('click', refreshData);
+        document.getElementById('abnormalRecordBtn').addEventListener('click', () => openModal('abnormalModal'));
+        document.getElementById('batchHandleBtn').addEventListener('click', () => {
+            updateSelectedCount();
+            openModal('batchModal');
+        });
+    });
+
+    // 显示预警提示
+    function showAlerts() {
+        setTimeout(() => {
+            document.getElementById('spaceWarnAlert').classList.add('show');
+            document.getElementById('mainContainer').classList.add('with-alert');
+        }, 500);
+        
+        setTimeout(() => {
+            document.getElementById('longtimeWarnAlert').classList.add('show');
+        }, 1000);
+        
+        setTimeout(() => {
+            document.getElementById('noplateWarnAlert').classList.add('show');
+        }, 1500);
+        
+        setTimeout(() => {
+            document.getElementById('deviceWarnAlert').classList.add('show');
+        }, 2000);
+    }
+
+    // 关闭预警提示
+    function closeAlert(alertId) {
+        const alertElement = document.getElementById(alertId);
+        alertElement.classList.remove('show');
+        
+        // 检查是否还有显示的预警
+        const activeAlerts = document.querySelectorAll('.warning-alert.show');
+        if (activeAlerts.length === 0) {
+            document.getElementById('mainContainer').classList.remove('with-alert');
+        }
+    }
+
+    // 打开弹窗
+    function openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        modal.style.display = 'flex';
+        // 阻止页面滚动
+        document.body.style.overflow = 'hidden';
+    }
+
+    // 关闭弹窗
+    function closeModal() {
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => {
+            modal.style.display = 'none';
+        });
+        // 恢复页面滚动
+        document.body.style.overflow = 'auto';
+    }
+
+    // 更新选中车辆数量
+    function updateSelectedCount() {
+        const checkedBoxes = document.querySelectorAll('input[name="vehicleItem"]:checked');
+        const countElement = document.getElementById('selectedCount');
+        if (countElement) {
+            countElement.textContent = checkedBoxes.length;
+        }
+        return checkedBoxes.length;
+    }
+
+    // 获取选中的车辆ID
+    function getSelectedVehicleIds() {
+        const checkedBoxes = document.querySelectorAll('input[name="vehicleItem"]:checked');
+        return Array.from(checkedBoxes).map(checkbox => checkbox.value);
+    }
+
+    // 查看车辆详情
+    function viewDetail(vehicleId) {
+        const vehicleRow = document.querySelector(`tr[data-id="${vehicleId}"]`);
+        if (!vehicleRow) return;
+        
+        const plateNumber = vehicleRow.dataset.plate;
+        const vehicleType = vehicleRow.dataset.type;
+        
+        // 构建详情内容
+        let typeText = '';
+        switch(vehicleType) {
+            case 'monthly': typeText = '月卡车'; break;
+            case 'temp': typeText = '临时车'; break;
+            case 'inner': typeText = '内部车'; break;
+            case 'visitor': typeText = '访客车'; break;
+            case 'noplate': typeText = '无牌车'; break;
+            default: typeText = '未知类型';
+        }
+        
+        const cells = vehicleRow.querySelectorAll('td');
+        const entranceTime = cells[4].textContent;
+        const duration = cells[5].textContent;
+        const entrance = cells[6].textContent;
+        const parkingSpace = cells[7].textContent;
+        const fee = cells[8].textContent;
+        const status = cells[9].textContent;
+        
+        // 填充详情弹窗
+        document.getElementById('detailTitle').textContent = `车辆详情 - ${plateNumber}`;
+        document.getElementById('detailContent').innerHTML = `
+            <div class="detail-info">
+                <div class="detail-item">
+                    <span class="detail-label">车牌号码</span>
+                    <span class="detail-value ${vehicleType === 'noplate' ? 'plate-number-none' : 'plate-number'}">${plateNumber}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">车辆类型</span>
+                    <span class="detail-value">${typeText}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">进场时间</span>
+                    <span class="detail-value">${entranceTime}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">停车时长</span>
+                    <span class="detail-value">${duration}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">出入口</span>
+                    <span class="detail-value">${entrance}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">车位号</span>
+                    <span class="detail-value">${parkingSpace}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">应缴费用</span>
+                    <span class="detail-value">${fee}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">车辆状态</span>
+                    <span class="detail-value">${status}</span>
+                </div>
+            </div>
+            <div class="warning-detail">
+                <p><strong>车辆备注：</strong>${vehicleType === 'noplate' ? '无牌车辆，需人工核实身份信息' : '正常登记车辆'}</p>
+                <p><strong>最后更新时间：</strong>2026-01-16 15:00:00</p>
+            </div>
+            <div style="text-align: center;">
+                <div class="photo-placeholder" style="margin: 0 auto; width: 200px; height: 120px; font-size: 14px;" onclick="viewPhoto('${plateNumber}')">
+                    点击查看进场照片
+                </div>
+            </div>
+        `;
+        
+        openModal('detailModal');
+    }
+
+    // 查看车辆照片
+    function viewPhoto(plateNumber) {
+        alert(`查看${plateNumber}的进场照片功能已触发，实际项目中可在此处实现图片预览`);
+    }
+
+    // 车辆出场操作
+    function exitVehicle(vehicleId) {
+        const vehicleRow = document.querySelector(`tr[data-id="${vehicleId}"]`);
+        const plateNumber = vehicleRow ? vehicleRow.dataset.plate : '未知车辆';
+        
+        if (confirm(`确认让${plateNumber}出场吗？`)) {
+            // 模拟出场操作
+            alert(`${plateNumber}出场成功！已记录出场时间：${new Date().toLocaleString()}`);
+            
+            // 更新界面
+            if (vehicleRow) {
+                vehicleRow.style.opacity = '0.5';
+                const actionCell = vehicleRow.querySelector('td:last-child');
+                actionCell.innerHTML = '<span style="color: #67c23a;">已出场</span>';
+                
+                // 更新在场车辆总数
+                const totalElement = document.getElementById('totalVehicles');
+                totalElement.textContent = parseInt(totalElement.textContent) - 1;
+            }
+        }
+    }
+
+    // 处理预警
+    function handleWarn(warnType, vehicleId) {
+        let warnTitle = '';
+        let warnContent = '';
+        
+        switch(warnType) {
+            case 'space':
+                warnTitle = '余位不足预警处理';
+                warnContent = `
+                    <p><strong>预警类型：</strong>临时车位余位不足</p>
+                    <p><strong>预警时间：</strong>2026-01-16 14:30:00</p>
+                    <p><strong>预警内容：</strong>临时车位剩余不足10%，当前仅剩余8个，其中可用临时车位4个</p>
+                    <p><strong>影响范围：</strong>所有出入口的临时车辆进场</p>
+                `;
+                break;
+            case 'longtime':
+                warnTitle = '长时间停车预警处理';
+                warnContent = `
+                    <p><strong>预警类型：</strong>车辆长时间停车</p>
+                    <p><strong>车辆信息：</strong>粤B66666（临时车）</p>
+                    <p><strong>进场时间：</strong>2026-01-15 10:15:40</p>
+                    <p><strong>停车时长：</strong>28小时45分（超过24小时）</p>
+                    <p><strong>车位位置：</strong>B区-088</p>
+                    <p><strong>应缴费用：</strong>¥186.00</p>
+                `;
+                break;
+            case 'noplate':
+                warnTitle = '无牌车预警处理';
+                warnContent = `
+                    <p><strong>预警类型：</strong>无牌车辆进场</p>
+                    <p><strong>车辆信息：</strong>无牌车</p>
+                    <p><strong>进场时间：</strong>2026-01-16 13:10:15</p>
+                    <p><strong>进场入口：</strong>东门</p>
+                    <p><strong>车位位置：</strong>临时-008</p>
+                    <p><strong>预警原因：</strong>未识别到车牌信息，需人工核实</p>
+                `;
+                break;
+            case 'device':
+                warnTitle = '设备异常预警处理';
+                warnContent = `
+                    <p><strong>预警类型：</strong>道闸识别设备离线</p>
+                    <p><strong>设备位置：</strong>南门出入口</p>
+                    <p><strong>离线时长：</strong>20分钟</p>
+                    <p><strong>影响范围：</strong>南门车辆进场识别、出场缴费</p>
+                    <p><strong>建议措施：</strong>联系运维人员检修设备</p>
+                `;
+                break;
+            default:
+                warnTitle = '预警处理';
+                warnContent = '<p>预警信息加载中...</p>';
+        }
+        
+        // 填充预警处理弹窗
+        document.getElementById('modalTitle').textContent = warnTitle;
+        document.getElementById('modalTitle').className = `modal-title ${
+            warnType === 'space' ? 'modal-title-yellow' : 
+            warnType === 'longtime' || warnType === 'device' ? 'modal-title-red' : 'modal-title-purple'
+        }`;
+        document.getElementById('warningDetail').innerHTML = warnContent;
+        
+        // 存储当前处理的预警类型和车辆ID
+        document.getElementById('warningModal').dataset.warnType = warnType;
+        document.getElementById('warningModal').dataset.vehicleId = vehicleId || '';
+        
+        openModal('warningModal');
+    }
+
+    // 保存预警处理结果
+    function saveWarningHandle() {
+        const warnType = document.getElementById('warningModal').dataset.warnType;
+        const vehicleId = document.getElementById('warningModal').dataset.warnType;
+        const handleStatus = document.getElementById('handleStatus').value;
+        const handlerName = document.getElementById('handlerName').value;
+        const handleRemark = document.getElementById('handleRemark').value;
+        
+        if (!handleRemark && handleStatus !== 'pending') {
+            alert('请输入处理备注！');
+            return;
+        }
+        
+        // 模拟保存处理结果
+        alert(`
+            预警处理结果已保存：
+            预警类型：${warnType}
+            处理状态：${handleStatus === 'pending' ? '待处理' : 
+                      handleStatus === 'processing' ? '处理中' : 
+                      handleStatus === 'completed' ? '已完成' : '已忽略'}
+            处理人：${handlerName}
+            处理备注：${handleRemark}
+            处理时间：${new Date().toLocaleString()}
+        `);
+        
+        // 更新界面
+        if (vehicleId) {
+            const vehicleRow = document.querySelector(`tr[data-id="${vehicleId}"]`);
+            if (vehicleRow) {
+                const statusCell = vehicleRow.querySelectorAll('td')[9];
+                statusCell.innerHTML = '<span class="status-processed">已处理</span>';
+                
+                const actionCell = vehicleRow.querySelectorAll('td')[10];
+                const detailBtn = actionCell.querySelector('button:first-child');
+                actionCell.innerHTML = `${detailBtn.outerHTML} | <span class="btn-handled">已处理</span>`;
+            }
+        }
+        
+        // 关闭对应的预警提示
+        if (warnType === 'space') closeAlert('spaceWarnAlert');
+        else if (warnType === 'longtime') closeAlert('longtimeWarnAlert');
+        else if (warnType === 'noplate') closeAlert('noplateWarnAlert');
+        else if (warnType === 'device') closeAlert('deviceWarnAlert');
+        
+        closeModal();
+    }
+
+    // 确认远程开闸操作
+    function confirmRemoteControl() {
+        const plateNumber = document.getElementById('remotePlateNumber').value;
+        const entrance = document.getElementById('remoteEntrance').value;
+        const reason = document.getElementById('remoteReason').value;
+        const remark = document.getElementById('remoteRemark').value;
+        
+        if (!plateNumber) {
+            alert('请输入车牌号！');
+            return;
+        }
+        
+        const entranceText = {
+            'east': '东门', 'west': '西门', 'south': '南门', 'north': '北门'
+        }[entrance] || entrance;
+        
+        const reasonText = {
+            'normal': '正常出场', 'emergency': '紧急情况', 'system': '系统故障', 'other': '其他原因'
+        }[reason] || reason;
+        
+        if (confirm(`确认远程开启${entranceText}道闸？
+车牌号：${plateNumber}
+开闸原因：${reasonText}
+操作备注：${remark || '无'}`)) {
+            alert(`远程开闸指令已发送！
+出入口：${entranceText}
+车牌号：${plateNumber}
+开闸时间：${new Date().toLocaleString()}
+操作已记录到系统日志`);
+            closeModal();
+            
+            // 清空表单
+            document.getElementById('remotePlateNumber').value = '';
+            document.getElementById('remoteRemark').value = '';
+        }
+    }
+
+    // 确认批量处理操作
+    function confirmBatchHandle() {
+        const selectedCount = updateSelectedCount();
+        if (selectedCount === 0) {
+            alert('请先选择要处理的车辆！');
+            return;
+        }
+        
+        const actionType = document.getElementById('batchActionType').value;
+        const handleStatus = document.getElementById('batchHandleStatus').value;
+        const remark = document.getElementById('batchRemark').value;
+        
+        const actionText = {
+            'warn': '批量处理预警', 'exit': '批量出场', 
+            'ignore': '批量忽略预警', 'export': '批量导出信息'
+        }[actionType] || actionType;
+        
+        if (confirm(`确认执行${actionText}操作？
+选中车辆数量：${selectedCount}辆
+处理状态：${handleStatus === 'completed' ? '已完成' : 
+              handleStatus === 'processing' ? '处理中' : '已忽略'}
+操作备注：${remark || '无'}`)) {
+            
+            const vehicleIds = getSelectedVehicleIds();
+            
+            // 根据不同操作类型执行不同逻辑
+            switch(actionType) {
+                case 'exit':
+                    // 批量出场
+                    vehicleIds.forEach(id => {
+                        const vehicleRow = document.querySelector(`tr[data-id="${id}"]`);
+                        if (vehicleRow) {
+                            vehicleRow.style.opacity = '0.5';
+                            const actionCell = vehicleRow.querySelector('td:last-child');
+                            actionCell.innerHTML = '<span style="color: #67c23a;">已出场</span>';
+                        }
+                    });
+                    // 更新在场车辆总数
+                    const totalElement = document.getElementById('totalVehicles');
+                    totalElement.textContent = Math.max(0, parseInt(totalElement.textContent) - selectedCount);
+                    break;
+                    
+                case 'warn':
+                case 'ignore':
+                    // 批量处理/忽略预警
+                    vehicleIds.forEach(id => {
+                        const vehicleRow = document.querySelector(`tr[data-id="${id}"]`);
+                        if (vehicleRow) {
+                            const statusCell = vehicleRow.querySelectorAll('td')[9];
+                            statusCell.innerHTML = actionType === 'warn' ? 
+                                '<span class="status-processed">已处理</span>' : 
+                                '<span class="status-normal">已忽略</span>';
+                            
+                            const actionCell = vehicleRow.querySelectorAll('td')[10];
+                            const detailBtn = actionCell.querySelector('button:first-child');
+                            actionCell.innerHTML = `${detailBtn.outerHTML} | <span class="btn-handled">${
+                                actionType === 'warn' ? '已处理' : '已忽略'
+                            }</span>`;
+                        }
+                    });
+                    break;
+                    
+                case 'export':
+                    // 批量导出
+                    alert(`已导出选中的${selectedCount}辆车辆信息，文件格式：Excel`);
+                    break;
+            }
+            
+            alert(`${actionText}操作已完成！
+处理车辆数量：${selectedCount}辆
+处理时间：${new Date().toLocaleString()}
+操作备注：${remark || '无'}`);
+            
+            closeModal();
+        }
+    }
+
+    // 搜索车辆
+    function searchVehicles() {
+        const plateNumber = document.getElementById('plateNumberInput').value.trim();
+        const vehicleType = document.getElementById('vehicleTypeSelect').value;
+        const warningType = document.getElementById('warningTypeSelect').value;
+        const entrance = document.getElementById('entranceSelect').value;
+        const entranceTime = document.getElementById('entranceTimeInput').value;
+        
+        // 模拟搜索操作
+        alert(`
+            搜索条件已提交：
+            车牌号码：${plateNumber || '不限'}
+            车辆类型：${vehicleType === 'all' ? '全部类型' : 
+                      vehicleType === 'temp' ? '临时车' : 
+                      vehicleType === 'monthly' ? '月卡车' : 
+                      vehicleType === 'inner' ? '内部车' : 
+                      vehicleType === 'visitor' ? '访客车' : '无牌车'}
+            预警类型：${warningType === 'all' ? '全部类型' : 
+                      warningType === 'space' ? '余位不足预警' : 
+                      warningType === 'blacklist' ? '黑名单预警' : 
+                      warningType === 'repeat' ? '反复进场预警' : 
+                      warningType === 'longtime' ? '长时间停车预警' : 
+                      warningType === 'noplate' ? '无牌车预警' : '设备离线预警'}
+            出入口：${entrance === 'all' ? '全部出入口' : 
+                     entrance === 'east' ? '东门' : 
+                     entrance === 'west' ? '西门' : 
+                     entrance === 'south' ? '南门' : '北门'}
+            进场时间：${entranceTime || '不限'}
+            
+            实际项目中可在此处实现筛选逻辑
+        `);
+    }
+
+    // 重置搜索条件
+    function resetSearch() {
+        document.getElementById('plateNumberInput').value = '';
+        document.getElementById('vehicleTypeSelect').value = 'all';
+        document.getElementById('warningTypeSelect').value = 'all';
+        document.getElementById('entranceSelect').value = 'all';
+        document.getElementById('entranceTimeInput').value = '';
+    }
+
+    // 导出车辆信息
+    function exportVehicles() {
+        alert('车辆清单导出功能已触发，实际项目中可在此处实现Excel/CSV文件导出');
+    }
+
+    // 刷新数据
+    function refreshData() {
+        // 模拟刷新动画
+        const tableSection = document.querySelector('.table-section');
+        tableSection.style.opacity = '0.5';
+        
+        setTimeout(() => {
+            alert('数据已刷新！最后更新时间：' + new Date().toLocaleString());
+            tableSection.style.opacity = '1';
+        }, 800);
+    }
+</script>

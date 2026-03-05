@@ -1,5 +1,9 @@
 package cn.iocoder.yudao.module.iot.enums.device;
 
+import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
+import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
+
 /**
  * 门禁设备类型常量
  * 
@@ -62,5 +66,43 @@ public final class AccessDeviceTypeConstants {
             }
         }
         return getDeviceType(supportVideo);
+    }
+
+    /**
+     * 【统一入口】从设备对象获取门禁设备类型
+     * <p>
+     * 所有需要获取门禁设备类型的地方都应该调用此方法，确保逻辑一致。
+     * </p>
+     * <p>优先级：</p>
+     * <ol>
+     *   <li>AccessDeviceConfig.accessDeviceType（显式配置的设备子类型）</li>
+     *   <li>GenericDeviceConfig["deviceType"]（兼容旧格式）</li>
+     *   <li>根据 supportVideo 推断（兜底逻辑）</li>
+     * </ol>
+     *
+     * @param device 设备对象
+     * @return ACCESS_GEN1 或 ACCESS_GEN2，如果无法判断则返回 ACCESS_GEN1
+     */
+    public static String getAccessDeviceType(IotDeviceDO device) {
+        if (device == null || device.getConfig() == null) {
+            return ACCESS_GEN1;
+        }
+
+        String configDeviceType = null;
+        Boolean supportVideo = null;
+
+        if (device.getConfig() instanceof AccessDeviceConfig) {
+            AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
+            configDeviceType = config.getAccessDeviceType();
+            supportVideo = config.getSupportVideo();
+        } else if (device.getConfig() instanceof GenericDeviceConfig) {
+            GenericDeviceConfig config = (GenericDeviceConfig) device.getConfig();
+            Object dt = config.get("deviceType");
+            Object sv = config.get("supportVideo");
+            configDeviceType = dt != null ? dt.toString() : null;
+            supportVideo = (sv instanceof Boolean) ? (Boolean) sv : null;
+        }
+
+        return resolveDeviceType(configDeviceType, supportVideo);
     }
 }

@@ -6,7 +6,10 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.iot.controller.admin.parking.vo.record.ParkingRecordPageReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.parking.ParkingRecordDO;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -60,4 +63,30 @@ public interface ParkingRecordMapper extends BaseMapperX<ParkingRecordDO> {
                 .eq(ParkingRecordDO::getPaymentStatus, paymentStatus)
                 .between(ParkingRecordDO::getExitTime, startTime, endTime));
     }
+
+    /**
+     * 统计指定时间范围内的入场车辆数
+     */
+    default Long selectCountByEntryTime(LocalDateTime startTime, LocalDateTime endTime) {
+        return selectCount(new LambdaQueryWrapperX<ParkingRecordDO>()
+                .between(ParkingRecordDO::getEntryTime, startTime, endTime));
+    }
+
+    /**
+     * 统计指定时间范围内的出场车辆数
+     */
+    default Long selectCountByExitTime(LocalDateTime startTime, LocalDateTime endTime) {
+        return selectCount(new LambdaQueryWrapperX<ParkingRecordDO>()
+                .between(ParkingRecordDO::getExitTime, startTime, endTime)
+                .isNotNull(ParkingRecordDO::getExitTime));
+    }
+
+    /**
+     * 统计今日收入
+     */
+    @Select("SELECT COALESCE(SUM(paid_amount), 0) FROM iot_parking_record " +
+            "WHERE exit_time BETWEEN #{startTime} AND #{endTime} " +
+            "AND payment_status = 1 AND deleted = 0")
+    BigDecimal selectTodayIncome(@Param("startTime") LocalDateTime startTime, 
+                                  @Param("endTime") LocalDateTime endTime);
 }

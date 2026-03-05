@@ -136,10 +136,10 @@
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="锁状态" width="80" align="center">
+                <el-table-column label="控制模式" width="90" align="center">
                   <template #default="{ row }">
                     <el-tooltip 
-                      :content="getLockModeTooltip(row.alwaysMode)" 
+                      :content="getControlModeTooltip(row.alwaysMode)" 
                       placement="top"
                       :disabled="row.alwaysMode === 0"
                     >
@@ -149,34 +149,25 @@
                     </el-tooltip>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="280" align="center" fixed="right">
+                <el-table-column label="操作" width="220" align="center" fixed="right">
                   <template #default="{ row }">
-                    <el-button-group>
-                      <el-tooltip 
-                        :content="getOpenDoorDisabledReason(row)" 
-                        placement="top"
-                        :disabled="canOpenDoor(row)"
-                      >
-                        <el-button 
-                          type="success" 
-                          size="small" 
-                          :disabled="!canOpenDoor(row)"
-                          :loading="operatingChannelId === row.channelId && operatingAction === 'OPEN_DOOR'"
-                          @click="handleDoorControl(row, 'OPEN_DOOR')"
-                        >
-                          开门
-                        </el-button>
-                      </el-tooltip>
+                    <!-- 开门按钮：正常模式下可用，常开/常闭模式下禁用 -->
+                    <el-tooltip 
+                      :content="getOpenDoorDisabledReason(row)" 
+                      placement="top"
+                      :disabled="canOpenDoor(row)"
+                    >
                       <el-button 
-                        type="warning" 
+                        type="success" 
                         size="small" 
-                        :disabled="!row.operable"
-                        :loading="operatingChannelId === row.channelId && operatingAction === 'CLOSE_DOOR'"
-                        @click="handleDoorControl(row, 'CLOSE_DOOR')"
+                        :disabled="!canOpenDoor(row)"
+                        :loading="operatingChannelId === row.channelId && operatingAction === 'OPEN_DOOR'"
+                        @click="handleDoorControl(row, 'OPEN_DOOR')"
                       >
-                        关门
+                        开门
                       </el-button>
-                    </el-button-group>
+                    </el-tooltip>
+                    <!-- 控制模式下拉菜单 -->
                     <el-dropdown 
                       class="ml-10px" 
                       trigger="click" 
@@ -184,7 +175,7 @@
                       @command="(cmd) => handleDoorControl(row, cmd)"
                     >
                       <el-button type="primary" size="small" :disabled="!row.operable">
-                        更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                        模式<el-icon class="el-icon--right"><ArrowDown /></el-icon>
                       </el-button>
                       <template #dropdown>
                         <el-dropdown-menu>
@@ -247,7 +238,8 @@ import VideoPreviewDialog from '../components/VideoPreviewDialog.vue'
 import { 
   useAccessDeviceStatusWebSocket,
   type AccessDeviceStatusMessage,
-  type UnifiedDeviceStatusMessage
+  type UnifiedDeviceStatusMessage,
+  type DoorStateChangeMessage
 } from './useAccessDeviceStatusWebSocket'
 
 defineOptions({ name: 'AccessManagement' })
@@ -324,25 +316,28 @@ const getAlwaysModeLabel = (mode: number) => {
   return item?.label || '正常'
 }
 
-// 锁状态提示
-const getLockModeTooltip = (mode: number) => {
+// 控制模式提示
+const getControlModeTooltip = (mode: number) => {
   switch (mode) {
     case 1: return '门锁处于常开状态，无需刷卡即可通行'
     case 2: return '门锁处于常闭状态，所有开门操作将被禁止'
-    default: return ''
+    default: return '正常模式，需要刷卡/密码/远程开门'
   }
 }
 
 // 判断是否可以开门
+// 只有在【正常模式】且【设备在线】时才能操作开门
 const canOpenDoor = (row: any) => {
-  if (!row.operable) return false  // 设备不在线
-  if (row.alwaysMode === 2) return false  // 常闭状态
+  if (!row.operable) return false      // 设备不在线
+  if (row.alwaysMode === 1) return false  // 常开状态：门已经是开的，不需要操作
+  if (row.alwaysMode === 2) return false  // 常闭状态：禁止开门
   return true
 }
 
 // 获取开门按钮禁用原因
 const getOpenDoorDisabledReason = (row: any) => {
   if (!row.operable) return '设备离线，无法操作'
+  if (row.alwaysMode === 1) return '门锁处于常开状态，无需手动开门'
   if (row.alwaysMode === 2) return '门锁处于常闭状态，请先取消常闭后再开门'
   return ''
 }
@@ -570,6 +565,7 @@ const { connect: connectWs, disconnect: disconnectWs } = useAccessDeviceStatusWe
   autoConnect: false, // 手动连接
   onAccessDeviceStatus: handleAccessDeviceStatusChange,
   onUnifiedDeviceStatus: handleUnifiedDeviceStatus,
+  onDoorStateChange: handleDoorStateChange,
   onConnectionChange: (connected) => {
     console.log(`[门禁管理] WebSocket ${connected ? '✅ 已连接' : '❌ 已断开'}`)
   }
@@ -654,6 +650,137 @@ function handleUnifiedDeviceStatus(data: UnifiedDeviceStatusMessage) {
       message: `设备 ${controller?.deviceName || deviceId} 状态更新：${status}`
     })
   }
+}
+
+/**
+ * 门状态变化消息（后端：DOOR_STATE_CHANGE 事件）
+ * 当设备状态变化时（开门/关门/常开/常闭），后端会推送此消息
+ * 
+ * 注意：
+ * - doorStatus/lockStatus 为 null 时表示"不更新"，保持原值
+ * - CANCEL_ALWAYS 事件是设备自动上报的，不显示提示
+ * - eventData 中可能有 channelId（通道ID）或只有 channelNo（通道号），需要同时支持两种匹配
+ */
+function handleDoorStateChange(data: DoorStateChangeMessage) {
+  // 必须有 channelId 或 channelNo 才能匹配通道
+  const hasChannelId = data?.eventData?.channelId != null
+  const hasChannelNo = data?.eventData?.channelNo != null
+  if (!hasChannelId && !hasChannelNo) {
+    console.warn('[门禁管理] ⚠️ 门状态变化消息缺少 channelId 和 channelNo，无法匹配通道:', data)
+    return
+  }
+  
+  const channelId = hasChannelId ? Number(data.eventData.channelId) : null
+  const channelNo = hasChannelNo ? Number(data.eventData.channelNo) : null
+  const deviceId = Number(data.deviceId)
+  const action = data.eventData.action
+  
+  console.log('[门禁管理] 📡 收到门状态变化:', { 
+    deviceId, channelId, channelNo, action,
+    doorStatus: data.eventData.doorStatus,
+    doorStatusDesc: data.eventData.doorStatusDesc
+  })
+
+  // 匹配通道的辅助函数：优先用 channelId，其次用 channelNo（兼容字符串和数字类型）
+  const matchChannel = (ch: any) => {
+    // 将两边都转为数字比较，避免类型不匹配
+    if (channelId != null && Number(ch.channelId) === channelId) return true
+    if (channelNo != null && Number(ch.channelNo) === channelNo) return true
+    return false
+  }
+
+  // 调试：打印当前数据结构
+  console.log('[门禁管理] 🔍 当前数据:', {
+    controllerTreeLength: controllerTree.value.length,
+    controllerDeviceIds: controllerTree.value.map(c => ({ id: c.deviceId, type: typeof c.deviceId })),
+    channelListLength: channelList.value.length,
+    channelListIds: channelList.value.map(c => ({ channelId: c.channelId, channelNo: c.channelNo }))
+  })
+
+  // 更新树中对应门的状态（只更新非 null 的字段）
+  // 兼容 deviceId 可能是字符串或数字
+  const controller = controllerTree.value.find((c) => Number(c.deviceId) === deviceId)
+  console.log('[门禁管理] 🔍 找到控制器:', controller ? `deviceId=${controller.deviceId}` : '未找到')
+  
+  if (controller?.children) {
+    const door = controller.children.find(matchChannel)
+    console.log('[门禁管理] 🔍 找到门:', door ? `channelId=${door.channelId}, channelNo=${door.channelNo}` : '未找到')
+    
+    if (door) {
+      // 记录更新前的状态
+      const beforeStatus = { doorStatus: door.doorStatus, doorStatusDesc: door.doorStatusDesc }
+      
+      // doorStatus/lockStatus 为 null 时不更新（保持原值）
+      if (data.eventData.doorStatus != null) {
+        door.doorStatus = data.eventData.doorStatus
+        door.doorStatusDesc = data.eventData.doorStatusDesc
+      }
+      if (data.eventData.lockStatus != null) {
+        door.lockStatus = data.eventData.lockStatus
+        door.lockStatusDesc = data.eventData.lockStatusDesc
+      }
+      // alwaysMode 总是更新
+      if (data.eventData.alwaysMode != null) {
+        door.alwaysMode = data.eventData.alwaysMode
+        door.alwaysModeDesc = data.eventData.alwaysModeDesc
+      }
+      console.log('[门禁管理] ✅ 树节点状态已更新:', {
+        before: beforeStatus,
+        after: { doorStatus: door.doorStatus, doorStatusDesc: door.doorStatusDesc }
+      })
+    } else {
+      console.warn('[门禁管理] ⚠️ 未在树中找到匹配的门:', { 
+        deviceId, channelId, channelNo,
+        availableChildren: controller.children.map((c: any) => ({ channelId: c.channelId, channelNo: c.channelNo }))
+      })
+    }
+  } else {
+    console.warn('[门禁管理] ⚠️ 未找到控制器或控制器无子节点:', { deviceId })
+  }
+
+  // 更新通道列表中的状态（只更新非 null 的字段）
+  const channel = channelList.value.find(matchChannel)
+  if (channel) {
+    const beforeStatus = { doorStatus: channel.doorStatus, doorStatusDesc: channel.doorStatusDesc }
+    
+    if (data.eventData.doorStatus != null) {
+      channel.doorStatus = data.eventData.doorStatus
+      channel.doorStatusDesc = data.eventData.doorStatusDesc
+    }
+    if (data.eventData.lockStatus != null) {
+      channel.lockStatus = data.eventData.lockStatus
+      channel.lockStatusDesc = data.eventData.lockStatusDesc
+    }
+    if (data.eventData.alwaysMode != null) {
+      channel.alwaysMode = data.eventData.alwaysMode
+      channel.alwaysModeDesc = data.eventData.alwaysModeDesc
+    }
+    console.log('[门禁管理] ✅ 通道列表状态已更新:', {
+      before: beforeStatus,
+      after: { doorStatus: channel.doorStatus, doorStatusDesc: channel.doorStatusDesc }
+    })
+  } else {
+    console.warn('[门禁管理] ⚠️ 未在通道列表中找到匹配的门:', { deviceId, channelId, channelNo })
+  }
+  
+  // 显示操作结果提示
+  // 注意：CANCEL_ALWAYS 通常是设备自动上报的（开门后恢复正常），不需要显示提示
+  if (action && action !== 'CANCEL_ALWAYS') {
+    const actionDesc = getActionDesc(action)
+    ElMessage.success(`${actionDesc}成功`)
+  }
+}
+
+/** 获取操作描述 */
+function getActionDesc(action: string): string {
+  const actionMap: Record<string, string> = {
+    'OPEN_DOOR': '开门',
+    'CLOSE_DOOR': '关门',
+    'ALWAYS_OPEN': '设置常开',
+    'ALWAYS_CLOSED': '设置常闭',
+    'CANCEL_ALWAYS': '取消常开/常闭'
+  }
+  return actionMap[action] || action
 }
 
 // ========== 生命周期 ==========

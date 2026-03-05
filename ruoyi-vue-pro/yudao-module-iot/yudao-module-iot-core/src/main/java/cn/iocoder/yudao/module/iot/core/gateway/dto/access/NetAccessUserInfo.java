@@ -83,10 +83,15 @@ public class NetAccessUserInfo {
     // ==================== 照片信息 ====================
     
     /** 照片数据长度 */
+    @Deprecated
     private Integer photoLength;
     
-    /** 照片数据（JPEG格式） */
+    /** 照片数据（JPEG格式） - 已废弃，改用 photoUrl */
+    @Deprecated
     private byte[] photoData;
+    
+    /** 照片 URL（推荐使用，避免消息总线传输大量二进制数据） */
+    private String photoUrl;
     
     // ==================== 卡片信息（一代设备使用） ====================
     

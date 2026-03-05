@@ -4616,8 +4616,8 @@ onUnmounted(() => {
 .context-menu {
   position: fixed;
   z-index: 9999;
-  background: #fff;
-  border: 1px solid #e4e7ed;
+  background: var(--el-bg-color-overlay);
+  border: 1px solid var(--el-border-color);
   border-radius: 4px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   padding: 4px 0;
@@ -4630,11 +4630,11 @@ onUnmounted(() => {
     align-items: center;
     gap: 8px;
     transition: background-color 0.2s;
-    color: #303133;
+    color: var(--el-text-color-primary);
     font-size: 14px;
     
     &:hover {
-      background-color: #f5f7fa;
+      background-color: var(--el-fill-color-light);
     }
     
     :deep(.el-icon) {
@@ -4654,7 +4654,7 @@ onUnmounted(() => {
     span {
       font-size: 14px;
       font-weight: 500;
-      color: #303133;
+      color: var(--el-text-color-primary);
     }
   }
   
@@ -4670,18 +4670,18 @@ onUnmounted(() => {
   // 拖拽手柄样式
   .drag-handle {
     cursor: move;
-    color: #909399;
+    color: var(--el-text-color-secondary);
     transition: color 0.2s;
     
     &:hover {
-      color: #409eff;
+      color: var(--el-color-primary);
     }
   }
   
   // 拖拽时的行样式
   :deep(.sortable-ghost) {
     opacity: 0.4;
-    background: #f5f7fa;
+    background: var(--el-fill-color-light);
   }
   
   :deep(.sortable-drag) {

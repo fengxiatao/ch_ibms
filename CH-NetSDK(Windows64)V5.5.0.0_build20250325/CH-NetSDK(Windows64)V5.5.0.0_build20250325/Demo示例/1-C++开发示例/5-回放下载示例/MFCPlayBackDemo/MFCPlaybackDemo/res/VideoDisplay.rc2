@@ -1,0 +1,13 @@
+//
+// VideoDisplay.RC2 - Microsoft Visual C++ Resources that will not be edited directly
+//
+
+#ifdef APSTUDIO_INVOKED
+#error This file cannot be edited with Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Add manually edited resources here...
+
+/////////////////////////////////////////////////////////////////////////////

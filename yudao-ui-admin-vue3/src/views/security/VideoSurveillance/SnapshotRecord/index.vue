@@ -214,7 +214,7 @@
       </div>
       <template #footer>
         <el-button @click="previewVisible = false">关闭</el-button>
-        <el-button type="primary" @click="handleDownload">下载</el-button>
+        <el-button type="primary" @click="handlePreviewDownload">下载</el-button>
       </template>
     </el-dialog>
   </div>
@@ -713,24 +713,80 @@ const handleDelete = async (item: CameraSnapshotRespVO) => {
 }
 
 /**
- * 处理下载事件
+ * 下载图片（通过fetch获取blob后下载，解决跨域问题）
+ * @param url 图片URL
+ * @param fileName 下载文件名
+ */
+const downloadImage = async (url: string, fileName: string) => {
+  try {
+    ElMessage.info('正在下载图片...')
+    
+    // 通过fetch获取图片blob
+    // 注意：不使用 credentials: 'include'，因为服务器返回 Access-Control-Allow-Origin: * 时不兼容
+    const response = await fetch(url, {
+      method: 'GET',
+      mode: 'cors'
+    })
+    
+    if (!response.ok) {
+      throw new Error(`下载失败: ${response.status} ${response.statusText}`)
+    }
+    
+    const blob = await response.blob()
+    
+    // 创建blob URL并下载
+    const blobUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    // 释放blob URL
+    window.URL.revokeObjectURL(blobUrl)
+    
+    ElMessage.success('下载成功')
+  } catch (error: any) {
+    console.error('[快照记录] 下载失败:', error)
+    ElMessage.error('下载失败: ' + (error?.message || '网络错误'))
+  }
+}
+
+/**
+ * 处理下载事件（列表/网格视图）
  */
 const handleDownload = (item: CameraSnapshotRespVO) => {
-  if (!item.snapshotUrl) {
+  if (!item || !item.snapshotUrl) {
     ElMessage.error('快照URL无效')
     return
   }
   
-  // 创建一个隐藏的<a>标签进行下载
-  const link = document.createElement('a')
-  link.href = item.snapshotUrl
-  link.download = `snapshot_${item.channelName}_${item.captureTime}.jpg`
-  link.target = '_blank'
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+  // 生成文件名（替换特殊字符）
+  const safeChannelName = (item.channelName || '未知通道').replace(/[\\/:*?"<>|]/g, '_')
+  const safeTime = String(item.captureTime || Date.now()).replace(/[\\/:*?"<>|]/g, '-')
+  const fileName = `snapshot_${safeChannelName}_${safeTime}.jpg`
   
-  ElMessage.success('开始下载')
+  // 使用blob方式下载
+  downloadImage(item.snapshotUrl, fileName)
+}
+
+/**
+ * 处理预览对话框下载事件
+ */
+const handlePreviewDownload = () => {
+  if (!previewImage.snapshotUrl) {
+    ElMessage.error('快照URL无效')
+    return
+  }
+  
+  // 生成文件名
+  const safeChannelName = (previewImage.channelName || '未知通道').replace(/[\\/:*?"<>|]/g, '_')
+  const safeTime = String(previewImage.captureTime || Date.now()).replace(/[\\/:*?"<>|]/g, '-')
+  const fileName = `snapshot_${safeChannelName}_${safeTime}.jpg`
+  
+  // 使用blob方式下载
+  downloadImage(previewImage.snapshotUrl, fileName)
 }
 
 /**
@@ -783,7 +839,7 @@ const handleBatchDelete = async () => {
 /**
  * 批量下载
  */
-const handleBatchDownload = () => {
+const handleBatchDownload = async () => {
   if (selectedSnapshots.value.length === 0) {
     ElMessage.warning('请先选择要下载的记录')
     return
@@ -791,22 +847,53 @@ const handleBatchDownload = () => {
   
   ElMessage.info(`开始下载 ${selectedSnapshots.value.length} 张图片...`)
   
-  // 逐个下载
-  selectedSnapshots.value.forEach((item, index) => {
-    setTimeout(() => {
-      if (item.snapshotUrl) {
-        const link = document.createElement('a')
-        link.href = item.snapshotUrl
-        link.download = `snapshot_${item.channelName}_${item.captureTime}.jpg`
-        link.target = '_blank'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-      }
-    }, index * 200) // 延迟下载避免浏览器阻止
-  })
+  let successCount = 0
+  let failCount = 0
   
-  ElMessage.success('批量下载已开始')
+  // 逐个下载（使用串行避免并发过多）
+  for (const item of selectedSnapshots.value) {
+    if (item.snapshotUrl) {
+      try {
+        const safeChannelName = (item.channelName || '未知通道').replace(/[\\/:*?"<>|]/g, '_')
+        const safeTime = String(item.captureTime || Date.now()).replace(/[\\/:*?"<>|]/g, '-')
+        const fileName = `snapshot_${safeChannelName}_${safeTime}.jpg`
+        
+        // 通过fetch获取图片blob
+        // 注意：不使用 credentials: 'include'，因为服务器返回 Access-Control-Allow-Origin: * 时不兼容
+        const response = await fetch(item.snapshotUrl, {
+          method: 'GET',
+          mode: 'cors'
+        })
+        
+        if (response.ok) {
+          const blob = await response.blob()
+          const blobUrl = window.URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = blobUrl
+          link.download = fileName
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(blobUrl)
+          successCount++
+        } else {
+          failCount++
+        }
+        
+        // 延迟避免浏览器阻止
+        await new Promise(resolve => setTimeout(resolve, 300))
+      } catch (error) {
+        console.error('[快照记录] 下载单个文件失败:', error)
+        failCount++
+      }
+    }
+  }
+  
+  if (failCount === 0) {
+    ElMessage.success(`成功下载 ${successCount} 张图片`)
+  } else {
+    ElMessage.warning(`下载完成：成功 ${successCount} 张，失败 ${failCount} 张`)
+  }
 }
 
 

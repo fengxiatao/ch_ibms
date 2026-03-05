@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.iot.service.epatrol;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.epatrol.vo.EpatrolTaskPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.epatrol.vo.EpatrolTaskRespVO;
+import cn.iocoder.yudao.module.iot.controller.admin.epatrol.vo.EpatrolTaskStatisticsVO;
 import cn.iocoder.yudao.module.iot.controller.admin.epatrol.vo.EpatrolTaskSubmitReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.epatrol.EpatrolTaskDO;
 
@@ -31,8 +32,18 @@ public interface EpatrolTaskService {
     PageResult<EpatrolTaskDO> getTaskPage(EpatrolTaskPageReqVO pageReqVO);
 
     /**
+     * 获得巡更任务分页（包含详细信息：计划名称、路线名称、人员名称）
+     */
+    PageResult<EpatrolTaskRespVO> getTaskPageWithDetails(EpatrolTaskPageReqVO pageReqVO);
+
+    /**
      * 提交巡更结果
      */
     void submitTask(@Valid EpatrolTaskSubmitReqVO submitReqVO);
+
+    /**
+     * 获取任务统计信息
+     */
+    EpatrolTaskStatisticsVO getTaskStatistics(EpatrolTaskPageReqVO reqVO);
 
 }

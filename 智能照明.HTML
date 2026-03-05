@@ -1,0 +1,2238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧照明控制系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #409eff;
+            --success: #67c23a;
+            --warning: #e6a23c;
+            --danger: #f56c6c;
+            --text: #303133;
+            --text-regular: #606266;
+            --border: #ebeef5;
+            --bg: #f0f2f5;
+            --sidebar-bg: #304156;
+            --sidebar-text: #bfcbd9;
+            --light-bg: #f5f7fa;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        .container { display: flex; min-height: 100vh; }
+        
+        /* 侧边栏 */
+        .sidebar {
+            width: 220px;
+            background-color: var(--sidebar-bg);
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+        .logo {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .menu { padding: 10px 0; }
+        .menu-item {
+            padding: 0 20px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            color: var(--sidebar-text);
+            cursor: pointer;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+            justify-content: space-between;
+        }
+        .menu-item:hover, .menu-item.active {
+            background-color: rgba(64, 158, 255, 0.1);
+            color: var(--primary);
+            border-left-color: var(--primary);
+        }
+        .menu-icon-text { display: flex; align-items: center; }
+        .menu-icon { width: 20px; margin-right: 10px; text-align: center; }
+        .arrow { transition: transform 0.3s; font-size: 12px; }
+        .arrow.expanded { transform: rotate(90deg); }
+        .submenu {
+            background-color: rgba(0,0,0,0.15);
+            overflow: hidden;
+            max-height: 0;
+            transition: max-height 0.3s;
+        }
+        .submenu.expanded { max-height: 400px; }
+        .submenu-item {
+            padding: 12px 20px 12px 50px;
+            color: var(--sidebar-text);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .submenu-item:hover, .submenu-item.active {
+            color: var(--primary);
+            background: rgba(64, 158, 255, 0.05);
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: 220px;
+            padding: 20px;
+        }
+
+        .top-header {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .breadcrumb { color: #606266; font-size: 14px; }
+
+        .view-section { display: none; }
+        .view-section.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 设备管理样式 */
+        .device-management {
+            background: white;
+            border-radius: 4px;
+            padding: 20px;
+            min-height: calc(100vh - 140px);
+        }
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-select, .filter-input {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            outline: none;
+        }
+        .filter-input { width: 200px; }
+        .filter-btn {
+            padding: 8px 16px;
+            border: none;
+            background: var(--primary);
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .reset-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .group-tabs {
+            display: flex;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 20px;
+        }
+        .group-tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            color: var(--text-regular);
+            position: relative;
+        }
+        .group-tab.active {
+            color: var(--primary);
+            font-weight: 600;
+        }
+        .group-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--primary);
+        }
+
+        /* 设备网格 - 可展开卡片 */
+        .device-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        @media (max-width: 1400px) { .device-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 900px) { .device-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        .device-card {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            background: white;
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        .device-card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            border-color: var(--primary);
+        }
+        .device-card.on {
+            border-color: #fadb14;
+            background: #fffbe6;
+        }
+        .device-card.active-control {
+            grid-column: span 2;
+            background: #f5f7fa;
+            border: 2px solid var(--primary);
+            z-index: 10;
+        }
+        @media (max-width: 900px) {
+            .device-card.active-control {
+                grid-column: span 2;
+            }
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .device-name {
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .status-tag {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .status-on { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
+        .status-off { background: #f5f5f5; color: #8c8c8c; border: 1px solid #d9d9d9; }
+        .status-fault { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
+        
+        .card-body {
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+        .info-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            color: #606266;
+            font-size: 13px;
+        }
+        .info-icon {
+            width: 24px;
+            text-align: center;
+            margin-right: 5px;
+        }
+        
+        /* 展开的控制区域 */
+        .card-control-panel {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 2px solid var(--primary);
+            animation: slideDown 0.3s ease;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .control-title {
+            font-size: 12px;
+            color: #909399;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        
+        .control-btn {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .control-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        .control-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        
+        .slider-container {
+            margin-top: 12px;
+        }
+        
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #606266;
+        }
+        
+        .range-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #dcdfe6;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        .range-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .close-control {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            color: #909399;
+            font-size: 18px;
+            line-height: 24px;
+            text-align: center;
+        }
+        .close-control:hover {
+            color: var(--danger);
+        }
+
+        /* 场景控制样式 */
+        .scene-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        @media (max-width: 1200px) { .scene-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 900px) { .scene-grid { grid-template-columns: repeat(2, 1fr); } }
+        
+        .scene-card {
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+            position: relative;
+        }
+        .scene-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
+        }
+        .scene-card.active {
+            border-color: var(--primary);
+            background: rgba(64, 158, 255, 0.05);
+        }
+        .scene-icon {
+            font-size: 36px;
+            margin-bottom: 12px;
+        }
+        .scene-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .scene-desc {
+            font-size: 12px;
+            color: #909399;
+        }
+
+        /* 模态框样式 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active { display: flex; }
+        
+        .modal-container {
+            background: white;
+            border-radius: 8px;
+            width: 700px;
+            max-width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+            animation: modalSlide 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+        @keyframes modalSlide {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f5f7fa;
+        }
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .close-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 20px;
+            color: #909399;
+            border-radius: 4px;
+        }
+        .close-btn:hover { background: #e6e6e6; color: #606266; }
+        
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #606266;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            outline: none;
+            font-size: 14px;
+        }
+        .form-input:focus { border-color: var(--primary); }
+        
+        .device-select-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 10px;
+        }
+        .device-select-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .device-select-item:hover {
+            background: #f5f7fa;
+        }
+        .device-select-item input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        .device-info {
+            flex: 1;
+        }
+        .device-name-small {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .device-area-small {
+            font-size: 12px;
+            color: #909399;
+        }
+        
+        .scene-preview {
+            background: #f5f7fa;
+            padding: 16px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        .preview-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #303133;
+        }
+        .preview-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 13px;
+            border-bottom: 1px dashed #dcdfe6;
+        }
+        
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            background: #f5f7fa;
+        }
+        .btn {
+            padding: 8px 20px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .btn-primary:hover {
+            opacity: 0.9;
+            color: white;
+        }
+
+        /* 系统设置样式 */
+        .settings-container { background: white; border-radius: 4px; min-height: calc(100vh - 140px); display: flex; }
+        .settings-sidebar { width: 200px; border-right: 1px solid var(--border); padding: 20px 0; background: #fafafa; }
+        .settings-menu-item { padding: 12px 20px; cursor: pointer; color: #606266; border-left: 3px solid transparent; }
+        .settings-menu-item:hover { color: var(--primary); background: #ecf5ff; }
+        .settings-menu-item.active { color: var(--primary); background: #ecf5ff; border-left-color: var(--primary); font-weight: 600; }
+        .settings-content { flex: 1; padding: 30px; overflow-y: auto; }
+        .settings-section { display: none; }
+        .settings-section.active { display: block; }
+        .settings-title { font-size: 20px; font-weight: 600; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+        
+        .schedule-list {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .schedule-item {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.2s;
+        }
+        .schedule-item:hover {
+            background: #f5f7fa;
+        }
+        .schedule-item:last-child {
+            border-bottom: none;
+        }
+        .schedule-info {
+            flex: 1;
+        }
+        .schedule-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .schedule-detail {
+            font-size: 13px;
+            color: #909399;
+        }
+        .schedule-status {
+            margin-right: 20px;
+        }
+        .schedule-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(26px); }
+        
+        .weekday-selector {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .weekday-tag {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            background: white;
+            transition: all 0.2s;
+        }
+        .weekday-tag.selected {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #909399;
+        }
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        .save-btn { 
+            background: var(--primary); 
+            color: white; 
+            padding: 10px 24px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 14px; 
+        }
+        .save-btn:hover { opacity: 0.9; }
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            z-index: 9999;
+            font-size: 14px;
+            animation: fadeIn 0.3s;
+        }
+
+        /* 设备管理表格样式 */
+        .device-table-container {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .data-table th {
+            background: #f5f7fa;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #606266;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            color: #303133;
+        }
+        .data-table tr:hover td {
+            background: #f5f7fa;
+        }
+        .device-type-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .type-normal { background: #e6f7ff; color: #1890ff; }
+        .type-dimming { background: #f6ffed; color: #52c41a; }
+        .type-gateway { background: #fff7e6; color: #fa8c16; }
+        .type-controller { background: #f9f0ff; color: #722ed1; }
+        
+        .status-dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        .dot-on { background: #52c41a; }
+        .dot-off { background: #8c8c8c; }
+        .dot-fault { background: #f5222d; }
+        
+        .action-link {
+            color: var(--primary);
+            cursor: pointer;
+            margin-right: 12px;
+            font-size: 13px;
+        }
+        .action-link:hover {
+            text-decoration: underline;
+        }
+        .action-link.danger {
+            color: var(--danger);
+        }
+        
+        .info-btn {
+            padding: 2px 8px;
+            border: 1px solid var(--primary);
+            background: white;
+            color: var(--primary);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .info-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* 日志样式 */
+        .log-container {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .log-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            background: #f5f7fa;
+        }
+        .log-tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border-right: 1px solid var(--border);
+            font-size: 14px;
+            color: #606266;
+        }
+        .log-tab.active {
+            background: white;
+            color: var(--primary);
+            font-weight: 600;
+            border-bottom: 2px solid var(--primary);
+            margin-bottom: -1px;
+        }
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .log-table th {
+            padding: 12px 16px;
+            text-align: left;
+            background: #fafafa;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            color: #606266;
+            font-size: 13px;
+        }
+        .log-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+        .log-type-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .log-type-info { background: #e6f7ff; color: #1890ff; }
+        .log-type-control { background: #f6ffed; color: #52c41a; }
+        .log-type-system { background: #fff7e6; color: #fa8c16; }
+        
+        .alarm-level {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .level-high { background: #fff1f0; color: #cf1322; }
+        .level-medium { background: #fff7e6; color: #fa8c16; }
+        .level-low { background: #e6f7ff; color: #1890ff; }
+        
+        .alarm-status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .status-unhandled { background: #fff1f0; color: #cf1322; }
+        .status-handling { background: #fff7e6; color: #fa8c16; }
+        .status-resolved { background: #f6ffed; color: #52c41a; }
+
+        .log-filter-bar {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: white;
+        }
+
+        .pagination-bar {
+            padding: 16px;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            border-top: 1px solid var(--border);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="logo">💡 智慧照明系统</div>
+            <div class="menu">
+                <div class="menu-item" onclick="switchView('dashboard')">
+                    <div class="menu-icon-text">
+                        <span class="menu-icon">🏢</span>
+                        <span>智慧楼宇</span>
+                    </div>
+                </div>
+                
+                <div class="menu-item active" onclick="toggleSubmenu(this)">
+                    <div class="menu-icon-text">
+                        <span class="menu-icon">💡</span>
+                        <span>智慧照明</span>
+                    </div>
+                    <span class="arrow expanded">▶</span>
+                </div>
+                
+                <div class="submenu expanded" id="lightSubmenu">
+                    <div class="submenu-item active" onclick="switchToDevice()">照明控制</div>
+                    <div class="submenu-item" onclick="switchToScene()">场景控制</div>
+                    <div class="submenu-item" onclick="switchToDeviceManagement()">设备管理</div>
+                    <div class="submenu-item" onclick="switchToOperationLog()">操作日志</div>
+                    <div class="submenu-item" onclick="switchToAlarmInfo()">告警信息</div>
+                </div>
+
+                <div class="menu-item" onclick="switchToSettings()">
+                    <div class="menu-icon-text">
+                        <span class="menu-icon">⚙️</span>
+                        <span>系统设置</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主内容 -->
+        <main class="main-content">
+            
+            <!-- 1. 照明控制视图 -->
+            <div id="deviceView" class="view-section active">
+                <div class="top-header">
+                    <div class="breadcrumb">首页 / 智慧照明 / 照明控制</div>
+                    <div style="color: #606266;">👤 管理员</div>
+                </div>
+
+                <div class="device-management">
+                    <div class="filter-bar">
+                        <select class="filter-select" id="areaFilter" onchange="filterDevices()">
+                            <option value="all">全部区域</option>
+                            <option value="A1">A区一层</option>
+                            <option value="A2">A区二层</option>
+                            <option value="B1">B区展厅</option>
+                            <option value="public">公共区域</option>
+                        </select>
+                        <select class="filter-select" id="statusFilter" onchange="filterDevices()">
+                            <option value="all">全部状态</option>
+                            <option value="on">开启</option>
+                            <option value="off">关闭</option>
+                            <option value="fault">故障</option>
+                        </select>
+                        <input type="text" class="filter-input" placeholder="请输入回路名称或编号" id="searchInput">
+                        <button class="filter-btn" onclick="filterDevices()">筛选</button>
+                        <button class="reset-btn" onclick="resetFilter()">重置</button>
+                    </div>
+
+                    <div class="group-tabs">
+                        <div class="group-tab active" onclick="switchDeviceTab('normal')">普通照明回路控制</div>
+                        <div class="group-tab" onclick="switchDeviceTab('dimming')">调光设备控制</div>
+                    </div>
+
+                    <div class="device-grid" id="deviceGrid"></div>
+                </div>
+            </div>
+
+            <!-- 2. 场景控制视图 -->
+            <div id="sceneView" class="view-section">
+                <div class="top-header">
+                    <div class="breadcrumb">首页 / 智慧照明 / 场景控制</div>
+                    <div style="color: #606266;">👤 管理员</div>
+                </div>
+                
+                <div class="device-management">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                        <h2 style="font-size: 18px; font-weight: 600;">场景列表</h2>
+                        <button class="btn btn-primary" onclick="openSceneModal()">+ 新建场景</button>
+                    </div>
+                    
+                    <div class="scene-grid" id="sceneGrid">
+                        <!-- 场景卡片由JS生成 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. 设备管理视图 -->
+            <div id="deviceManagementView" class="view-section">
+                <div class="top-header">
+                    <div class="breadcrumb">首页 / 智慧照明 / 设备管理</div>
+                    <div style="color: #606266;">👤 管理员</div>
+                </div>
+
+                <div class="device-management">
+                    <div class="filter-bar">
+                        <select class="filter-select" id="mgmtTypeFilter" onchange="filterDeviceManagement()">
+                            <option value="all">全部设备</option>
+                            <option value="normal">普通回路</option>
+                            <option value="dimming">调光设备</option>
+                            <option value="gateway">智能照明网关</option>
+                            <option value="controller">照明执行控制器</option>
+                        </select>
+                        <select class="filter-select" id="mgmtStatusFilter" onchange="filterDeviceManagement()">
+                            <option value="all">全部状态</option>
+                            <option value="online">在线</option>
+                            <option value="offline">离线</option>
+                            <option value="fault">故障</option>
+                        </select>
+                        <select class="filter-select" id="mgmtAreaFilter" onchange="filterDeviceManagement()">
+                            <option value="all">全部区域</option>
+                            <option value="A1">A区一层</option>
+                            <option value="A2">A区二层</option>
+                            <option value="B1">B区展厅</option>
+                            <option value="public">公共区域</option>
+                            <option value="machine">机房/弱电间</option>
+                        </select>
+                        <input type="text" class="filter-input" placeholder="搜索设备名称/编号" id="mgmtSearchInput" oninput="filterDeviceManagement()">
+                        <button class="filter-btn" onclick="filterDeviceManagement()">查询</button>
+                        <button class="reset-btn" onclick="resetDeviceManagementFilter()">重置</button>
+                        <button class="btn btn-primary" onclick="exportDeviceManagement()" style="margin-left: auto;">📥 导出</button>
+                    </div>
+
+                    <div class="device-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>设备编号</th>
+                                    <th>设备名称</th>
+                                    <th>设备类型</th>
+                                    <th>所属区域</th>
+                                    <th>规格参数</th>
+                                    <th>当前状态</th>
+                                    <th>最后通信</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deviceManagementTableBody">
+                                <!-- 由JS生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="pagination-bar">
+                        <span style="color: #606266;">共 <span id="mgmtTotalCount">0</span> 条</span>
+                        <select style="padding: 5px; border: 1px solid #dcdfe6; border-radius: 4px;">
+                            <option>10条/页</option>
+                            <option>20条/页</option>
+                            <option>50条/页</option>
+                        </select>
+                        <button class="btn" style="padding: 5px 12px;">←</button>
+                        <button class="btn btn-primary" style="padding: 5px 12px;">1</button>
+                        <button class="btn" style="padding: 5px 12px;">2</button>
+                        <button class="btn" style="padding: 5px 12px;">→</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. 操作日志视图 -->
+            <div id="operationLogView" class="view-section">
+                <div class="top-header">
+                    <div class="breadcrumb">首页 / 智慧照明 / 操作日志</div>
+                    <div style="color: #606266;">👤 管理员</div>
+                </div>
+
+                <div class="device-management">
+                    <div class="log-filter-bar">
+                        <input type="date" class="filter-select" value="2026-01-30">
+                        <input type="date" class="filter-select" value="2026-01-30">
+                        <select class="filter-select">
+                            <option value="all">全部类型</option>
+                            <option value="control">手动控制</option>
+                            <option value="scene">场景执行</option>
+                            <option value="schedule">定时任务</option>
+                            <option value="system">系统操作</option>
+                        </select>
+                        <select class="filter-select">
+                            <option value="all">全部用户</option>
+                            <option value="admin">管理员</option>
+                            <option value="operator">操作员</option>
+                            <option value="system">系统</option>
+                        </select>
+                        <input type="text" class="filter-input" placeholder="搜索设备名称/操作内容">
+                        <button class="filter-btn">查询</button>
+                        <button class="reset-btn">重置</button>
+                        <button class="btn btn-primary" style="margin-left: auto;">📥 导出日志</button>
+                    </div>
+
+                    <div class="log-container">
+                        <div class="log-tabs">
+                            <div class="log-tab active">操作日志</div>
+                        </div>
+                        <table class="log-table">
+                            <thead>
+                                <tr>
+                                    <th>时间</th>
+                                    <th>操作类型</th>
+                                    <th>操作人</th>
+                                    <th>操作对象</th>
+                                    <th>操作内容</th>
+                                    <th>IP地址</th>
+                                    <th>操作结果</th>
+                                </tr>
+                            </thead>
+                            <tbody id="operationLogTableBody">
+                                <!-- 由JS生成 -->
+                            </tbody>
+                        </table>
+                        <div class="pagination-bar">
+                            <span style="color: #606266;">共 156 条</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn" style="padding: 5px 12px;">←</button>
+                                <button class="btn btn-primary" style="padding: 5px 12px;">1</button>
+                                <button class="btn" style="padding: 5px 12px;">2</button>
+                                <button class="btn" style="padding: 5px 12px;">3</button>
+                                <button class="btn" style="padding: 5px 12px;">→</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. 告警信息视图 -->
+            <div id="alarmInfoView" class="view-section">
+                <div class="top-header">
+                    <div class="breadcrumb">首页 / 智慧照明 / 告警信息</div>
+                    <div style="color: #606266;">👤 管理员</div>
+                </div>
+
+                <div class="device-management">
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 20px;">
+                        <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+                            <div style="font-size: 32px; font-weight: bold; color: var(--danger);">3</div>
+                            <div style="color: #606266; margin-top: 8px;">未处理告警</div>
+                        </div>
+                        <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+                            <div style="font-size: 32px; font-weight: bold; color: var(--warning);">1</div>
+                            <div style="color: #606266; margin-top: 8px;">处理中</div>
+                        </div>
+                        <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+                            <div style="font-size: 32px; font-weight: bold; color: var(--success);">28</div>
+                            <div style="color: #606266; margin-top: 8px;">今日已处理</div>
+                        </div>
+                        <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+                            <div style="font-size: 32px; font-weight: bold; color: var(--primary);">98%</div>
+                            <div style="color: #606266; margin-top: 8px;">处理率</div>
+                        </div>
+                    </div>
+
+                    <div class="log-filter-bar">
+                        <select class="filter-select">
+                            <option value="all">全部级别</option>
+                            <option value="high">严重</option>
+                            <option value="medium">警告</option>
+                            <option value="low">提示</option>
+                        </select>
+                        <select class="filter-select">
+                            <option value="all">全部状态</option>
+                            <option value="unhandled">未处理</option>
+                            <option value="handling">处理中</option>
+                            <option value="resolved">已解决</option>
+                        </select>
+                        <input type="date" class="filter-select" value="2026-01-30">
+                        <input type="text" class="filter-input" placeholder="搜索设备名称/告警内容">
+                        <button class="filter-btn">查询</button>
+                        <button class="reset-btn">重置</button>
+                        <button class="btn btn-primary" style="margin-left: auto;">📥 导出告警</button>
+                    </div>
+
+                    <div class="log-container">
+                        <table class="log-table">
+                            <thead>
+                                <tr>
+                                    <th>告警时间</th>
+                                    <th>告警级别</th>
+                                    <th>设备名称</th>
+                                    <th>告警内容</th>
+                                    <th>持续时间</th>
+                                    <th>处理状态</th>
+                                    <th>处理人</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alarmTableBody">
+                                <!-- 由JS生成 -->
+                            </tbody>
+                        </table>
+                        <div class="pagination-bar">
+                            <span style="color: #606266;">共 32 条</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn" style="padding: 5px 12px;">←</button>
+                                <button class="btn btn-primary" style="padding: 5px 12px;">1</button>
+                                <button class="btn" style="padding: 5px 12px;">2</button>
+                                <button class="btn" style="padding: 5px 12px;">→</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. 系统设置视图 -->
+            <div id="settingsView" class="view-section">
+                <div class="top-header">
+                    <div class="breadcrumb">首页 / 系统设置</div>
+                    <div style="color: #606266;">👤 管理员</div>
+                </div>
+                <div class="settings-container">
+                    <div class="settings-sidebar">
+                        <div class="settings-menu-item active" onclick="switchSettings('schedule')">⏰ 定时任务</div>
+                        <div class="settings-menu-item" onclick="switchSettings('basic')">⚙️ 基础设置</div>
+                    </div>
+                    <div class="settings-content">
+                        <div class="settings-section active" id="setting-schedule">
+                            <div class="settings-title">定时任务管理</div>
+                            <button class="btn btn-primary" onclick="openScheduleModal()" style="margin-bottom: 20px;">+ 新建定时任务</button>
+                            <div class="schedule-list" id="scheduleList">
+                                <!-- 定时任务列表由JS生成 -->
+                            </div>
+                        </div>
+
+                        <div class="settings-section" id="setting-basic">
+                            <div class="settings-title">基础设置</div>
+                            <div class="form-group">
+                                <label class="form-label">系统名称</label>
+                                <input type="text" class="form-input" value="智慧照明控制系统">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">数据刷新间隔（秒）</label>
+                                <input type="number" class="form-input" value="5" min="3" max="60">
+                            </div>
+                            <button class="save-btn" onclick="saveSettings()">保存设置</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- 网关/控制器详情模态框 -->
+    <div class="modal-overlay" id="deviceInfoModal" onclick="closeModal(event, 'deviceInfoModal')">
+        <div class="modal-container" onclick="event.stopPropagation()" style="width: 600px;">
+            <div class="modal-header">
+                <div class="modal-title" id="deviceInfoTitle">设备详情</div>
+                <button class="close-btn" onclick="closeModal(null, 'deviceInfoModal')">×</button>
+            </div>
+            <div class="modal-body" id="deviceInfoContent">
+                <!-- 动态生成 -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal(null, 'deviceInfoModal')">关闭</button>
+                <button class="btn btn-primary" onclick="restartDevice()">重启设备</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建/编辑场景模态框 -->
+    <div class="modal-overlay" id="sceneModal" onclick="closeModal(event, 'sceneModal')">
+        <div class="modal-container" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="sceneModalTitle">新建场景</div>
+                <button class="close-btn" onclick="closeModal(null, 'sceneModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">场景名称 *</label>
+                    <input type="text" class="form-input" id="sceneNameInput" placeholder="例如：会议模式、午休模式">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">选择控制的设备</label>
+                    <div style="margin-bottom: 10px;">
+                        <label style="font-size: 13px; color: #606266; margin-right: 15px; cursor: pointer;">
+                            <input type="checkbox" id="selectAllDevices" onchange="toggleSelectAllDevices()"> 全选
+                        </label>
+                        <span style="font-size: 13px; color: #909399;" id="selectedCount">已选择 0 个设备</span>
+                    </div>
+                    <div class="device-select-list" id="deviceSelectList">
+                        <!-- 设备列表由JS生成 -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal(null, 'sceneModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveScene()">保存场景</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建/编辑定时任务模态框 -->
+    <div class="modal-overlay" id="scheduleModal" onclick="closeModal(event, 'scheduleModal')">
+        <div class="modal-container" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="scheduleModalTitle">新建定时任务</div>
+                <button class="close-btn" onclick="closeModal(null, 'scheduleModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">任务名称 *</label>
+                    <input type="text" class="form-input" id="scheduleNameInput" placeholder="例如：早晨自动开灯">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">执行时间 *</label>
+                    <input type="time" class="form-input" id="scheduleTimeInput" value="08:00">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">重复周期 *</label>
+                    <div class="weekday-selector" id="weekdaySelector">
+                        <div class="weekday-tag" data-day="1" onclick="toggleWeekday(this)">周一</div>
+                        <div class="weekday-tag" data-day="2" onclick="toggleWeekday(this)">周二</div>
+                        <div class="weekday-tag" data-day="3" onclick="toggleWeekday(this)">周三</div>
+                        <div class="weekday-tag" data-day="4" onclick="toggleWeekday(this)">周四</div>
+                        <div class="weekday-tag" data-day="5" onclick="toggleWeekday(this)">周五</div>
+                        <div class="weekday-tag" data-day="6" onclick="toggleWeekday(this)">周六</div>
+                        <div class="weekday-tag" data-day="0" onclick="toggleWeekday(this)">周日</div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">执行场景 *</label>
+                    <select class="form-input" id="scheduleSceneSelect">
+                        <option value="">请选择要执行的场景</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal(null, 'scheduleModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveSchedule()">保存任务</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 数据定义
+        const normalCircuits = Array.from({length: 12}, (_, i) => ({
+            id: `L-A${String(Math.floor(i/6)+1)}-${String(i%6+1).padStart(2, '0')}`,
+            name: `照明回路-${String(i+1).padStart(2, '0')}`,
+            pos: i < 6 ? 'A区一层' : 'A区二层',
+            area: i < 6 ? 'A1' : 'A2',
+            type: 'normal',
+            load: `LED灯具 x ${Math.floor(Math.random() * 8 + 4)}`,
+            power: `${(Math.floor(Math.random() * 8 + 4) * 12)}W`,
+            status: Math.random() > 0.3 ? 'on' : 'off',
+            isDimming: false,
+            lastUpdate: '2026-01-30 14:32'
+        }));
+
+        const dimmingDevices = Array.from({length: 8}, (_, i) => ({
+            id: `D-B1-${String(i+1).padStart(3, '0')}`,
+            name: `调光回路-${String(i+1).padStart(2, '0')}`,
+            pos: 'B区展厅',
+            area: 'B1',
+            type: 'dimming',
+            load: '可调光LED射灯',
+            power: '15W x 6',
+            brightness: [0, 30, 50, 80, 100][Math.floor(Math.random() * 5)],
+            colorTemp: [2700, 3000, 4500, 5500][Math.floor(Math.random() * 4)],
+            status: Math.random() > 0.2 ? 'on' : 'off',
+            isDimming: true,
+            lastUpdate: '2026-01-30 14:30'
+        }));
+
+        // 智能照明网关数据
+        const gateways = [
+            {
+                id: 'GW-F1-001',
+                name: '智能照明网关-1F',
+                type: 'gateway',
+                pos: '机房/弱电间',
+                area: 'machine',
+                model: 'IoT-GW-2024',
+                ip: '192.168.1.101',
+                mac: 'AA:BB:CC:DD:EE:01',
+                status: 'online',
+                lastUpdate: '2026-01-30 14:35',
+                deviceCount: 24,
+                version: 'v2.1.5',
+                signal: '强'
+            },
+            {
+                id: 'GW-F2-001',
+                name: '智能照明网关-2F',
+                type: 'gateway',
+                pos: '机房/弱电间',
+                area: 'machine',
+                model: 'IoT-GW-2024',
+                ip: '192.168.1.102',
+                mac: 'AA:BB:CC:DD:EE:02',
+                status: 'online',
+                lastUpdate: '2026-01-30 14:33',
+                deviceCount: 18,
+                version: 'v2.1.5',
+                signal: '中'
+            }
+        ];
+
+        // 照明执行控制器数据
+        const controllers = [
+            {
+                id: 'CTRL-A1-001',
+                name: '照明执行控制器-A1',
+                type: 'controller',
+                pos: 'A区一层',
+                area: 'A1',
+                model: 'LC-8CH-20A',
+                load: '8通道/20A',
+                status: 'online',
+                lastUpdate: '2026-01-30 14:34',
+                channelCount: 8,
+                currentLoad: '65%'
+            },
+            {
+                id: 'CTRL-A2-001',
+                name: '照明执行控制器-A2',
+                type: 'controller',
+                pos: 'A区二层',
+                area: 'A2',
+                model: 'LC-8CH-20A',
+                load: '8通道/20A',
+                status: 'online',
+                lastUpdate: '2026-01-30 14:32',
+                channelCount: 8,
+                currentLoad: '48%'
+            },
+            {
+                id: 'CTRL-B1-001',
+                name: '照明执行控制器-B1',
+                type: 'controller',
+                pos: 'B区展厅',
+                area: 'B1',
+                model: 'LC-4CH-10A-DIM',
+                load: '4通道/10A(调光)',
+                status: 'online',
+                lastUpdate: '2026-01-30 14:30',
+                channelCount: 4,
+                currentLoad: '72%'
+            }
+        ];
+
+        let scenes = [
+            { id: 'morning', name: '上班模式', icon: '🌅', desc: '开启全部 · 亮度80%', devices: [] },
+            { id: 'meeting', name: '会议模式', icon: '📊', desc: '会议室100% · 其他50%', devices: [] },
+            { id: 'lunch', name: '午休模式', icon: '🍽️', desc: '公共区域50% · 办公区30%', devices: [] },
+            { id: 'offwork', name: '下班模式', icon: '🌙', desc: '仅保留通道灯 · 亮度30%', devices: [] }
+        ];
+
+        let schedules = [
+            { id: 1, name: '早晨自动开灯', time: '07:30', weekdays: [1,2,3,4,5], scene: 'morning', enabled: true },
+            { id: 2, name: '晚间自动关灯', time: '22:00', weekdays: [0,1,2,3,4,5,6], scene: 'offwork', enabled: true }
+        ];
+
+        // 操作日志数据
+        const operationLogs = [
+            { time: '2026-01-30 14:32:15', type: 'control', user: '管理员', target: '照明回路-01', content: '手动开启回路', ip: '192.168.1.50', result: '成功' },
+            { time: '2026-01-30 14:30:22', type: 'scene', user: '系统', target: '会议模式', content: '执行场景：会议室100%亮度', ip: '-', result: '成功' },
+            { time: '2026-01-30 14:28:05', type: 'schedule', user: '系统', target: '上班模式', content: '定时任务触发：开启全部照明', ip: '-', result: '成功' },
+            { time: '2026-01-30 14:25:33', type: 'control', user: '操作员A', target: '调光回路-03', content: '调节亮度至 80%', ip: '192.168.1.55', result: '成功' },
+            { time: '2026-01-30 14:20:18', type: 'system', user: '系统', target: '智能照明网关-1F', content: '设备心跳检测正常', ip: '-', result: '成功' },
+            { time: '2026-01-30 14:15:42', type: 'control', user: '管理员', target: '照明回路-05', content: '延时关闭设置：30分钟', ip: '192.168.1.50', result: '成功' }
+        ];
+
+        // 告警信息数据
+        const alarms = [
+            { time: '2026-01-30 14:30:00', level: 'high', device: '照明执行控制器-B1', content: '通道3电流过载，超过额定值120%', duration: '5分钟', status: 'handling', handler: '张工' },
+            { time: '2026-01-30 14:25:00', level: 'medium', device: '智能照明网关-2F', content: '信号强度低于阈值（当前-75dBm）', duration: '15分钟', status: 'unhandled', handler: '-' },
+            { time: '2026-01-30 14:20:00', level: 'low', device: '照明回路-A1-08', content: '灯具离线，通信超时', duration: '已恢复', status: 'resolved', handler: '系统自动' },
+            { time: '2026-01-30 14:15:00', level: 'medium', device: '调光回路-B1-02', content: '色温调节异常，反馈值与设定值偏差过大', duration: '10分钟', status: 'unhandled', handler: '-' }
+        ];
+
+        let currentTab = 'normal';
+        let expandedCardId = null;
+        let editingScheduleId = null;
+        let editingSceneId = null;
+        let currentViewingDevice = null;
+
+        // 获取所有设备（包括回路、网关、控制器）
+        function getAllDevices() {
+            return [...normalCircuits, ...dimmingDevices];
+        }
+
+        function getAllManagementDevices() {
+            return [...normalCircuits, ...dimmingDevices, ...gateways, ...controllers];
+        }
+
+        function renderDevices() {
+            const grid = document.getElementById('deviceGrid');
+            grid.innerHTML = '';
+            
+            const devices = currentTab === 'normal' ? normalCircuits : dimmingDevices;
+            
+            const area = document.getElementById('areaFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            
+            let filtered = devices.filter(dev => {
+                if(area !== 'all' && dev.area !== area) return false;
+                if(status !== 'all' && dev.status !== status) return false;
+                return true;
+            });
+
+            filtered.forEach((dev) => {
+                const isExpanded = expandedCardId === dev.id;
+                const statusClass = dev.status === 'on' ? 'status-on' : 
+                                   dev.status === 'fault' ? 'status-fault' : 'status-off';
+                const statusText = dev.status === 'on' ? '开启' : 
+                                  dev.status === 'fault' ? '故障' : '关闭';
+                const isOn = dev.status === 'on';
+                const icon = dev.isDimming ? '🔅' : '🔌';
+                
+                const card = document.createElement('div');
+                card.className = `device-card ${isOn ? 'on' : ''} ${isExpanded ? 'active-control' : ''}`;
+                
+                let controlPanel = '';
+                if (isExpanded) {
+                    if (dev.isDimming) {
+                        controlPanel = `
+                            <div class="card-control-panel">
+                                <div class="control-title">灯光调节</div>
+                                <div class="control-buttons">
+                                    <button class="control-btn ${dev.status === 'on' ? 'active' : ''}" onclick="setDeviceStatus('${dev.id}', 'on', event)">
+                                        💡 开启
+                                    </button>
+                                    <button class="control-btn ${dev.status === 'off' ? 'active' : ''}" onclick="setDeviceStatus('${dev.id}', 'off', event)">
+                                        🌙 关闭
+                                    </button>
+                                </div>
+                                <div class="slider-container">
+                                    <div class="slider-label">
+                                        <span>亮度</span>
+                                        <span>${dev.brightness}%</span>
+                                    </div>
+                                    <input type="range" class="range-slider" min="0" max="100" value="${dev.brightness}" 
+                                           onchange="updateDeviceBrightness('${dev.id}', this.value, event)">
+                                </div>
+                                <div class="slider-container">
+                                    <div class="slider-label">
+                                        <span>色温</span>
+                                        <span>${dev.colorTemp}K</span>
+                                    </div>
+                                    <input type="range" class="range-slider" min="2700" max="6500" step="100" value="${dev.colorTemp}" 
+                                           onchange="updateDeviceColorTemp('${dev.id}', this.value, event)">
+                                </div>
+                                <button class="close-control" onclick="closeCardControl(event)">×</button>
+                            </div>
+                        `;
+                    } else {
+                        controlPanel = `
+                            <div class="card-control-panel">
+                                <div class="control-title">回路控制</div>
+                                <div class="control-buttons">
+                                    <button class="control-btn ${dev.status === 'on' ? 'active' : ''}" onclick="setDeviceStatus('${dev.id}', 'on', event)">
+                                        💡 开启
+                                    </button>
+                                    <button class="control-btn ${dev.status === 'off' ? 'active' : ''}" onclick="setDeviceStatus('${dev.id}', 'off', event)">
+                                        🌙 关闭
+                                    </button>
+                                </div>
+                                <div style="margin-top: 12px; display: flex; gap: 8px;">
+                                    <button class="control-btn" onclick="setDelayOff('${dev.id}', 10, event)" style="font-size: 12px;">
+                                        10分钟后关
+                                    </button>
+                                    <button class="control-btn" onclick="setDelayOff('${dev.id}', 30, event)" style="font-size: 12px;">
+                                        30分钟后关
+                                    </button>
+                                </div>
+                                <button class="close-control" onclick="closeCardControl(event)">×</button>
+                            </div>
+                        `;
+                    }
+                }
+                
+                card.innerHTML = `
+                    <div onclick="toggleCardControl('${dev.id}')">
+                        <div class="card-header">
+                            <div class="device-name">
+                                <span style="filter: ${isOn ? 'none' : 'grayscale(100%)'}; opacity: ${isOn ? '1' : '0.6'};">${icon}</span>
+                                ${dev.name}
+                            </div>
+                            <span class="status-tag ${statusClass}">${statusText}</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-row"><span class="info-icon">📍</span><span>${dev.pos}</span></div>
+                            <div class="info-row"><span class="info-icon">⚡</span><span>${dev.load}</span></div>
+                            ${dev.isDimming ? `
+                                <div class="info-row"><span class="info-icon">💡</span>
+                                    <span style="color: ${isOn ? '#d48806' : '#8c8c8c'};">
+                                        亮度 ${dev.brightness}% · 色温 ${dev.colorTemp}K
+                                    </span>
+                                </div>
+                            ` : `
+                                <div class="info-row"><span class="info-icon">🔋</span><span>额定 ${dev.power}</span></div>
+                            `}
+                        </div>
+                    </div>
+                    ${controlPanel}
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function toggleCardControl(deviceId) {
+            if (expandedCardId === deviceId) {
+                expandedCardId = null;
+            } else {
+                expandedCardId = deviceId;
+            }
+            renderDevices();
+        }
+
+        function closeCardControl(event) {
+            event.stopPropagation();
+            expandedCardId = null;
+            renderDevices();
+        }
+
+        function setDeviceStatus(deviceId, status, event) {
+            event.stopPropagation();
+            const allDevices = getAllDevices();
+            const device = allDevices.find(d => d.id === deviceId);
+            if (device) {
+                device.status = status;
+                renderDevices();
+                showToast(`${device.name} 已${status === 'on' ? '开启' : '关闭'}`);
+            }
+        }
+
+        function updateDeviceBrightness(deviceId, value, event) {
+            event.stopPropagation();
+            const device = dimmingDevices.find(d => d.id === deviceId);
+            if (device) {
+                device.brightness = parseInt(value);
+                device.status = 'on';
+                renderDevices();
+            }
+        }
+
+        function updateDeviceColorTemp(deviceId, value, event) {
+            event.stopPropagation();
+            const device = dimmingDevices.find(d => d.id === deviceId);
+            if (device) {
+                device.colorTemp = parseInt(value);
+                renderDevices();
+            }
+        }
+
+        function setDelayOff(deviceId, minutes, event) {
+            event.stopPropagation();
+            const device = getAllDevices().find(d => d.id === deviceId);
+            showToast(`${device.name} 将在 ${minutes} 分钟后关闭`);
+        }
+
+        function switchDeviceTab(tab) {
+            currentTab = tab;
+            expandedCardId = null;
+            document.querySelectorAll('.group-tab').forEach(el => el.classList.remove('active'));
+            event.target.classList.add('active');
+            renderDevices();
+        }
+
+        function filterDevices() {
+            expandedCardId = null;
+            renderDevices();
+        }
+
+        function resetFilter() {
+            document.getElementById('areaFilter').value = 'all';
+            document.getElementById('statusFilter').value = 'all';
+            document.getElementById('searchInput').value = '';
+            renderDevices();
+        }
+
+        // 场景控制
+        function renderScenes() {
+            const grid = document.getElementById('sceneGrid');
+            grid.innerHTML = scenes.map(scene => `
+                <div class="scene-card" onclick="applyScene('${scene.id}')" id="scene-${scene.id}">
+                    <div class="scene-icon">${scene.icon}</div>
+                    <div class="scene-name">${scene.name}</div>
+                    <div class="scene-desc">${scene.desc}</div>
+                    <div style="margin-top: 12px; display: flex; gap: 8px; justify-content: center;">
+                        <button class="btn" style="padding: 4px 12px; font-size: 12px;" onclick="event.stopPropagation(); editScene('${scene.id}')">编辑</button>
+                        <button class="btn" style="padding: 4px 12px; font-size: 12px; color: var(--danger); border-color: var(--danger);" 
+                                onclick="event.stopPropagation(); deleteScene('${scene.id}')">删除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function applyScene(sceneId) {
+            document.querySelectorAll('.scene-card').forEach(c => c.classList.remove('active'));
+            document.getElementById(`scene-${sceneId}`).classList.add('active');
+            const scene = scenes.find(s => s.id === sceneId);
+            showToast(`已应用场景：${scene.name}`);
+            
+            setTimeout(() => {
+                document.getElementById(`scene-${sceneId}`).classList.remove('active');
+            }, 2000);
+        }
+
+        function openSceneModal(sceneId = null) {
+            editingSceneId = sceneId;
+            document.getElementById('sceneModalTitle').textContent = sceneId ? '编辑场景' : '新建场景';
+            document.getElementById('sceneNameInput').value = sceneId ? scenes.find(s => s.id === sceneId).name : '';
+            
+            const allDevices = getAllDevices();
+            const listHtml = allDevices.map(dev => `
+                <div class="device-select-item" onclick="toggleDeviceSelection(this, '${dev.id}')">
+                    <input type="checkbox" class="device-check" data-id="${dev.id}">
+                    <div class="device-info">
+                        <div class="device-name-small">${dev.name}</div>
+                        <div class="device-area-small">${dev.pos} · ${dev.isDimming ? '可调光' : '普通回路'}</div>
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('deviceSelectList').innerHTML = listHtml;
+            document.getElementById('selectAllDevices').checked = false;
+            updateSelectedCount();
+            
+            document.getElementById('sceneModal').classList.add('active');
+        }
+
+        function toggleDeviceSelection(element, deviceId) {
+            const checkbox = element.querySelector('.device-check');
+            checkbox.checked = !checkbox.checked;
+            element.style.background = checkbox.checked ? '#e6f7ff' : '';
+            updateSelectedCount();
+        }
+
+        function toggleSelectAllDevices() {
+            const checked = document.getElementById('selectAllDevices').checked;
+            document.querySelectorAll('.device-check').forEach(cb => {
+                cb.checked = checked;
+                cb.closest('.device-select-item').style.background = checked ? '#e6f7ff' : '';
+            });
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const count = document.querySelectorAll('.device-check:checked').length;
+            document.getElementById('selectedCount').textContent = `已选择 ${count} 个设备`;
+        }
+
+        function saveScene() {
+            const name = document.getElementById('sceneNameInput').value.trim();
+            if (!name) {
+                alert('请输入场景名称');
+                return;
+            }
+            
+            if (editingSceneId) {
+                const scene = scenes.find(s => s.id === editingSceneId);
+                scene.name = name;
+                showToast('场景已更新');
+            } else {
+                const newScene = {
+                    id: 'scene_' + Date.now(),
+                    name: name,
+                    icon: '✨',
+                    desc: '自定义场景',
+                    devices: []
+                };
+                scenes.push(newScene);
+                showToast('场景创建成功');
+            }
+            
+            closeModal(null, 'sceneModal');
+            renderScenes();
+        }
+
+        function editScene(sceneId) {
+            openSceneModal(sceneId);
+        }
+
+        function deleteScene(sceneId) {
+            if (confirm('确定要删除这个场景吗？')) {
+                scenes = scenes.filter(s => s.id !== sceneId);
+                renderScenes();
+                showToast('场景已删除');
+            }
+        }
+
+        // 设备管理功能
+        function renderDeviceManagement() {
+            const tbody = document.getElementById('deviceManagementTableBody');
+            const allDevs = getAllManagementDevices();
+            
+            const type = document.getElementById('mgmtTypeFilter').value;
+            const status = document.getElementById('mgmtStatusFilter').value;
+            const area = document.getElementById('mgmtAreaFilter').value;
+            const search = document.getElementById('mgmtSearchInput').value.toLowerCase();
+            
+            let filtered = allDevs.filter(dev => {
+                if(type !== 'all' && dev.type !== type) return false;
+                if(status !== 'all' && dev.status !== status) return false;
+                if(area !== 'all' && dev.area !== area) return false;
+                if(search && !dev.name.toLowerCase().includes(search) && !dev.id.toLowerCase().includes(search)) return false;
+                return true;
+            });
+            
+            document.getElementById('mgmtTotalCount').textContent = filtered.length;
+            
+            tbody.innerHTML = filtered.map(dev => {
+                const statusText = dev.status === 'online' || dev.status === 'on' ? '在线' : 
+                                  dev.status === 'fault' ? '故障' : '离线';
+                const statusDot = dev.status === 'online' || dev.status === 'on' ? 'dot-on' : 
+                                 dev.status === 'fault' ? 'dot-fault' : 'dot-off';
+                
+                let typeClass, typeText, spec;
+                if(dev.type === 'normal') {
+                    typeClass = 'type-normal';
+                    typeText = '普通回路';
+                    spec = `${dev.load} · ${dev.power}`;
+                } else if(dev.type === 'dimming') {
+                    typeClass = 'type-dimming';
+                    typeText = '调光设备';
+                    spec = `${dev.load} · ${dev.power}`;
+                } else if(dev.type === 'gateway') {
+                    typeClass = 'type-gateway';
+                    typeText = '智能网关';
+                    spec = `型号:${dev.model} · IP:${dev.ip}`;
+                } else if(dev.type === 'controller') {
+                    typeClass = 'type-controller';
+                    typeText = '执行控制器';
+                    spec = `${dev.model} · ${dev.load}`;
+                }
+                
+                const isSpecial = dev.type === 'gateway' || dev.type === 'controller';
+                
+                return `
+                    <tr>
+                        <td style="font-family: monospace; color: #606266;">${dev.id}</td>
+                        <td style="font-weight: 600;">${dev.name}</td>
+                        <td><span class="device-type-tag ${typeClass}">${typeText}</span></td>
+                        <td>${dev.pos}</td>
+                        <td style="font-size: 13px; color: #606266;">${spec}</td>
+                        <td><span class="status-dot ${statusDot}"></span>${statusText}</td>
+                        <td style="font-size: 13px; color: #909399;">${dev.lastUpdate}</td>
+                        <td>
+                            ${isSpecial ? 
+                                `<button class="info-btn" onclick="viewDeviceInfo('${dev.id}', '${dev.type}')">查看详情</button>` :
+                                `<span class="action-link" onclick="switchToDeviceAndControl('${dev.id}')">控制</span>`
+                            }
+                            <span class="action-link" onclick="viewDeviceDetail('${dev.id}')">详情</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function viewDeviceInfo(deviceId, type) {
+            const devices = type === 'gateway' ? gateways : controllers;
+            const dev = devices.find(d => d.id === deviceId);
+            currentViewingDevice = dev;
+            
+            document.getElementById('deviceInfoTitle').textContent = `${dev.name} - 详细信息`;
+            
+            let content = '';
+            if(type === 'gateway') {
+                content = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">设备型号</label>
+                            <div style="padding: 8px 0; font-weight: 600;">${dev.model}</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">固件版本</label>
+                            <div style="padding: 8px 0; font-weight: 600;">${dev.version}</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">IP地址</label>
+                            <div style="padding: 8px 0; font-family: monospace;">${dev.ip}</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">MAC地址</label>
+                            <div style="padding: 8px 0; font-family: monospace;">${dev.mac}</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">信号强度</label>
+                            <div style="padding: 8px 0; color: ${dev.signal === '强' ? '#52c41a' : dev.signal === '中' ? '#fa8c16' : '#f5222d'}; font-weight: 600;">${dev.signal}</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">接入设备数</label>
+                            <div style="padding: 8px 0; font-weight: 600;">${dev.deviceCount} 个</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0; grid-column: span 2;">
+                            <label class="form-label">安装位置</label>
+                            <div style="padding: 8px 0;">${dev.pos}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px; padding: 16px; background: #f5f7fa; border-radius: 4px;">
+                        <div style="font-weight: 600; margin-bottom: 8px;">设备状态</div>
+                        <div style="color: ${dev.status === 'online' ? '#52c41a' : '#f5222d'};">
+                            ${dev.status === 'online' ? '● 正常运行' : '● 离线'}
+                        </div>
+                    </div>
+                `;
+            } else {
+                content = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">控制器型号</label>
+                            <div style="padding: 8px 0; font-weight: 600;">${dev.model}</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">通道配置</label>
+                            <div style="padding: 8px 0; font-weight: 600;">${dev.channelCount} 通道</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">额定负载</label>
+                            <div style="padding: 8px 0;">${dev.load}</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">当前负载率</label>
+                            <div style="padding: 8px 0; color: ${parseInt(dev.currentLoad) > 80 ? '#f5222d' : '#52c41a'}; font-weight: 600;">${dev.currentLoad}</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0; grid-column: span 2;">
+                            <label class="form-label">所属区域</label>
+                            <div style="padding: 8px 0;">${dev.pos}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px; padding: 16px; background: #f5f7fa; border-radius: 4px;">
+                        <div style="font-weight: 600; margin-bottom: 8px;">通信状态</div>
+                        <div style="color: ${dev.status === 'online' ? '#52c41a' : '#f5222d'};">
+                            ${dev.status === 'online' ? '● 通信正常' : '● 通信中断'}
+                        </div>
+                        <div style="margin-top: 8px; font-size: 13px; color: #909399;">最后通信：${dev.lastUpdate}</div>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('deviceInfoContent').innerHTML = content;
+            document.getElementById('deviceInfoModal').classList.add('active');
+        }
+
+        function restartDevice() {
+            if(currentViewingDevice) {
+                showToast(`正在重启 ${currentViewingDevice.name}...`);
+                setTimeout(() => {
+                    showToast(`${currentViewingDevice.name} 重启成功`);
+                    closeModal(null, 'deviceInfoModal');
+                }, 2000);
+            }
+        }
+
+        function switchToDeviceAndControl(deviceId) {
+            switchToDevice();
+            setTimeout(() => {
+                toggleCardControl(deviceId);
+            }, 100);
+        }
+
+        function viewDeviceDetail(deviceId) {
+            const dev = getAllManagementDevices().find(d => d.id === deviceId);
+            alert(`设备详情：\n名称：${dev.name}\n编号：${dev.id}\n类型：${dev.type}\n区域：${dev.pos}`);
+        }
+
+        function filterDeviceManagement() {
+            renderDeviceManagement();
+        }
+
+        function resetDeviceManagementFilter() {
+            document.getElementById('mgmtTypeFilter').value = 'all';
+            document.getElementById('mgmtStatusFilter').value = 'all';
+            document.getElementById('mgmtAreaFilter').value = 'all';
+            document.getElementById('mgmtSearchInput').value = '';
+            renderDeviceManagement();
+        }
+
+        function exportDeviceManagement() {
+            showToast('正在导出设备清单...');
+        }
+
+        // 操作日志渲染
+        function renderOperationLogs() {
+            const tbody = document.getElementById('operationLogTableBody');
+            tbody.innerHTML = operationLogs.map(log => {
+                const typeClass = log.type === 'control' ? 'log-type-info' : 
+                                 log.type === 'scene' ? 'log-type-control' : 
+                                 log.type === 'schedule' ? 'log-type-system' : 'log-type-info';
+                const typeText = log.type === 'control' ? '手动控制' : 
+                                log.type === 'scene' ? '场景执行' : 
+                                log.type === 'schedule' ? '定时任务' : '系统操作';
+                return `
+                    <tr>
+                        <td style="font-family: monospace; color: #606266;">${log.time}</td>
+                        <td><span class="log-type-tag ${typeClass}">${typeText}</span></td>
+                        <td>${log.user}</td>
+                        <td>${log.target}</td>
+                        <td>${log.content}</td>
+                        <td style="font-family: monospace; color: #909399;">${log.ip}</td>
+                        <td style="color: ${log.result === '成功' ? '#52c41a' : '#f5222d'};">${log.result}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 告警信息渲染
+        function renderAlarms() {
+            const tbody = document.getElementById('alarmTableBody');
+            tbody.innerHTML = alarms.map(alarm => {
+                const levelClass = alarm.level === 'high' ? 'level-high' : 
+                                  alarm.level === 'medium' ? 'level-medium' : 'level-low';
+                const levelText = alarm.level === 'high' ? '严重' : 
+                                 alarm.level === 'medium' ? '警告' : '提示';
+                const statusClass = alarm.status === 'unhandled' ? 'status-unhandled' : 
+                                   alarm.status === 'handling' ? 'status-handling' : 'status-resolved';
+                const statusText = alarm.status === 'unhandled' ? '未处理' : 
+                                  alarm.status === 'handling' ? '处理中' : '已解决';
+                
+                return `
+                    <tr>
+                        <td style="font-family: monospace;">${alarm.time}</td>
+                        <td><span class="alarm-level ${levelClass}">${levelText}</span></td>
+                        <td>${alarm.device}</td>
+                        <td>${alarm.content}</td>
+                        <td style="color: #606266;">${alarm.duration}</td>
+                        <td><span class="alarm-status ${statusClass}">${statusText}</span></td>
+                        <td>${alarm.handler}</td>
+                        <td>
+                            ${alarm.status !== 'resolved' ? 
+                                `<span class="action-link" onclick="handleAlarm('${alarm.time}')">处理</span>` : 
+                                '<span style="color: #909399;">-</span>'
+                            }
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function handleAlarm(time) {
+            const alarm = alarms.find(a => a.time === time);
+            if(alarm) {
+                if(alarm.status === 'unhandled') {
+                    alarm.status = 'handling';
+                    alarm.handler = '当前用户';
+                    showToast('已开始处理告警');
+                } else {
+                    alarm.status = 'resolved';
+                    alarm.handler = '当前用户';
+                    showToast('告警已标记为已解决');
+                }
+                renderAlarms();
+            }
+        }
+
+        // 定时任务
+        function renderSchedules() {
+            const list = document.getElementById('scheduleList');
+            list.innerHTML = schedules.map(s => `
+                <div class="schedule-item">
+                    <div class="schedule-status">
+                        <label class="switch">
+                            <input type="checkbox" ${s.enabled ? 'checked' : ''} onchange="toggleSchedule(${s.id})">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="schedule-info">
+                        <div class="schedule-name">${s.name}</div>
+                        <div class="schedule-detail">
+                            ⏰ ${s.time} · 📅 ${formatWeekdays(s.weekdays)} · 🎬 ${getSceneName(s.scene)}
+                        </div>
+                    </div>
+                    <div class="schedule-actions">
+                        <button class="btn" onclick="editSchedule(${s.id})" style="padding: 6px 16px;">编辑</button>
+                        <button class="btn" onclick="deleteSchedule(${s.id})" style="padding: 6px 16px; color: var(--danger); border-color: var(--danger);">删除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatWeekdays(days) {
+            if (days.length === 7) return '每天';
+            if (days.length === 5 && days.includes(1) && days.includes(5)) return '工作日';
+            const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+            return days.map(d => `周${dayNames[d]}`).join('、');
+        }
+
+        function getSceneName(sceneId) {
+            const scene = scenes.find(s => s.id === sceneId);
+            return scene ? scene.name : sceneId;
+        }
+
+        function openScheduleModal(scheduleId = null) {
+            editingScheduleId = scheduleId;
+            document.getElementById('scheduleModalTitle').textContent = scheduleId ? '编辑定时任务' : '新建定时任务';
+            
+            const sceneSelect = document.getElementById('scheduleSceneSelect');
+            sceneSelect.innerHTML = '<option value="">请选择要执行的场景</option>' + 
+                scenes.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            
+            if (scheduleId) {
+                const s = schedules.find(x => x.id === scheduleId);
+                document.getElementById('scheduleNameInput').value = s.name;
+                document.getElementById('scheduleTimeInput').value = s.time;
+                document.getElementById('scheduleSceneSelect').value = s.scene;
+                
+                document.querySelectorAll('.weekday-tag').forEach(tag => {
+                    tag.classList.toggle('selected', s.weekdays.includes(parseInt(tag.dataset.day)));
+                });
+            } else {
+                document.getElementById('scheduleNameInput').value = '';
+                document.getElementById('scheduleTimeInput').value = '08:00';
+                document.getElementById('scheduleSceneSelect').value = '';
+                document.querySelectorAll('.weekday-tag').forEach(tag => tag.classList.remove('selected'));
+            }
+            
+            document.getElementById('scheduleModal').classList.add('active');
+        }
+
+        function toggleWeekday(element) {
+            element.classList.toggle('selected');
+        }
+
+        function saveSchedule() {
+            const name = document.getElementById('scheduleNameInput').value.trim();
+            const time = document.getElementById('scheduleTimeInput').value;
+            const scene = document.getElementById('scheduleSceneSelect').value;
+            const weekdays = Array.from(document.querySelectorAll('.weekday-tag.selected')).map(el => parseInt(el.dataset.day));
+            
+            if (!name || !time || !scene || weekdays.length === 0) {
+                alert('请填写完整信息');
+                return;
+            }
+            
+            if (editingScheduleId) {
+                const s = schedules.find(x => x.id === editingScheduleId);
+                s.name = name;
+                s.time = time;
+                s.scene = scene;
+                s.weekdays = weekdays;
+                showToast('定时任务已更新');
+            } else {
+                schedules.push({
+                    id: Date.now(),
+                    name, time, scene, weekdays, enabled: true
+                });
+                showToast('定时任务创建成功');
+            }
+            
+            closeModal(null, 'scheduleModal');
+            renderSchedules();
+        }
+
+        function toggleSchedule(id) {
+            const s = schedules.find(x => x.id === id);
+            s.enabled = !s.enabled;
+            showToast(`任务"${s.name}"已${s.enabled ? '启用' : '禁用'}`);
+        }
+
+        function editSchedule(id) {
+            openScheduleModal(id);
+        }
+
+        function deleteSchedule(id) {
+            if (confirm('确定要删除这个定时任务吗？')) {
+                schedules = schedules.filter(x => x.id !== id);
+                renderSchedules();
+                showToast('定时任务已删除');
+            }
+        }
+
+        // 导航切换
+        function toggleSubmenu(element) {
+            const arrow = element.querySelector('.arrow');
+            const submenu = document.getElementById('lightSubmenu');
+            submenu.classList.toggle('expanded');
+            arrow.classList.toggle('expanded');
+        }
+
+        function clearAllActive() {
+            document.querySelectorAll('.submenu-item').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        }
+
+        function switchToDevice() {
+            clearAllActive();
+            event.target.classList.add('active');
+            document.getElementById('deviceView').classList.add('active');
+            currentTab = 'normal';
+            renderDevices();
+        }
+
+        function switchToScene() {
+            clearAllActive();
+            event.target.classList.add('active');
+            document.getElementById('sceneView').classList.add('active');
+            renderScenes();
+        }
+
+        function switchToDeviceManagement() {
+            clearAllActive();
+            event.target.classList.add('active');
+            document.getElementById('deviceManagementView').classList.add('active');
+            renderDeviceManagement();
+        }
+
+        function switchToOperationLog() {
+            clearAllActive();
+            event.target.classList.add('active');
+            document.getElementById('operationLogView').classList.add('active');
+            renderOperationLogs();
+        }
+
+        function switchToAlarmInfo() {
+            clearAllActive();
+            event.target.classList.add('active');
+            document.getElementById('alarmInfoView').classList.add('active');
+            renderAlarms();
+        }
+
+        function switchToSettings() {
+            document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+            if(event && event.currentTarget) event.currentTarget.classList.add('active');
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.getElementById('settingsView').classList.add('active');
+            renderSchedules();
+        }
+
+        function switchSettings(section) {
+            document.querySelectorAll('.settings-menu-item').forEach(el => el.classList.remove('active'));
+            event.target.classList.add('active');
+            document.querySelectorAll('.settings-section').forEach(el => el.classList.remove('active'));
+            document.getElementById('setting-' + section).classList.add('active');
+        }
+
+        function closeModal(e, modalId) {
+            if (!e || e.target.id === modalId) {
+                document.getElementById(modalId).classList.remove('active');
+            }
+        }
+
+        function saveSettings() {
+            showToast('设置已保存');
+        }
+
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
+        }
+
+        function switchView(view) {}
+
+        // 初始化
+        renderDevices();
+        renderScenes();
+        renderSchedules();
+        renderDeviceManagement();
+        renderOperationLogs();
+        renderAlarms();
+    </script>
+</body>
+</html>

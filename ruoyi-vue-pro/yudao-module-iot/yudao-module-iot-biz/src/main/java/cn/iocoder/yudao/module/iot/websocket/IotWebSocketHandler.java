@@ -36,6 +36,15 @@ public class IotWebSocketHandler extends TextWebSocketHandler {
     private final Map<String, Long> sessionToUserId = new ConcurrentHashMap<>();
 
     /**
+     * Session 写锁映射（用于保证每个 Session 的写入操作线程安全）
+     * <p>
+     * WebSocketSession.sendMessage() 不是线程安全的，
+     * 多线程并发写入会导致 IllegalStateException: TEXT_PARTIAL_WRITING
+     * </p>
+     */
+    private final Map<String, Object> sessionWriteLocks = new ConcurrentHashMap<>();
+
+    /**
      * 连接建立后的处理
      */
     @Override
@@ -59,6 +68,7 @@ public class IotWebSocketHandler extends TextWebSocketHandler {
             // 保存新连接
             sessions.put(userId, session);
             sessionToUserId.put(session.getId(), userId);
+            sessionWriteLocks.put(session.getId(), new Object());  // 创建写锁
 
             log.info("[IoT WebSocket] ✅ 用户 {} 连接成功，sessionId={}, 当前在线用户数: {}", 
                     userId, session.getId(), sessions.size());
@@ -109,6 +119,7 @@ public class IotWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
         Long userId = sessionToUserId.remove(session.getId());
+        sessionWriteLocks.remove(session.getId());  // 移除写锁
         if (userId != null) {
             sessions.remove(userId);
             log.info("[IoT WebSocket] 🔌 用户 {} 断开连接，sessionId={}, 原因={}, 当前在线用户数: {}", 
@@ -230,19 +241,38 @@ public class IotWebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
-     * 发送消息到 Session
+     * 发送消息到 Session（线程安全）
+     * <p>
+     * WebSocketSession.sendMessage() 不是线程安全的，
+     * 使用 synchronized 保证同一 Session 的写入操作串行化，
+     * 避免 IllegalStateException: TEXT_PARTIAL_WRITING 错误
+     * </p>
      */
     private void sendMessage(WebSocketSession session, IotMessage message) {
-        try {
-            if (session.isOpen()) {
-                String json = JSONUtil.toJsonStr(message);
-                session.sendMessage(new TextMessage(json));
-            } else {
-                log.warn("[IoT WebSocket] ⚠️ Session 已关闭，无法发送消息: sessionId={}", session.getId());
+        if (session == null || !session.isOpen()) {
+            log.warn("[IoT WebSocket] ⚠️ Session 已关闭或为空，无法发送消息");
+            return;
+        }
+        
+        // 获取该 Session 的写锁
+        Object lock = sessionWriteLocks.get(session.getId());
+        if (lock == null) {
+            // 如果锁不存在（可能是旧连接），使用 session 本身作为锁
+            lock = session;
+        }
+        
+        synchronized (lock) {
+            try {
+                if (session.isOpen()) {
+                    String json = JSONUtil.toJsonStr(message);
+                    session.sendMessage(new TextMessage(json));
+                } else {
+                    log.warn("[IoT WebSocket] ⚠️ Session 已关闭，无法发送消息: sessionId={}", session.getId());
+                }
+            } catch (IOException e) {
+                log.error("[IoT WebSocket] ❌ 发送消息失败: sessionId={}, error={}", 
+                        session.getId(), e.getMessage(), e);
             }
-        } catch (IOException e) {
-            log.error("[IoT WebSocket] ❌ 发送消息失败: sessionId={}, error={}", 
-                    session.getId(), e.getMessage(), e);
         }
     }
 

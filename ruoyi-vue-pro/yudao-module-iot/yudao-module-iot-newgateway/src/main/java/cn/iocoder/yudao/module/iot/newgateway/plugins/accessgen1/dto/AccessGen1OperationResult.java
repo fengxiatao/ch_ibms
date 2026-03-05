@@ -155,4 +155,19 @@ public class AccessGen1OperationResult {
         Object value = data.get(key);
         return value != null ? value.toString() : null;
     }
+
+    /**
+     * 链式设置附加数据
+     *
+     * @param key   键
+     * @param value 值
+     * @return 当前对象，支持链式调用
+     */
+    public AccessGen1OperationResult withData(String key, Object value) {
+        if (this.data == null) {
+            this.data = new HashMap<>();
+        }
+        this.data.put(key, value);
+        return this;
+    }
 }

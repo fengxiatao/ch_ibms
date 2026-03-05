@@ -1,0 +1,2009 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧访客管理系统 2.0 - 融合版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #f8fafc; }
+        .glass { background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(10px); border: 1px solid rgba(226, 232, 240, 0.8); }
+        .drawer { transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .drawer.open { transform: translateX(0); }
+        .table-row-hover { transition: all 0.2s ease; }
+        .table-row-hover:hover { background-color: #f8fafc; transform: scale(1.002); box-shadow: 0 2px 8px rgba(0,0,0,0.04); z-index: 10; position: relative; }
+        .tag-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        .qr-pattern { background-image: radial-gradient(circle, #1e293b 2px, transparent 2px); background-size: 6px 6px; }
+        .timeline-line { position: absolute; left: 15px; top: 24px; bottom: 0; width: 2px; background: #e2e8f0; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .animate-slide-in { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
+        .filter-active { background-color: #dbeafe; color: #2563eb; border-color: #3b82f6; }
+        .filter-btn { transition: all 0.2s; }
+        .filter-btn:hover:not(.filter-active) { border-color: #93c5fd; color: #2563eb; background-color: #eff6ff; }
+        .approval-card { transition: all 0.3s ease; }
+        .approval-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+        .step-active { border-color: #3b82f6; color: #3b82f6; background: #eff6ff; }
+        .step-completed { border-color: #10b981; color: #10b981; background: #d1fae5; }
+    </style>
+</head>
+<body class="text-slate-800">
+
+<!-- 顶部导航 -->
+<nav class="glass fixed w-full z-40 border-b border-slate-200 px-6 py-3 flex justify-between items-center">
+    <div class="flex items-center gap-4">
+        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold"><i class="fas fa-building"></i></div>
+        <div>
+            <h1 class="font-bold text-lg text-slate-800">智慧访客管理系统</h1>
+            <p class="text-xs text-slate-500">Smart Visitor Management 2.0</p>
+        </div>
+    </div>
+    <div class="flex items-center gap-6">
+        <div class="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-full text-sm border border-green-200">
+            <span class="w-2 h-2 bg-green-500 rounded-full tag-pulse"></span>系统运行正常
+        </div>
+        <button onclick="openModal('approvalCenterModal')" class="relative p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all">
+            <i class="fas fa-clipboard-check text-xl"></i>
+            <span id="approvalBadge" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">2</span>
+        </button>
+        <button class="relative p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
+            <i class="fas fa-bell"></i>
+            <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+        </button>
+        <div class="flex items-center gap-3 pl-6 border-l border-slate-200">
+            <img src="https://i.pravatar.cc/150?img=11" class="w-8 h-8 rounded-full border-2 border-white shadow-sm" alt="Admin">
+            <div class="text-sm"><p class="font-medium">张管理员</p><p class="text-xs text-slate-500">安保部</p></div>
+        </div>
+    </div>
+</nav>
+
+<!-- 主容器 -->
+<div class="pt-20 pb-8 px-6 max-w-[1600px] mx-auto">
+    
+    <!-- 关键指标卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 relative overflow-hidden group hover:shadow-md transition-all">
+            <div class="absolute right-0 top-0 w-32 h-32 bg-blue-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
+            <div class="relative">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 bg-blue-100 text-blue-600 rounded-xl"><i class="fas fa-users text-xl"></i></div>
+                    <span class="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">+12% 较昨日</span>
+                </div>
+                <h3 class="text-slate-500 text-sm font-medium mb-1">当前在访人数</h3>
+                <div class="flex items-baseline gap-2"><span class="text-3xl font-bold text-slate-800">24</span><span class="text-sm text-slate-400">人</span></div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 relative overflow-hidden group hover:shadow-md transition-all">
+            <div class="absolute right-0 top-0 w-32 h-32 bg-purple-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
+            <div class="relative">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 bg-purple-100 text-purple-600 rounded-xl"><i class="fas fa-calendar-check text-xl"></i></div>
+                    <span class="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full">待确认 5</span>
+                </div>
+                <h3 class="text-slate-500 text-sm font-medium mb-1">今日预约</h3>
+                <div class="flex items-baseline gap-2"><span class="text-3xl font-bold text-slate-800">42</span><span class="text-sm text-slate-400">人</span></div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 relative overflow-hidden group hover:shadow-md transition-all cursor-pointer" onclick="openModal('approvalCenterModal')">
+            <div class="absolute right-0 top-0 w-32 h-32 bg-yellow-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
+            <div class="relative">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 bg-yellow-100 text-yellow-600 rounded-xl"><i class="fas fa-user-clock text-xl"></i></div>
+                    <span class="text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded-full animate-pulse">需处理</span>
+                </div>
+                <h3 class="text-slate-500 text-sm font-medium mb-1">待审批</h3>
+                <div class="flex items-baseline gap-2"><span class="text-3xl font-bold text-slate-800" id="pendingCount">2</span><span class="text-sm text-slate-400">条</span></div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 relative overflow-hidden group hover:shadow-md transition-all">
+            <div class="absolute right-0 top-0 w-32 h-32 bg-red-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
+            <div class="relative">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 bg-red-100 text-red-600 rounded-xl"><i class="fas fa-exclamation-triangle text-xl"></i></div>
+                    <span class="text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded-full animate-pulse">需处理</span>
+                </div>
+                <h3 class="text-slate-500 text-sm font-medium mb-1">异常预警</h3>
+                <div class="flex items-baseline gap-2"><span class="text-3xl font-bold text-slate-800">3</span><span class="text-sm text-slate-400">条</span></div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 relative overflow-hidden group hover:shadow-md transition-all">
+            <div class="absolute right-0 top-0 w-32 h-32 bg-emerald-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
+            <div class="relative">
+                <div class="flex justify-between items-start mb-4"><div class="p-3 bg-emerald-100 text-emerald-600 rounded-xl"><i class="fas fa-chart-line text-xl"></i></div></div>
+                <h3 class="text-slate-500 text-sm font-medium mb-1">本月累计访客</h3>
+                <div class="flex items-baseline gap-2"><span class="text-3xl font-bold text-slate-800">1,284</span><span class="text-sm text-slate-400">人</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主要内容区 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- 左侧：访客列表（占2列） -->
+        <div class="lg:col-span-2 space-y-6">
+            
+            <!-- 操作栏 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                <div class="flex flex-col lg:flex-row justify-between gap-4 mb-4">
+                    <div class="flex gap-2">
+                        <button onclick="switchTab('today')" id="tab-today" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium transition-all hover:bg-blue-700 shadow-sm shadow-blue-200">今日在访</button>
+                        <button onclick="switchTab('upcoming')" id="tab-upcoming" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium transition-all">访客预约</button>
+                        <button onclick="switchTab('history')" id="tab-history" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium transition-all">来访记录</button>
+                        <button onclick="switchTab('abnormal')" id="tab-abnormal" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium transition-all flex items-center gap-2">异常监控<span class="w-2 h-2 bg-red-500 rounded-full"></span></button>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button onclick="resetFilters()" class="px-4 py-2 text-slate-600 border border-slate-300 rounded-lg text-sm hover:bg-slate-50 transition-all flex items-center gap-2">
+                            <i class="fas fa-undo-alt"></i> 重置
+                        </button>
+                        <button class="px-4 py-2 text-slate-600 border border-slate-300 rounded-lg text-sm hover:bg-slate-50 transition-all flex items-center gap-2">
+                            <i class="fas fa-download"></i> 导出
+                        </button>
+                        <button onclick="openModal('addModal')" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-200">
+                            <i class="fas fa-plus"></i> 新增预约
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 动态筛选栏 -->
+                <div id="filterBar" class="flex flex-wrap gap-2 border-t border-slate-100 pt-4 items-center"></div>
+                <div id="activeFilters" class="hidden mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-2 items-center">
+                    <span class="text-xs text-slate-500 mr-1">已选条件：</span>
+                    <div id="filterTags" class="flex flex-wrap gap-2"></div>
+                </div>
+            </div>
+
+            <!-- 表格区域 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto custom-scroll">
+                    <table class="w-full text-left border-collapse">
+                        <thead id="tableHead"></thead>
+                        <tbody class="divide-y divide-slate-100" id="visitorTable"></tbody>
+                    </table>
+                </div>
+                <div class="p-4 border-t border-slate-200 flex justify-between items-center bg-slate-50">
+                    <div class="text-sm text-slate-500">显示 <span class="font-medium text-slate-800" id="showRange">1-10</span> 条，共 <span class="font-medium text-slate-800" id="totalCount">24</span> 条</div>
+                    <div class="flex gap-2">
+                        <button onclick="changePage(-1)" id="prevBtn" class="px-3 py-1 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
+                        <div id="pageNumbers" class="flex gap-2"></div>
+                        <button onclick="changePage(1)" id="nextBtn" class="px-3 py-1 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：待办+快捷工具 -->
+        <div class="space-y-6">
+            
+            <!-- 审批快捷入口 -->
+            <div class="bg-gradient-to-br from-yellow-500 to-orange-500 rounded-2xl shadow-lg p-5 text-white">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="font-bold text-lg">审批中心</h3>
+                        <p class="text-yellow-100 text-sm mt-1">您有 <span class="font-bold text-white text-lg" id="quickPendingCount">2</span> 条待审批事项</p>
+                    </div>
+                    <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur">
+                        <i class="fas fa-clipboard-check text-xl"></i>
+                    </div>
+                </div>
+                <div class="space-y-2 mb-4" id="quickApprovalList">
+                    <!-- 动态生成前2条待审批 -->
+                </div>
+                <button onclick="openModal('approvalCenterModal')" class="w-full py-2 bg-white text-orange-600 rounded-lg font-medium hover:bg-orange-50 transition-all text-sm">
+                    进入审批中心 <i class="fas fa-arrow-right ml-1"></i>
+                </button>
+            </div>
+
+            <!-- 待办事项预览 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-slate-800">待办提醒</h3>
+                    <button onclick="openModal('todoModal')" class="text-xs text-blue-600 hover:text-blue-700 font-medium">查看全部 (8)</button>
+                </div>
+                <div class="space-y-3">
+                    <div class="flex gap-3 p-3 bg-red-50 rounded-xl border border-red-100 cursor-pointer hover:shadow-sm transition-all group">
+                        <div class="w-10 h-10 bg-red-100 text-red-600 rounded-full flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform"><i class="fas fa-clock"></i></div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-slate-800 truncate">访客超时未签离</p>
+                            <p class="text-xs text-slate-500 mt-0.5">张三 (拜访技术部) 已超时2小时</p>
+                            <div class="flex gap-2 mt-2">
+                                <button class="text-xs px-2 py-1 bg-white text-red-600 rounded border border-red-200 hover:bg-red-600 hover:text-white transition-all">一键签离</button>
+                                <button class="text-xs px-2 py-1 bg-white text-slate-600 rounded border border-slate-200 hover:bg-slate-50 transition-all">延时</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3 p-3 bg-yellow-50 rounded-xl border border-yellow-100 cursor-pointer hover:shadow-sm transition-all group" onclick="openApprovalDetail(8)">
+                        <div class="w-10 h-10 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform"><i class="fas fa-user-check"></i></div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-slate-800 truncate">VIP访客预约待审批</p>
+                            <p class="text-xs text-slate-500 mt-0.5">周 candidate · 技术终面 · 14:30</p>
+                            <div class="flex gap-2 mt-2">
+                                <button onclick="event.stopPropagation(); quickApprove(8, 'approve')" class="text-xs px-2 py-1 bg-green-600 text-white rounded border border-green-600 hover:bg-green-700 transition-all">
+                                    <i class="fas fa-check mr-1"></i>通过
+                                </button>
+                                <button onclick="event.stopPropagation(); quickApprove(8, 'reject')" class="text-xs px-2 py-1 bg-white text-red-600 rounded border border-red-200 hover:bg-red-600 hover:text-white transition-all">
+                                    <i class="fas fa-times mr-1"></i>拒绝
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100 cursor-pointer hover:shadow-sm transition-all group">
+                        <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform"><i class="fas fa-clipboard-check"></i></div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-slate-800 truncate">权限即将过期</p>
+                            <p class="text-xs text-slate-500 mt-0.5">5位外协人员门禁权限将于今日18:00过期</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 快捷工具 -->
+            <div class="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl shadow-lg p-5 text-white">
+                <h3 class="font-bold mb-4">快捷工具</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="openModal('inviteModal')" class="p-3 bg-white/10 backdrop-blur rounded-xl hover:bg-white/20 transition-all text-sm flex flex-col items-center gap-2 border border-white/10"><i class="fas fa-qrcode text-2xl"></i><span>生成邀约码</span></button>
+                    <button onclick="openModal('importModal')" class="p-3 bg-white/10 backdrop-blur rounded-xl hover:bg-white/20 transition-all text-sm flex flex-col items-center gap-2 border border-white/10"><i class="fas fa-file-import text-2xl"></i><span>批量导入</span></button>
+                    <button onclick="openModal('blacklistModal')" class="p-3 bg-white/10 backdrop-blur rounded-xl hover:bg-white/20 transition-all text-sm flex flex-col items-center gap-2 border border-white/10"><i class="fas fa-ban text-2xl"></i><span>黑名单</span></button>
+                    <button onclick="openModal('reportModal')" class="p-3 bg-white/10 backdrop-blur rounded-xl hover:bg-white/20 transition-all text-sm flex flex-col items-center gap-2 border border-white/10"><i class="fas fa-chart-bar text-2xl"></i><span>数据报表</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 审批功能模态框 ==================== -->
+
+<!-- 1. 审批中心（完整页面） -->
+<div id="approvalCenterModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col animate-slide-in">
+        <div class="p-6 border-b border-slate-200 flex justify-between items-center bg-white">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 bg-yellow-100 text-yellow-600 rounded-xl flex items-center justify-center">
+                    <i class="fas fa-clipboard-check text-xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">访客预约审批中心</h2>
+                    <p class="text-sm text-slate-500 mt-1">待审批 <span class="text-yellow-600 font-bold" id="centerPendingCount">2</span> 条 | 今日已处理 <span class="text-green-600 font-bold">5</span> 条</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="batchApproval()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-all flex items-center gap-2">
+                    <i class="fas fa-check-double"></i> 批量审批
+                </button>
+                <button onclick="closeModal('approvalCenterModal')" class="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="flex-1 overflow-hidden flex">
+            <!-- 左侧筛选 -->
+            <div class="w-64 border-r border-slate-200 bg-slate-50 p-4 space-y-4 overflow-y-auto custom-scroll">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <h4 class="font-bold text-slate-800 mb-3 text-sm">审批状态</h4>
+                    <div class="space-y-2">
+                        <button onclick="filterApprovals('all')" class="w-full text-left px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium flex justify-between items-center approval-filter-btn" data-filter="all">
+                            <span>全部</span>
+                            <span class="bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full text-xs" id="count-all">7</span>
+                        </button>
+                        <button onclick="filterApprovals('pending')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white text-slate-600 text-sm flex justify-between items-center approval-filter-btn" data-filter="pending">
+                            <span>待我审批</span>
+                            <span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full text-xs" id="count-pending">2</span>
+                        </button>
+                        <button onclick="filterApprovals('approved')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white text-slate-600 text-sm flex justify-between items-center approval-filter-btn" data-filter="approved">
+                            <span>已通过</span>
+                            <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs" id="count-approved">3</span>
+                        </button>
+                        <button onclick="filterApprovals('rejected')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-white text-slate-600 text-sm flex justify-between items-center approval-filter-btn" data-filter="rejected">
+                            <span>已拒绝</span>
+                            <span class="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs" id="count-rejected">2</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <h4 class="font-bold text-slate-800 mb-3 text-sm">访客类型</h4>
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                            <input type="checkbox" checked class="rounded text-blue-600 border-slate-300" onchange="filterByType('vip')">
+                            <span class="flex-1">VIP访客</span>
+                            <span class="text-xs text-slate-400">2</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                            <input type="checkbox" checked class="rounded text-blue-600 border-slate-300" onchange="filterByType('business')">
+                            <span class="flex-1">商务访客</span>
+                            <span class="text-xs text-slate-400">3</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                            <input type="checkbox" checked class="rounded text-blue-600 border-slate-300" onchange="filterByType('interview')">
+                            <span class="flex-1">面试候选</span>
+                            <span class="text-xs text-slate-400">1</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                            <input type="checkbox" checked class="rounded text-blue-600 border-slate-300" onchange="filterByType('contractor')">
+                            <span class="flex-1">外协人员</span>
+                            <span class="text-xs text-slate-400">1</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <h4 class="font-bold text-slate-800 mb-3 text-sm">预约时间</h4>
+                    <div class="space-y-2">
+                        <button class="w-full text-left px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium">今日</button>
+                        <button class="w-full text-left px-3 py-2 rounded-lg hover:bg-white text-slate-600 text-sm">明日</button>
+                        <button class="w-full text-left px-3 py-2 rounded-lg hover:bg-white text-slate-600 text-sm">本周</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧列表 -->
+            <div class="flex-1 overflow-y-auto custom-scroll p-6 bg-white">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="selectAll" class="rounded border-slate-300 text-blue-600" onchange="toggleSelectAll()">
+                        <label for="selectAll" class="text-sm text-slate-600 cursor-pointer">全选</label>
+                    </div>
+                    <div class="flex gap-2">
+                        <select class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-600 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option>排序：最新提交</option>
+                            <option>排序：预约时间先后</option>
+                            <option>排序：访客类型</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="space-y-3" id="approvalList">
+                    <!-- 动态生成审批列表 -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. 审批详情模态框 -->
+<div id="approvalDetailModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slide-in">
+        <div class="sticky top-0 bg-white border-b border-slate-200 p-6 flex justify-between items-start z-10">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden">
+                    <img id="approvalAvatar" src="" class="w-full h-full object-cover" alt="">
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800" id="approvalName">访客姓名</h2>
+                    <p class="text-sm text-slate-500" id="approvalType">商务访客 · 预约编号 #20260203001</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="approvalStatusBadge" class="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+                    待审批
+                </span>
+                <button onclick="closeModal('approvalDetailModal')" class="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 ml-2">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="p-6 space-y-6">
+            <!-- 审批流程步骤 -->
+            <div class="flex items-center justify-between relative">
+                <div class="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-200 -z-10"></div>
+                <div class="flex flex-col items-center gap-2 bg-white px-2">
+                    <div class="w-10 h-10 rounded-full border-2 step-completed flex items-center justify-center text-sm font-bold">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <span class="text-xs font-medium text-green-700">提交预约</span>
+                    <span class="text-xs text-slate-400">09:00</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 bg-white px-2">
+                    <div class="w-10 h-10 rounded-full border-2 step-active flex items-center justify-center text-sm font-bold text-blue-600 border-blue-500 bg-blue-50">
+                        2
+                    </div>
+                    <span class="text-xs font-medium text-blue-700">部门审批</span>
+                    <span class="text-xs text-slate-400">进行中</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 bg-white px-2">
+                    <div class="w-10 h-10 rounded-full border-2 border-slate-200 text-slate-400 flex items-center justify-center text-sm font-bold bg-white">
+                        3
+                    </div>
+                    <span class="text-xs font-medium text-slate-500">权限下发</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 bg-white px-2">
+                    <div class="w-10 h-10 rounded-full border-2 border-slate-200 text-slate-400 flex items-center justify-center text-sm font-bold bg-white">
+                        4
+                    </div>
+                    <span class="text-xs font-medium text-slate-500">完成</span>
+                </div>
+            </div>
+
+            <!-- 访客信息卡片 -->
+            <div class="bg-slate-50 rounded-xl p-5 border border-slate-200">
+                <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i class="fas fa-user text-blue-500"></i> 访客信息
+                </h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs text-slate-500 block mb-1">联系电话</label>
+                        <p class="text-sm font-medium text-slate-800" id="approvalPhone">138****8888</p>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-500 block mb-1">身份证号</label>
+                        <p class="text-sm font-medium text-slate-800">11010119900101****</p>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-500 block mb-1">所属单位</label>
+                        <p class="text-sm font-medium text-slate-800" id="approvalCompany">北京科技有限公司</p>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-500 block mb-1">车牌号</label>
+                        <p class="text-sm font-medium text-slate-800" id="approvalCar">京A·88888</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 访问信息 -->
+            <div class="bg-slate-50 rounded-xl p-5 border border-slate-200">
+                <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i class="fas fa-calendar-alt text-blue-500"></i> 访问详情
+                </h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center py-2 border-b border-slate-200 last:border-0">
+                        <span class="text-sm text-slate-500">被访人</span>
+                        <div class="text-right">
+                            <p class="text-sm font-medium text-slate-800" id="approvalHost">张经理</p>
+                            <p class="text-xs text-slate-500" id="approvalDept">技术部 · 138****0000</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-slate-200 last:border-0">
+                        <span class="text-sm text-slate-500">预约时间</span>
+                        <span class="text-sm font-medium text-slate-800" id="approvalTime">2026-02-03 14:30</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-slate-200 last:border-0">
+                        <span class="text-sm text-slate-500">来访事由</span>
+                        <span class="text-sm font-medium text-slate-800" id="approvalReason">技术终面</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-slate-200 last:border-0">
+                        <span class="text-sm text-slate-500">访问区域</span>
+                        <div class="flex gap-1">
+                            <span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">会议室B</span>
+                            <span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">15层</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-start py-2">
+                        <span class="text-sm text-slate-500">备注说明</span>
+                        <span class="text-sm text-slate-800 text-right max-w-xs" id="approvalRemark">候选人有5年工作经验，请安排高级面试官</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 审批历史 -->
+            <div id="approvalHistory" class="hidden">
+                <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <i class="fas fa-history text-blue-500"></i> 审批记录
+                </h3>
+                <div class="space-y-3" id="historyList">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+
+            <!-- 审批操作区（仅待审批状态显示） -->
+            <div id="approvalActionArea" class="space-y-4">
+                <div>
+                    <label class="text-sm font-medium text-slate-700 mb-2 block">审批意见 <span class="text-red-500">*</span></label>
+                    <textarea id="approvalComment" class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none h-24" placeholder="请输入审批意见，同意或拒绝的原因..."></textarea>
+                    <div class="flex gap-2 mt-2">
+                        <button onclick="setQuickComment('同意，请安排接待')" class="px-3 py-1 bg-slate-100 text-slate-600 rounded text-xs hover:bg-slate-200 transition-all">同意，请安排接待</button>
+                        <button onclick="setQuickComment('时间冲突，请改期')" class="px-3 py-1 bg-slate-100 text-slate-600 rounded text-xs hover:bg-slate-200 transition-all">时间冲突，请改期</button>
+                        <button onclick="setQuickComment('信息不全，请补充')" class="px-3 py-1 bg-slate-100 text-slate-600 rounded text-xs hover:bg-slate-200 transition-all">信息不全，请补充</button>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 pt-4 border-t border-slate-200">
+                    <button onclick="submitApproval('reject')" class="flex-1 px-4 py-3 border-2 border-red-200 text-red-700 bg-red-50 rounded-xl hover:bg-red-100 hover:border-red-300 transition-all font-medium flex items-center justify-center gap-2">
+                        <i class="fas fa-times-circle"></i> 拒绝预约
+                    </button>
+                    <button onclick="submitApproval('approve')" class="flex-1 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-green-200">
+                        <i class="fas fa-check-circle"></i> 通过预约
+                    </button>
+                </div>
+                <button onclick="submitApproval('transfer')" class="w-full px-4 py-2 text-slate-500 hover:text-slate-700 text-sm transition-all flex items-center justify-center gap-2">
+                    <i class="fas fa-share"></i> 转交他人审批
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. 批量审批模态框 -->
+<div id="batchApprovalModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-slide-in">
+        <div class="p-6 border-b border-slate-200">
+            <h2 class="text-xl font-bold text-slate-800">批量审批</h2>
+            <p class="text-sm text-slate-500 mt-1">已选择 <span id="batchCount" class="font-bold text-blue-600">0</span> 条预约申请</p>
+        </div>
+        <div class="p-6 space-y-4">
+            <div class="max-h-48 overflow-y-auto custom-scroll space-y-2" id="batchList">
+                <!-- 动态生成选中项 -->
+            </div>
+            <div>
+                <label class="text-sm font-medium text-slate-700 mb-2 block">统一审批意见</label>
+                <textarea id="batchComment" class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none h-24" placeholder="请输入统一的审批意见..."></textarea>
+            </div>
+        </div>
+        <div class="p-6 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex gap-3">
+            <button onclick="closeModal('batchApprovalModal')" class="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-white transition-all font-medium">取消</button>
+            <button onclick="submitBatchApproval('reject')" class="px-4 py-2 border-2 border-red-200 text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-all font-medium">批量拒绝</button>
+            <button onclick="submitBatchApproval('approve')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-medium shadow-lg shadow-green-200">批量通过</button>
+        </div>
+    </div>
+</div>
+
+<!-- 其他原有模态框保持不变... -->
+<!-- 待办事项模态框 -->
+<div id="todoModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col animate-slide-in">
+        <div class="p-6 border-b border-slate-200 flex justify-between items-center bg-white">
+            <div>
+                <h2 class="text-xl font-bold text-slate-800">待办事项中心</h2>
+                <p class="text-sm text-slate-500 mt-1">共 8 条待处理事项，其中 <span class="text-red-600 font-medium">3 条紧急</span></p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button class="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-lg text-sm transition-all"><i class="fas fa-check-double mr-1"></i>全部已读</button>
+                <button onclick="closeModal('todoModal')" class="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+        <div class="flex-1 overflow-hidden flex">
+            <div class="w-64 border-r border-slate-200 bg-slate-50 p-4 space-y-2 overflow-y-auto custom-scroll">
+                <button onclick="filterTodos('all')" class="w-full text-left px-4 py-3 rounded-xl bg-white shadow-sm border border-slate-200 text-slate-800 font-medium flex justify-between items-center group hover:border-blue-300 transition-all">
+                    <span><i class="fas fa-inbox mr-2 text-blue-500"></i>全部待办</span>
+                    <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs">8</span>
+                </button>
+                <button onclick="filterTodos('approval')" class="w-full text-left px-4 py-3 rounded-xl hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 text-slate-600 transition-all flex justify-between items-center group">
+                    <span><i class="fas fa-user-check mr-2 text-slate-400 group-hover:text-yellow-500"></i>预约审批</span>
+                    <span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full text-xs">2</span>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scroll p-6 bg-white">
+                <div class="space-y-4" id="todoList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 访客详情抽屉 -->
+<div id="detailDrawer" class="fixed inset-y-0 right-0 w-[600px] bg-white shadow-2xl z-50 drawer overflow-y-auto custom-scroll border-l border-slate-200">
+    <div class="sticky top-0 bg-white z-10 border-b border-slate-200 p-6 flex justify-between items-start">
+        <div class="flex items-center gap-4">
+            <img id="detailAvatar" src="" class="w-16 h-16 rounded-full border-4 border-blue-50" alt="">
+            <div>
+                <h2 id="detailName" class="text-2xl font-bold text-slate-800"></h2>
+                <div class="flex items-center gap-2 mt-1">
+                    <span id="detailType" class="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700"></span>
+                    <span id="detailStatus" class="px-2 py-0.5 rounded text-xs font-medium"></span>
+                </div>
+            </div>
+        </div>
+        <button onclick="closeDrawer()" class="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all"><i class="fas fa-times text-lg"></i></button>
+    </div>
+    <div class="p-6 space-y-8">
+        <section>
+            <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2"><i class="fas fa-id-card text-blue-500"></i>基础信息</h3>
+            <div class="grid grid-cols-2 gap-4 bg-slate-50 rounded-xl p-4">
+                <div><label class="text-xs text-slate-500 block mb-1">联系电话</label><p id="detailPhone" class="text-sm font-medium text-slate-800"></p></div>
+                <div><label class="text-xs text-slate-500 block mb-1">身份证号</label><p class="text-sm font-medium text-slate-800">11010119900101****</p></div>
+                <div><label class="text-xs text-slate-500 block mb-1">所属单位</label><p class="text-sm font-medium text-slate-800">北京科技有限公司</p></div>
+                <div><label class="text-xs text-slate-500 block mb-1">车牌号</label><p class="text-sm font-medium text-slate-800">京A·88888</p></div>
+            </div>
+        </section>
+        <section>
+            <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2"><i class="fas fa-walking text-blue-500"></i>本次访问详情</h3>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center p-3 border border-slate-200 rounded-lg">
+                    <div><p class="text-xs text-slate-500">被访人</p><p id="detailHost" class="text-sm font-medium text-slate-800 mt-0.5"></p><p id="detailDept" class="text-xs text-slate-500"></p></div>
+                    <button class="text-blue-600 text-xs hover:underline">查看被访人信息</button>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="p-3 border border-slate-200 rounded-lg"><p class="text-xs text-slate-500">来访事由</p><p id="detailReason" class="text-sm font-medium text-slate-800 mt-1"></p></div>
+                    <div class="p-3 border border-slate-200 rounded-lg"><p class="text-xs text-slate-500">访问区域</p><div class="flex flex-wrap gap-1 mt-1"><span class="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded">大堂</span><span class="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded">会议室A</span></div></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="p-3 bg-green-50 border border-green-200 rounded-lg"><p class="text-xs text-green-600 mb-1">签到时间</p><p class="text-lg font-bold text-green-700">09:30</p><p class="text-xs text-green-600">2026-02-03</p></div>
+                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg opacity-60"><p class="text-xs text-slate-500 mb-1">签离时间</p><p class="text-lg font-bold text-slate-700">--:--</p><p class="text-xs text-slate-400">预计 17:00</p></div>
+                </div>
+            </div>
+        </section>
+        <section>
+            <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2"><i class="fas fa-route text-blue-500"></i>实时轨迹</h3>
+            <div class="relative pl-4 space-y-6">
+                <div class="timeline-line"></div>
+                <div class="relative flex gap-4">
+                    <div class="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-xs flex-shrink-0 z-10 ring-4 ring-white"><i class="fas fa-check"></i></div>
+                    <div class="flex-1"><p class="text-sm font-medium text-slate-800">闸机通行 - 1号门</p><p class="text-xs text-slate-500 mt-0.5">09:30:15 · 人脸识别 · 已通过</p></div>
+                </div>
+                <div class="relative flex gap-4">
+                    <div class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs flex-shrink-0 z-10 ring-4 ring-white"><i class="fas fa-elevator"></i></div>
+                    <div class="flex-1"><p class="text-sm font-medium text-slate-800">电梯使用 - A梯</p><p class="text-xs text-slate-500 mt-0.5">09:32:40 · 前往 15层</p></div>
+                </div>
+                <div class="relative flex gap-4">
+                    <div class="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs flex-shrink-0 z-10 ring-4 ring-white"><i class="fas fa-door-open"></i></div>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-slate-800">会议室A门禁</p>
+                        <p class="text-xs text-slate-500 mt-0.5">09:35:12 · 二维码验证 · 已进入</p>
+                        <span class="inline-block mt-1 px-2 py-0.5 bg-orange-50 text-orange-600 text-xs rounded">当前位置</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div class="sticky bottom-0 bg-white border-t border-slate-200 pt-4 pb-2 flex gap-3">
+            <button class="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-all text-sm font-medium"><i class="fas fa-phone mr-2"></i>联系访客</button>
+            <button class="flex-1 px-4 py-2 border border-orange-300 text-orange-700 bg-orange-50 rounded-lg hover:bg-orange-100 transition-all text-sm font-medium"><i class="fas fa-clock mr-2"></i>延长访问</button>
+            <button class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all text-sm font-medium"><i class="fas fa-sign-out-alt mr-2"></i>强制签离</button>
+        </div>
+    </div>
+</div>
+<div id="drawerOverlay" onclick="closeDrawer()" class="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 hidden transition-opacity"></div>
+
+<!-- 3. 生成邀约码模态框 -->
+<div id="inviteModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-slide-in">
+        <div class="p-6 border-b border-slate-200 flex justify-between items-center">
+            <h2 class="text-xl font-bold text-slate-800">生成邀约二维码</h2>
+            <button onclick="closeModal('inviteModal')" class="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-6 space-y-6">
+            <div class="text-center">
+                <div class="inline-block p-4 bg-slate-50 rounded-2xl border-2 border-slate-200 mb-4">
+                    <div class="w-48 h-48 bg-white p-2 rounded-xl shadow-inner">
+                        <div class="w-full h-full qr-pattern rounded relative overflow-hidden">
+                            <div class="absolute inset-0 flex items-center justify-center bg-white/90">
+                                <i class="fas fa-qrcode text-6xl text-slate-800"></i>
+                            </div>
+                            <div class="absolute top-1/2 left-0 right-0 h-0.5 bg-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.8)] animate-[scan_2s_linear_infinite]"></div>
+                        </div>
+                    </div>
+                </div>
+                <h3 class="font-bold text-slate-800 mb-1">临时访客邀约码</h3>
+                <p class="text-sm text-slate-500">有效期至 2026-02-03 18:00</p>
+                <div class="mt-4 flex justify-center gap-2">
+                    <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-200">1号楼</span>
+                    <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-200">会议室区域</span>
+                </div>
+            </div>
+            <div class="space-y-3">
+                <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <i class="fas fa-link text-slate-400"></i>
+                    <input type="text" value="https://visit.example.com/i/8x9s7d" readonly class="flex-1 bg-transparent text-sm text-slate-600 outline-none">
+                    <button class="text-blue-600 text-sm font-medium hover:text-blue-700">复制</button>
+                </div>
+                <p class="text-xs text-slate-500 text-center">访客可通过微信扫码自助登记，无需前台接待</p>
+            </div>
+        </div>
+        <div class="p-6 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex gap-3">
+            <button class="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-white transition-all font-medium text-sm"><i class="fas fa-download mr-2"></i>下载二维码</button>
+            <button class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium text-sm"><i class="fas fa-share-alt mr-2"></i>发送给访客</button>
+        </div>
+    </div>
+</div>
+
+<!-- 4. 批量导入模态框 -->
+<div id="importModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slide-in">
+        <div class="p-6 border-b border-slate-200 flex justify-between items-center sticky top-0 bg-white z-10">
+            <h2 class="text-xl font-bold text-slate-800">批量导入访客</h2>
+            <button onclick="closeModal('importModal')" class="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-6 space-y-6">
+            <div class="flex items-center justify-center gap-4 mb-6">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">1</div>
+                    <span class="text-sm font-medium text-blue-600">下载模板</span>
+                </div>
+                <div class="w-12 h-0.5 bg-slate-200"></div>
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-sm font-bold">2</div>
+                    <span class="text-sm font-medium text-slate-500">填写上传</span>
+                </div>
+                <div class="w-12 h-0.5 bg-slate-200"></div>
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-sm font-bold">3</div>
+                    <span class="text-sm font-medium text-slate-500">确认导入</span>
+                </div>
+            </div>
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-file-excel text-2xl"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-slate-800 mb-1">访客导入模板</h3>
+                        <p class="text-sm text-slate-600 mb-3">请下载模板文件，按格式填写访客信息后上传</p>
+                        <div class="flex gap-2">
+                            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-all flex items-center gap-2"><i class="fas fa-download"></i>下载模板</button>
+                            <button class="px-4 py-2 border border-blue-300 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-all">查看填写示例</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-400 hover:bg-blue-50/30 transition-all cursor-pointer group">
+                <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-blue-100 group-hover:text-blue-600 transition-all">
+                    <i class="fas fa-cloud-upload-alt text-2xl"></i>
+                </div>
+                <p class="text-sm font-medium text-slate-700 mb-1">点击或拖拽文件到此处上传</p>
+                <p class="text-xs text-slate-500">支持 .xlsx, .csv 格式，单个文件不超过 5MB</p>
+            </div>
+        </div>
+        <div class="p-6 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex justify-end gap-3">
+            <button onclick="closeModal('importModal')" class="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-white transition-all font-medium">取消</button>
+            <button class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium shadow-lg shadow-blue-200">确认导入</button>
+        </div>
+    </div>
+</div>
+
+<!-- 5. 黑名单管理模态框 -->
+<div id="blacklistModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-slide-in">
+        <div class="p-6 border-b border-slate-200 flex justify-between items-center bg-white">
+            <div>
+                <h2 class="text-xl font-bold text-slate-800">黑名单管理</h2>
+                <p class="text-sm text-slate-500 mt-1">列入黑名单的访客将被禁止预约和进入</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="openModal('addBlacklistModal')" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all flex items-center gap-2"><i class="fas fa-plus"></i>添加黑名单</button>
+                <button onclick="closeModal('blacklistModal')" class="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+        <div class="flex-1 overflow-auto p-6 custom-scroll bg-slate-50">
+            <div class="grid grid-cols-3 gap-4 mb-6">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="text-2xl font-bold text-slate-800 mb-1">15</div>
+                    <div class="text-xs text-slate-500">黑名单总人数</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="text-2xl font-bold text-red-600 mb-1">3</div>
+                    <div class="text-xs text-slate-500">本月拦截次数</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="text-2xl font-bold text-orange-600 mb-1">2</div>
+                    <div class="text-xs text-slate-500">即将到期</div>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th class="px-6 py-3 font-medium text-slate-600">访客信息</th>
+                            <th class="px-6 py-3 font-medium text-slate-600">拉黑原因</th>
+                            <th class="px-6 py-3 font-medium text-slate-600">期限</th>
+                            <th class="px-6 py-3 font-medium text-slate-600 text-right">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <tr class="hover:bg-slate-50 transition-all">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500"><i class="fas fa-user"></i></div>
+                                    <div><div class="font-medium text-slate-800">赵某某</div><div class="text-xs text-slate-500">138****9999</div></div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-slate-700">扰乱办公秩序</td>
+                            <td class="px-6 py-4"><span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">永久</span></td>
+                            <td class="px-6 py-4 text-right">
+                                <button class="text-blue-600 hover:text-blue-700 text-sm font-medium mr-3">详情</button>
+                                <button class="text-slate-400 hover:text-red-600 text-sm font-medium">移除</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 6. 添加黑名单弹窗 -->
+<div id="addBlacklistModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-slide-in">
+        <div class="p-6 border-b border-slate-200">
+            <h2 class="text-xl font-bold text-slate-800">添加黑名单</h2>
+            <p class="text-sm text-slate-500 mt-1">请将恶意访客或违反规定的人员加入黑名单</p>
+        </div>
+        <div class="p-6 space-y-4">
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-slate-700">访客姓名 <span class="text-red-500">*</span></label>
+                <input type="text" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none" placeholder="请输入姓名">
+            </div>
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-slate-700">联系电话 <span class="text-red-500">*</span></label>
+                <input type="tel" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none" placeholder="请输入手机号">
+            </div>
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-slate-700">拉黑原因 <span class="text-red-500">*</span></label>
+                <textarea class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none h-24 resize-none" placeholder="请详细描述拉黑原因"></textarea>
+            </div>
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-slate-700">拉黑期限</label>
+                <select class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none bg-white">
+                    <option>永久</option>
+                    <option>30天</option>
+                    <option>90天</option>
+                </select>
+            </div>
+        </div>
+        <div class="p-6 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex justify-end gap-3">
+            <button onclick="closeModal('addBlacklistModal')" class="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-white transition-all font-medium">取消</button>
+            <button class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-medium shadow-lg shadow-red-200">确认添加</button>
+        </div>
+    </div>
+</div>
+
+<!-- 7. 数据报表模态框 -->
+<div id="reportModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col animate-slide-in">
+        <div class="p-6 border-b border-slate-200 flex justify-between items-center bg-white">
+            <div class="flex items-center gap-4">
+                <h2 class="text-xl font-bold text-slate-800">访客数据报表</h2>
+                <div class="flex gap-2">
+                    <button class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium">近7天</button>
+                    <button class="px-3 py-1 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium">近30天</button>
+                    <button class="px-3 py-1 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium">本月</button>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-all flex items-center gap-2"><i class="fas fa-download"></i>导出报表</button>
+                <button onclick="closeModal('reportModal')" class="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+        <div class="flex-1 overflow-auto p-6 custom-scroll bg-slate-50 space-y-6">
+            <div class="grid grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="text-xs text-slate-500 mb-1">总访客数</div>
+                    <div class="text-2xl font-bold text-slate-800">342</div>
+                    <div class="text-xs text-green-600 mt-1 flex items-center gap-1"><i class="fas fa-arrow-up"></i> 12.5%</div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="text-xs text-slate-500 mb-1">平均访问时长</div>
+                    <div class="text-2xl font-bold text-slate-800">2.5<span class="text-sm font-normal text-slate-500">小时</span></div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="text-xs text-slate-500 mb-1">预约到访率</div>
+                    <div class="text-2xl font-bold text-slate-800">89.3%</div>
+                    <div class="text-xs text-green-600 mt-1 flex items-center gap-1"><i class="fas fa-arrow-up"></i> 5.2%</div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="text-xs text-slate-500 mb-1">异常事件</div>
+                    <div class="text-2xl font-bold text-slate-800">3</div>
+                    <div class="text-xs text-red-600 mt-1">需关注</div>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-800 mb-4">来访趋势分析</h3>
+                    <div class="h-64 flex items-end justify-between gap-2">
+                        <div class="flex-1 flex flex-col items-center gap-2">
+                            <div class="w-full bg-blue-100 rounded-t-lg relative group" style="height: 40%"></div>
+                            <span class="text-xs text-slate-500">周一</span>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-2">
+                            <div class="w-full bg-blue-500 rounded-t-lg relative group" style="height: 90%"></div>
+                            <span class="text-xs text-slate-500">周五</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-800 mb-4">访客类型分布</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                            <div class="flex-1">
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-slate-700">商务访客</span>
+                                    <span class="font-medium text-slate-900">45%</span>
+                                </div>
+                                <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                    <div class="h-full bg-blue-500 rounded-full" style="width: 45%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 8. 新增预约模态框 -->
+<div id="addModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slide-in">
+        <div class="p-6 border-b border-slate-200 flex justify-between items-center sticky top-0 bg-white z-10">
+            <h2 class="text-xl font-bold text-slate-800">新增访客预约</h2>
+            <button onclick="closeModal('addModal')" class="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-6 space-y-6">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-700">访客姓名 <span class="text-red-500">*</span></label>
+                    <input type="text" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="请输入姓名">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-700">联系电话 <span class="text-red-500">*</span></label>
+                    <input type="tel" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="请输入手机号">
+                </div>
+            </div>
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-slate-700">被访人 <span class="text-red-500">*</span></label>
+                <input type="text" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="请输入被访人姓名或工号">
+            </div>
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-slate-700">来访事由 <span class="text-red-500">*</span></label>
+                <input type="text" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="请输入来访事由">
+            </div>
+        </div>
+        <div class="p-6 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex justify-end gap-3">
+            <button onclick="closeModal('addModal')" class="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-white transition-all font-medium">取消</button>
+            <button class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium shadow-lg shadow-blue-200">确认预约</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ==================== 数据定义（融合版）====================
+
+const todayVisitors = [
+    { id: 1, name: '李明', phone: '138****1234', avatar: 'https://i.pravatar.cc/150?img=12', host: '王经理', hostDept: '技术部', reason: '商务洽谈', type: 'business', status: 'in', time: '09:30', auth: '已下发', location: '会议室A' },
+    { id: 2, name: '张华', phone: '139****5678', avatar: 'https://i.pravatar.cc/150?img=5', host: '李总监', hostDept: '市场部', reason: '产品演示', type: 'vip', status: 'in', time: '10:00', auth: '已下发', location: '演示厅' },
+    { id: 3, name: '陈工', phone: '137****9012', avatar: 'https://i.pravatar.cc/150?img=3', host: '赵主管', hostDept: '工程部', reason: '设备维护', type: 'contractor', status: 'in', time: '08:00', auth: '已下发', location: '机房' },
+    { id: 4, name: '刘 candidate', phone: '136****3456', avatar: 'https://i.pravatar.cc/150?img=9', host: 'HRBP', hostDept: '人力资源', reason: '技术面试', type: 'interview', status: 'in', time: '14:00', auth: '已下发', location: '面试间B' },
+    { id: 5, name: '王总', phone: '135****7890', avatar: 'https://i.pravatar.cc/150?img=8', host: 'CEO', hostDept: '总经办', reason: '董事会', type: 'vip', status: 'in', time: '09:00', auth: '已下发', location: '董事会议室' },
+    { id: 20, name: '赵敏', phone: '138****2222', avatar: 'https://i.pravatar.cc/150?img=5', host: '财务经理', hostDept: '财务部', reason: '审计对接', type: 'business', status: 'in', time: '11:20', auth: '已下发', location: '财务室' }
+];
+
+// 扩展预约数据，增加审批相关字段
+const upcomingVisitors = [
+    { 
+        id: 6, name: '赵总', phone: '138****9999', avatar: 'https://i.pravatar.cc/150?img=13', host: 'VP', hostDept: '战略部', 
+        reason: '战略合作洽谈', type: 'vip', status: 'approved', time: '15:00', auth: '待下发', approval: '已通过', 
+        carNo: '沪A·66666', company: '上海科技有限公司', idCard: '31010119850101****',
+        approver: '张总监', approvalTime: '2026-02-03 08:30', approvalComment: '重要客户，请安排VIP会议室',
+        remark: '需准备NDA协议'
+    },
+    { 
+        id: 7, name: '孙工程师', phone: '139****1111', avatar: 'https://i.pravatar.cc/150?img=14', host: '运维经理', hostDept: 'IT部', 
+        reason: '系统巡检', type: 'contractor', status: 'approved', time: '16:30', auth: '待下发', approval: '已通过', 
+        carNo: '京B·12345', company: '北京运维服务有限公司', idCard: '11010119900101****',
+        approver: '李主管', approvalTime: '2026-02-03 09:00', approvalComment: '例行维护，已确认时间',
+        remark: ''
+    },
+    { 
+        id: 8, name: '周 candidate', phone: '137****2222', avatar: 'https://i.pravatar.cc/150?img=15', host: '技术总监', hostDept: '研发部', 
+        reason: '终面', type: 'interview', status: 'pending', time: '14:30', auth: '未下发', approval: '待审批', 
+        carNo: '-', company: '自由职业', idCard: '42010119950202****',
+        approver: null, approvalTime: null, approvalComment: null,
+        remark: '候选人有5年工作经验，请安排高级面试官'
+    },
+    { 
+        id: 9, name: '吴顾问', phone: '136****3333', avatar: 'https://i.pravatar.cc/150?img=16', host: '咨询部', hostDept: '外部顾问', 
+        reason: '项目咨询', type: 'business', status: 'pending', time: '10:00', auth: '未下发', approval: '待审批', 
+        carNo: '粤C·88888', company: '深圳管理咨询公司', idCard: '44030119880101****',
+        approver: null, approvalTime: null, approvalComment: null,
+        remark: '项目紧急，请尽快审批'
+    },
+    { 
+        id: 10, name: '郑客户', phone: '135****4444', avatar: 'https://i.pravatar.cc/150?img=17', host: '销售经理', hostDept: '销售部', 
+        reason: '合同签约', type: 'business', status: 'approved', time: '17:00', auth: '待下发', approval: '已通过', 
+        carNo: '-', company: '广州贸易有限公司', idCard: '44010119920101****',
+        approver: '王经理', approvalTime: '2026-02-02 16:00', approvalComment: '重要合同签署，已确认',
+        remark: '需准备合同文本'
+    },
+    { 
+        id: 21, name: '钱工', phone: '139****5555', avatar: 'https://i.pravatar.cc/150?img=18', host: '设施经理', hostDept: '行政部', 
+        reason: '空调维修', type: 'contractor', status: 'rejected', time: '09:00', auth: '未下发', approval: '已拒绝', 
+        carNo: '-', company: '维修服务有限公司', idCard: '11010119870101****',
+        approver: '行政主管', approvalTime: '2026-02-03 07:30', approvalComment: '时间冲突，请改期至明日',
+        remark: ''
+    }
+];
+
+const historyVisitors = [
+    { id: 11, name: '钱总', phone: '138****5555', avatar: 'https://i.pravatar.cc/150?img=18', host: '总经理', hostDept: '总经办', reason: '年度 review', type: 'vip', status: 'completed', inTime: '2026-02-02 09:00', outTime: '2026-02-02 12:30', duration: '3小时30分', auth: '已回收', rating: 5.0 },
+    { id: 12, name: '冯工', phone: '139****6666', avatar: 'https://i.pravatar.cc/150?img=19', host: '工程部', hostDept: '工程部', reason: '空调维修', type: 'contractor', status: 'completed', inTime: '2026-02-02 08:30', outTime: '2026-02-02 18:00', duration: '9小时30分', auth: '已回收', rating: 4.8 },
+    { id: 13, name: '陈 candidate', phone: '137****7777', avatar: 'https://i.pravatar.cc/150?img=20', host: 'HR', hostDept: '人力资源', reason: '初面', type: 'interview', status: 'completed', inTime: '2026-02-02 14:00', outTime: '2026-02-02 15:30', duration: '1小时30分', auth: '已回收', rating: 4.5 },
+    { id: 14, name: '卫客户', phone: '136****8888', avatar: 'https://i.pravatar.cc/150?img=21', host: '销售总监', hostDept: '销售部', reason: '商务谈判', type: 'business', status: 'completed', inTime: '2026-02-01 10:00', outTime: '2026-02-01 16:00', duration: '6小时00分', auth: '已回收', rating: 4.2 },
+    { id: 15, name: '蒋专家', phone: '135****9999', avatar: 'https://i.pravatar.cc/150?img=22', host: '技术VP', hostDept: '技术部', reason: '技术交流', type: 'vip', status: 'completed', inTime: '2026-01-30 09:30', outTime: '2026-01-30 12:00', duration: '2小时30分', auth: '已回收', rating: 4.9 }
+];
+
+const abnormalVisitors = [
+    { id: 17, name: '张三', phone: '138****1234', avatar: 'https://i.pravatar.cc/150?img=24', host: '王经理', hostDept: '技术部', reason: '商务洽谈', type: 'business', status: 'overtime', time: '09:30', overdue: '2小时15分', level: 'high', location: '会议室A（滞留）', details: '超过预定时间未签离' },
+    { id: 18, name: '李四', phone: '139****5678', avatar: 'https://i.pravatar.cc/150?img=25', host: '李总监', hostDept: '市场部', reason: '产品演示', type: 'business', status: 'unauthorized', time: '--', level: 'high', location: '试图进入：研发区', details: '无权限区域闯入被拦截' },
+    { id: 19, name: '王五', phone: '137****9012', avatar: 'https://i.pravatar.cc/150?img=26', host: '赵主管', hostDept: '工程部', reason: '设备维护', type: 'contractor', status: 'noshow', time: '预约 10:00', level: 'medium', location: '-', details: '已超时30分钟未签到' }
+];
+
+const todoItems = [
+    { id: 1, type: 'warning', title: '访客超时未签离', content: '张三（拜访技术部）已超时2小时15分钟，当前仍在会议室A滞留', time: '10分钟前', level: 'high', action: '一键签离', actionType: 'danger' },
+    { id: 2, type: 'approval', title: 'VIP访客预约待审批', content: '王总拜访CEO，需确认接待安排及会议室预留', time: '30分钟前', level: 'high', action: '立即审批', actionType: 'primary' },
+    { id: 3, type: 'warning', title: '黑名单人员试图进入', content: '李四（黑名单）试图通过2号闸机进入研发区域，已被拦截', time: '1小时前', level: 'high', action: '查看详情', actionType: 'danger' },
+    { id: 4, type: 'system', title: '权限即将过期提醒', content: '5位外协人员门禁权限将于今日18:00自动过期', time: '2小时前', level: 'medium', action: '批量延期', actionType: 'normal' },
+    { id: 5, type: 'approval', title: '面试候选预约确认', content: '周 candidate 技术终面预约，需确认面试官时间', time: '3小时前', level: 'medium', action: '确认', actionType: 'primary' },
+    { id: 6, type: 'system', title: '系统维护通知', content: '今晚23:00-24:00进行系统升级，期间暂停预约服务', time: '5小时前', level: 'low', action: '知道了', actionType: 'normal' },
+    { id: 7, type: 'warning', title: '访客未按时到访', content: '王五（设备维护）预约10:00，已超时30分钟未签到', time: '30分钟前', level: 'medium', action: '联系访客', actionType: 'warning' },
+    { id: 8, type: 'system', title: '月度报表生成完成', content: '2026年1月访客数据报表已生成，请查看', time: '昨天', level: 'low', action: '查看报表', actionType: 'normal' }
+];
+
+// ==================== 筛选配置 ====================
+
+const filterConfigs = {
+    today: [
+        { key: 'type', label: '访客类型', options: [
+            { value: 'all', label: '全部' },
+            { value: 'business', label: '商务访客' },
+            { value: 'vip', label: 'VIP访客' },
+            { value: 'contractor', label: '外协人员' },
+            { value: 'interview', label: '面试候选' }
+        ]},
+        { key: 'location', label: '所在区域', options: [
+            { value: 'all', label: '全部区域' },
+            { value: '会议室', label: '会议室' },
+            { value: '办公区', label: '办公区' },
+            { value: '机房', label: '机房/设备区' }
+        ]},
+        { key: 'time', label: '到访时间', options: [
+            { value: 'all', label: '全部时段' },
+            { value: 'morning', label: '上午(8:00-12:00)' },
+            { value: 'afternoon', label: '下午(12:00-18:00)' },
+            { value: 'overtime', label: '加班(18:00后)' }
+        ]},
+        { key: 'status', label: '签离状态', options: [
+            { value: 'all', label: '全部状态' },
+            { value: 'in', label: '在访中' },
+            { value: 'nearly', label: '即将超时' },
+            { value: 'overdue', label: '已超时' }
+        ]}
+    ],
+    upcoming: [
+        { key: 'approval', label: '审批状态', options: [
+            { value: 'all', label: '全部' },
+            { value: 'pending', label: '待审批' },
+            { value: 'approved', label: '已通过' },
+            { value: 'rejected', label: '已拒绝' }
+        ]},
+        { key: 'type', label: '访客类型', options: [
+            { value: 'all', label: '全部类型' },
+            { value: 'vip', label: 'VIP访客' },
+            { value: 'business', label: '商务访客' },
+            { value: 'contractor', label: '外协人员' },
+            { value: 'interview', label: '面试候选' }
+        ]},
+        { key: 'time', label: '预约时间', options: [
+            { value: 'all', label: '全部时间' },
+            { value: 'today', label: '今日' },
+            { value: 'tomorrow', label: '明日' },
+            { value: 'week', label: '本周内' }
+        ]},
+        { key: 'auth', label: '权限状态', options: [
+            { value: 'all', label: '全部' },
+            { value: 'issued', label: '已下发' },
+            { value: 'pending', label: '待下发' },
+            { value: 'none', label: '未下发' }
+        ]}
+    ],
+    history: [
+        { key: 'time', label: '时间范围', options: [
+            { value: 'today', label: '今日' },
+            { value: 'yesterday', label: '昨日' },
+            { value: 'week', label: '近7天' },
+            { value: 'month', label: '近30天' },
+            { value: 'custom', label: '自定义' }
+        ]},
+        { key: 'type', label: '访客类型', options: [
+            { value: 'all', label: '全部类型' },
+            { value: 'vip', label: 'VIP访客' },
+            { value: 'business', label: '商务访客' },
+            { value: 'contractor', label: '外协人员' },
+            { value: 'interview', label: '面试候选' }
+        ]},
+        { key: 'rating', label: '评价等级', options: [
+            { value: 'all', label: '全部评价' },
+            { value: '5', label: '5星好评' },
+            { value: '4', label: '4星及以上' },
+            { value: '3', label: '3星及以下' }
+        ]},
+        { key: 'duration', label: '访问时长', options: [
+            { value: 'all', label: '全部时长' },
+            { value: 'short', label: '1小时内' },
+            { value: 'medium', label: '1-4小时' },
+            { value: 'long', label: '4小时以上' }
+        ]}
+    ],
+    abnormal: [
+        { key: 'status', label: '异常类型', options: [
+            { value: 'all', label: '全部异常' },
+            { value: 'overtime', label: '超时滞留' },
+            { value: 'unauthorized', label: '非法闯入' },
+            { value: 'noshow', label: '未按时到访' },
+            { value: 'conflict', label: '预约冲突' }
+        ]},
+        { key: 'level', label: '风险等级', options: [
+            { value: 'all', label: '全部等级' },
+            { value: 'high', label: '高风险' },
+            { value: 'medium', label: '中风险' },
+            { value: 'low', label: '低风险' }
+        ]},
+        { key: 'deal', label: '处理状态', options: [
+            { value: 'all', label: '全部' },
+            { value: 'undeal', label: '待处理' },
+            { value: 'dealing', label: '处理中' },
+            { value: 'dealt', label: '已处理' }
+        ]},
+        { key: 'time', label: '发生时间', options: [
+            { value: 'all', label: '全部时间' },
+            { value: '1h', label: '1小时内' },
+            { value: '24h', label: '24小时内' },
+            { value: 'week', label: '7天内' }
+        ]}
+    ]
+};
+
+// ==================== 状态管理 ====================
+
+let currentTab = 'today';
+let currentFilters = {};
+let currentPage = 1;
+let pageSize = 10;
+let filteredData = [];
+
+// ==================== 审批功能专用数据与状态 ====================
+
+let currentApprovalFilter = 'all';
+let selectedApprovals = new Set();
+let currentApprovalId = null;
+
+// ==================== 初始化与渲染 ====================
+
+function init() {
+    resetFilters();
+    renderTable();
+    updateApprovalBadge();
+    renderQuickApproval();
+}
+
+// 更新待审批数量徽章
+function updateApprovalBadge() {
+    const pendingCount = upcomingVisitors.filter(v => v.status === 'pending').length;
+    document.getElementById('pendingCount').textContent = pendingCount;
+    document.getElementById('quickPendingCount').textContent = pendingCount;
+    document.getElementById('centerPendingCount').textContent = pendingCount;
+    document.getElementById('approvalBadge').textContent = pendingCount;
+    
+    if (pendingCount === 0) {
+        document.getElementById('approvalBadge').classList.add('hidden');
+    } else {
+        document.getElementById('approvalBadge').classList.remove('hidden');
+    }
+}
+
+// 渲染右侧快捷审批
+function renderQuickApproval() {
+    const container = document.getElementById('quickApprovalList');
+    const pending = upcomingVisitors.filter(v => v.status === 'pending').slice(0, 2);
+    
+    if (pending.length === 0) {
+        container.innerHTML = '<p class="text-white/70 text-sm text-center py-2">暂无待审批事项</p>';
+        return;
+    }
+    
+    container.innerHTML = pending.map(v => `
+        <div class="bg-white/10 backdrop-blur rounded-lg p-3 cursor-pointer hover:bg-white/20 transition-all" onclick="openApprovalDetail(${v.id})">
+            <div class="flex justify-between items-start mb-1">
+                <span class="font-medium text-white text-sm">${v.name}</span>
+                <span class="text-xs text-yellow-200 bg-yellow-500/20 px-2 py-0.5 rounded">${v.type === 'interview' ? '面试' : '商务'}</span>
+            </div>
+            <p class="text-xs text-yellow-100 mb-2">${v.reason} · ${v.time}</p>
+            <div class="flex gap-2">
+                <button onclick="event.stopPropagation(); quickApprove(${v.id}, 'approve')" class="flex-1 py-1 bg-green-500 hover:bg-green-400 text-white rounded text-xs transition-all">
+                    <i class="fas fa-check mr-1"></i>通过
+                </button>
+                <button onclick="event.stopPropagation(); quickApprove(${v.id}, 'reject')" class="flex-1 py-1 bg-red-500 hover:bg-red-400 text-white rounded text-xs transition-all">
+                    <i class="fas fa-times mr-1"></i>拒绝
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ==================== 审批中心功能 ====================
+
+function openApprovalCenter() {
+    renderApprovalList();
+    openModal('approvalCenterModal');
+}
+
+function filterApprovals(type) {
+    currentApprovalFilter = type;
+    
+    // 更新按钮样式
+    document.querySelectorAll('.approval-filter-btn').forEach(btn => {
+        if (btn.dataset.filter === type) {
+            btn.className = 'w-full text-left px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium flex justify-between items-center approval-filter-btn';
+        } else {
+            btn.className = 'w-full text-left px-3 py-2 rounded-lg hover:bg-white text-slate-600 text-sm flex justify-between items-center approval-filter-btn';
+        }
+    });
+    
+    renderApprovalList();
+}
+
+function renderApprovalList() {
+    const container = document.getElementById('approvalList');
+    let data = upcomingVisitors;
+    
+    if (currentApprovalFilter !== 'all') {
+        data = data.filter(v => v.status === currentApprovalFilter);
+    }
+    
+    // 更新计数
+    document.getElementById('count-all').textContent = upcomingVisitors.length;
+    document.getElementById('count-pending').textContent = upcomingVisitors.filter(v => v.status === 'pending').length;
+    document.getElementById('count-approved').textContent = upcomingVisitors.filter(v => v.status === 'approved').length;
+    document.getElementById('count-rejected').textContent = upcomingVisitors.filter(v => v.status === 'rejected').length;
+    
+    if (data.length === 0) {
+        container.innerHTML = '<div class="text-center py-12 text-slate-400"><i class="fas fa-inbox text-4xl mb-3"></i><p>暂无相关审批事项</p></div>';
+        return;
+    }
+    
+    container.innerHTML = data.map(v => `
+        <div class="approval-card bg-white border ${v.status === 'pending' ? 'border-yellow-200 bg-yellow-50/30' : 'border-slate-200'} rounded-xl p-4 flex items-center gap-4">
+            <input type="checkbox" class="rounded border-slate-300 text-blue-600 w-5 h-5" 
+                ${selectedApprovals.has(v.id) ? 'checked' : ''} 
+                onchange="toggleSelection(${v.id})"
+                ${v.status !== 'pending' ? 'disabled' : ''}>
+            
+            <img src="${v.avatar}" class="w-12 h-12 rounded-full object-cover border border-slate-200" alt="${v.name}">
+            
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                    <h4 class="font-bold text-slate-800">${v.name}</h4>
+                    ${getTypeBadge(v.type)}
+                    ${v.status === 'pending' ? '<span class="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">待审批</span>' : ''}
+                    ${v.status === 'approved' ? '<span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">已通过</span>' : ''}
+                    ${v.status === 'rejected' ? '<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">已拒绝</span>' : ''}
+                </div>
+                <p class="text-sm text-slate-600 mb-1">${v.reason} · 拜访${v.host}</p>
+                <div class="flex items-center gap-4 text-xs text-slate-500">
+                    <span><i class="far fa-clock mr-1"></i>${v.time}</span>
+                    <span><i class="far fa-building mr-1"></i>${v.company}</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                ${v.status === 'pending' ? `
+                    <button onclick="openApprovalDetail(${v.id})" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-all">
+                        审批
+                    </button>
+                ` : `
+                    <button onclick="openApprovalDetail(${v.id})" class="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-all">
+                        查看
+                    </button>
+                `}
+            </div>
+        </div>
+    `).join('');
+}
+
+function toggleSelection(id) {
+    if (selectedApprovals.has(id)) {
+        selectedApprovals.delete(id);
+    } else {
+        selectedApprovals.add(id);
+    }
+    updateSelectAllCheckbox();
+}
+
+function toggleSelectAll() {
+    const checkboxes = document.querySelectorAll('#approvalList input[type="checkbox"]:not(:disabled)');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    
+    checkboxes.forEach(cb => {
+        cb.checked = !allChecked;
+        const id = parseInt(cb.getAttribute('onchange').match(/\d+/)[0]);
+        if (!allChecked) {
+            selectedApprovals.add(id);
+        } else {
+            selectedApprovals.delete(id);
+        }
+    });
+}
+
+function updateSelectAllCheckbox() {
+    const checkboxes = document.querySelectorAll('#approvalList input[type="checkbox"]:not(:disabled)');
+    const checkedBoxes = document.querySelectorAll('#approvalList input[type="checkbox"]:checked');
+    const selectAll = document.getElementById('selectAll');
+    
+    if (checkedBoxes.length === 0) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+    } else if (checkedBoxes.length === checkboxes.length) {
+        selectAll.checked = true;
+        selectAll.indeterminate = false;
+    } else {
+        selectAll.checked = false;
+        selectAll.indeterminate = true;
+    }
+}
+
+// ==================== 审批详情功能 ====================
+
+function openApprovalDetail(id) {
+    const v = upcomingVisitors.find(item => item.id === id);
+    if (!v) return;
+    
+    currentApprovalId = id;
+    
+    // 填充基本信息
+    document.getElementById('approvalAvatar').src = v.avatar;
+    document.getElementById('approvalName').textContent = v.name;
+    document.getElementById('approvalType').textContent = `${v.type === 'business' ? '商务访客' : v.type === 'vip' ? 'VIP访客' : v.type === 'contractor' ? '外协人员' : '面试候选'} · 预约编号 #20260203${String(id).padStart(3, '0')}`;
+    document.getElementById('approvalPhone').textContent = v.phone;
+    document.getElementById('approvalCompany').textContent = v.company;
+    document.getElementById('approvalCar').textContent = v.carNo;
+    document.getElementById('approvalHost').textContent = v.host;
+    document.getElementById('approvalDept').textContent = `${v.hostDept} · ${v.phone}`;
+    document.getElementById('approvalTime').textContent = `2026-02-03 ${v.time}`;
+    document.getElementById('approvalReason').textContent = v.reason;
+    document.getElementById('approvalRemark').textContent = v.remark || '无';
+    
+    // 状态显示控制
+    const statusBadge = document.getElementById('approvalStatusBadge');
+    const actionArea = document.getElementById('approvalActionArea');
+    const historyDiv = document.getElementById('approvalHistory');
+    const historyList = document.getElementById('historyList');
+    
+    if (v.status === 'pending') {
+        statusBadge.className = 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-200';
+        statusBadge.textContent = '待审批';
+        actionArea.classList.remove('hidden');
+        historyDiv.classList.add('hidden');
+    } else {
+        statusBadge.className = v.status === 'approved' 
+            ? 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-200'
+            : 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 border border-red-200';
+        statusBadge.textContent = v.status === 'approved' ? '已通过' : '已拒绝';
+        actionArea.classList.add('hidden');
+        historyDiv.classList.remove('hidden');
+        
+        // 显示审批历史
+        historyList.innerHTML = `
+            <div class="flex gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-user-check"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-medium text-slate-800">${v.status === 'approved' ? '审批通过' : '审批拒绝'}</p>
+                            <p class="text-xs text-slate-500 mt-0.5">审批人：${v.approver} · ${v.approvalTime}</p>
+                        </div>
+                        <span class="px-2 py-0.5 ${v.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} rounded text-xs font-medium">
+                            ${v.status === 'approved' ? '通过' : '拒绝'}
+                        </span>
+                    </div>
+                    <p class="text-sm text-slate-600 mt-2 bg-white p-2 rounded border border-slate-100">${v.approvalComment}</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    openModal('approvalDetailModal');
+}
+
+function setQuickComment(text) {
+    document.getElementById('approvalComment').value = text;
+}
+
+function submitApproval(action) {
+    const comment = document.getElementById('approvalComment').value;
+    if (!comment.trim()) {
+        alert('请输入审批意见');
+        return;
+    }
+    
+    const v = upcomingVisitors.find(item => item.id === currentApprovalId);
+    if (v) {
+        v.status = action === 'approve' ? 'approved' : 'rejected';
+        v.approval = action === 'approve' ? '已通过' : '已拒绝';
+        v.approver = '张管理员';
+        v.approvalTime = new Date().toLocaleString('zh-CN', { hour12: false });
+        v.approvalComment = comment;
+        
+        // 更新UI
+        updateApprovalBadge();
+        renderQuickApproval();
+        renderApprovalList();
+        renderTable();
+        closeModal('approvalDetailModal');
+        
+        // 显示成功提示
+        showToast(action === 'approve' ? '审批通过成功' : '已拒绝该预约', action === 'approve' ? 'success' : 'error');
+    }
+}
+
+// 快捷审批（无需打开详情）
+function quickApprove(id, action) {
+    const v = upcomingVisitors.find(item => item.id === id);
+    if (v && v.status === 'pending') {
+        v.status = action === 'approve' ? 'approved' : 'rejected';
+        v.approval = action === 'approve' ? '已通过' : '已拒绝';
+        v.approver = '张管理员';
+        v.approvalTime = new Date().toLocaleString('zh-CN', { hour12: false });
+        v.approvalComment = action === 'approve' ? '同意预约' : '拒绝预约';
+        
+        updateApprovalBadge();
+        renderQuickApproval();
+        renderApprovalList();
+        renderTable();
+        
+        showToast(action === 'approve' ? '审批通过成功' : '已拒绝该预约', action === 'approve' ? 'success' : 'error');
+    }
+}
+
+// ==================== 批量审批功能 ====================
+
+function batchApproval() {
+    if (selectedApprovals.size === 0) {
+        alert('请至少选择一条预约申请');
+        return;
+    }
+    
+    const container = document.getElementById('batchList');
+    const selectedData = upcomingVisitors.filter(v => selectedApprovals.has(v.id) && v.status === 'pending');
+    
+    if (selectedData.length === 0) {
+        alert('选中的记录中没有待审批的预约');
+        return;
+    }
+    
+    document.getElementById('batchCount').textContent = selectedData.length;
+    container.innerHTML = selectedData.map(v => `
+        <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <img src="${v.avatar}" class="w-8 h-8 rounded-full object-cover" alt="${v.name}">
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-slate-800 truncate">${v.name} · ${v.reason}</p>
+                <p class="text-xs text-slate-500">${v.time} · ${v.host}</p>
+            </div>
+        </div>
+    `).join('');
+    
+    openModal('batchApprovalModal');
+}
+
+function submitBatchApproval(action) {
+    const comment = document.getElementById('batchComment').value;
+    if (!comment.trim()) {
+        alert('请输入统一审批意见');
+        return;
+    }
+    
+    let count = 0;
+    selectedApprovals.forEach(id => {
+        const v = upcomingVisitors.find(item => item.id === id);
+        if (v && v.status === 'pending') {
+            v.status = action === 'approve' ? 'approved' : 'rejected';
+            v.approval = action === 'approve' ? '已通过' : '已拒绝';
+            v.approver = '张管理员';
+            v.approvalTime = new Date().toLocaleString('zh-CN', { hour12: false });
+            v.approvalComment = comment;
+            count++;
+        }
+    });
+    
+    selectedApprovals.clear();
+    updateApprovalBadge();
+    renderQuickApproval();
+    renderApprovalList();
+    renderTable();
+    closeModal('batchApprovalModal');
+    closeModal('approvalCenterModal');
+    
+    showToast(`批量${action === 'approve' ? '通过' : '拒绝'}成功，共处理 ${count} 条预约`, action === 'approve' ? 'success' : 'error');
+}
+
+// ==================== Toast 提示 ====================
+
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `fixed top-20 right-6 px-6 py-3 rounded-lg shadow-lg z-[100] animate-slide-in flex items-center gap-2 ${
+        type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+    }`;
+    toast.innerHTML = `
+        <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-times-circle'}"></i>
+        <span class="font-medium">${message}</span>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
+
+// ==================== 筛选功能（来自第二段）====================
+
+function resetFilters() {
+    currentFilters = {};
+    currentPage = 1;
+    
+    // 根据当前Tab设置默认筛选值
+    const configs = filterConfigs[currentTab] || [];
+    configs.forEach(config => {
+        if (config.options && config.options.length > 0) {
+            currentFilters[config.key] = config.options[0].value;
+        }
+    });
+    
+    renderFilters();
+    updateFilterTags();
+}
+
+function renderFilters() {
+    const container = document.getElementById('filterBar');
+    const configs = filterConfigs[currentTab] || [];
+    
+    let html = '<span class="text-xs text-slate-400 py-1 mr-2">筛选条件：</span>';
+    
+    configs.forEach(config => {
+        html += `<div class="flex items-center gap-1 mr-4 border-r border-slate-200 pr-4 last:border-0 last:pr-0">`;
+        html += `<span class="text-xs text-slate-500 mr-1">${config.label}:</span>`;
+        html += `<div class="flex gap-1">`;
+        
+        config.options.forEach(opt => {
+            const isActive = currentFilters[config.key] === opt.value;
+            html += `<button onclick="setFilter('${config.key}', '${opt.value}')" 
+                class="filter-btn px-3 py-1 rounded-full text-xs font-medium border ${isActive ? 'filter-active border-blue-500' : 'bg-white text-slate-600 border-slate-200'}">
+                ${opt.label}
+            </button>`;
+        });
+        
+        html += `</div></div>`;
+    });
+    
+    container.innerHTML = html;
+}
+
+function setFilter(key, value) {
+    currentFilters[key] = value;
+    currentPage = 1;
+    renderFilters();
+    renderTable();
+    updateFilterTags();
+}
+
+function updateFilterTags() {
+    const container = document.getElementById('activeFilters');
+    const tagsContainer = document.getElementById('filterTags');
+    const configs = filterConfigs[currentTab] || [];
+    
+    const activeTags = [];
+    configs.forEach(config => {
+        const currentValue = currentFilters[config.key];
+        const option = config.options.find(o => o.value === currentValue);
+        if (option && currentValue !== 'all') {
+            activeTags.push({
+                key: config.key,
+                label: config.label,
+                value: option.label
+            });
+        }
+    });
+    
+    if (activeTags.length === 0) {
+        container.classList.add('hidden');
+    } else {
+        container.classList.remove('hidden');
+        tagsContainer.innerHTML = activeTags.map(tag => `
+            <span class="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs border border-blue-200">
+                ${tag.label}: ${tag.value}
+                <button onclick="clearFilter('${tag.key}')" class="hover:text-blue-900"><i class="fas fa-times"></i></button>
+            </span>
+        `).join('');
+    }
+}
+
+function clearFilter(key) {
+    currentFilters[key] = 'all';
+    renderFilters();
+    renderTable();
+    updateFilterTags();
+}
+
+// ==================== 数据过滤逻辑 ====================
+
+function filterData(data) {
+    return data.filter(item => {
+        // 根据Tab应用不同的过滤逻辑
+        if (currentTab === 'today') {
+            if (currentFilters.type && currentFilters.type !== 'all' && item.type !== currentFilters.type) return false;
+            if (currentFilters.location && currentFilters.location !== 'all') {
+                if (currentFilters.location === '会议室' && !item.location.includes('会议')) return false;
+                if (currentFilters.location === '办公区' && !item.location.includes('办公')) return false;
+                if (currentFilters.location === '机房' && !item.location.includes('机房')) return false;
+            }
+            if (currentFilters.time && currentFilters.time !== 'all') {
+                const hour = parseInt(item.time.split(':')[0]);
+                if (currentFilters.time === 'morning' && (hour < 8 || hour >= 12)) return false;
+                if (currentFilters.time === 'afternoon' && (hour < 12 || hour >= 18)) return false;
+                if (currentFilters.time === 'overtime' && hour < 18) return false;
+            }
+        }
+        else if (currentTab === 'upcoming') {
+            if (currentFilters.approval && currentFilters.approval !== 'all' && item.status !== currentFilters.approval) return false;
+            if (currentFilters.type && currentFilters.type !== 'all' && item.type !== currentFilters.type) return false;
+            if (currentFilters.auth && currentFilters.auth !== 'all') {
+                if (currentFilters.auth === 'issued' && item.auth !== '已下发') return false;
+                if (currentFilters.auth === 'pending' && item.auth !== '待下发') return false;
+                if (currentFilters.auth === 'none' && item.auth !== '未下发') return false;
+            }
+        }
+        else if (currentTab === 'history') {
+            if (currentFilters.type && currentFilters.type !== 'all' && item.type !== currentFilters.type) return false;
+            if (currentFilters.rating && currentFilters.rating !== 'all') {
+                if (currentFilters.rating === '5' && item.rating < 5) return false;
+                if (currentFilters.rating === '4' && item.rating < 4) return false;
+                if (currentFilters.rating === '3' && item.rating > 3) return false;
+            }
+        }
+        else if (currentTab === 'abnormal') {
+            if (currentFilters.status && currentFilters.status !== 'all' && item.status !== currentFilters.status) return false;
+            if (currentFilters.level && currentFilters.level !== 'all' && item.level !== currentFilters.level) return false;
+        }
+        
+        return true;
+    });
+}
+
+// ==================== 表格渲染 ====================
+
+function renderTable() {
+    let sourceData = [];
+    switch(currentTab) {
+        case 'today': sourceData = todayVisitors; break;
+        case 'upcoming': sourceData = upcomingVisitors; break;
+        case 'history': sourceData = historyVisitors; break;
+        case 'abnormal': sourceData = abnormalVisitors; break;
+    }
+    
+    filteredData = filterData(sourceData);
+    
+    // 分页逻辑
+    const total = filteredData.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const start = (currentPage - 1) * pageSize;
+    const end = Math.min(start + pageSize, total);
+    const pageData = filteredData.slice(start, end);
+    
+    // 更新分页信息
+    document.getElementById('totalCount').textContent = total;
+    document.getElementById('showRange').textContent = total > 0 ? `${start + 1}-${end}` : '0-0';
+    document.getElementById('prevBtn').disabled = currentPage === 1;
+    document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+    
+    // 渲染页码
+    renderPageNumbers(totalPages);
+    
+    // 渲染表头和表格
+    const thead = document.getElementById('tableHead');
+    const tbody = document.getElementById('visitorTable');
+    
+    thead.innerHTML = getTableHeader();
+    tbody.innerHTML = pageData.map(item => renderRow(item)).join('');
+}
+
+function renderPageNumbers(totalPages) {
+    const container = document.getElementById('pageNumbers');
+    let html = '';
+    
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+    
+    if (endPage - startPage < maxVisible - 1) {
+        startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+    
+    if (startPage > 1) {
+        html += `<button onclick="goToPage(1)" class="px-3 py-1 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-white">1</button>`;
+        if (startPage > 2) html += `<span class="px-2 text-slate-400">...</span>`;
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const isActive = i === currentPage;
+        html += `<button onclick="goToPage(${i})" class="px-3 py-1 border ${isActive ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-300 text-slate-600 hover:bg-white'} rounded-lg text-sm font-medium transition-all">${i}</button>`;
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) html += `<span class="px-2 text-slate-400">...</span>`;
+        html += `<button onclick="goToPage(${totalPages})" class="px-3 py-1 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-white">${totalPages}</button>`;
+    }
+    
+    container.innerHTML = html;
+}
+
+function changePage(delta) {
+    const totalPages = Math.ceil(filteredData.length / pageSize);
+    const newPage = currentPage + delta;
+    if (newPage >= 1 && newPage <= totalPages) {
+        currentPage = newPage;
+        renderTable();
+    }
+}
+
+function goToPage(page) {
+    currentPage = page;
+    renderTable();
+}
+
+function getTableHeader() {
+    switch(currentTab) {
+        case 'today':
+            return `<tr class="bg-slate-50 border-b border-slate-200">
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase w-10"><input type="checkbox" class="rounded border-slate-300 text-blue-600"></th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">访客信息</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">被访人</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">来访事由</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">状态/时间</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">当前位置</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase text-right">操作</th>
+            </tr>`;
+        case 'upcoming':
+            return `<tr class="bg-slate-50 border-b border-slate-200">
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase w-10"><input type="checkbox" class="rounded border-slate-300 text-blue-600"></th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">访客信息</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">被访人</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">来访事由</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">预约时间</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">审批状态</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase text-right">操作</th>
+            </tr>`;
+        case 'history':
+            return `<tr class="bg-slate-50 border-b border-slate-200">
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase w-10"><input type="checkbox" class="rounded border-slate-300 text-blue-600"></th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">访客信息</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">被访人</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">进入/离开时间</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">访问时长</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">评价</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase text-right">操作</th>
+            </tr>`;
+        case 'abnormal':
+            return `<tr class="bg-slate-50 border-b border-slate-200">
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase w-10"><input type="checkbox" class="rounded border-slate-300 text-blue-600"></th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">访客信息</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">异常类型</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">发生时间</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">风险等级</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase">当前状态</th>
+                <th class="p-4 text-xs font-semibold text-slate-500 uppercase text-right">处理</th>
+            </tr>`;
+    }
+}
+
+function renderRow(v) {
+    switch(currentTab) {
+        case 'today': return renderTodayRow(v);
+        case 'upcoming': return renderUpcomingRow(v);
+        case 'history': return renderHistoryRow(v);
+        case 'abnormal': return renderAbnormalRow(v);
+    }
+}
+
+function renderTodayRow(v) {
+    return `<tr class="table-row-hover bg-white border-b border-slate-50 last:border-0">
+        <td class="p-4"><input type="checkbox" class="rounded border-slate-300 text-blue-600"></td>
+        <td class="p-4">
+            <div class="flex items-center gap-3 cursor-pointer" onclick="openDetail(${v.id})">
+                <div class="relative">
+                    <img src="${v.avatar}" class="w-10 h-10 rounded-full object-cover border border-slate-200" alt="${v.name}">
+                    <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2"><span class="font-medium text-slate-800 hover:text-blue-600">${v.name}</span>${getTypeBadge(v.type)}</div>
+                    <div class="text-xs text-slate-500 mt-0.5">${v.phone}</div>
+                </div>
+            </div>
+        </td>
+        <td class="p-4"><div class="text-sm font-medium text-slate-800">${v.host}</div><div class="text-xs text-slate-500">${v.hostDept}</div></td>
+        <td class="p-4"><div class="text-sm text-slate-700">${v.reason}</div></td>
+        <td class="p-4"><div class="flex flex-col gap-1"><span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 w-fit"><span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>在访中</span><span class="text-xs text-slate-400">到访 ${v.time}</span></div></td>
+        <td class="p-4"><span class="text-sm text-slate-700"><i class="fas fa-map-marker-alt text-blue-500 mr-1"></i>${v.location}</span></td>
+        <td class="p-4 text-right"><div class="flex justify-end gap-2"><button onclick="openDetail(${v.id})" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><i class="fas fa-eye"></i></button><button class="p-2 text-orange-600 hover:bg-orange-50 rounded-lg" title="签离"><i class="fas fa-sign-out-alt"></i></button></div></td>
+    </tr>`;
+}
+
+function renderUpcomingRow(v) {
+    const statusClass = v.status === 'approved' ? 'bg-green-100 text-green-800' : v.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800';
+    const statusText = v.status === 'approved' ? '已通过' : v.status === 'rejected' ? '已拒绝' : '待审批';
+    return `<tr class="table-row-hover bg-white border-b border-slate-50 last:border-0">
+        <td class="p-4"><input type="checkbox" class="rounded border-slate-300 text-blue-600"></td>
+        <td class="p-4">
+            <div class="flex items-center gap-3">
+                <img src="${v.avatar}" class="w-10 h-10 rounded-full object-cover border border-slate-200" alt="${v.name}">
+                <div><div class="flex items-center gap-2"><span class="font-medium text-slate-800">${v.name}</span>${getTypeBadge(v.type)}</div><div class="text-xs text-slate-500 mt-0.5">${v.phone}</div></div>
+            </div>
+        </td>
+        <td class="p-4"><div class="text-sm font-medium text-slate-800">${v.host}</div><div class="text-xs text-slate-500">${v.hostDept}</div></td>
+        <td class="p-4"><div class="text-sm text-slate-700">${v.reason}</div></td>
+        <td class="p-4"><div class="text-sm font-medium text-slate-800">${v.time}</div><div class="text-xs text-slate-500">今日</div></td>
+        <td class="p-4"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">${statusText}</span>${v.status === 'approved' ? '<div class="text-xs text-slate-400 mt-1">待下发权限</div>' : ''}</td>
+        <td class="p-4 text-right"><div class="flex justify-end gap-2">${v.status === 'pending' ? `<button onclick="openApprovalDetail(${v.id})" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 font-medium">审批</button>` : `<button onclick="openApprovalDetail(${v.id})" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><i class="fas fa-eye"></i></button>`}</div></td>
+    </tr>`;
+}
+
+function renderHistoryRow(v) {
+    return `<tr class="table-row-hover bg-white border-b border-slate-50 last:border-0">
+        <td class="p-4"><input type="checkbox" class="rounded border-slate-300 text-blue-600"></td>
+        <td class="p-4"><div class="flex items-center gap-3"><img src="${v.avatar}" class="w-10 h-10 rounded-full object-cover border border-slate-200 opacity-80 grayscale-[30%]" alt="${v.name}"><div><div class="flex items-center gap-2"><span class="font-medium text-slate-800">${v.name}</span>${getTypeBadge(v.type)}</div><div class="text-xs text-slate-500">${v.phone}</div></div></div></td>
+        <td class="p-4"><div class="text-sm font-medium text-slate-800">${v.host}</div><div class="text-xs text-slate-500">${v.hostDept}</div></td>
+        <td class="p-4"><div class="text-xs text-slate-600"><div class="text-green-600"><i class="fas fa-sign-in-alt mr-1"></i>${v.inTime}</div><div class="text-slate-400 mt-0.5"><i class="fas fa-sign-out-alt mr-1"></i>${v.outTime}</div></div></td>
+        <td class="p-4"><div class="text-sm font-medium text-slate-800">${v.duration}</div></td>
+        <td class="p-4"><div class="flex items-center gap-1 text-yellow-500 text-sm"><i class="fas fa-star"></i><span class="font-medium text-slate-700">${v.rating}</span></div></td>
+        <td class="p-4 text-right"><button onclick="openDetail(${v.id})" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><i class="fas fa-eye"></i></button></td>
+    </tr>`;
+}
+
+function renderAbnormalRow(v) {
+    const levelColors = { high: 'red', medium: 'orange', low: 'yellow' };
+    const levelText = { high: '高风险', medium: '中风险', low: '低风险' };
+    const typeColors = { overtime: 'red', unauthorized: 'purple', noshow: 'gray', conflict: 'orange' };
+    const typeText = { overtime: '超时滞留', unauthorized: '非法闯入', noshow: '未按时到访', conflict: '预约冲突' };
+    
+    return `<tr class="table-row-hover bg-white border-b border-slate-50 last:border-0 ${v.level === 'high' ? 'bg-red-50/30' : ''}">
+        <td class="p-4"><input type="checkbox" class="rounded border-slate-300 text-blue-600"></td>
+        <td class="p-4"><div class="flex items-center gap-3"><img src="${v.avatar}" class="w-10 h-10 rounded-full object-cover border border-slate-200" alt="${v.name}"><div><div class="font-medium text-slate-800">${v.name}</div><div class="text-xs text-slate-500">${v.phone}</div></div></div></td>
+        <td class="p-4"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${typeColors[v.status]}-100 text-${typeColors[v.status]}-700">${typeText[v.status]}</span><div class="text-xs text-slate-500 mt-1">${v.details}</div></td>
+        <td class="p-4"><div class="text-sm text-slate-800">${v.time}</div>${v.overdue ? `<div class="text-xs text-red-600 font-medium">超期 ${v.overdue}</div>` : ''}</td>
+        <td class="p-4"><span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-${levelColors[v.level]}-100 text-${levelColors[v.level]}-700"><span class="w-1.5 h-1.5 bg-${levelColors[v.level]}-500 rounded-full"></span>${levelText[v.level]}</span></td>
+        <td class="p-4"><div class="text-sm text-slate-700">${v.location || '-'}</div></td>
+        <td class="p-4 text-right"><div class="flex justify-end gap-2"><button class="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700">处理</button><button class="p-2 text-slate-400 hover:bg-slate-100 rounded-lg"><i class="fas fa-ellipsis-v"></i></button></div></td>
+    </tr>`;
+}
+
+function getTypeBadge(type) {
+    const types = {
+        business: '<span class="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] rounded-full border border-blue-100">商务</span>',
+        vip: '<span class="px-2 py-0.5 bg-purple-50 text-purple-600 text-[10px] rounded-full border border-purple-100">VIP</span>',
+        contractor: '<span class="px-2 py-0.5 bg-orange-50 text-orange-600 text-[10px] rounded-full border border-orange-100">外协</span>',
+        interview: '<span class="px-2 py-0.5 bg-green-50 text-green-600 text-[10px] rounded-full border border-green-100">面试</span>'
+    };
+    return types[type] || '';
+}
+
+// ==================== 待办事项渲染 ====================
+
+function renderTodoList(filter = 'all') {
+    const container = document.getElementById('todoList');
+    let filtered = todoItems;
+    if (filter !== 'all') filtered = todoItems.filter(t => t.type === filter);
+    
+    container.innerHTML = filtered.map(todo => {
+        const typeColors = {
+            warning: 'border-red-200 bg-red-50',
+            approval: 'border-yellow-200 bg-yellow-50',
+            system: 'border-blue-200 bg-blue-50'
+        };
+        const typeIcons = {
+            warning: 'fa-exclamation-triangle text-red-600',
+            approval: 'fa-user-check text-yellow-600',
+            system: 'fa-info-circle text-blue-600'
+        };
+        const levelBadges = {
+            high: '<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">紧急</span>',
+            medium: '<span class="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-medium">重要</span>',
+            low: '<span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-medium">普通</span>'
+        };
+        
+        return `<div class="flex gap-4 p-4 border ${typeColors[todo.type]} rounded-xl hover:shadow-md transition-all group cursor-pointer">
+            <div class="w-12 h-12 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                <i class="fas ${typeIcons[todo.type]} text-lg"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex justify-between items-start mb-1">
+                    <div class="flex items-center gap-2">
+                        <h4 class="font-bold text-slate-800">${todo.title}</h4>
+                        ${levelBadges[todo.level]}
+                    </div>
+                    <span class="text-xs text-slate-400">${todo.time}</span>
+                </div>
+                <p class="text-sm text-slate-600 mb-3 leading-relaxed">${todo.content}</p>
+                <div class="flex gap-2">
+                    <button class="px-4 py-1.5 ${todo.actionType === 'danger' ? 'bg-red-600 text-white hover:bg-red-700' : todo.actionType === 'primary' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'} rounded-lg text-sm font-medium transition-all">
+                        ${todo.action}
+                    </button>
+                    <button class="px-4 py-1.5 text-slate-500 hover:text-slate-700 text-sm transition-all">忽略</button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function filterTodos(type) {
+    renderTodoList(type);
+    document.querySelectorAll('#todoModal .w-64 button').forEach(btn => {
+        btn.classList.remove('bg-white', 'shadow-sm', 'border-slate-200', 'text-slate-800');
+        btn.classList.add('border-transparent', 'text-slate-600');
+    });
+    event.currentTarget.classList.add('bg-white', 'shadow-sm', 'border-slate-200', 'text-slate-800');
+    event.currentTarget.classList.remove('border-transparent', 'text-slate-600');
+}
+
+// ==================== 通用交互 ====================
+
+function switchTab(tab) {
+    currentTab = tab;
+    
+    // 更新按钮样式
+    ['today', 'upcoming', 'history', 'abnormal'].forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        if (t === tab) {
+            btn.className = 'px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium transition-all shadow-sm shadow-blue-200';
+        } else {
+            btn.className = 'px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium transition-all';
+        }
+    });
+    
+    // 重置筛选并渲染
+    resetFilters();
+}
+
+function openDetail(id) {
+    let v = [...todayVisitors, ...upcomingVisitors, ...historyVisitors].find(item => item.id === id);
+    if (!v) return;
+    
+    document.getElementById('detailAvatar').src = v.avatar;
+    document.getElementById('detailName').textContent = v.name;
+    document.getElementById('detailType').textContent = v.type === 'business' ? '商务访客' : v.type === 'vip' ? 'VIP访客' : v.type === 'contractor' ? '外协人员' : '面试候选';
+    document.getElementById('detailStatus').textContent = v.status === 'in' ? '在访中' : v.status === 'completed' ? '已签离' : '待到访';
+    document.getElementById('detailStatus').className = `px-2 py-0.5 rounded text-xs font-medium ${v.status === 'in' ? 'bg-green-100 text-green-700' : v.status === 'completed' ? 'bg-slate-100 text-slate-600' : 'bg-yellow-100 text-yellow-700'}`;
+    document.getElementById('detailPhone').textContent = v.phone;
+    document.getElementById('detailHost').textContent = v.host;
+    document.getElementById('detailDept').textContent = v.hostDept;
+    document.getElementById('detailReason').textContent = v.reason;
+    
+    document.getElementById('detailDrawer').classList.add('open');
+    document.getElementById('drawerOverlay').classList.remove('hidden');
+}
+
+function closeDrawer() {
+    document.getElementById('detailDrawer').classList.remove('open');
+    document.getElementById('drawerOverlay').classList.add('hidden');
+}
+
+function openModal(modalId) {
+    document.getElementById(modalId).classList.remove('hidden');
+    if (modalId === 'todoModal') renderTodoList();
+    if (modalId === 'approvalCenterModal') renderApprovalList();
+    document.body.style.overflow = 'hidden';
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+// 点击外部关闭
+window.onclick = function(event) {
+    if (event.target.classList.contains('fixed') && event.target.id && event.target.id !== 'drawerOverlay') {
+        if (!event.target.id.includes('Modal')) return;
+        event.target.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+}
+
+// 启动
+init();
+</script>
+
+</body>
+</html>

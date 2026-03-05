@@ -205,6 +205,16 @@ public interface IotAccessPersonService {
     void replaceCard(Long credentialId, String newCardNo);
 
     /**
+     * 保存卡片二维码图片
+     *
+     * @param personId     人员ID
+     * @param credentialId 凭证ID
+     * @param qrCodeData   二维码图片数据
+     * @return 二维码图片URL
+     */
+    String saveCardQrCode(Long personId, Long credentialId, byte[] qrCodeData);
+
+    /**
      * 获取人员凭证列表（包含详细信息）
      *
      * @param personId 人员ID

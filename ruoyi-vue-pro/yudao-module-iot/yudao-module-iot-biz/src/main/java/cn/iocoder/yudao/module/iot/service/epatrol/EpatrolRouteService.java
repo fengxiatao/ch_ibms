@@ -48,6 +48,11 @@ public interface EpatrolRouteService {
     PageResult<EpatrolRouteDO> getRoutePage(EpatrolRoutePageReqVO pageReqVO);
 
     /**
+     * 获得巡更路线分页（包含点位列表）
+     */
+    PageResult<EpatrolRouteRespVO> getRoutePageWithPoints(EpatrolRoutePageReqVO pageReqVO);
+
+    /**
      * 获得所有启用的巡更路线
      */
     List<EpatrolRouteDO> getEnabledRouteList();

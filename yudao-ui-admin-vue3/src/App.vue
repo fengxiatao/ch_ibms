@@ -1,5 +1,4 @@
 <script lang="ts" setup>
-import { isDark } from '@/utils/is'
 import { useAppStore } from '@/store/modules/app'
 import { useDesign } from '@/hooks/web/useDesign'
 import { CACHE_KEY, useCache } from '@/hooks/web/useCache'
@@ -18,13 +17,13 @@ const { wsCache } = useCache()
 // 初始化视口Hook，设置全局CSS变量
 useViewport()
 
-// 根据浏览器当前主题设置系统主题色
+// 设置系统主题色（默认深色模式）
 const setDefaultTheme = () => {
   let isDarkTheme = wsCache.get(CACHE_KEY.IS_DARK)
   if (isDarkTheme === null) {
-    isDarkTheme = isDark()
+    isDarkTheme = true
   }
-  appStore.setIsDark(isDarkTheme)
+  appStore.setIsDark(!!isDarkTheme)
 }
 setDefaultTheme()
 </script>

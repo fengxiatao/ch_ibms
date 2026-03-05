@@ -501,14 +501,15 @@ public class IotDeviceActivationServiceImpl implements IotDeviceActivationServic
 
         Boolean supportVideo = null;
         
-        // Try to get supportVideo from AccessDeviceConfig
+        // Try to get supportVideo and accessDeviceType from AccessDeviceConfig
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
+            String configDeviceType = config.getAccessDeviceType();
             supportVideo = config.getSupportVideo();
             
-            // If supportVideo is set, this is an access device
-            if (supportVideo != null) {
-                return AccessDeviceTypeConstants.getDeviceType(supportVideo);
+            // If accessDeviceType or supportVideo is set, this is an access device
+            if (configDeviceType != null || supportVideo != null) {
+                return AccessDeviceTypeConstants.resolveDeviceType(configDeviceType, supportVideo);
             }
             
             // Check if config has ipAddress (access devices typically have this)

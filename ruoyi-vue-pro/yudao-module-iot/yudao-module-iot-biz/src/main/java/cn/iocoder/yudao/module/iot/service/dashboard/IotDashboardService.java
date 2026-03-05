@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.iot.service.dashboard;
 
 import cn.iocoder.yudao.module.iot.controller.admin.dashboard.vo.AlertStatisticsRespVO;
 import cn.iocoder.yudao.module.iot.controller.admin.dashboard.vo.DeviceStatisticsRespVO;
+import cn.iocoder.yudao.module.iot.controller.admin.dashboard.vo.HomeScreenRespVO;
 import cn.iocoder.yudao.module.iot.controller.admin.dashboard.vo.RealTimeMonitorRespVO;
 
 /**
@@ -31,6 +32,13 @@ public interface IotDashboardService {
      * @return 实时监控数据
      */
     RealTimeMonitorRespVO getRealTimeMonitor();
+
+    /**
+     * 获取首页大屏统计数据
+     *
+     * @return 首页大屏统计数据
+     */
+    HomeScreenRespVO getHomeScreenData();
 }
 
 

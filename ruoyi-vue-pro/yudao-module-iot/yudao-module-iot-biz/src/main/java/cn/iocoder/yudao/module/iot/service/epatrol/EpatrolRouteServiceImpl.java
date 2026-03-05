@@ -46,9 +46,9 @@ public class EpatrolRouteServiceImpl implements EpatrolRouteService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createRoute(EpatrolRouteSaveReqVO createReqVO) {
-        // 计算路线总耗时
-        int totalDuration = 0;
-        if (CollUtil.isNotEmpty(createReqVO.getPoints())) {
+        // 使用前端传递的总时长，如果没有则计算
+        int totalDuration = createReqVO.getTotalDuration() != null ? createReqVO.getTotalDuration() : 0;
+        if (totalDuration == 0 && CollUtil.isNotEmpty(createReqVO.getPoints())) {
             for (EpatrolRouteSaveReqVO.RoutePointItem item : createReqVO.getPoints()) {
                 totalDuration += item.getIntervalMinutes() != null ? item.getIntervalMinutes() : 0;
             }
@@ -57,7 +57,7 @@ public class EpatrolRouteServiceImpl implements EpatrolRouteService {
         // 插入路线
         EpatrolRouteDO route = new EpatrolRouteDO();
         route.setRouteName(createReqVO.getRouteName());
-        route.setPointCount(createReqVO.getPoints().size());
+        route.setPointCount(CollUtil.isNotEmpty(createReqVO.getPoints()) ? createReqVO.getPoints().size() : 0);
         route.setTotalDuration(totalDuration);
         route.setStatus(1); // 默认启用
         route.setRemark(createReqVO.getRemark());
@@ -84,9 +84,9 @@ public class EpatrolRouteServiceImpl implements EpatrolRouteService {
         // 校验存在
         validateRouteExists(updateReqVO.getId());
 
-        // 计算路线总耗时
-        int totalDuration = 0;
-        if (CollUtil.isNotEmpty(updateReqVO.getPoints())) {
+        // 使用前端传递的总时长，如果没有则计算
+        int totalDuration = updateReqVO.getTotalDuration() != null ? updateReqVO.getTotalDuration() : 0;
+        if (totalDuration == 0 && CollUtil.isNotEmpty(updateReqVO.getPoints())) {
             for (EpatrolRouteSaveReqVO.RoutePointItem item : updateReqVO.getPoints()) {
                 totalDuration += item.getIntervalMinutes() != null ? item.getIntervalMinutes() : 0;
             }
@@ -96,7 +96,7 @@ public class EpatrolRouteServiceImpl implements EpatrolRouteService {
         EpatrolRouteDO updateObj = new EpatrolRouteDO();
         updateObj.setId(updateReqVO.getId());
         updateObj.setRouteName(updateReqVO.getRouteName());
-        updateObj.setPointCount(updateReqVO.getPoints().size());
+        updateObj.setPointCount(CollUtil.isNotEmpty(updateReqVO.getPoints()) ? updateReqVO.getPoints().size() : 0);
         updateObj.setTotalDuration(totalDuration);
         updateObj.setRemark(updateReqVO.getRemark());
         routeMapper.updateById(updateObj);
@@ -180,7 +180,100 @@ public class EpatrolRouteServiceImpl implements EpatrolRouteService {
 
     @Override
     public PageResult<EpatrolRouteDO> getRoutePage(EpatrolRoutePageReqVO pageReqVO) {
+        // 如果有点位名称搜索条件，先查询包含该点位的路线ID
+        if (pageReqVO.getPointName() != null && !pageReqVO.getPointName().isEmpty()) {
+            // 查询符合条件的点位
+            List<EpatrolPointDO> points = pointMapper.selectList(
+                    new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<EpatrolPointDO>()
+                            .like(EpatrolPointDO::getPointName, pageReqVO.getPointName()));
+            if (CollUtil.isEmpty(points)) {
+                return new PageResult<>(new ArrayList<>(), 0L);
+            }
+            // 查询包含这些点位的路线ID
+            List<Long> pointIds = points.stream().map(EpatrolPointDO::getId).collect(Collectors.toList());
+            List<EpatrolRoutePointDO> routePoints = routePointMapper.selectList(
+                    new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<EpatrolRoutePointDO>()
+                            .in(EpatrolRoutePointDO::getPointId, pointIds));
+            if (CollUtil.isEmpty(routePoints)) {
+                return new PageResult<>(new ArrayList<>(), 0L);
+            }
+            List<Long> routeIds = routePoints.stream().map(EpatrolRoutePointDO::getRouteId).distinct().collect(Collectors.toList());
+            // 在这些路线中分页查询
+            return routeMapper.selectPage(pageReqVO, new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<EpatrolRouteDO>()
+                    .in(EpatrolRouteDO::getId, routeIds)
+                    .likeIfPresent(EpatrolRouteDO::getRouteName, pageReqVO.getRouteName())
+                    .eqIfPresent(EpatrolRouteDO::getStatus, pageReqVO.getStatus())
+                    .orderByDesc(EpatrolRouteDO::getId));
+        }
         return routeMapper.selectPage(pageReqVO);
+    }
+
+    @Override
+    public PageResult<EpatrolRouteRespVO> getRoutePageWithPoints(EpatrolRoutePageReqVO pageReqVO) {
+        // 先获取分页数据
+        PageResult<EpatrolRouteDO> pageResult = getRoutePage(pageReqVO);
+        if (CollUtil.isEmpty(pageResult.getList())) {
+            return new PageResult<>(new ArrayList<>(), pageResult.getTotal());
+        }
+
+        // 获取所有路线ID
+        List<Long> routeIds = pageResult.getList().stream()
+                .map(EpatrolRouteDO::getId)
+                .collect(Collectors.toList());
+
+        // 批量查询所有路线的点位关联
+        List<EpatrolRoutePointDO> allRoutePoints = routePointMapper.selectList(
+                new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<EpatrolRoutePointDO>()
+                        .in(EpatrolRoutePointDO::getRouteId, routeIds)
+                        .orderByAsc(EpatrolRoutePointDO::getSort));
+
+        // 获取所有点位ID
+        List<Long> pointIds = allRoutePoints.stream()
+                .map(EpatrolRoutePointDO::getPointId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // 批量查询点位详情
+        Map<Long, EpatrolPointDO> pointMap = new java.util.HashMap<>();
+        if (CollUtil.isNotEmpty(pointIds)) {
+            List<EpatrolPointDO> points = pointMapper.selectBatchIds(pointIds);
+            pointMap = points.stream().collect(Collectors.toMap(EpatrolPointDO::getId, p -> p));
+        }
+
+        // 按路线ID分组点位
+        Map<Long, List<EpatrolRoutePointDO>> routePointsMap = allRoutePoints.stream()
+                .collect(Collectors.groupingBy(EpatrolRoutePointDO::getRouteId));
+
+        // 转换为RespVO
+        List<EpatrolRouteRespVO> respList = new ArrayList<>();
+        for (EpatrolRouteDO route : pageResult.getList()) {
+            EpatrolRouteRespVO respVO = BeanUtils.toBean(route, EpatrolRouteRespVO.class);
+
+            // 填充点位信息
+            List<EpatrolRoutePointDO> routePoints = routePointsMap.get(route.getId());
+            if (CollUtil.isNotEmpty(routePoints)) {
+                List<EpatrolRouteRespVO.RoutePointRespVO> pointRespVOs = new ArrayList<>();
+                for (EpatrolRoutePointDO rp : routePoints) {
+                    EpatrolRouteRespVO.RoutePointRespVO pointResp = new EpatrolRouteRespVO.RoutePointRespVO();
+                    pointResp.setId(rp.getId());
+                    pointResp.setPointId(rp.getPointId());
+                    pointResp.setSort(rp.getSort());
+                    pointResp.setIntervalMinutes(rp.getIntervalMinutes());
+
+                    EpatrolPointDO point = pointMap.get(rp.getPointId());
+                    if (point != null) {
+                        pointResp.setPointNo(point.getPointNo());
+                        pointResp.setPointName(point.getPointName());
+                        pointResp.setPointLocation(point.getPointLocation());
+                    }
+                    pointRespVOs.add(pointResp);
+                }
+                respVO.setPoints(pointRespVOs);
+            }
+            respList.add(respVO);
+        }
+
+        return new PageResult<>(respList, pageResult.getTotal());
     }
 
     @Override

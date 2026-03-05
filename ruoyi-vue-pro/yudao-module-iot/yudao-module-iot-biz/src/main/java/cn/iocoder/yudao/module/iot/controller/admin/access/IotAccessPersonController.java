@@ -238,6 +238,21 @@ public class IotAccessPersonController {
         return success(true);
     }
 
+    @PostMapping("/card/save-qrcode")
+    @Operation(summary = "保存卡片二维码图片")
+    @PreAuthorize("@ss.hasPermission('iot:access-person:update')")
+    public CommonResult<String> saveCardQrCode(
+            @RequestParam("personId") Long personId,
+            @RequestParam("credentialId") Long credentialId,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            String qrCodeUrl = personService.saveCardQrCode(personId, credentialId, file.getBytes());
+            return success(qrCodeUrl);
+        } catch (Exception e) {
+            return CommonResult.error(500, "保存二维码失败: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/credentials/{personId}")
     @Operation(summary = "获取人员凭证列表")
     @Parameter(name = "personId", description = "人员ID", required = true)

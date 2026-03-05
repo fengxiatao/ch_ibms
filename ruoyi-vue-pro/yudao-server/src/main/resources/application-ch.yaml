@@ -47,12 +47,12 @@ spring:
       primary: master
       datasource:
         master:
-          url: jdbc:mysql://127.0.0.1:3306/ch_ibms?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true&tinyInt1isBit=true # MySQL Connector/J 8.X 连接的示例
+          url: jdbc:mysql://127.0.0.1:3306/ch_ibms?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true&tinyInt1isBit=true&useUnicode=true&characterEncoding=UTF-8 # MySQL Connector/J 8.X 连接的示例
           username: root
           password: 123456
         slave: # 模拟从库，可根据自己需要修改 # 模拟从库，可根据自己需要修改
           lazy: true # 开启懒加载，保证启动速度
-          url: jdbc:mysql://127.0.0.1:3306/ch_ibms?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true&tinyInt1isBit=true # MySQL Connector/J 8.X 连接的示例
+          url: jdbc:mysql://127.0.0.1:3306/ch_ibms?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true&tinyInt1isBit=true&useUnicode=true&characterEncoding=UTF-8 # MySQL Connector/J 8.X 连接的示例
           username: root
           password: 123456
         tdengine: # IoT 数据库（暂停使用 - 长辉设备不需要）
@@ -108,7 +108,7 @@ spring:
             threadPriority: 5 # 线程优先级
             class: org.quartz.simpl.SimpleThreadPool # 线程池类型
     jdbc: # 使用 JDBC 的 JobStore 的时候，JDBC 的配置
-      initialize-schema: NEVER # 是否自动使用 SQL 初始化 Quartz 表结构。这里设置成 never ，我们手动创建表结构。
+      initialize-schema: ALWAYS # 自动创建 Quartz 表结构（解决 Linux MySQL 表名大小写问题）
 
 --- #################### 消息队列相关 ####################
 

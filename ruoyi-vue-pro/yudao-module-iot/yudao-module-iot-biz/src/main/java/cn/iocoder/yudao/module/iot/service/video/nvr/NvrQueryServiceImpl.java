@@ -57,17 +57,42 @@ public class NvrQueryServiceImpl implements NvrQueryService {
 
     @Override
     public List<IotDeviceDO> getNvrList() {
-        // 仅按产品ID=4 识别 NVR；租户与逻辑删除由全局拦截器处理
+        // 识别 NVR 设备的条件（满足任一即可）：
+        // 1. product_id = 4（NVR产品）
+        // 2. config JSON 字段中 deviceType = "NVR"
+        // 租户与逻辑删除由全局拦截器处理
         List<IotDeviceDO> result = new ArrayList<>();
+        java.util.Set<Long> addedIds = new java.util.HashSet<>();
+        
         try {
+            // 方式1：按产品ID查询
             List<IotDeviceDO> listByProduct = deviceMapper.selectListByProductId(NVR_PRODUCT_ID);
             if (!CollUtil.isEmpty(listByProduct)) {
-                result.addAll(listByProduct);
+                for (IotDeviceDO device : listByProduct) {
+                    if (addedIds.add(device.getId())) {
+                        result.add(device);
+                    }
+                }
             }
-        } catch (Exception ignored) {}
+            
+            // 方式2：按 config.deviceType = "NVR" 查询
+            List<IotDeviceDO> listByConfig = deviceMapper.selectNvrDevices();
+            if (!CollUtil.isEmpty(listByConfig)) {
+                for (IotDeviceDO device : listByConfig) {
+                    if (addedIds.add(device.getId())) {
+                        result.add(device);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[NVR] 查询NVR设备列表异常: {}", e.getMessage());
+        }
+        
         // 在线优先、按ID倒序
         result.sort(Comparator.comparing(IotDeviceDO::getState, Comparator.nullsLast(Integer::compareTo)).reversed()
                 .thenComparing(IotDeviceDO::getId, Comparator.nullsLast(Long::compareTo)).reversed());
+        
+        log.info("[NVR] 查询到 {} 台NVR设备", result.size());
         return result;
     }
 

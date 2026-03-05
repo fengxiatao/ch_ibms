@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>授权信息弹窗</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .card-shadow {
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            }
+            .form-input-focus {
+                @apply focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary;
+            }
+            .badge-tag {
+                @apply bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-sm flex items-center justify-between gap-2;
+            }
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1677ff',
+                        success: '#52c41a',
+                        warning: '#faad14',
+                        danger: '#ff4d4f',
+                        info: '#40a9ff',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        };
+    </script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <!-- 弹窗遮罩层 -->
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <!-- 弹窗主体 -->
+        <div class="bg-white rounded-xl w-full max-w-md card-shadow overflow-hidden">
+            <!-- 弹窗头部 -->
+            <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/70 flex justify-between items-center">
+                <h3 class="text-lg font-medium text-gray-800">授权信息</h3>
+                <button class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- 弹窗内容区 -->
+            <div class="p-6">
+                <form class="space-y-5">
+                    <!-- 门禁卡号 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">门禁卡号</label>
+                        <input 
+                            type="text" 
+                            value="12684329" 
+                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm form-input-focus"
+                            placeholder="请输入门禁卡号"
+                        >
+                    </div>
+                    
+                    <!-- 人脸图片 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">人脸图片</label>
+                        <div class="flex items-center gap-4">
+                            <div class="w-28 h-28 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center">
+                                <img 
+                                    src="https://picsum.photos/200/200" 
+                                    alt="人脸照片" 
+                                    class="w-full h-full object-cover"
+                                >
+                            </div>
+                            <div class="flex flex-col gap-2">
+                                <button type="button" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1 w-24">
+                                    <i class="fa fa-upload text-xs"></i> 更换图片
+                                </button>
+                                <button type="button" class="px-3 py-1.5 text-sm bg-danger/10 text-danger rounded-lg hover:bg-danger/20 transition-colors flex items-center gap-1 w-24">
+                                    <i class="fa fa-trash text-xs"></i> 删除图片
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 门禁权限 -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="block text-sm font-medium text-gray-700">门禁权限</label>
+                            <button type="button" class="px-3 py-1 text-xs bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1">
+                                <i class="fa fa-plus text-xs"></i> 添加
+                            </button>
+                        </div>
+                        
+                        <!-- 权限列表 -->
+                        <div class="space-y-2">
+                            <div class="badge-tag">
+                                <span>192.168.1.207-人脸门</span>
+                                <button type="button" class="text-gray-400 hover:text-danger transition-colors">
+                                    <i class="fa fa-times text-xs"></i>
+                                </button>
+                            </div>
+                            <div class="badge-tag">
+                                <span>192.168.1.208-读卡器门</span>
+                                <button type="button" class="text-gray-400 hover:text-danger transition-colors">
+                                    <i class="fa fa-times text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- 弹窗底部操作区 -->
+            <div class="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+                <button type="button" class="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                    取消
+                </button>
+                <button type="button" class="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                    下发
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

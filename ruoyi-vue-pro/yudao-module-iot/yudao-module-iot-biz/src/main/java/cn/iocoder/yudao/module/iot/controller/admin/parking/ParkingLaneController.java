@@ -79,4 +79,22 @@ public class ParkingLaneController {
         List<ParkingLaneDO> list = parkingLaneService.getParkingLaneListByLotId(lotId);
         return success(BeanUtils.toBean(list, ParkingLaneRespVO.class));
     }
+
+    @PostMapping("/open-gate")
+    @Operation(summary = "开闸（升闸）")
+    @Parameter(name = "laneId", description = "车道ID", required = true)
+    @PreAuthorize("@ss.hasPermission('iot:parking:lane:update')")
+    public CommonResult<Boolean> openGate(@RequestParam("laneId") Long laneId) {
+        parkingLaneService.openGate(laneId);
+        return success(true);
+    }
+
+    @PostMapping("/close-gate")
+    @Operation(summary = "关闸（落闸）")
+    @Parameter(name = "laneId", description = "车道ID", required = true)
+    @PreAuthorize("@ss.hasPermission('iot:parking:lane:update')")
+    public CommonResult<Boolean> closeGate(@RequestParam("laneId") Long laneId) {
+        parkingLaneService.closeGate(laneId);
+        return success(true);
+    }
 }

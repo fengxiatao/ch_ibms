@@ -220,19 +220,28 @@ public class IotAlarmZoneServiceImpl implements IotAlarmZoneService {
             return;
         }
         
-        // 2. 查找防区（使用字符串类型的zoneNo）
+        // 2. 将 zoneNo 字符串转换为整数（OPC协议传入的是 "003" 格式）
+        Integer zoneNoInt;
+        try {
+            zoneNoInt = Integer.parseInt(zoneNo);
+        } catch (NumberFormatException e) {
+            log.warn("[updateZoneStatusByDeviceIdAndZoneNo][防区号格式错误] zoneNo={}", zoneNo);
+            return;
+        }
+        
+        // 3. 查找防区（使用整数类型的zoneNo）
         IotAlarmZoneDO zone = alarmZoneMapper.selectOne(
                 IotAlarmZoneDO::getHostId, host.getId(),
-                IotAlarmZoneDO::getZoneNo, zoneNo
+                IotAlarmZoneDO::getZoneNo, zoneNoInt
         );
         
         if (zone == null) {
             log.warn("[updateZoneStatusByDeviceIdAndZoneNo][防区不存在] hostId={}, zoneNo={}", 
-                    host.getId(), zoneNo);
+                    host.getId(), zoneNoInt);
             return;
         }
         
-        // 3. 更新防区状态
+        // 4. 更新防区状态
         IotAlarmZoneDO updateObj = new IotAlarmZoneDO();
         updateObj.setId(zone.getId());
         updateObj.setZoneStatus(status);
@@ -244,11 +253,20 @@ public class IotAlarmZoneServiceImpl implements IotAlarmZoneService {
             updateObj.setLastAlarmTime(LocalDateTime.now());
         } else if ("NORMAL".equals(status)) {
             updateObj.setAlarmStatus(0);  // 正常
+        } else if ("BYPASS".equals(status)) {
+            // 旁路状态：设置 armStatus 为 2（旁路）
+            updateObj.setArmStatus(2);
+        } else if ("ARMED".equals(status)) {
+            // 布防状态：设置 armStatus 为 1（布防）
+            updateObj.setArmStatus(1);
+        } else if ("DISARMED".equals(status)) {
+            // 撤防状态：设置 armStatus 为 0（撤防）
+            updateObj.setArmStatus(0);
         }
         
         alarmZoneMapper.updateById(updateObj);
         
         log.info("[updateZoneStatusByDeviceIdAndZoneNo][防区状态已更新] zoneId={}, deviceId={}, zoneNo={}, status={}", 
-                zone.getId(), deviceId, zoneNo, status);
+                zone.getId(), deviceId, zoneNoInt, status);
     }
 }

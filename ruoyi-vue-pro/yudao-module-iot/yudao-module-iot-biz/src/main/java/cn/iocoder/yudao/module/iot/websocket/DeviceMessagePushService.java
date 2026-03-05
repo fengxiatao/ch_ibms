@@ -150,4 +150,80 @@ public class DeviceMessagePushService {
                     failure.getDeviceId(), failure.getServiceName(), e.getMessage(), e);
         }
     }
+
+    /**
+     * 推送门状态变化事件
+     * <p>当门禁操作（开门/关门/常开/常闭）成功后调用，通知前端更新门状态</p>
+     * 
+     * @param deviceId      设备ID
+     * @param deviceType    设备类型（ACCESS_GEN1/ACCESS_GEN2）
+     * @param channelId     通道ID
+     * @param channelNo     通道号
+     * @param doorStatus    门状态（0-关闭, 1-打开, 2-未知）
+     * @param lockStatus    锁状态（0-已锁, 1-已解锁, 2-未知）
+     * @param alwaysMode    控制模式（0-正常, 1-常开, 2-常闭）
+     * @param action        操作类型（OPEN_DOOR/CLOSE_DOOR/ALWAYS_OPEN/ALWAYS_CLOSE/CANCEL_ALWAYS）
+     */
+    public void pushDoorStateChange(Long deviceId, String deviceType, Long channelId, Integer channelNo,
+                                     Integer doorStatus, Integer lockStatus, Integer alwaysMode, String action) {
+        try {
+            java.util.Map<String, Object> eventData = new java.util.HashMap<>();
+            eventData.put("channelId", channelId);
+            eventData.put("channelNo", channelNo);
+            eventData.put("action", action);
+            eventData.put("timestamp", System.currentTimeMillis());
+            
+            // 只有非 null 的字段才放入 eventData（null 表示"不更新"）
+            if (doorStatus != null) {
+                eventData.put("doorStatus", doorStatus);
+                eventData.put("doorStatusDesc", getDoorStatusDesc(doorStatus));
+            }
+            if (lockStatus != null) {
+                eventData.put("lockStatus", lockStatus);
+                eventData.put("lockStatusDesc", getLockStatusDesc(lockStatus));
+            }
+            if (alwaysMode != null) {
+                eventData.put("alwaysMode", alwaysMode);
+                eventData.put("alwaysModeDesc", getAlwaysModeDesc(alwaysMode));
+            }
+
+            // 使用 DOOR_STATE_CHANGE 事件类型
+            pushDeviceEvent(deviceId, deviceType, "DOOR_STATE_CHANGE", eventData);
+            
+            log.info("[DeviceMessagePushService] 📡 推送门状态变化: deviceId={}, channelNo={}, action={}, " +
+                    "doorStatus={}, lockStatus={}, alwaysMode={}", 
+                    deviceId, channelNo, action, doorStatus, lockStatus, alwaysMode);
+        } catch (Exception e) {
+            log.error("[DeviceMessagePushService] ❌ 推送门状态变化失败: deviceId={}, channelNo={}, error={}",
+                    deviceId, channelNo, e.getMessage(), e);
+        }
+    }
+
+    private String getDoorStatusDesc(Integer status) {
+        if (status == null) return "未知";
+        return switch (status) {
+            case 0 -> "关闭";
+            case 1 -> "打开";
+            default -> "未知";
+        };
+    }
+
+    private String getLockStatusDesc(Integer status) {
+        if (status == null) return "未知";
+        return switch (status) {
+            case 0 -> "已锁";
+            case 1 -> "已解锁";
+            default -> "未知";
+        };
+    }
+
+    private String getAlwaysModeDesc(Integer mode) {
+        if (mode == null) return "正常";
+        return switch (mode) {
+            case 0 -> "正常";
+            case 1 -> "常开";
+            case 2 -> "常闭";
+            default -> "正常";
+        };
+    }
 }

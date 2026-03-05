@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧能源管理平台</title>
+    <style>
+        :root {
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --secondary: #6366f1;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --water: #0ea5e9;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --border: #e5e7eb;
+            --bg-primary: #f3f4f6;
+            --bg-secondary: #ffffff;
+            --sidebar-bg: #1f2937;
+            --sidebar-width: 260px;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.08);
+            --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); font-size: 14px; line-height: 1.5; }
+        .app-container { display: flex; min-height: 100vh; }
+        .sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); color: #fff; position: fixed; height: 100vh; overflow-y: auto; z-index: 100; transition: transform 0.3s ease; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 12px; }
+        .sidebar-logo { width: 40px; height: 40px; background: var(--primary); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .sidebar-title { font-size: 18px; font-weight: 600; }
+        .sidebar-subtitle { font-size: 11px; color: rgba(255,255,255,0.5); }
+        .nav-menu { padding: 15px 0; }
+        .nav-section { margin-bottom: 10px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 20px; color: rgba(255,255,255,0.7); cursor: pointer; transition: all 0.2s ease; gap: 12px; border-left: 3px solid transparent; }
+        .nav-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+        .nav-item.active { background: rgba(16, 185, 129, 0.15); color: var(--primary); border-left-color: var(--primary); }
+        .nav-item-icon { width: 20px; text-align: center; font-size: 16px; }
+        .nav-item-text { flex: 1; }
+        .main-content { flex: 1; margin-left: var(--sidebar-width); padding: 20px 30px; min-height: 100vh; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding: 20px 25px; background: var(--bg-secondary); border-radius: 12px; box-shadow: var(--shadow-sm); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 14px; }
+        .breadcrumb-item { color: var(--text-secondary); }
+        .breadcrumb-item.active { color: var(--text-primary); font-weight: 500; }
+        .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-weight: 500; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-secondary { background: var(--bg-primary); color: var(--text-primary); }
+        .btn-secondary:hover { background: #e5e7eb; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn.active { background: var(--primary); color: white; }
+        .filter-card-container {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 25px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+        .filter-group { flex: 1; min-width: 200px; }
+        .filter-label { display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary); font-size: 13px; }
+        .filter-select { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 14px; color: var(--text-primary); cursor: pointer; }
+        .filter-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1); }
+        .view-toggle { display: flex; gap: 8px; background: var(--bg-primary); padding: 4px; border-radius: 8px; }
+        .view-toggle .btn { padding: 6px 12px; font-size: 13px; }
+        .monitor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; margin-bottom: 25px; }
+        .monitor-card { background: var(--bg-secondary); border-radius: 12px; padding: 20px; box-shadow: var(--shadow-sm); transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer; position: relative; overflow: hidden; }
+        .monitor-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .monitor-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #3b82f6; }
+        .monitor-card.water::before { background: var(--water); }
+        .monitor-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+        .monitor-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .monitor-device-info { font-size: 12px; color: var(--text-secondary); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .monitor-device-id { background: rgba(59, 130, 246, 0.1); color: #3b82f6; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+        .monitor-device-id.water { background: rgba(14, 165, 233, 0.1); color: var(--water); }
+        .electric-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 15px 0; }
+        .water-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 15px 0; }
+        .metric-item { text-align: center; padding: 12px 8px; background: rgba(59, 130, 246, 0.05); border-radius: 8px; }
+        .metric-item.water { background: rgba(14, 165, 233, 0.05); }
+        .metric-value { font-size: 18px; font-weight: 700; color: #3b82f6; font-family: 'SF Mono', Monaco, monospace; }
+        .metric-value.water { color: var(--water); }
+        .metric-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+        .click-hint { position: absolute; bottom: 10px; right: 10px; font-size: 11px; color: var(--text-secondary); opacity: 0.7; }
+        .list-view { display: none; background: var(--bg-secondary); border-radius: 12px; padding: 20px; box-shadow: var(--shadow-sm); }
+        .list-view.active { display: block; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .data-table th { padding: 12px 15px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 2px solid var(--border); }
+        .data-table td { padding: 12px 15px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        .data-table tbody tr:hover { background: rgba(0,0,0,0.02); cursor: pointer; }
+        .status-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+        .status-normal { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+        .status-warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .status-abnormal { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .device-type-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; margin-left: 8px; }
+        .device-type-tag.three { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .device-type-tag.single { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .device-type-tag.water { background: rgba(14, 165, 233, 0.1); color: var(--water); }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal-content { background: white; border-radius: 16px; width: 90%; max-width: 800px; max-height: 85vh; overflow-y: auto; box-shadow: var(--shadow-lg); animation: modalSlideIn 0.3s ease; }
+        @keyframes modalSlideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { font-size: 18px; font-weight: 600; }
+        .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-secondary); }
+        .modal-body { padding: 20px; }
+        .detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .detail-item { padding: 15px; background: var(--bg-primary); border-radius: 8px; }
+        .detail-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 5px; }
+        .detail-value { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .modal-footer { padding: 15px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+        .history-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+        .history-title { font-size: 14px; font-weight: 600; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .history-chart { width: 100%; height: 250px; margin-top: 10px; }
+        .history-tabs { display: flex; gap: 8px; margin-bottom: 15px; }
+        .history-tab { padding: 6px 12px; border-radius: 6px; border: none; background: var(--bg-primary); color: var(--text-secondary); cursor: pointer; font-size: 12px; }
+        .history-tab.active { background: var(--info); color: white; }
+        .history-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px; }
+        .history-stat-item { text-align: center; padding: 10px; background: rgba(59, 130, 246, 0.05); border-radius: 6px; }
+        .history-stat-item.water { background: rgba(14, 165, 233, 0.05); }
+        .history-stat-value { font-size: 16px; font-weight: 700; color: #3b82f6; }
+        .history-stat-value.water { color: var(--water); }
+        .history-stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+        @media (max-width: 992px) { 
+            .sidebar { transform: translateX(-100%); } 
+            .main-content { margin-left: 0; } 
+            .monitor-grid { grid-template-columns: 1fr; }
+            .electric-metrics { grid-template-columns: 1fr; }
+            .detail-grid { grid-template-columns: repeat(2, 1fr); }
+            .history-stats { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<base target="_blank">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">⚡</div>
+                <div>
+                    <div class="sidebar-title">智慧能源管理</div>
+                    <div class="sidebar-subtitle">Smart Energy Platform</div>
+                </div>
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-section">
+                    <div class="nav-item active" data-page="realtime">
+                        <span class="nav-item-icon">📡</span>
+                        <span class="nav-item-text">设备管理</span>
+                    </div>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <div class="page-header">
+                <div class="breadcrumb">
+                    <span class="breadcrumb-item">首页</span>
+                    <span>/</span>
+                    <span class="breadcrumb-item active">设备管理</span>
+                </div>
+                <div class="header-actions">
+                    <button id="refresh-btn" class="btn btn-primary"><span>🔄 刷新数据</span></button>
+                    <button class="btn btn-secondary">📥 导出实时数据</button>
+                    <button class="btn btn-danger ml-2">🚨 查看告警</button>
+                </div>
+            </div>
+
+            <div class="filter-card-container">
+                <div class="filter-group">
+                    <label class="filter-label">按区域筛选</label>
+                    <select id="area-filter" class="filter-select">
+                        <option value="">全部区域</option>
+                        <option value="area1">一号配电室</option>
+                        <option value="area2">二号配电室</option>
+                        <option value="area3">办公区A</option>
+                        <option value="area4">生产区B</option>
+                        <option value="area5">水务区</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">按设备类型筛选</label>
+                    <select id="type-filter" class="filter-select">
+                        <option value="">全部类型</option>
+                        <option value="three">三相电表</option>
+                        <option value="single">单相电表</option>
+                        <option value="water">水表</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">查看方式</label>
+                    <div class="view-toggle">
+                        <button class="btn btn-secondary active" id="view-card-btn">🎴 卡片视图</button>
+                        <button class="btn btn-secondary" id="view-list-btn">📋 列表视图</button>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">筛选操作</label>
+                    <button id="apply-filter" class="btn btn-primary" style="width: 100%;">✅ 应用筛选</button>
+                    <button id="reset-filter" class="btn btn-secondary" style="width: 100%; margin-top: 8px;">🔄 重置筛选</button>
+                </div>
+            </div>
+
+            <div class="realtime-monitor">
+                <!-- 卡片视图 -->
+                <div class="monitor-grid" id="card-view-container">
+                    <!-- 1#配电柜 - 改为三相电表 -->
+                    <div class="monitor-card" data-area="area1" data-type="three" onclick="showDetail('EL-001')">
+                        <div class="monitor-card-header">
+                            <div class="monitor-title">
+                                ⚡ 1#配电柜
+                                <span class="device-type-tag three">三相电表</span>
+                            </div>
+                            <span class="status-badge status-normal">正常</span>
+                        </div>
+                        <div class="monitor-device-info">
+                            <span class="monitor-device-name">主进线柜</span>
+                            <span class="monitor-device-id">EL-001</span>
+                        </div>
+                        <div class="electric-metrics">
+                            <div class="metric-item">
+                                <div class="metric-value" id="voltage-el001">380.5<span style="font-size:10px;">V</span></div>
+                                <div class="metric-label">电压</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="current-el001">20.1<span style="font-size:10px;">A</span></div>
+                                <div class="metric-label">电流</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="power-el001">10.75<span style="font-size:10px;">kW</span></div>
+                                <div class="metric-label">功率</div>
+                            </div>
+                        </div>
+                        <div class="click-hint">点击查看详情 →</div>
+                    </div>
+
+                    <!-- 2#配电柜 - 改为三相电表 -->
+                    <div class="monitor-card" data-area="area2" data-type="three" onclick="showDetail('EL-002')">
+                        <div class="monitor-card-header">
+                            <div class="monitor-title">
+                                ⚡ 2#配电柜
+                                <span class="device-type-tag three">三相电表</span>
+                            </div>
+                            <span class="status-badge status-normal">正常</span>
+                        </div>
+                        <div class="monitor-device-info">
+                            <span class="monitor-device-name">备用进线柜</span>
+                            <span class="monitor-device-id">EL-002</span>
+                        </div>
+                        <div class="electric-metrics">
+                            <div class="metric-item">
+                                <div class="metric-value">380.2<span style="font-size:10px;">V</span></div>
+                                <div class="metric-label">电压</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value">5.2<span style="font-size:10px;">A</span></div>
+                                <div class="metric-label">电流</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value">3.25<span style="font-size:10px;">kW</span></div>
+                                <div class="metric-label">功率</div>
+                            </div>
+                        </div>
+                        <div class="click-hint">点击查看详情 →</div>
+                    </div>
+
+                    <!-- 办公区A单相电表001 -->
+                    <div class="monitor-card" data-area="area3" data-type="single" onclick="showDetail('A-S-001')">
+                        <div class="monitor-card-header">
+                            <div class="monitor-title">
+                                🔌 办公区A单相电表001
+                                <span class="device-type-tag single">单相电表</span>
+                            </div>
+                            <span class="status-badge status-normal">正常</span>
+                        </div>
+                        <div class="monitor-device-info">
+                            <span class="monitor-device-name">办公区A层照明</span>
+                            <span class="monitor-device-id">A-S-001</span>
+                        </div>
+                        <div class="electric-metrics">
+                            <div class="metric-item">
+                                <div class="metric-value">220.3<span style="font-size:10px;">V</span></div>
+                                <div class="metric-label">电压</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value">8.5<span style="font-size:10px;">A</span></div>
+                                <div class="metric-label">电流</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value">1.87<span style="font-size:10px;">kW</span></div>
+                                <div class="metric-label">功率</div>
+                            </div>
+                        </div>
+                        <div class="click-hint">点击查看详情 →</div>
+                    </div>
+
+                    <!-- 生产区B三相电表001 -->
+                    <div class="monitor-card" data-area="area4" data-type="three" onclick="showDetail('B-T-001')">
+                        <div class="monitor-card-header">
+                            <div class="monitor-title">
+                                ⚡ 生产区B三相电表001
+                                <span class="device-type-tag three">三相电表</span>
+                            </div>
+                            <span class="status-badge status-warning">注意</span>
+                        </div>
+                        <div class="monitor-device-info">
+                            <span class="monitor-device-name">生产线B1动力</span>
+                            <span class="monitor-device-id">B-T-001</span>
+                        </div>
+                        <div class="electric-metrics">
+                            <div class="metric-item">
+                                <div class="metric-value">381.2<span style="font-size:10px;">V</span></div>
+                                <div class="metric-label">电压</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value">45.6<span style="font-size:10px;">A</span></div>
+                                <div class="metric-label">电流</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value">28.5<span style="font-size:10px;">kW</span></div>
+                                <div class="metric-label">功率</div>
+                            </div>
+                        </div>
+                        <div class="click-hint">点击查看详情 →</div>
+                    </div>
+
+                    <!-- 总进水水表001 -->
+                    <div class="monitor-card water" data-area="area5" data-type="water" onclick="showDetail('W-001')">
+                        <div class="monitor-card-header">
+                            <div class="monitor-title">
+                                💧 总进水水表001
+                                <span class="device-type-tag water">水表</span>
+                            </div>
+                            <span class="status-badge status-normal">正常</span>
+                        </div>
+                        <div class="monitor-device-info">
+                            <span class="monitor-device-name">厂区总进水</span>
+                            <span class="monitor-device-id water">W-001</span>
+                        </div>
+                        <div class="water-metrics">
+                            <div class="metric-item water">
+                                <div class="metric-value water">45.6<span style="font-size:10px;">m³/h</span></div>
+                                <div class="metric-label">瞬时流量</div>
+                            </div>
+                            <div class="metric-item water">
+                                <div class="metric-value water">12568<span style="font-size:10px;">m³</span></div>
+                                <div class="metric-label">累计流量</div>
+                            </div>
+                        </div>
+                        <div class="click-hint">点击查看详情 →</div>
+                    </div>
+
+                    <!-- 生产区水表001 -->
+                    <div class="monitor-card water" data-area="area4" data-type="water" onclick="showDetail('W-P-001')">
+                        <div class="monitor-card-header">
+                            <div class="monitor-title">
+                                💧 生产区水表001
+                                <span class="device-type-tag water">水表</span>
+                            </div>
+                            <span class="status-badge status-normal">正常</span>
+                        </div>
+                        <div class="monitor-device-info">
+                            <span class="monitor-device-name">生产区B用水</span>
+                            <span class="monitor-device-id water">W-P-001</span>
+                        </div>
+                        <div class="water-metrics">
+                            <div class="metric-item water">
+                                <div class="metric-value water">28.3<span style="font-size:10px;">m³/h</span></div>
+                                <div class="metric-label">瞬时流量</div>
+                            </div>
+                            <div class="metric-item water">
+                                <div class="metric-value water">8235<span style="font-size:10px;">m³</span></div>
+                                <div class="metric-label">累计流量</div>
+                            </div>
+                        </div>
+                        <div class="click-hint">点击查看详情 →</div>
+                    </div>
+
+                    <!-- 办公区水表001 -->
+                    <div class="monitor-card water" data-area="area3" data-type="water" onclick="showDetail('W-O-001')">
+                        <div class="monitor-card-header">
+                            <div class="monitor-title">
+                                💧 办公区水表001
+                                <span class="device-type-tag water">水表</span>
+                            </div>
+                            <span class="status-badge status-normal">正常</span>
+                        </div>
+                        <div class="monitor-device-info">
+                            <span class="monitor-device-name">办公区A用水</span>
+                            <span class="monitor-device-id water">W-O-001</span>
+                        </div>
+                        <div class="water-metrics">
+                            <div class="metric-item water">
+                                <div class="metric-value water">8.7<span style="font-size:10px;">m³/h</span></div>
+                                <div class="metric-label">瞬时流量</div>
+                            </div>
+                            <div class="metric-item water">
+                                <div class="metric-value water">2156<span style="font-size:10px;">m³</span></div>
+                                <div class="metric-label">累计流量</div>
+                            </div>
+                        </div>
+                        <div class="click-hint">点击查看详情 →</div>
+                    </div>
+
+                    <!-- 生活区水表001 -->
+                    <div class="monitor-card water" data-area="area5" data-type="water" onclick="showDetail('W-L-001')">
+                        <div class="monitor-card-header">
+                            <div class="monitor-title">
+                                💧 生活区水表001
+                                <span class="device-type-tag water">水表</span>
+                            </div>
+                            <span class="status-badge status-warning">注意</span>
+                        </div>
+                        <div class="monitor-device-info">
+                            <span class="monitor-device-name">员工生活用水</span>
+                            <span class="monitor-device-id water">W-L-001</span>
+                        </div>
+                        <div class="water-metrics">
+                            <div class="metric-item water">
+                                <div class="metric-value water">6.2<span style="font-size:10px;">m³/h</span></div>
+                                <div class="metric-label">瞬时流量</div>
+                            </div>
+                            <div class="metric-item water">
+                                <div class="metric-value water">1892<span style="font-size:10px;">m³</span></div>
+                                <div class="metric-label">累计流量</div>
+                            </div>
+                        </div>
+                        <div class="click-hint">点击查看详情 →</div>
+                    </div>
+                </div>
+
+                <!-- 列表视图 -->
+                <div class="list-view" id="list-view-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>设备ID</th>
+                                <th>设备名称</th>
+                                <th>设备类型</th>
+                                <th>所属区域</th>
+                                <th>实时数值</th>
+                                <th>累计用量</th>
+                                <th>运行状态</th>
+                                <th>最后更新</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="device-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 详情弹窗 -->
+    <div class="modal-overlay" id="detail-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modal-title">设备详情</div>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-grid" id="detail-grid"></div>
+
+                <!-- 历史数据展示区域 -->
+                <div class="history-section" id="history-section">
+                    <div class="history-title">
+                        📊 历史数据趋势
+                        <span style="font-size: 12px; color: var(--text-secondary); font-weight: normal;">（近7天）</span>
+                    </div>
+                    <div class="history-tabs" id="history-tabs"></div>
+                    <div class="history-stats" id="history-stats"></div>
+                    <div class="history-chart" id="history-chart"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">关闭</button>
+                <button class="btn btn-primary" onclick="exportHistory()">📥 导出历史数据</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 设备数据
+        const deviceData = [
+            { 
+                id: "EL-001", 
+                name: "1#配电柜", 
+                type: "three", 
+                typeName: "三相电表",
+                area: "area1", 
+                areaName: "一号配电室", 
+                subName: "主进线柜",
+                voltage: "380.5V",
+                current: "20.1A",
+                power: "10.75kW",
+                status: "normal", 
+                update: "2024-05-20 14:30:25",
+                details: {
+                    voltage: "380.5V",
+                    current: "20.1A",
+                    power: "10.75kW",
+                    frequency: "50.0Hz",
+                    energy: "1256.8kWh"
+                },
+                history: {
+                    labels: ['5-14', '5-15', '5-16', '5-17', '5-18', '5-19', '5-20'],
+                    power: [245, 268, 252, 275, 260, 248, 256],
+                    current: [18.5, 20.2, 19.1, 21.0, 19.8, 18.9, 20.1],
+                    voltage: [380.2, 380.5, 380.1, 380.8, 380.3, 380.4, 380.5]
+                }
+            },
+            { 
+                id: "EL-002", 
+                name: "2#配电柜", 
+                type: "three", 
+                typeName: "三相电表",
+                area: "area2", 
+                areaName: "二号配电室", 
+                subName: "备用进线柜",
+                voltage: "380.2V",
+                current: "5.2A",
+                power: "3.25kW",
+                status: "normal", 
+                update: "2024-05-20 14:30:18",
+                details: {
+                    voltage: "380.2V",
+                    current: "5.2A",
+                    power: "3.25kW",
+                    frequency: "50.0Hz",
+                    energy: "456.2kWh"
+                },
+                history: {
+                    labels: ['5-14', '5-15', '5-16', '5-17', '5-18', '5-19', '5-20'],
+                    power: [78, 82, 75, 80, 77, 79, 78],
+                    current: [5.0, 5.3, 4.9, 5.2, 5.0, 5.1, 5.2],
+                    voltage: [380.0, 380.3, 379.9, 380.4, 380.1, 380.2, 380.2]
+                }
+            },
+            { 
+                id: "A-S-001", 
+                name: "办公区A单相电表001", 
+                type: "single", 
+                typeName: "单相电表",
+                area: "area3", 
+                areaName: "办公区A", 
+                subName: "办公区A层照明",
+                voltage: "220.3V",
+                current: "8.5A",
+                power: "1.87kW",
+                status: "normal", 
+                update: "2024-05-20 14:30:30",
+                details: {
+                    voltage: "220.3V",
+                    current: "8.5A",
+                    power: "1.87kW",
+                    frequency: "50.0Hz",
+                    energy: "45.2kWh"
+                },
+                history: {
+                    labels: ['5-14', '5-15', '5-16', '5-17', '5-18', '5-19', '5-20'],
+                    power: [42, 45, 43, 46, 44, 42, 45],
+                    current: [8.2, 8.8, 8.4, 9.0, 8.6, 8.3, 8.5],
+                    voltage: [220.0, 220.5, 220.2, 220.8, 220.4, 220.1, 220.3]
+                }
+            },
+            { 
+                id: "B-T-001", 
+                name: "生产区B三相电表001", 
+                type: "three", 
+                typeName: "三相电表",
+                area: "area4", 
+                areaName: "生产区B", 
+                subName: "生产线B1动力",
+                voltage: "381.2V",
+                current: "45.6A",
+                power: "28.5kW",
+                status: "warning", 
+                update: "2024-05-20 14:30:22",
+                details: {
+                    voltage: "381.2V",
+                    current: "45.6A",
+                    power: "28.5kW",
+                    frequency: "50.0Hz",
+                    energy: "892.6kWh"
+                },
+                history: {
+                    labels: ['5-14', '5-15', '5-16', '5-17', '5-18', '5-19', '5-20'],
+                    power: [520, 545, 530, 560, 540, 525, 542],
+                    current: [44.2, 46.5, 45.1, 48.0, 46.2, 44.8, 45.6],
+                    voltage: [380.8, 381.5, 381.0, 382.0, 381.2, 380.9, 381.2]
+                }
+            },
+            { 
+                id: "W-001", 
+                name: "总进水水表001", 
+                type: "water", 
+                typeName: "水表",
+                area: "area5", 
+                areaName: "水务区", 
+                subName: "厂区总进水",
+                flow: "45.6m³/h",
+                pressure: "0.35MPa",
+                total: "12568m³",
+                today: "356m³",
+                status: "normal", 
+                update: "2024-05-20 14:30:35",
+                details: {
+                    flow: "45.6m³/h",
+                    pressure: "0.35MPa",
+                    temperature: "18.5°C",
+                    total: "12568m³",
+                    today: "356m³"
+                },
+                history: {
+                    labels: ['5-14', '5-15', '5-16', '5-17', '5-18', '5-19', '5-20'],
+                    flow: [42, 45, 43, 48, 46, 44, 45.6],
+                    total: [12120, 12165, 12208, 12256, 12302, 12348, 12404]
+                }
+            },
+            { 
+                id: "W-P-001", 
+                name: "生产区水表001", 
+                type: "water", 
+                typeName: "水表",
+                area: "area4", 
+                areaName: "生产区B", 
+                subName: "生产区B用水",
+                flow: "28.3m³/h",
+                pressure: "0.32MPa",
+                total: "8235m³",
+                today: "218m³",
+                status: "normal", 
+                update: "2024-05-20 14:30:33",
+                details: {
+                    flow: "28.3m³/h",
+                    pressure: "0.32MPa",
+                    temperature: "19.2°C",
+                    total: "8235m³",
+                    today: "218m³"
+                },
+                history: {
+                    labels: ['5-14', '5-15', '5-16', '5-17', '5-18', '5-19', '5-20'],
+                    flow: [26, 28, 27, 30, 29, 27.5, 28.3],
+                    total: [8017, 8045, 8072, 8102, 8131, 8160, 8188]
+                }
+            },
+            { 
+                id: "W-O-001", 
+                name: "办公区水表001", 
+                type: "water", 
+                typeName: "水表",
+                area: "area3", 
+                areaName: "办公区A", 
+                subName: "办公区A用水",
+                flow: "8.7m³/h",
+                pressure: "0.28MPa",
+                total: "2156m³",
+                today: "68m³",
+                status: "normal", 
+                update: "2024-05-20 14:30:28",
+                details: {
+                    flow: "8.7m³/h",
+                    pressure: "0.28MPa",
+                    temperature: "20.5°C",
+                    total: "2156m³",
+                    today: "68m³"
+                },
+                history: {
+                    labels: ['5-14', '5-15', '5-16', '5-17', '5-18', '5-19', '5-20'],
+                    flow: [10.2, 9.8, 9.5, 10.5, 9.2, 9.0, 8.7],
+                    total: [2088, 2098, 2107, 2117, 2126, 2135, 2143]
+                }
+            },
+            { 
+                id: "W-L-001", 
+                name: "生活区水表001", 
+                type: "water", 
+                typeName: "水表",
+                area: "area5", 
+                areaName: "水务区", 
+                subName: "员工生活用水",
+                flow: "6.2m³/h",
+                pressure: "0.30MPa",
+                total: "1892m³",
+                today: "52m³",
+                status: "warning", 
+                update: "2024-05-20 14:30:25",
+                details: {
+                    flow: "6.2m³/h",
+                    pressure: "0.30MPa",
+                    temperature: "21.0°C",
+                    total: "1892m³",
+                    today: "52m³"
+                },
+                history: {
+                    labels: ['5-14', '5-15', '5-16', '5-17', '5-18', '5-19', '5-20'],
+                    flow: [4.8, 4.5, 4.6, 5.0, 4.9, 5.2, 6.2],
+                    total: [1836, 1841, 1846, 1851, 1856, 1861, 1868]
+                }
+            }
+        ];
+
+        let currentView = 'card';
+        let currentDevice = null;
+        let historyChartInstance = null;
+
+        function switchView(view) {
+            currentView = view;
+            const cardContainer = document.getElementById('card-view-container');
+            const listContainer = document.getElementById('list-view-container');
+            const cardBtn = document.getElementById('view-card-btn');
+            const listBtn = document.getElementById('view-list-btn');
+
+            if (view === 'card') {
+                cardContainer.style.display = 'grid';
+                listContainer.classList.remove('active');
+                cardBtn.classList.add('active');
+                listBtn.classList.remove('active');
+            } else {
+                cardContainer.style.display = 'none';
+                listContainer.classList.add('active');
+                cardBtn.classList.remove('active');
+                listBtn.classList.add('active');
+                renderTable(deviceData);
+            }
+        }
+
+        function applyAllFilters() {
+            const area = document.getElementById('area-filter').value;
+            const type = document.getElementById('type-filter').value;
+
+            const allCards = document.querySelectorAll('.monitor-card');
+            allCards.forEach(card => {
+                let visible = true;
+
+                if (area) {
+                    const cardAreas = card.dataset.area.split(',');
+                    if (!cardAreas.includes(area)) visible = false;
+                }
+
+                if (type && visible) {
+                    const cardTypes = card.dataset.type.split(',');
+                    if (!cardTypes.includes(type)) visible = false;
+                }
+
+                card.style.display = visible ? 'block' : 'none';
+            });
+
+            let filteredData = deviceData;
+            if (area) filteredData = filteredData.filter(item => item.area === area);
+            if (type) filteredData = filteredData.filter(item => item.type === type);
+
+            if (currentView === 'list') renderTable(filteredData);
+        }
+
+        function resetFilter() {
+            document.getElementById('area-filter').value = '';
+            document.getElementById('type-filter').value = '';
+            document.querySelectorAll('.monitor-card').forEach(card => card.style.display = 'block');
+            if (currentView === 'list') renderTable(deviceData);
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('device-table-body');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">暂无匹配的设备数据</td></tr>';
+                return;
+            }
+
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.onclick = () => showDetail(item.id);
+
+                let value, total;
+                if (item.type === 'water') {
+                    value = item.flow;
+                    total = item.total;
+                } else {
+                    value = item.power;
+                    total = item.details.energy;
+                }
+
+                tr.innerHTML = `
+                    <td>${item.id}</td>
+                    <td>${item.name}</td>
+                    <td>${item.typeName}</td>
+                    <td>${item.areaName}</td>
+                    <td>${value}</td>
+                    <td>${total}</td>
+                    <td><span class="status-badge status-${item.status}">${item.status === 'normal' ? '正常' : item.status === 'warning' ? '警告' : '异常'}</span></td>
+                    <td>${item.update}</td>
+                    <td><button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); showDetail('${item.id}')">详情</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function showDetail(deviceId) {
+            const device = deviceData.find(d => d.id === deviceId);
+            if (!device) return;
+
+            currentDevice = device;
+
+            const modal = document.getElementById('detail-modal');
+            const title = document.getElementById('modal-title');
+            const grid = document.getElementById('detail-grid');
+
+            title.textContent = `${device.name} (${device.id}) - ${device.subName}`;
+
+            let detailsHtml = '';
+            if (device.type === 'water') {
+                detailsHtml = `
+                    <div class="detail-item"><div class="detail-label">瞬时流量</div><div class="detail-value">${device.details.flow}</div></div>
+                    <div class="detail-item"><div class="detail-label">管道压力</div><div class="detail-value">${device.details.pressure}</div></div>
+                    <div class="detail-item"><div class="detail-label">水温</div><div class="detail-value">${device.details.temperature}</div></div>
+                    <div class="detail-item"><div class="detail-label">累计流量</div><div class="detail-value">${device.details.total}</div></div>
+                    <div class="detail-item"><div class="detail-label">今日用量</div><div class="detail-value">${device.details.today}</div></div>
+                    <div class="detail-item"><div class="detail-label">更新时间</div><div class="detail-value">${device.update}</div></div>
+                `;
+            } else {
+                detailsHtml = `
+                    <div class="detail-item"><div class="detail-label">实时电压</div><div class="detail-value">${device.details.voltage}</div></div>
+                    <div class="detail-item"><div class="detail-label">实时电流</div><div class="detail-value">${device.details.current}</div></div>
+                    <div class="detail-item"><div class="detail-label">有功功率</div><div class="detail-value">${device.details.power}</div></div>
+                    <div class="detail-item"><div class="detail-label">电网频率</div><div class="detail-value">${device.details.frequency}</div></div>
+                    <div class="detail-item"><div class="detail-label">累计电量</div><div class="detail-value">${device.details.energy}</div></div>
+                    <div class="detail-item"><div class="detail-label">更新时间</div><div class="detail-value">${device.update}</div></div>
+                `;
+            }
+
+            grid.innerHTML = detailsHtml;
+            initHistorySection(device);
+            modal.classList.add('active');
+        }
+
+        function initHistorySection(device) {
+            const tabsContainer = document.getElementById('history-tabs');
+            const statsContainer = document.getElementById('history-stats');
+
+            let tabsHtml = '';
+            let statsHtml = '';
+
+            if (device.type === 'water') {
+                tabsHtml = `
+                    <button class="history-tab active" onclick="switchHistoryTab('flow')">流量趋势</button>
+                    <button class="history-tab" onclick="switchHistoryTab('total')">累计用量</button>
+                `;
+                statsHtml = `
+                    <div class="history-stat-item water"><div class="history-stat-value water">${device.history.flow[6]}</div><div class="history-stat-label">当前流量(m³/h)</div></div>
+                    <div class="history-stat-item water"><div class="history-stat-value water">${(device.history.flow.reduce((a,b)=>a+b,0)/7).toFixed(1)}</div><div class="history-stat-label">平均流量(m³/h)</div></div>
+                    <div class="history-stat-item water"><div class="history-stat-value water">${Math.max(...device.history.flow)}</div><div class="history-stat-label">最大流量(m³/h)</div></div>
+                    <div class="history-stat-item water"><div class="history-stat-value water">${device.history.total[6]}</div><div class="history-stat-label">累计总量(m³)</div></div>
+                `;
+            } else {
+                tabsHtml = `
+                    <button class="history-tab active" onclick="switchHistoryTab('power')">功率趋势</button>
+                    <button class="history-tab" onclick="switchHistoryTab('current')">电流趋势</button>
+                    <button class="history-tab" onclick="switchHistoryTab('voltage')">电压趋势</button>
+                `;
+                statsHtml = `
+                    <div class="history-stat-item"><div class="history-stat-value">${device.history.power[6]}</div><div class="history-stat-label">当前功率(kW)</div></div>
+                    <div class="history-stat-item"><div class="history-stat-value">${(device.history.power.reduce((a,b)=>a+b,0)/7).toFixed(1)}</div><div class="history-stat-label">平均功率(kW)</div></div>
+                    <div class="history-stat-item"><div class="history-stat-value">${Math.max(...device.history.power)}</div><div class="history-stat-label">最大功率(kW)</div></div>
+                    <div class="history-stat-item"><div class="history-stat-value">${device.details.energy}</div><div class="history-stat-label">累计电量(kWh)</div></div>
+                `;
+            }
+
+            tabsContainer.innerHTML = tabsHtml;
+            statsContainer.innerHTML = statsHtml;
+            switchHistoryTab(device.type === 'water' ? 'flow' : 'power');
+        }
+
+        function switchHistoryTab(metric) {
+            if (!currentDevice) return;
+
+            document.querySelectorAll('.history-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.textContent.includes(metric === 'flow' ? '流量' : metric === 'total' ? '累计' : metric === 'power' ? '功率' : metric === 'current' ? '电流' : '电压')) {
+                    tab.classList.add('active');
+                }
+            });
+
+            renderHistoryChart(currentDevice, metric);
+        }
+
+        function renderHistoryChart(device, metric) {
+            const chartDom = document.getElementById('history-chart');
+            if (historyChartInstance) historyChartInstance.dispose();
+            historyChartInstance = echarts.init(chartDom);
+
+            const isWater = device.type === 'water';
+            const data = device.history[metric];
+            const labels = device.history.labels;
+
+            let title, unit, color;
+            if (metric === 'flow') { title = '流量趋势'; unit = 'm³/h'; color = '#0ea5e9'; }
+            else if (metric === 'total') { title = '累计用量'; unit = 'm³'; color = '#0ea5e9'; }
+            else if (metric === 'power') { title = '功率趋势'; unit = 'kW'; color = '#3b82f6'; }
+            else if (metric === 'current') { title = '电流趋势'; unit = 'A'; color = '#3b82f6'; }
+            else if (metric === 'voltage') { title = '电压趋势'; unit = 'V'; color = '#3b82f6'; }
+
+            const option = {
+                tooltip: { trigger: 'axis' },
+                grid: { left: '3%', right: '4%', bottom: '3%', top: '10%', containLabel: true },
+                xAxis: { type: 'category', data: labels, boundaryGap: false },
+                yAxis: { type: 'value', name: unit },
+                series: [{
+                    data: data,
+                    type: 'line',
+                    smooth: true,
+                    itemStyle: { color: color },
+                    areaStyle: { 
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: isWater ? 'rgba(14, 165, 233, 0.3)' : 'rgba(59, 130, 246, 0.3)' },
+                            { offset: 1, color: isWater ? 'rgba(14, 165, 233, 0.05)' : 'rgba(59, 130, 246, 0.05)' }
+                        ])
+                    },
+                    markPoint: {
+                        data: [
+                            { type: 'max', name: '最大值' },
+                            { type: 'min', name: '最小值' }
+                        ]
+                    }
+                }]
+            };
+
+            historyChartInstance.setOption(option);
+        }
+
+        function exportHistory() {
+            if (!currentDevice) return;
+            alert(`正在导出 ${currentDevice.name} 的历史数据...\n数据时间范围：近7天\n导出格式：CSV`);
+        }
+
+        function closeModal() {
+            document.getElementById('detail-modal').classList.remove('active');
+            if (historyChartInstance) {
+                historyChartInstance.dispose();
+                historyChartInstance = null;
+            }
+            currentDevice = null;
+        }
+
+        function simulateRealTimeUpdate() {
+            setInterval(() => {
+                // 更新部分设备数据
+                const voltage1 = 380 + (Math.random() - 0.5) * 1;
+                const current1 = 20 + (Math.random() - 0.5) * 0.5;
+                const power1 = (voltage1 * current1 * 1.732 / 1000).toFixed(2);
+
+                const el1 = document.getElementById('voltage-el001');
+                if (el1) el1.innerHTML = voltage1.toFixed(1) + '<span style="font-size:10px;">V</span>';
+
+                const el2 = document.getElementById('current-el001');
+                if (el2) el2.innerHTML = current1.toFixed(1) + '<span style="font-size:10px;">A</span>';
+
+                const el3 = document.getElementById('power-el001');
+                if (el3) el3.innerHTML = power1 + '<span style="font-size:10px;">kW</span>';
+            }, 5000);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            simulateRealTimeUpdate();
+
+            document.getElementById('view-card-btn').addEventListener('click', () => switchView('card'));
+            document.getElementById('view-list-btn').addEventListener('click', () => switchView('list'));
+            document.getElementById('apply-filter').addEventListener('click', applyAllFilters);
+            document.getElementById('reset-filter').addEventListener('click', resetFilter);
+            document.getElementById('refresh-btn').addEventListener('click', () => {
+                resetFilter();
+                alert('数据已刷新！');
+            });
+
+            document.getElementById('detail-modal').addEventListener('click', (e) => {
+                if (e.target.id === 'detail-modal') closeModal();
+            });
+
+            window.addEventListener('resize', () => {
+                if (historyChartInstance) historyChartInstance.resize();
+            });
+        });
+    </script>
+</body>
+</html>

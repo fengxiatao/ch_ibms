@@ -67,8 +67,7 @@ public class EpatrolPlanController {
     @Operation(summary = "获得巡更计划分页")
     @PreAuthorize("@ss.hasPermission('iot:epatrol-plan:query')")
     public CommonResult<PageResult<EpatrolPlanRespVO>> getPlanPage(@Valid EpatrolPlanPageReqVO pageReqVO) {
-        PageResult<EpatrolPlanDO> pageResult = planService.getPlanPage(pageReqVO);
-        return success(BeanUtils.toBean(pageResult, EpatrolPlanRespVO.class));
+        return success(planService.getPlanPageWithDetails(pageReqVO));
     }
 
     @PutMapping("/update-status")

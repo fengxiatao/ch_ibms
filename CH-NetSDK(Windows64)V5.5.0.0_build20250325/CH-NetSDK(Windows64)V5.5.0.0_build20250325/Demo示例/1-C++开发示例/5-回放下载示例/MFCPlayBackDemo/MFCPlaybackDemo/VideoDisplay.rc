@@ -1,0 +1,321 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#ifndef APSTUDIO_INVOKED
+#include "targetver.h"
+#endif
+#include "afxres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
+#ifdef _WIN32
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+#pragma code_page(936)
+#endif //_WIN32
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#ifndef APSTUDIO_INVOKED\r\n"
+    "#include ""targetver.h""\r\n"
+    "#endif\r\n"
+    "#include ""afxres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "#define _AFX_NO_SPLITTER_RESOURCES\r\n"
+    "#define _AFX_NO_OLE_RESOURCES\r\n"
+    "#define _AFX_NO_TRACKER_RESOURCES\r\n"
+    "#define _AFX_NO_PROPERTY_RESOURCES\r\n"
+    "\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)\r\n"
+    "LANGUAGE 4, 2\r\n"
+    "#pragma code_page(936)\r\n"
+    "#include ""res\\VideoDisplay.rc2""  // Resources for Non-Microsoft Visual C++ Editing\r\n"
+    "#include ""l.CHS\\afxres.rc""      // Standard components\r\n"
+    "#endif\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDR_MAINFRAME           ICON                    "res\\VideoDisplay.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_ABOUTBOX DIALOGEX 0, 0, 170, 62
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "about VideoDisplay"
+FONT 9, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    ICON            IDR_MAINFRAME,IDC_STATIC,14,14,21,20
+    LTEXT           "VideoDisplay, 1.0 版",IDC_STATIC,42,14,114,8,SS_NOPREFIX
+    LTEXT           "Copyright (C) 2018",IDC_STATIC,42,26,114,8
+    DEFPUSHBUTTON   "确定",IDOK,113,41,50,14,WS_GROUP
+END
+
+IDD_MAIN_DIALOG DIALOGEX 0, 0, 386, 292
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "VideoDisplay"
+FONT 9, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "IP",IDC_STATIC,4,5,21,12
+    LTEXT           "端口",IDC_STATIC_PORT,112,7,16,10
+    EDITTEXT        IDC_EDIT_PORT_INPUT,147,3,40,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "登录",IDC_BUTTON_LOGON,203,20,50,14
+    LTEXT           "用户名",IDC_STATIC_USERNAME,4,22,30,10
+    EDITTEXT        IDC_EDIT_USERNAME,39,20,68,14,ES_AUTOHSCROLL
+    LTEXT           "密码",IDC_STATIC_PASSWORD,112,24,30,10
+    EDITTEXT        IDC_EDIT_PASSWORD,147,20,40,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "按文件操作",IDC_BUTTON_FILE,2,42,56,14
+    PUSHBUTTON      "退出",IDC_BUTTON_LOGOFF,258,20,50,14
+    PUSHBUTTON      "按时间段操作",IDC_BUTTON_TIME_SPACE,58,42,58,14
+    CONTROL         "",IDC_LIST_LOG,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,2,217,381,73
+    EDITTEXT        IDC_EDIT_IP_ADRESS,39,3,68,14,ES_AUTOHSCROLL
+    CONTROL         "",IDC_STATIC_CHILD_AREA,"Static",SS_BLACKFRAME | NOT WS_VISIBLE,1,63,383,148,WS_EX_TRANSPARENT
+    COMBOBOX        IDC_COMBO_LANGUAGE,203,3,48,61,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+END
+
+IDD_FILE_DISPLAY_DIALOG DIALOGEX 0, 0, 454, 160
+STYLE DS_SETFONT | DS_3DLOOK | DS_FIXEDSYS | WS_CHILD | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "时间范围",IDC_STATIC_FILE_MODE_TIMESPACE,3,4,36,13
+    COMBOBOX        IDC_COMBO_FILE_MODE_CHANNEL,43,24,48,99,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "",IDC_DATETIMEPICKER_FILE_MODE_STOP_TIME,
+                    "SysDateTimePick32",DTS_RIGHTALIGN | WS_TABSTOP,176,2,106,14
+    CONTROL         "",IDC_DATETIMEPICKER_FILE_MODE_START_TIME,
+                    "SysDateTimePick32",DTS_RIGHTALIGN | DTS_LONGDATEFORMAT | WS_TABSTOP,43,2,106,14
+    LTEXT           "至",IDC_STATIC_FILE_MODE_TO,158,4,9,8
+    RTEXT           "通道号",IDC_STATIC_FILE_MODE_CHANNEL_NUM,0,26,41,8
+    COMBOBOX        IDC_COMBO_FILE_MODE_FILE_TYPE,265,24,48,56,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    RTEXT           "文件类型",IDC_STATIC_FILE_MODE_FILE_TYPE,213,26,39,8
+    PUSHBUTTON      "查询",IDC_BUTTON_QUERY,334,23,50,14
+    CONTROL         "",IDC_LIST3,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,2,42,442,82
+    PUSHBUTTON      "下载",IDC_BUTTON_DOWNLOAD,50,126,41,14
+    PUSHBUTTON      "设置",IDC_BUTTON_DOWNLOAD_SPEED,164,126,23,14
+    PUSHBUTTON      "播放",IDC_BUTTON_PLAY,1,146,43,14
+    LTEXT           "下载速度",IDC_STATIC_FILE_MODE_DOWNLOAD_SPEED,95,129,32,8
+    PUSHBUTTON      "停止下载",IDC_BUTTON_STOP_DOWNLOAD,190,126,42,14
+    PUSHBUTTON      "暂停下载",IDC_BUTTON_PAUSE,232,126,41,14
+    PUSHBUTTON      "继续下载",IDC_BUTTON_CONTINUE_DOWNLOAD,271,126,39,14
+    COMBOBOX        IDC_COMBO_FILE_MODE_CHANNEL2,134,127,24,82,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "设置",IDC_BUTTON_DOWNLOAD_POS,417,127,29,14
+    EDITTEXT        IDC_FILE_MODE_DOWNLOAD_POS,385,128,28,12,ES_AUTOHSCROLL
+    RTEXT           "下载定位(0-100)",IDC_STATIC_FILE_MODE_DOWNLOAD_POS,311,129,69,8
+    COMBOBOX        IDC_COMBO_FILE_MODE_SREAM,154,24,48,95,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO_FILE_SAVEFILE_TYPE,1,127,47,95,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    RTEXT           "码流类型",IDC_STATIC_STREAM_TYPE,102,26,42,8
+    COMBOBOX        IDC_COMBO_FILE_PAGE,387,23,48,99,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+END
+
+IDD_TIME_DISPLAYDIALOG DIALOGEX 0, 0, 425, 89
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "时间范围",IDC_STATIC_TIME_MODE_TIME_SPACE,0,5,36,13
+    COMBOBOX        IDC_COMBO_TIME_MODE_CHANNEL_NUM,303,2,33,71,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "",IDC_DATETIMEPICKER1,"SysDateTimePick32",DTS_RIGHTALIGN | WS_TABSTOP,156,1,103,15
+    LTEXT           "至",IDC_STATIC_TIME_MODE_TO,140,5,9,8
+    LTEXT           "通道号",IDC_STATIC_TIME_MODE_CHANNEL_NUM,265,4,34,8
+    PUSHBUTTON      "下载",IDC_BUTTON_TIME_MODE_DOWNLOAD,47,25,50,14
+    PUSHBUTTON      "设置",IDC_BUTTON_TIME_MODE_SET_DOWN_LAOD_SPEED,265,25,50,14
+    PUSHBUTTON      "播放",IDC_BUTTON_TIME_MODE_PLAY,47,41,50,14
+    LTEXT           "下载速度",IDC_STATIC_TIME_MODE_DWONLOAD_SPEED,163,28,33,8
+    CONTROL         "",IDC_DATETIMEPICKER3,"SysDateTimePick32",DTS_RIGHTALIGN | WS_TABSTOP,39,2,96,15
+    PUSHBUTTON      "停止下载",IDC_BUTTON_TIME_MODE_STOP_DOWNLAOD,106,25,50,14
+    LTEXT           "下载进度:",IDC_STATIC_TIME_MODE_DOWNLAOD_POS,0,64,68,13
+    CONTROL         "",IDC_PROGRESS1,"msctls_progress32",WS_BORDER,41,62,319,14
+    COMBOBOX        IDC_COMBO_TIME_MODE_STREAM_TYPE,346,2,47,44,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO_TIME_MODE_DOWNLOAD_SPEED,208,26,48,42,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "",IDC_STATIC_PROCESS,395,65,23,8
+    COMBOBOX        IDC_COMBO_STREAM_SAVEFILE_TYPE,1,26,45,95,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+END
+
+IDD_DISPLAY_DIALOG DIALOGEX 0, 0, 392, 269
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "PlayDialog"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    PUSHBUTTON      "播放",IDC_BUTTON_START_DISPLAY,0,239,32,14
+    PUSHBUTTON      "暂停",IDC_BUTTON_PAUSE_PLAY,35,239,32,14
+    LTEXT           "快放",IDC_STATIC_FAST_PLAY,73,241,16,10
+    COMBOBOX        IDC_COMBO_DISPLAY_SPEED,94,240,24,63,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "",IDC_STATIC_DISPLAY,0,2,391,236,SS_NOTIFY | WS_BORDER
+    LTEXT           "播放定位(0-100)",IDC_STATIC_PLAY_POS,258,241,57,10
+    PUSHBUTTON      "设置",IDC_BUTTON_FAST_PLAY,124,239,32,14
+    PUSHBUTTON      "设置",IDC_BUTTON_POS_SET,360,239,32,14
+    LTEXT           "慢放",IDC_STATIC_SLOW_PLAY,164,241,16,10
+    COMBOBOX        IDC_COMBO_DISPLAY_SPEED2,186,240,24,66,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP,WS_EX_ACCEPTFILES
+    PUSHBUTTON      "设置",IDC_BUTTON_SLOW_SET,216,239,32,14
+    EDITTEXT        IDC_EDIT1,323,239,27,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "步进",IDC_BUTTON_FORWARD_STEP,0,254,57,14
+    PUSHBUTTON      "抓拍",IDC_BUTTON_CAPTURE,65,254,56,14
+    CONTROL         "",IDC_SLIDER_VOICE_CTRL,"msctls_trackbar32",TBS_BOTH | TBS_NOTICKS | WS_TABSTOP,187,256,55,11
+    LTEXT           "",IDC_STATIC_VOLUME_DISPLAY,243,256,31,8
+    PUSHBUTTON      "开启声音",IDC_BUTTON_VOLUME_CTRL,129,254,50,14
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,1
+ PRODUCTVERSION 1,0,0,1
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x4L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080403a8"
+        BEGIN
+            VALUE "CompanyName", "TODO: <Company Name>"
+            VALUE "FileDescription", "TODO: <file description>"
+            VALUE "FileVersion", "1.0.0.1"
+            VALUE "InternalName", "VideoDisplay.exe"
+            VALUE "LegalCopyright", "TODO: (C) <Company Name>. all rights reserved."
+            VALUE "OriginalFilename", "VideoDisplay.exe"
+            VALUE "ProductName", "TODO: <product name>"
+            VALUE "ProductVersion", "1.0.0.1"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x804, 936
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO 
+BEGIN
+    IDD_ABOUTBOX, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 163
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 55
+    END
+
+    IDD_MAIN_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 379
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 285
+        HORZGUIDE, 14
+        HORZGUIDE, 49
+        HORZGUIDE, 98
+    END
+
+    IDD_FILE_DISPLAY_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 447
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 153
+    END
+
+    IDD_TIME_DISPLAYDIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 418
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 82
+    END
+
+    IDD_DISPLAY_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 385
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 262
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE 
+BEGIN
+    IDS_ABOUTBOX            "about VideoDisplay(&A)..."
+END
+
+#endif    // Chinese (P.R.C.) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+#define _AFX_NO_SPLITTER_RESOURCES
+#define _AFX_NO_OLE_RESOURCES
+#define _AFX_NO_TRACKER_RESOURCES
+#define _AFX_NO_PROPERTY_RESOURCES
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
+LANGUAGE 4, 2
+#pragma code_page(936)
+#include "res\VideoDisplay.rc2"  // Resources for Non-Microsoft Visual C++ Editing
+#include "l.CHS\afxres.rc"      // Standard components
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+

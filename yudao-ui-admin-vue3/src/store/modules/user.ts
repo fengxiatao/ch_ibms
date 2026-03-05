@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { getAccessToken, removeToken } from '@/utils/auth'
 import { CACHE_KEY, useCache, deleteUserCache } from '@/hooks/web/useCache'
 import { getInfo, loginOut } from '@/api/login'
+import { closeIotWebSocket } from '@/utils/iotWebSocket'
 
 const { wsCache } = useCache()
 
@@ -85,6 +86,8 @@ export const useUserStore = defineStore('admin-user', {
     },
     async loginOut() {
       await loginOut()
+      // 关闭 IoT WebSocket 连接
+      closeIotWebSocket()
       removeToken()
       deleteUserCache() // 删除用户缓存
       this.resetState()

@@ -298,3 +298,67 @@ export const VehicleCategoryOptions = [
   { label: '月租车', value: 'monthly' },
   { label: '临时车', value: 'temporary' }
 ]
+
+// 月卡类型选项（新版）
+export const MonthlyCardTypeOptions = [
+  { label: '月卡车', value: 'monthly' },
+  { label: '临时车', value: 'temporary' }
+]
+
+// 月卡状态选项
+export const MonthlyCardStatusOptions = [
+  { label: '启用', value: 0, type: 'success' },
+  { label: '停用', value: 1, type: 'danger' }
+]
+
+// ========== 黑名单车辆管理 ==========
+export const ParkingBlacklistApi = {
+  // 获得黑名单分页
+  getBlacklistPage: async (params: any) => {
+    return await request.get({ url: '/iot/parking/blacklist/page', params })
+  },
+  // 获得黑名单详情
+  getBlacklist: async (id: number) => {
+    return await request.get({ url: '/iot/parking/blacklist/get', params: { id } })
+  },
+  // 创建黑名单
+  createBlacklist: async (data: any) => {
+    return await request.post({ url: '/iot/parking/blacklist/create', data })
+  },
+  // 更新黑名单
+  updateBlacklist: async (data: any) => {
+    return await request.put({ url: '/iot/parking/blacklist/update', data })
+  },
+  // 删除黑名单
+  deleteBlacklist: async (id: number) => {
+    return await request.delete({ url: '/iot/parking/blacklist/delete', params: { id } })
+  },
+  // 解除黑名单
+  releaseBlacklist: async (id: number) => {
+    return await request.post({ url: '/iot/parking/blacklist/release', params: { id } })
+  }
+}
+
+// ========== 车道开关闸操作 ==========
+export const ParkingGateControlApi = {
+  // 开闸（升闸）
+  openGate: async (laneId: number) => {
+    return await request.post({ url: '/iot/parking/lane/open-gate', params: { laneId } })
+  },
+  // 关闸（落闸）
+  closeGate: async (laneId: number) => {
+    return await request.post({ url: '/iot/parking/lane/close-gate', params: { laneId } })
+  }
+}
+
+// ========== 停车场统计 ==========
+export const ParkingStatisticsApi = {
+  // 获取在场车辆统计
+  getPresentStatistics: async (lotId?: number) => {
+    return await request.get({ url: '/iot/parking/statistics/present', params: { lotId } })
+  },
+  // 获取停车场概览统计
+  getOverviewStatistics: async () => {
+    return await request.get({ url: '/iot/parking/statistics/overview' })
+  }
+}

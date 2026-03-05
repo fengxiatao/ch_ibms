@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>访客实时管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .card-shadow {
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+            }
+            .card-hover {
+                transition: all 0.2s ease;
+            }
+            .card-hover:hover {
+                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+                transform: translateY(-1px);
+            }
+            .table-hover-row {
+                transition: background-color 0.2s ease;
+            }
+            .table-hover-row:hover {
+                background-color: rgba(22, 119, 255, 0.03);
+            }
+            .form-input-focus {
+                @apply focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary;
+            }
+            .status-tag {
+                @apply px-2 py-0.5 text-xs rounded-full;
+            }
+            .alert-card {
+                @apply border-l-4 rounded-r-lg p-4 bg-white border border-gray-200 card-shadow card-hover;
+            }
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1677ff',
+                        success: '#52c41a',
+                        warning: '#faad14',
+                        danger: '#ff4d4f',
+                        info: '#40a9ff',
+                        visiting: '#1890ff',
+                        visited: '#722ed1',
+                        pending: '#faad14',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        };
+    </script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <!-- 页面标题 -->
+        <div class="mb-6">
+            <h1 class="text-[clamp(1.25rem,2vw,1.5rem)] font-semibold text-gray-800">访客实时管理</h1>
+            <p class="text-sm text-gray-500 mt-1">实时监控访客状态，处理各类访客提醒事项</p>
+        </div>
+
+        <!-- 1. 提醒列表：最顶部，卡片式布局，横向排列 -->
+        <div class="mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-base font-medium text-gray-800">提醒事项</h3>
+                <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 text-xs rounded-full bg-danger/10 text-danger">4条提醒</span>
+                    <button class="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1">
+                        <i class="fa fa-refresh text-xs"></i> 刷新
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 提醒卡片容器：可横向滚动 -->
+            <div class="overflow-x-auto pb-3">
+                <div class="flex gap-4 min-w-max">
+                    <!-- 提醒卡片1：非法闯入（最新）2025/12/25 17:45:30 -->
+                    <div class="alert-card border-l-danger w-[300px]">
+                        <div class="flex items-start gap-2">
+                            <i class="fa fa-ban text-danger mt-0.5"></i>
+                            <div class="flex-1">
+                                <h4 class="text-sm font-medium text-gray-800 mb-1">访客非法闯入</h4>
+                                <p class="text-xs text-gray-600 mb-1">访客C君（13914725899）试图进入B公区栅栏</p>
+                                <p class="text-xs text-gray-400 mb-3">2025-12-25 17:45:30</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <button class="text-xs bg-info/10 text-info px-2 py-0.5 rounded-full hover:bg-info/20 transition-colors">
+                                        <i class="fa fa-phone mr-1"></i> 电话通知
+                                    </button>
+                                    <button class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full hover:bg-gray-200 transition-colors">
+                                        <i class="fa fa-bell-slash mr-1"></i> 忽略
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 提醒卡片2：超时未签离C君 2025/12/25 17:35:10 -->
+                    <div class="alert-card border-l-danger w-[300px]">
+                        <div class="flex items-start gap-2">
+                            <i class="fa fa-exclamation-triangle text-danger mt-0.5"></i>
+                            <div class="flex-1">
+                                <h4 class="text-sm font-medium text-gray-800 mb-1">访客超时未签离</h4>
+                                <p class="text-xs text-gray-600 mb-1">访客C君（13914725899）已超时10分钟</p>
+                                <p class="text-xs text-gray-400 mb-3">2025-12-25 17:35:10</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">未签离</span>
+                                    <button class="text-xs bg-warning/10 text-warning px-2 py-0.5 rounded-full hover:bg-warning/20 transition-colors">
+                                        <i class="fa fa-clock-o mr-1"></i> 延长访问
+                                    </button>
+                                    <button class="text-xs bg-danger/10 text-danger px-2 py-0.5 rounded-full hover:bg-danger/20 transition-colors">
+                                        <i class="fa fa-user-times mr-1"></i> 一键签离
+                                    </button>
+                                    <button class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full hover:bg-gray-200 transition-colors">
+                                        <i class="fa fa-bell-slash mr-1"></i> 忽略
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 提醒卡片3：超时未签离B君 2025/12/25 09:30:00 -->
+                    <div class="alert-card border-l-danger w-[300px]">
+                        <div class="flex items-start gap-2">
+                            <i class="fa fa-exclamation-triangle text-danger mt-0.5"></i>
+                            <div class="flex-1">
+                                <h4 class="text-sm font-medium text-gray-800 mb-1">访客超时未签离</h4>
+                                <p class="text-xs text-gray-600 mb-1">访客B君（18087654321）已超时30分钟</p>
+                                <p class="text-xs text-gray-400 mb-3">2025-12-25 09:30:00</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">未签离</span>
+                                    <button class="text-xs bg-warning/10 text-warning px-2 py-0.5 rounded-full hover:bg-warning/20 transition-colors">
+                                        <i class="fa fa-clock-o mr-1"></i> 延长访问
+                                    </button>
+                                    <button class="text-xs bg-danger/10 text-danger px-2 py-0.5 rounded-full hover:bg-danger/20 transition-colors">
+                                        <i class="fa fa-user-times mr-1"></i> 一键签离
+                                    </button>
+                                    <button class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full hover:bg-gray-200 transition-colors">
+                                        <i class="fa fa-bell-slash mr-1"></i> 忽略
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 提醒卡片4：超时未签到A君（最旧）2025/12/25 08:00:00 -->
+                    <div class="alert-card border-l-warning w-[300px]">
+                        <div class="flex items-start gap-2">
+                            <i class="fa fa-exclamation-circle text-warning mt-0.5"></i>
+                            <div class="flex-1">
+                                <h4 class="text-sm font-medium text-gray-800 mb-1">访客超时未签到</h4>
+                                <p class="text-xs text-gray-600 mb-1">访客A君（13812345678）已超时30分钟</p>
+                                <p class="text-xs text-gray-400 mb-3">2025-12-25 08:00:00</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">未签到</span>
+                                    <button class="text-xs bg-info/10 text-info px-2 py-0.5 rounded-full hover:bg-info/20 transition-colors">
+                                        <i class="fa fa-phone mr-1"></i> 电话通知
+                                    </button>
+                                    <button class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full hover:bg-gray-200 transition-colors">
+                                        <i class="fa fa-bell-slash mr-1"></i> 忽略
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 筛选/搜索区域 -->
+        <div class="bg-white rounded-xl p-5 mb-6 card-shadow card-hover">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1.5">访客姓名</label>
+                    <input type="text" placeholder="请输入访客姓名" class="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg form-input-focus">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1.5">访客车辆</label>
+                    <input type="text" placeholder="请输入预约车牌号" class="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg form-input-focus">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1.5">来访事由</label>
+                    <select class="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg form-input-focus appearance-none bg-white">
+                        <option value="">请选择来访事由</option>
+                        <option value="visit">参观</option>
+                        <option value="meet">拜访</option>
+                        <option value="interview">面试开会</option>
+                        <option value="other">其他</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1.5">被访人姓名</label>
+                    <input type="text" placeholder="请输入被访人姓名" class="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg form-input-focus">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1.5">来访状态</label>
+                    <select class="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg form-input-focus appearance-none bg-white">
+                        <option value="">请选择来访状态</option>
+                        <option value="pending">待访</option>
+                        <option value="visiting">在访</option>
+                        <option value="visited">离访</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-3 mt-4">
+                <button class="px-4 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1">
+                    <i class="fa fa-search text-xs"></i> 搜索
+                </button>
+                
+                <button class="px-4 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1">
+                    <i class="fa fa-refresh text-xs"></i> 重置
+                </button>
+            </div>
+        </div>
+
+        <!-- 3. 访客列表展示区域 -->
+        <div class="bg-white rounded-xl card-shadow card-hover overflow-hidden">
+            <div class="px-5 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/70">
+                <h3 class="text-base font-medium text-gray-800">访客列表</h3>
+                <div class="text-xs text-gray-500">共 <span class="text-primary font-medium">3</span> 条记录</div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="px-5 py-4 text-left text-gray-600 font-medium text-xs w-[80px]">序号</th>
+                            <th class="px-5 py-4 text-left text-gray-600 font-medium text-xs w-[100px]">访客姓名</th>
+                            <th class="px-5 py-4 text-left text-gray-600 font-medium text-xs w-[120px]">联系电话</th>
+                            <th class="px-5 py-4 text-left text-gray-600 font-medium text-xs w-[120px]">预约车辆</th>
+                            <th class="px-5 py-4 text-left text-gray-600 font-medium text-xs w-[100px]">被访人姓名</th>
+                            <th class="px-5 py-4 text-left text-gray-600 font-medium text-xs w-[100px]">来访事由</th>
+                            <th class="px-5 py-4 text-left text-gray-600 font-medium text-xs w-[100px]">来访状态</th>
+                            <th class="px-5 py-4 text-left text-gray-600 font-medium text-xs w-[120px]">权限下发状态</th>
+                            <th class="px-5 py-4 text-left text-gray-600 font-medium text-xs w-[140px]">签到时间</th>
+                            <th class="px-5 py-4 text-left text-gray-600 font-medium text-xs w-[140px]">签离时间</th>
+                            <th class="px-5 py-4 text-left text-gray-600 font-medium text-xs w-[120px]">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-gray-100 table-hover-row">
+                            <td class="px-5 py-4 text-gray-700">1</td>
+                            <td class="px-5 py-4 font-medium text-gray-800">A君</td>
+                            <td class="px-5 py-4 text-gray-700">13812345678</td>
+                            <td class="px-5 py-4 text-gray-700">粤A·AB1253</td>
+                            <td class="px-5 py-4 text-gray-700">张三</td>
+                            <td class="px-5 py-4 text-gray-700">参观</td>
+                            <td class="px-5 py-4">
+                                <span class="status-tag bg-yellow-50 text-pending">待访</span>
+                            </td>
+                            <td class="px-5 py-4 text-gray-700">-</td>
+                            <td class="px-5 py-4 text-gray-700">-</td>
+                            <td class="px-5 py-4 text-gray-700">-</td>
+                            <td class="px-5 py-4">
+                                <div class="flex flex-col gap-1.5">
+                                    <button class="text-primary hover:text-primary/80 text-xs transition-colors">详情</button>
+                                    <button class="text-primary hover:text-primary/80 text-xs transition-colors">签到</button>
+                                    <button class="text-primary hover:text-primary/80 text-xs transition-colors">下发权限</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="border-b border-gray-100 table-hover-row">
+                            <td class="px-5 py-4 text-gray-700">2</td>
+                            <td class="px-5 py-4 font-medium text-gray-800">B君</td>
+                            <td class="px-5 py-4 text-gray-700">18087654321</td>
+                            <td class="px-5 py-4 text-gray-700">-</td>
+                            <td class="px-5 py-4 text-gray-700">李四</td>
+                            <td class="px-5 py-4 text-gray-700">拜访</td>
+                            <td class="px-5 py-4">
+                                <span class="status-tag bg-blue-50 text-visiting">在访</span>
+                            </td>
+                            <td class="px-5 py-4 text-gray-700">已下发</td>
+                            <td class="px-5 py-4 text-gray-700 text-xs">2025/12/25 09:00:00</td>
+                            <td class="px-5 py-4 text-gray-700">-</td>
+                            <td class="px-5 py-4">
+                                <div class="flex flex-col gap-1.5">
+                                    <button class="text-primary hover:text-primary/80 text-xs transition-colors">详情</button>
+                                    <button class="text-primary hover:text-primary/80 text-xs transition-colors">签离</button>
+                                    <button class="text-primary hover:text-primary/80 text-xs transition-colors">修改权限</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="table-hover-row">
+                            <td class="px-5 py-4 text-gray-700">3</td>
+                            <td class="px-5 py-4 font-medium text-gray-800">C君</td>
+                            <td class="px-5 py-4 text-gray-700">13914725899</td>
+                            <td class="px-5 py-4 text-gray-700">桂A·C1688</td>
+                            <td class="px-5 py-4 text-gray-700">张三</td>
+                            <td class="px-5 py-4 text-gray-700">面试开会</td>
+                            <td class="px-5 py-4">
+                                <span class="status-tag bg-purple-50 text-visited">离访</span>
+                            </td>
+                            <td class="px-5 py-4 text-gray-700">已回收</td>
+                            <td class="px-5 py-4 text-gray-700 text-xs">2025/12/25 14:00:00</td>
+                            <td class="px-5 py-4 text-gray-700 text-xs">2025/12/25 17:30:00</td>
+                            <td class="px-5 py-4">
+                                <button class="text-primary hover:text-primary/80 text-xs transition-colors">详情</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页区域 -->
+            <div class="px-5 py-3 flex justify-between items-center border-t border-gray-100 bg-gray-50/50">
+                <div class="text-xs text-gray-500">
+                    显示 <span class="text-primary">1</span> - <span class="text-primary">3</span> 条，共 <span class="text-primary">3</span> 条
+                </div>
+                <div class="flex items-center gap-1">
+                    <button class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:border-primary hover:text-primary transition-colors text-xs">
+                        <i class="fa fa-angle-left"></i>
+                    </button>
+                    <button class="w-7 h-7 flex items-center justify-center rounded-lg bg-primary text-white text-xs">1</button>
+                    <button class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-primary hover:text-primary transition-colors text-xs">2</button>
+                    <button class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-primary hover:text-primary transition-colors text-xs">3</button>
+                    <button class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-primary hover:text-primary transition-colors text-xs">
+                        <i class="fa fa-angle-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

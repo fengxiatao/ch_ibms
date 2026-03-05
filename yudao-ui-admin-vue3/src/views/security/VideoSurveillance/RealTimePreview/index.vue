@@ -122,7 +122,7 @@ import { uploadCameraSnapshot } from '@/api/iot/video'
 import { nvrPresetControl } from '@/api/iot/video/nvr'
 
 // 类型导入
-import type { GridLayoutType, VideoView, PatrolScene, IbmsChannel } from './types'
+import type { GridLayoutType, VideoView, PatrolScene, PatrolSceneChannel, IbmsChannel } from './types'
 import { createVideoView, updateVideoView } from '@/api/iot/video/videoView'
 
 defineOptions({ name: 'RealTimePreview' })
@@ -793,8 +793,15 @@ const handlePatrolStop = () => {
   ElMessage.info('轮巡已停止')
 }
 
+// 轮巡场景的轮播定时器（按格子分组）
+const sceneRotationTimers = ref<Map<number, number>>(new Map())
+
 const handleExecuteScene = async (scene: PatrolScene) => {
   console.log('[轮巡] 执行场景:', scene.sceneName, '通道数据:', scene.channels)
+
+  // 清除之前的轮播定时器
+  sceneRotationTimers.value.forEach((timer) => clearTimeout(timer))
+  sceneRotationTimers.value.clear()
 
   // 停止当前所有播放
   await stopAllPlayers(panes.value)
@@ -817,50 +824,114 @@ const handleExecuteScene = async (scene: PatrolScene) => {
 
   // 播放场景中的通道
   if (scene.channels && scene.channels.length > 0) {
-    for (let i = 0; i < scene.channels.length; i++) {
-      const channelData = scene.channels[i]
-      const paneIndex = (channelData.gridPosition || 1) - 1
-
-      if (paneIndex >= 0 && paneIndex < panes.value.length) {
-        // 获取通道号（优先使用 channelNo，否则尝试通过 channelId 查找）
-        const channelNo = channelData.channelNo
-        const channelName = channelData.channelName || `通道${channelNo}`
-        
-        if (channelNo && channelNo > 0) {
-          console.log('[轮巡] 播放通道:', channelName, '窗格:', paneIndex + 1, 'channelNo:', channelNo)
-          
-          // 构建播放配置，直接使用保存的数据
-          setTimeout(async () => {
-            const pane = panes.value[paneIndex]
-            if (!pane) return
-            
-            // 确保容器存在
-            await nextTick()
-            if (!pane.container) {
-              const el = document.querySelector(
-                `.player-pane[data-index="${paneIndex}"] .player-container`
-              ) as HTMLElement
-              if (el) pane.container = el
-            }
-            
-            // 使用 NVR 配置播放
-            const config: DahuaPlayerConfig = {
-              ip: DEFAULT_NVR_CONFIG.ip,
-              port: DEFAULT_NVR_CONFIG.port,
-              rtspPort: DEFAULT_NVR_CONFIG.rtspPort,
-              username: DEFAULT_NVR_CONFIG.username,
-              password: DEFAULT_NVR_CONFIG.password,
-              channelNo: channelNo,
-              subtype: pane.streamType === 'sub' ? 1 : 0
-            }
-            
-            await startPreview(pane, config, channelName)
-          }, i * 300)
-        } else {
-          console.warn('[轮巡] 通道号无效:', channelData)
-        }
+    // 按格子位置分组通道
+    const channelsByGrid = new Map<number, typeof scene.channels>()
+    for (const channel of scene.channels) {
+      const gridPos = channel.gridPosition || 1
+      if (!channelsByGrid.has(gridPos)) {
+        channelsByGrid.set(gridPos, [])
       }
+      channelsByGrid.get(gridPos)!.push(channel)
     }
+
+    console.log('[轮巡] 按格子分组:', Array.from(channelsByGrid.entries()).map(([k, v]) => 
+      `格子${k}: ${v.map(c => c.channelName).join(', ')}`
+    ))
+
+    // 为每个格子启动轮播
+    channelsByGrid.forEach((channels, gridPos) => {
+      const paneIndex = gridPos - 1
+      if (paneIndex >= 0 && paneIndex < panes.value.length) {
+        // 启动该格子的通道轮播
+        startGridRotation(paneIndex, channels, 0)
+      }
+    })
+  }
+}
+
+// 格子内通道轮播播放
+const startGridRotation = async (
+  paneIndex: number, 
+  channels: PatrolSceneChannel[], 
+  currentIndex: number
+) => {
+  if (!isPatrolling.value || currentIndex >= channels.length) {
+    // 如果还在轮巡中，循环播放该格子的通道
+    if (isPatrolling.value && channels.length > 0) {
+      startGridRotation(paneIndex, channels, 0)
+    }
+    return
+  }
+
+  const channelData = channels[currentIndex]
+  const channelNo = channelData.channelNo
+  const channelName = channelData.channelName || `通道${channelNo}`
+  const duration = channelData.duration || 15  // 默认15秒
+
+  if (!channelNo || channelNo <= 0) {
+    console.warn('[轮巡] 通道号无效，跳过:', channelData)
+    // 跳过无效通道，立即播放下一个
+    startGridRotation(paneIndex, channels, currentIndex + 1)
+    return
+  }
+
+  console.log('[轮巡] 格子', paneIndex + 1, '播放通道:', channelName, 
+    `(${currentIndex + 1}/${channels.length})`, '时长:', duration, '秒')
+
+  const pane = panes.value[paneIndex]
+  if (!pane) return
+
+  // 先停止该格子当前播放
+  if (pane.isPlaying) {
+    await stopPlayer(pane)
+  }
+
+  // 确保容器存在
+  await nextTick()
+  if (!pane.container) {
+    const el = document.querySelector(
+      `.player-pane[data-index="${paneIndex}"] .player-container`
+    ) as HTMLElement
+    if (el) pane.container = el
+  }
+
+  // 使用 NVR 配置播放
+  const config: DahuaPlayerConfig = {
+    ip: DEFAULT_NVR_CONFIG.ip,
+    port: DEFAULT_NVR_CONFIG.port,
+    rtspPort: DEFAULT_NVR_CONFIG.rtspPort,
+    username: DEFAULT_NVR_CONFIG.username,
+    password: DEFAULT_NVR_CONFIG.password,
+    channelNo: channelNo,
+    subtype: pane.streamType === 'sub' ? 1 : 0
+  }
+
+  // 等待视频真正开始播放后才开始计时
+  const success = await startPreview(pane, config, channelName)
+
+  if (!isPatrolling.value) return  // 轮巡已停止
+
+  if (success) {
+    // 播放成功，从视频打开后开始计时
+    console.log('[轮巡] 格子', paneIndex + 1, '视频已打开，开始计时', duration, '秒')
+    
+    const timer = window.setTimeout(() => {
+      if (isPatrolling.value) {
+        startGridRotation(paneIndex, channels, currentIndex + 1)
+      }
+    }, duration * 1000)
+
+    // 保存定时器以便清理
+    sceneRotationTimers.value.set(paneIndex, timer)
+  } else {
+    // 播放失败，跳过该通道，立即播放下一个
+    console.warn('[轮巡] 格子', paneIndex + 1, '播放失败，跳过:', channelName)
+    // 短暂延迟后播放下一个，避免快速连续失败
+    setTimeout(() => {
+      if (isPatrolling.value) {
+        startGridRotation(paneIndex, channels, currentIndex + 1)
+      }
+    }, 500)
   }
 }
 
@@ -877,7 +948,7 @@ onMounted(async () => {
   }
 })
 
-onUnmounted(() => {
+onUnmounted(async () => {
   console.log('[实时预览] 页面卸载，清理资源')
 
   // 停止轮巡
@@ -885,8 +956,9 @@ onUnmounted(() => {
     patrolManagerRef.value?.stopPatrol()
   }
 
-  // 停止所有播放
-  stopAllPlayers(panes.value)
+  // 停止所有播放（await 确保 Worker 被完全销毁）
+  await stopAllPlayers(panes.value)
+  console.log('[实时预览] 所有播放器已清理完毕')
 })
 </script>
 

@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>长辉科技IBMS管理平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+SC:wght@300;400;700&display=swap');
+        
+        :root {
+            --primary-blue: #00d4ff;
+            --deep-blue: #0a1929;
+            --glass-bg: rgba(16, 30, 50, 0.9);
+            --alert-red: #ff4d4f;
+            --success-green: #52c41a;
+            --warning-gold: #faad14;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Noto Sans SC', sans-serif;
+            color: #e0f7ff;
+            background: #000;
+        }
+        
+        .tech-font {
+            font-family: 'Orbitron', monospace;
+        }
+        
+        /* 真实学校底图容器 */
+        .campus-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+        
+        /* 暗化遮罩 */
+        .campus-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 10, 30, 0.4);
+            backdrop-filter: blur(1px);
+        }
+        
+        /* 热点标记 */
+        .map-hotspot {
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            z-index: 20;
+            transform: translate(-50%, -50%);
+            transition: all 0.3s;
+        }
+        
+        .map-hotspot:hover {
+            transform: translate(-50%, -50%) scale(1.2);
+            z-index: 30;
+        }
+        
+        .hotspot-pulse {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px solid;
+            animation: pulse 2s infinite;
+        }
+        
+        .hotspot-core {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            box-shadow: 0 0 15px currentColor;
+        }
+        
+        .hotspot-label {
+            position: absolute;
+            top: -35px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 20, 40, 0.95);
+            border: 1px solid currentColor;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        
+        .map-hotspot:hover .hotspot-label {
+            opacity: 1;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(2.5); opacity: 0; }
+        }
+        
+        /* UI层 */
+        .ui-layer {
+            position: relative;
+            z-index: 100;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .glass-panel {
+            background: rgba(16, 30, 50, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 212, 255, 0.25);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(0, 212, 255, 0.05);
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .glass-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary-blue), transparent);
+            opacity: 0.8;
+        }
+        
+        .module-title {
+            background: linear-gradient(90deg, rgba(0,212,255,0.3) 0%, transparent 100%);
+            border-left: 4px solid var(--primary-blue);
+            padding: 10px 16px;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #00d4ff;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .stats-card {
+            background: linear-gradient(135deg, rgba(0, 50, 100, 0.7), rgba(0, 20, 40, 0.85));
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .hexagon-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 100, 200, 0.4));
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(0, 212, 255, 0.5);
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+        }
+
+        .stat-number-large {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.6rem;
+            font-weight: 700;
+            background: linear-gradient(to bottom, #fff, #7ecfff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .data-card {
+            background: rgba(0, 20, 40, 0.6);
+            border: 1px solid rgba(0, 212, 255, 0.15);
+            border-radius: 8px;
+            padding: 12px;
+            transition: all 0.3s;
+        }
+        .data-card:hover {
+            border-color: rgba(0, 212, 255, 0.4);
+            background: rgba(0, 30, 60, 0.7);
+        }
+        
+        .alert-item { 
+            border-left: 3px solid transparent; 
+            background: rgba(0, 0, 0, 0.2);
+            margin-bottom: 6px;
+            border-radius: 0 4px 4px 0;
+        }
+        .alert-item.danger { border-left-color: var(--alert-red); background: rgba(255, 77, 79, 0.15); }
+        .alert-item.warning { border-left-color: var(--warning-gold); background: rgba(250, 173, 20, 0.15); }
+        
+        .corner-accent {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border: 2px solid var(--primary-blue);
+        }
+        .corner-tl { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+        .corner-tr { top: -1px; right: -1px; border-left: 0; border-bottom: 0; }
+        .corner-bl { bottom: -1px; left: -1px; border-right: 0; border-top: 0; }
+        .corner-br { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+
+        header {
+            background: linear-gradient(180deg, rgba(10, 25, 50, 0.95), rgba(10, 25, 50, 0.8));
+            border-bottom: 1px solid rgba(0, 212, 255, 0.3);
+        }
+
+        /* 通道总览样式 */
+        .channel-overview {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .channel-gauge-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .channel-gauge {
+            width: 120px;
+            height: 100px;
+            position: relative;
+        }
+        .channel-gauge-value {
+            position: absolute;
+            top: 60%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            font-weight: bold;
+            font-family: 'Orbitron', monospace;
+            color: #52c41a;
+        }
+        .channel-stats {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .channel-stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            border-left: 3px solid;
+        }
+        .channel-stat-item.online {
+            border-left-color: #52c41a;
+        }
+        .channel-stat-item.offline {
+            border-left-color: #ff4d4f;
+        }
+        .channel-stat-label {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        .channel-stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            font-family: 'Orbitron', monospace;
+        }
+        .channel-stat-value.online {
+            color: #52c41a;
+        }
+        .channel-stat-value.offline {
+            color: #ff4d4f;
+        }
+
+        /* 在线率统计样式 */
+        .rate-stat {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 8px;
+            margin-bottom: 8px;
+        }
+        .rate-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        .rate-bar-bg {
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+        .rate-bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+        .rate-count {
+            display: flex;
+            gap: 8px;
+            font-size: 10px;
+        }
+        .rate-count span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 学校底图 -->
+    <div class="campus-container">
+        <div style="width:100%; height:100%; background: url('/mnt/kimi/upload/933d3aa3a6544a34b91a14f3a32fa2d2.jpeg') center center / cover no-repeat; filter: brightness(0.7) contrast(1.1);"></div>
+        <div class="campus-overlay"></div>
+        
+        <!-- 建筑热点标记 -->
+        <div class="map-hotspot" style="top: 35%; left: 48%;" onclick="selectBuilding('main-teaching')">
+            <div class="hotspot-pulse" style="border-color: #00d4ff; color: #00d4ff;"></div>
+            <div class="hotspot-core" style="background: #00d4ff; color: #00d4ff;"></div>
+            <div class="hotspot-label">主教学楼<br><span style="color:#aaa;font-size:10px;"> occupancy: 85%</span></div>
+        </div>
+        
+        <div class="map-hotspot" style="top: 30%; left: 72%;" onclick="selectBuilding('dormitory')">
+            <div class="hotspot-pulse" style="border-color: #22c55e; color: #22c55e;"></div>
+            <div class="hotspot-core" style="background: #22c55e; color: #22c55e;"></div>
+            <div class="hotspot-label">学生公寓<br><span style="color:#22c55e;font-size:10px;">正常</span></div>
+        </div>
+        
+        <div class="map-hotspot" style="top: 60%; left: 75%;" onclick="selectBuilding('stadium')">
+            <div class="hotspot-pulse" style="border-color: #a855f7; color: #a855f7;"></div>
+            <div class="hotspot-core" style="background: #a855f7; color: #a855f7;"></div>
+            <div class="hotspot-label">体育场<br><span style="color:#a855f7;font-size:10px;">活动中</span></div>
+        </div>
+        
+        <div class="map-hotspot" style="top: 40%; left: 22%;" onclick="selectBuilding('liberal-arts')">
+            <div class="hotspot-pulse" style="border-color: #f59e0b; color: #f59e0b;"></div>
+            <div class="hotspot-core" style="background: #f59e0b; color: #f59e0b;"></div>
+            <div class="hotspot-label">文理楼<br><span style="color:#f59e0b;font-size:10px;">能耗异常</span></div>
+        </div>
+        
+        <div class="map-hotspot" style="top: 65%; left: 25%;" onclick="selectBuilding('canteen')">
+            <div class="hotspot-pulse" style="border-color: #ef4444; color: #ef4444;"></div>
+            <div class="hotspot-core" style="background: #ef4444; color: #ef4444;"></div>
+            <div class="hotspot-label">第一食堂<br><span style="color:#ef4444;font-size:10px;">烟雾告警</span></div>
+        </div>
+        
+        <div class="map-hotspot" style="top: 25%; left: 28%;" onclick="selectBuilding('gym')">
+            <div class="hotspot-pulse" style="border-color: #3b82f6; color: #3b82f6;"></div>
+            <div class="hotspot-core" style="background: #3b82f6; color: #3b82f6;"></div>
+            <div class="hotspot-label">体育馆<br><span style="color:#3b82f6;font-size:10px;">空闲</span></div>
+        </div>
+    </div>
+
+    <!-- UI层 -->
+    <div class="ui-layer">
+        <!-- 顶部 Header -->
+        <header class="h-16 flex items-center justify-between px-6 mx-3 mt-3 rounded-t-lg glass-panel">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
+                    <i class="fas fa-graduation-cap text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-400">
+                        长辉科技IBMS管理平台
+                    </h1>
+                    <p class="text-xs text-cyan-400/70 tracking-widest">CHANGHUI TECH IBMS MANAGEMENT SYSTEM</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-2 text-cyan-300">
+                    <i class="fas fa-cloud-sun text-xl"></i>
+                    <div class="text-right">
+                        <div class="text-sm font-bold">26°C 晴</div>
+                        <div class="text-xs text-cyan-400/70">PM2.5: 35</div>
+                    </div>
+                </div>
+                <div class="text-right tech-font">
+                    <div class="text-xl text-cyan-300" id="clock">00:00:00</div>
+                    <div class="text-xs text-cyan-400/70" id="date">2026-01-30</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主体内容 -->
+        <main class="flex-1 p-3 grid grid-cols-12 gap-3 overflow-hidden">
+            
+            <!-- 左侧：智慧安防 - 已修改通道总览 -->
+            <section class="col-span-3 flex flex-col gap-3">
+                <div class="glass-panel flex-1 flex flex-col">
+                    <div class="corner-accent corner-tl"></div><div class="corner-accent corner-tr"></div>
+                    <div class="corner-accent corner-bl"></div><div class="corner-accent corner-br"></div>
+                    <div class="module-title">
+                        <i class="fas fa-shield-alt"></i>智慧安防
+                    </div>
+                    <div class="p-3 flex-1 flex flex-col gap-3 overflow-y-auto">
+                        
+                        <!-- 通道总览 - 已简化只保留在线率+数量统计 -->
+                        <div class="data-card">
+                            <div class="flex items-center gap-2 mb-3">
+                                <i class="fas fa-diamond text-cyan-400 text-xs"></i>
+                                <span class="text-xs text-cyan-300 font-bold">通道总览</span>
+                            </div>
+                            
+                            <div class="channel-overview">
+                                <!-- 左侧仪表盘：只保留在线率 -->
+                                <div class="channel-gauge-container">
+                                    <div class="channel-gauge">
+                                        <div id="channelGauge" style="width: 100%; height: 100%;"></div>
+                                        <div class="channel-gauge-value">98%</div>
+                                    </div>
+                                    
+                                    <!-- 右侧数量统计 -->
+                                    <div class="channel-stats">
+                                        <div class="channel-stat-item online">
+                                            <span class="channel-stat-label">
+                                                <i class="fas fa-circle text-green-500 text-[10px] mr-1"></i>在线数量
+                                            </span>
+                                            <span class="channel-stat-value online">46</span>
+                                        </div>
+                                        <div class="channel-stat-item offline">
+                                            <span class="channel-stat-label">
+                                                <i class="fas fa-circle text-red-500 text-[10px] mr-1"></i>离线数量
+                                            </span>
+                                            <span class="channel-stat-value offline">2</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 在线率统计（存储设备/服务器） -->
+                        <div class="data-card">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-diamond text-cyan-400 text-xs"></i>
+                                    <span class="text-xs text-cyan-300 font-bold">在线率统计</span>
+                                </div>
+                                <div class="flex items-center gap-3 text-[10px]">
+                                    <span class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-green-500"></div>在线数</span>
+                                    <span class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-red-500"></div>离线数</span>
+                                </div>
+                            </div>
+                            
+                            <div class="rate-stat">
+                                <div class="rate-header">
+                                    <span class="text-xs text-cyan-300">存储设备</span>
+                                    <span class="text-xs font-bold text-cyan-300">100%</span>
+                                </div>
+                                <div class="rate-bar-bg">
+                                    <div class="rate-bar-fill bg-gradient-to-r from-cyan-400 to-green-400" style="width: 100%"></div>
+                                </div>
+                                <div class="rate-count">
+                                    <span class="text-green-400"><div class="w-2 h-2 rounded-full bg-green-500"></div>21</span>
+                                    <span class="text-red-400"><div class="w-2 h-2 rounded-full bg-red-500"></div>0</span>
+                                </div>
+                            </div>
+
+                            <div class="rate-stat">
+                                <div class="rate-header">
+                                    <span class="text-xs text-cyan-300">服务器</span>
+                                    <span class="text-xs font-bold text-gray-500">--</span>
+                                </div>
+                                <div class="rate-bar-bg">
+                                    <div class="rate-bar-fill bg-gradient-to-r from-cyan-400 to-green-400" style="width: 0%"></div>
+                                </div>
+                                <div class="rate-count">
+                                    <span class="text-green-400"><div class="w-2 h-2 rounded-full bg-green-500"></div>0</span>
+                                    <span class="text-red-400"><div class="w-2 h-2 rounded-full bg-red-500"></div>0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 入侵报警 -->
+                        <div class="data-card">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs text-gray-400 font-bold"><i class="fas fa-exclamation-triangle mr-1"></i>入侵报警</span>
+                                <span class="px-2 py-0.5 bg-red-500/20 text-red-400 text-[10px] rounded animate-pulse">2 条未处理</span>
+                            </div>
+                            <div id="alarmChart" style="height: 50px;"></div>
+                            <div class="mt-2 space-y-1">
+                                <div class="alert-item danger p-2 rounded text-xs">
+                                    <div class="flex justify-between mb-1">
+                                        <span class="text-red-300 font-bold">食堂烟雾探测器</span>
+                                        <span class="text-[10px] text-gray-500">刚刚</span>
+                                    </div>
+                                    <div class="text-gray-400 text-[10px]">第一食堂-后厨区域</div>
+                                </div>
+                                <div class="alert-item warning p-2 rounded text-xs">
+                                    <div class="flex justify-between mb-1">
+                                        <span class="text-yellow-300 font-bold">文理楼门禁异常</span>
+                                        <span class="text-[10px] text-gray-500">5分钟前</span>
+                                    </div>
+                                    <div class="text-gray-400 text-[10px]">B座-东侧入口</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 电子巡更 -->
+                        <div class="data-card">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs text-gray-400 font-bold"><i class="fas fa-route mr-1"></i>电子巡更</span>
+                                <span class="text-xs text-cyan-400">80%</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="relative w-14 h-14">
+                                    <svg class="w-14 h-14 transform -rotate-90">
+                                        <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(0,212,255,0.2)" stroke-width="3"/>
+                                        <circle cx="28" cy="28" r="24" fill="none" stroke="#00d4ff" stroke-width="3" 
+                                                stroke-dasharray="150.8" stroke-dashoffset="30"/>
+                                    </svg>
+                                    <div class="absolute inset-0 flex items-center justify-center text-xs font-bold tech-font">16/20</div>
+                                </div>
+                                <div class="flex-1 grid grid-cols-2 gap-1 text-[10px]">
+                                    <div class="bg-green-500/10 rounded p-1 text-center text-green-400">已完成 16</div>
+                                    <div class="bg-yellow-500/10 rounded p-1 text-center text-yellow-400">异常 1</div>
+                                    <div class="bg-red-500/10 rounded p-1 text-center text-red-400">漏检 3</div>
+                                    <div class="bg-cyan-500/10 rounded p-1 text-center text-cyan-400">进行中</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 中间：学校底图视图 + 顶部统计 -->
+            <section class="col-span-6 flex flex-col gap-3">
+                <!-- 顶部统计栏 -->
+                <div class="grid grid-cols-4 gap-3">
+                    <div class="stats-card p-3 flex items-center gap-3">
+                        <div class="hexagon-icon">
+                            <i class="fas fa-server text-cyan-300 text-lg"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-400 mb-1">校园设备接入</div>
+                            <div class="stat-number-large text-xl">2,856</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stats-card p-3 flex items-center gap-3">
+                        <div class="hexagon-icon" style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.3), rgba(21, 128, 61, 0.5));">
+                            <i class="fas fa-leaf text-green-300 text-lg"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-400 mb-1">本月能耗(标煤)</div>
+                            <div class="stat-number-large text-xl" style="background: linear-gradient(to bottom, #86efac, #22c55e); -webkit-background-clip: text;">142.8<span class="text-xs">t</span></div>
+                        </div>
+                    </div>
+
+                    <div class="stats-card p-3 flex items-center gap-3">
+                        <div class="hexagon-icon" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(185, 28, 28, 0.5));">
+                            <i class="fas fa-bell text-red-300 text-lg"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-400 mb-1">实时异常设备</div>
+                            <div class="stat-number-large text-xl" style="background: linear-gradient(to bottom, #fca5a5, #ef4444); -webkit-background-clip: text;">5</div>
+                        </div>
+                    </div>
+
+                    <div class="stats-card p-3 flex items-center gap-3">
+                        <div class="hexagon-icon" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(180, 83, 9, 0.5));">
+                            <i class="fas fa-exclamation-circle text-yellow-300 text-lg"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-400 mb-1">今日告警事件</div>
+                            <div class="stat-number-large text-xl" style="background: linear-gradient(to bottom, #fcd34d, #f59e0b); -webkit-background-clip: text;">12</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 设备实时状态统计栏 -->
+                <div class="glass-panel p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-2 mr-4">
+                        <div class="text-sm font-bold text-cyan-300 border-r border-cyan-500/30 pr-3">设备实时状态统计</div>
+                    </div>
+                    <div class="flex-1 flex justify-around items-center">
+                        <div class="flex items-center gap-2">
+                            <div class="hexagon-icon" style="width: 40px; height: 40px;">
+                                <i class="fas fa-cube text-cyan-300 text-lg"></i>
+                            </div>
+                            <div>
+                                <div class="stat-number-large text-base">323</div>
+                                <div class="text-[10px] text-gray-400">总数(台)</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="hexagon-icon" style="width: 40px; height: 40px; background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(21, 128, 61, 0.4)); border-color: rgba(34, 197, 94, 0.5);">
+                                <i class="fas fa-play-circle text-green-400 text-lg"></i>
+                            </div>
+                            <div>
+                                <div class="stat-number-large text-base" style="background: linear-gradient(to bottom, #86efac, #22c55e); -webkit-background-clip: text;">243</div>
+                                <div class="text-[10px] text-gray-400">在线(台)</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="hexagon-icon" style="width: 40px; height: 40px; background: linear-gradient(135deg, rgba(156, 163, 175, 0.2), rgba(75, 85, 99, 0.4)); border-color: rgba(156, 163, 175, 0.5);">
+                                <i class="fas fa-minus-circle text-gray-400 text-lg"></i>
+                            </div>
+                            <div>
+                                <div class="stat-number-large text-base" style="background: linear-gradient(to bottom, #d1d5db, #9ca3af); -webkit-background-clip: text;">42</div>
+                                <div class="text-[10px] text-gray-400">离线(台)</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="hexagon-icon" style="width: 40px; height: 40px; background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(180, 83, 9, 0.4)); border-color: rgba(245, 158, 11, 0.5);">
+                                <i class="fas fa-exclamation-triangle text-yellow-400 text-lg"></i>
+                            </div>
+                            <div>
+                                <div class="stat-number-large text-base" style="background: linear-gradient(to bottom, #fcd34d, #f59e0b); -webkit-background-clip: text;">4</div>
+                                <div class="text-[10px] text-gray-400">告警(台)</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="hexagon-icon" style="width: 40px; height: 40px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(185, 28, 28, 0.4)); border-color: rgba(239, 68, 68, 0.5);">
+                                <i class="fas fa-times-circle text-red-400 text-lg"></i>
+                            </div>
+                            <div>
+                                <div class="stat-number-large text-base" style="background: linear-gradient(to bottom, #fca5a5, #ef4444); -webkit-background-clip: text;">34</div>
+                                <div class="text-[10px] text-gray-400">故障(台)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 中间视图提示 -->
+                <div class="flex-1 relative rounded-lg border border-cyan-500/20 bg-gradient-to-b from-transparent to-cyan-900/10 flex items-center justify-center">
+                    <div class="text-center opacity-50">
+                        <i class="fas fa-map-marked-alt text-6xl text-cyan-500/30 mb-4"></i>
+                        <div class="text-cyan-300 text-lg">智慧校园管理平台</div>
+                        <div class="text-cyan-400/50 text-sm">点击地图标记查看详情</div>
+                    </div>
+                    <div class="absolute top-4 left-4 glass-panel px-4 py-2 rounded-lg border-l-4 border-cyan-400">
+                        <div class="text-xs text-gray-400">当前视角</div>
+                        <div class="text-sm font-bold text-cyan-300">校园全景鸟瞰</div>
+                    </div>
+                    <div class="absolute bottom-4 left-4 flex gap-2">
+                        <div class="glass-panel px-3 py-1 rounded text-xs border border-green-500/30 text-green-400">
+                            <i class="fas fa-check-circle mr-1"></i>安防正常
+                        </div>
+                        <div class="glass-panel px-3 py-1 rounded text-xs border border-yellow-500/30 text-yellow-400">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>1处告警
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 智慧楼宇 - 已修改标题 -->
+                <div class="glass-panel h-44 flex flex-col">
+                    <div class="module-title">
+                        <i class="fas fa-building"></i>智慧楼宇
+                    </div>
+                    <div class="p-3 flex-1 grid grid-cols-4 gap-3">
+                        <div class="data-card">
+                            <div class="text-xs text-gray-400 mb-1"><i class="fas fa-thermometer-half mr-1"></i>环境温度</div>
+                            <div class="text-2xl font-bold tech-font text-orange-300">24.5°C</div>
+                            <div class="w-full bg-gray-800 rounded-full h-1.5 mt-2">
+                                <div class="bg-orange-400 h-1.5 rounded-full" style="width: 65%"></div>
+                            </div>
+                        </div>
+                        <div class="data-card">
+                            <div class="text-xs text-gray-400 mb-1"><i class="fas fa-tint mr-1"></i>环境湿度</div>
+                            <div class="text-2xl font-bold tech-font text-blue-300">58%</div>
+                            <div class="w-full bg-gray-800 rounded-full h-1.5 mt-2">
+                                <div class="bg-blue-400 h-1.5 rounded-full" style="width: 58%"></div>
+                            </div>
+                        </div>
+                        <div class="data-card">
+                            <div class="text-xs text-gray-400 mb-1"><i class="fas fa-wind mr-1"></i>空气质量</div>
+                            <div class="text-2xl font-bold tech-font text-green-300">优</div>
+                            <div class="text-[10px] text-gray-400 mt-1">PM2.5: 35μg/m³</div>
+                            <div class="text-[10px] text-gray-400">CO₂: 450ppm</div>
+                        </div>
+                        <div class="data-card">
+                            <div class="text-xs text-gray-400 mb-1"><i class="fas fa-server mr-1"></i>设备状态</div>
+                            <div class="flex justify-between items-end mb-1">
+                                <div>
+                                    <div class="text-[10px] text-gray-400">在线率</div>
+                                    <div class="text-lg font-bold tech-font text-green-400">96.2%</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-[10px] text-gray-400">负载率</div>
+                                    <div class="text-lg font-bold tech-font text-yellow-300">68%</div>
+                                </div>
+                            </div>
+                            <div class="space-y-1 mt-1">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-full bg-gray-800 rounded-full h-1 flex-1">
+                                        <div class="bg-green-400 h-1 rounded-full" style="width: 96.2%"></div>
+                                    </div>
+                                    <span class="text-[9px] text-green-400 w-6 text-right">243</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-full bg-gray-800 rounded-full h-1 flex-1">
+                                        <div class="bg-yellow-400 h-1 rounded-full" style="width: 68%"></div>
+                                    </div>
+                                    <span class="text-[9px] text-yellow-400 w-6 text-right">68%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 右侧：智慧通行 + 智慧能源 -->
+            <section class="col-span-3 flex flex-col gap-3">
+                <div class="glass-panel h-1/2 flex flex-col">
+                    <div class="corner-accent corner-tl"></div><div class="corner-accent corner-tr"></div>
+                    <div class="corner-accent corner-bl"></div><div class="corner-accent corner-br"></div>
+                    <div class="module-title"><i class="fas fa-id-card"></i>智慧通行</div>
+                    <div class="p-3 flex-1 flex flex-col gap-2 overflow-y-auto">
+                        <div class="data-card">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs text-gray-400 font-bold"><i class="fas fa-door-open mr-1"></i>门禁管理</span>
+                                <span class="text-[10px] bg-green-500/20 text-green-400 px-2 rounded">正常</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                <div class="text-center p-2 bg-black/30 rounded">
+                                    <div class="text-lg font-bold tech-font text-cyan-300">3,428</div>
+                                    <div class="text-[10px] text-gray-400">今日进入</div>
+                                </div>
+                                <div class="text-center p-2 bg-black/30 rounded">
+                                    <div class="text-lg font-bold tech-font text-cyan-300">3,156</div>
+                                    <div class="text-[10px] text-gray-400">今日离开</div>
+                                </div>
+                            </div>
+                            <div id="accessChart" style="height: 40px;"></div>
+                        </div>
+
+                        <div class="data-card">
+                            <div class="text-xs text-gray-400 font-bold mb-2"><i class="fas fa-user-clock mr-1"></i>访客预约</div>
+                            <div class="flex justify-around mb-2">
+                                <div class="text-center"><div class="text-lg font-bold text-blue-300">24</div><div class="text-[10px] text-gray-500">预约</div></div>
+                                <div class="text-center"><div class="text-lg font-bold text-green-300">18</div><div class="text-[10px] text-gray-500">在访</div></div>
+                                <div class="text-center"><div class="text-lg font-bold text-gray-300">156</div><div class="text-[10px] text-gray-500">已离</div></div>
+                            </div>
+                        </div>
+
+                        <div class="data-card">
+                            <div class="text-xs text-gray-400 font-bold mb-1"><i class="fas fa-car mr-1"></i>停车场</div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-gray-400">车位占用</span>
+                                <span class="text-sm font-bold text-cyan-300">82%</span>
+                            </div>
+                            <div class="w-full bg-gray-800 rounded-full h-2 mt-1">
+                                <div class="bg-gradient-to-r from-cyan-400 to-blue-500 h-2 rounded-full" style="width: 82%"></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+                                <span>已用: 328</span>
+                                <span>剩余: 72</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel h-1/2 flex flex-col">
+                    <div class="corner-accent corner-tl"></div><div class="corner-accent corner-tr"></div>
+                    <div class="corner-accent corner-bl"></div><div class="corner-accent corner-br"></div>
+                    <div class="module-title"><i class="fas fa-bolt"></i>智慧能源</div>
+                    <div class="p-3 flex-1 flex flex-col gap-2 overflow-y-auto">
+                        <div class="data-card border-l-4 border-yellow-400">
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-yellow-400 font-bold"><i class="fas fa-bolt mr-1"></i>用电量</span>
+                                <span class="text-[10px] text-gray-500">今日</span>
+                            </div>
+                            <div class="text-xl font-bold tech-font text-yellow-300 mb-1">8,650<span class="text-xs text-gray-500"> kWh</span></div>
+                            <div id="electricChart" style="height: 35px;"></div>
+                        </div>
+
+                        <div class="data-card border-l-4 border-blue-400">
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-blue-400 font-bold"><i class="fas fa-tint mr-1"></i>用水量</span>
+                                <span class="text-[10px] text-gray-500">今日</span>
+                            </div>
+                            <div class="text-xl font-bold tech-font text-blue-300">1,240<span class="text-xs text-gray-500"> m³</span></div>
+                            <div class="text-[10px] text-green-400 mt-1">↓ 比昨日减少 5.2%</div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-2 text-[10px] text-center mt-auto">
+                            <div class="bg-black/40 rounded p-2 border border-yellow-400/30">
+                                <div class="text-gray-400">电费</div>
+                                <div class="font-bold text-yellow-400">¥6,920</div>
+                            </div>
+                            <div class="bg-black/40 rounded p-2 border border-blue-400/30">
+                                <div class="text-gray-400">水费</div>
+                                <div class="font-bold text-blue-400">¥3,720</div>
+                            </div>
+                            <div class="bg-black/40 rounded p-2 border border-orange-400/30">
+                                <div class="text-gray-400">燃气</div>
+                                <div class="font-bold text-orange-400">¥1,450</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- 底部状态栏 -->
+        <footer class="h-10 glass-panel border-t border-cyan-500/20 flex items-center justify-between px-6 mx-3 mb-3 rounded-b-lg">
+            <div class="flex items-center gap-6 text-xs text-cyan-400/80">
+                <span class="flex items-center gap-2"><div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> 系统运行正常</span>
+            </div>
+            <div class="text-xs text-cyan-400/60">长辉科技IBMS管理平台 V1.0</div>
+        </footer>
+    </div>
+
+    <script>
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = now.toLocaleTimeString('zh-CN', {hour12: false});
+            document.getElementById('date').textContent = now.toLocaleDateString('zh-CN');
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function selectBuilding(buildingId) {
+            console.log('选择建筑:', buildingId);
+        }
+
+        function highlightHotspot(buildingId) {
+            console.log('高亮热点:', buildingId);
+        }
+
+        const commonOption = { grid: { top: 5, bottom: 5, left: 0, right: 0 }, tooltip: { trigger: 'axis' } };
+
+        // 通道总览仪表盘 - 只保留在线率
+        const channelGauge = echarts.init(document.getElementById('channelGauge'));
+        channelGauge.setOption({
+            series: [{
+                type: 'gauge',
+                startAngle: 180,
+                endAngle: 0,
+                min: 0,
+                max: 100,
+                radius: '100%',
+                center: ['50%', '70%'],
+                itemStyle: {
+                    color: '#52c41a',
+                    shadowColor: 'rgba(82,196,26,0.45)',
+                    shadowBlur: 10
+                },
+                progress: {
+                    show: true,
+                    roundCap: true,
+                    width: 8
+                },
+                pointer: { show: false },
+                axisLine: {
+                    roundCap: true,
+                    lineStyle: {
+                        width: 8,
+                        color: [[1, 'rgba(255,255,255,0.1)']]
+                    }
+                },
+                axisTick: { show: false },
+                splitLine: { show: false },
+                axisLabel: { show: false },
+                title: { show: false },
+                detail: { show: false },
+                data: [{ value: 98 }]
+            }]
+        });
+
+        const alarmChart = echarts.init(document.getElementById('alarmChart'));
+        alarmChart.setOption({
+            ...commonOption,
+            xAxis: { type: 'category', data: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'], show: false },
+            yAxis: { type: 'value', show: false },
+            series: [{
+                data: [0, 0, 1, 0, 2, 1],
+                type: 'bar',
+                itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#ff4d4f' }, { offset: 1, color: 'rgba(255,77,79,0.1)' }]) },
+                barWidth: '50%'
+            }]
+        });
+
+        const accessChart = echarts.init(document.getElementById('accessChart'));
+        accessChart.setOption({
+            ...commonOption,
+            xAxis: { type: 'category', data: ['8h', '10h', '12h', '14h', '16h'], show: false },
+            yAxis: { type: 'value', show: false },
+            series: [
+                { name: '进入', type: 'line', smooth: true, data: [200, 450, 380, 420, 350], lineStyle: { color: '#22d3ee', width: 2 }, showSymbol: false },
+                { name: '离开', type: 'line', smooth: true, data: [150, 300, 480, 390, 380], lineStyle: { color: '#f472b6', width: 2 }, showSymbol: false }
+            ]
+        });
+
+        const electricChart = echarts.init(document.getElementById('electricChart'));
+        electricChart.setOption({
+            ...commonOption,
+            xAxis: { type: 'category', data: ['1月', '2月', '3月', '4月', '5月'], show: false },
+            yAxis: { type: 'value', show: false },
+            series: [{
+                type: 'line', smooth: true, data: [8200, 7800, 8500, 8100, 8650],
+                lineStyle: { color: '#facc15', width: 2 },
+                areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(250,204,21,0.3)' }, { offset: 1, color: 'rgba(250,204,21,0)' }]) },
+                symbol: 'none'
+            }]
+        });
+
+        window.addEventListener('resize', () => {
+            channelGauge.resize();
+            alarmChart.resize();
+            accessChart.resize();
+            electricChart.resize();
+        });
+    </script>
+</body>
+</html>

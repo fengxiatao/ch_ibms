@@ -21,8 +21,7 @@ public class EpatrolPlanSaveReqVO {
     @NotBlank(message = "计划名称不能为空")
     private String planName;
 
-    @Schema(description = "巡更路线ID", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
-    @NotNull(message = "巡更路线不能为空")
+    @Schema(description = "巡更路线ID（可选，每个时段可设置不同路线）", example = "1")
     private Long routeId;
 
     @Schema(description = "开始日期", requiredMode = Schema.RequiredMode.REQUIRED, example = "2024-01-01")
@@ -49,6 +48,10 @@ public class EpatrolPlanSaveReqVO {
 
         @Schema(description = "时段ID（修改时使用）", example = "1")
         private Long id;
+
+        @Schema(description = "巡更路线ID", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
+        @NotNull(message = "巡更路线不能为空")
+        private Long routeId;
 
         @Schema(description = "开始时间", requiredMode = Schema.RequiredMode.REQUIRED, example = "08:00")
         @NotNull(message = "开始时间不能为空")

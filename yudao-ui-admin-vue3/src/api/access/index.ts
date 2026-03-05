@@ -1,5 +1,12 @@
 import request from '@/config/axios'
 
+// ========== 通行门禁相关通用类型 ==========
+
+export interface AccessDoorVO {
+  id: number
+  doorName: string
+}
+
 // 智慧通行首页统计数据
 export interface AccessDashboardStatisticsVO {
   // 今日数据
@@ -145,5 +152,27 @@ export const getAccessHeatmapData = (params: { date: Date, type?: string }) => {
 export const getAbnormalEventList = (params: { pageSize?: number, level?: string }) => {
   return request.get({ url: '/iot/access/dashboard/abnormal-events', params })
 }
-
+ 
+// ========== 车场出入口（车道）列表，用于在场车辆页面选择出入口 ==========
+export const AccessDoorApi = {
+  /**
+   * 获取某车场的“出入口”列表。
+   * 目前直接复用 IoT 停车车道接口 `/iot/parking/lane/list-by-lot`，
+   * 并将后端的 laneName 映射为前端使用的 doorName。
+   */
+  async getList(lotId: number): Promise<AccessDoorVO[]> {
+    if (!lotId) {
+      return []
+    }
+    const res = await request.get<Array<{ id: number; laneName: string }>>({
+      url: '/iot/parking/lane/list-by-lot',
+      params: { lotId }
+    })
+    const list = Array.isArray(res) ? res : (res as any)?.list || []
+    return list.map((item: any) => ({
+      id: item.id,
+      doorName: item.laneName || `车道#${item.id}`
+    }))
+  }
+}
 

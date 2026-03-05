@@ -10,6 +10,9 @@ const appStore = useAppStore()
 
 const footer = computed(() => appStore.getFooter)
 
+// 首页全屏模式
+const homeFullscreen = computed(() => appStore.getHomeFullscreen)
+
 const tagsViewStore = useTagsViewStore()
 
 const getCaches = computed((): string[] => {
@@ -47,13 +50,19 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="app-view-container" :style="{ height: containerHeight }">
+  <div 
+    class="app-view-container" 
+    :class="{ 'app-view-container--fullscreen': homeFullscreen }"
+    :style="{ height: containerHeight }"
+  >
     <!-- 主要内容区域 -->
     <section
       :class="[
-        'app-view-content w-full bg-[var(--app-content-bg-color)] dark:bg-[var(--el-bg-color)]',
+        'app-view-content w-full',
         {
-          'pb-0': footer
+          'bg-[var(--app-content-bg-color)] dark:bg-[var(--el-bg-color)]': !homeFullscreen,
+          'pb-0': footer && !homeFullscreen,
+          'app-view-content--fullscreen': homeFullscreen
         }
       ]"
     >
@@ -67,7 +76,7 @@ onMounted(() => {
     </section>
     
     <!-- 页脚区域 -->
-    <Footer v-if="footer" class="app-view-footer" />
+    <Footer v-if="footer && !homeFullscreen" class="app-view-footer" />
   </div>
 </template>
 
@@ -78,6 +87,11 @@ onMounted(() => {
   overflow: hidden; /* 防止外层滚动 */
 }
 
+/* 全屏模式容器 */
+.app-view-container--fullscreen {
+  height: 100vh !important;
+}
+
 .app-view-content {
   flex: 1; /* 让内容区域占据剩余空间 */
   overflow-y: auto; /* 内容区域独立滚动 */
@@ -85,6 +99,13 @@ onMounted(() => {
   padding: var(--app-content-padding);
   padding-top: calc(var(--app-content-padding) + 10px); /* 增加顶部内边距 */
   box-sizing: border-box;
+}
+
+/* 全屏模式内容区域 */
+.app-view-content--fullscreen {
+  padding: 0 !important;
+  overflow: hidden;
+  height: 100vh;
 }
 
 .app-view-footer {
@@ -122,14 +143,14 @@ onMounted(() => {
 
 /* 响应式优化 */
 @media (max-height: 600px) {
-  .app-view-content {
+  .app-view-content:not(.app-view-content--fullscreen) {
     /* 小屏幕设备优化 */
     padding: calc(var(--app-content-padding) / 2);
   }
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
-  .app-view-content {
+  .app-view-content:not(.app-view-content--fullscreen) {
     /* 横屏小高度优化 */
     padding: 8px;
   }
