@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.parking.vo.presentvehicle.ParkingPresentVehiclePageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.parking.vo.record.ParkingRecordPageReqVO;
+import cn.iocoder.yudao.module.iot.controller.admin.parking.vo.record.ParkingRecordManualPayReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.parking.*;
 import cn.iocoder.yudao.module.iot.dal.mysql.parking.*;
 import jakarta.annotation.Resource;
@@ -394,6 +395,37 @@ public class ParkingRecordServiceImpl implements ParkingRecordService {
     public String getChargeRuleName(Long lotId, String vehicleCategory, Integer vehicleType) {
         ParkingChargeRuleDO rule = findApplicableChargeRule(lotId, vehicleCategory, vehicleType);
         return rule != null ? rule.getRuleName() : "默认收费规则";
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long manualPay(ParkingRecordManualPayReqVO reqVO) {
+        LocalDateTime entryTime = LocalDateTime.parse(reqVO.getInTime().replace(" ", "T"));
+        LocalDateTime exitTime = LocalDateTime.parse(reqVO.getOutTime().replace(" ", "T"));
+        int durationMinutes;
+        if (reqVO.getDurationMinutes() != null) {
+            durationMinutes = reqVO.getDurationMinutes();
+        } else {
+            durationMinutes = (int) Duration.between(entryTime, exitTime).toMinutes();
+        }
+
+        ParkingRecordDO record = ParkingRecordDO.builder()
+                .plateNumber(reqVO.getPlateNo())
+                .vehicleCategory("temporary")
+                .lotId(reqVO.getLotId())
+                .entryTime(entryTime)
+                .exitTime(exitTime)
+                .parkingDuration(durationMinutes)
+                .paidAmount(BigDecimal.valueOf(reqVO.getAmount()))
+                .paymentMethod(reqVO.getPayChannel())
+                .paymentTime(exitTime)
+                .paymentStatus(1)
+                .recordStatus(2)
+                .exitType("manual")
+                .remark(reqVO.getRemark())
+                .build();
+        parkingRecordMapper.insert(record);
+        return record.getId();
     }
 
     private String determineVehicleCategory(String plateNumber) {

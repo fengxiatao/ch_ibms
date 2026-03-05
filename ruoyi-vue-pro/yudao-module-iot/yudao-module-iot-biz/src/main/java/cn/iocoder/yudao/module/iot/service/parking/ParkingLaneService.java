@@ -26,4 +26,18 @@ public interface ParkingLaneService {
     PageResult<ParkingLaneDO> getParkingLanePage(ParkingLanePageReqVO pageReqVO);
 
     List<ParkingLaneDO> getParkingLaneListByLotId(Long lotId);
+
+    /**
+     * 开闸（升闸）
+     *
+     * @param laneId 车道ID
+     */
+    void openGate(Long laneId);
+
+    /**
+     * 关闸（落闸）
+     *
+     * @param laneId 车道ID
+     */
+    void closeGate(Long laneId);
 }

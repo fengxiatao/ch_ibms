@@ -56,11 +56,14 @@ public class IotAlarmEventRespVO {
     @Schema(description = "是否新事件", requiredMode = Schema.RequiredMode.REQUIRED, example = "true")
     private Boolean isNewEvent;
 
-    @Schema(description = "是否已处理", requiredMode = Schema.RequiredMode.REQUIRED, example = "false")
-    private Boolean isHandled;
+    @Schema(description = "处理状态：0-未处理，1-已处理，2-已忽略", requiredMode = Schema.RequiredMode.REQUIRED, example = "0")
+    private Integer status;
 
-    @Schema(description = "处理人", example = "admin")
+    @Schema(description = "处理人ID", example = "1")
     private String handledBy;
+
+    @Schema(description = "处理人名称", example = "管理员")
+    private String handledByName;
 
     @Schema(description = "处理时间")
     private LocalDateTime handledTime;

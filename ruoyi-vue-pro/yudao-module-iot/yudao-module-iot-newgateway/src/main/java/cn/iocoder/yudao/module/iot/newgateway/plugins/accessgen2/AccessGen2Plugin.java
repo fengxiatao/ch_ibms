@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.iot.newgateway.plugins.accessgen2;
 import cn.iocoder.yudao.module.iot.core.enums.ConnectionMode;
 import cn.iocoder.yudao.module.iot.core.gateway.dto.AccessControlEventMessage;
 import cn.iocoder.yudao.module.iot.core.gateway.dto.DeviceInfo;
+import cn.iocoder.yudao.module.iot.core.gateway.dto.access.NetAccessFaceInfo;
 import cn.iocoder.yudao.module.iot.core.gateway.dto.access.NetAccessUserInfo;
 import cn.iocoder.yudao.module.iot.core.messagebus.topics.IotMessageTopics;
 import cn.iocoder.yudao.module.iot.newgateway.core.annotation.DevicePlugin;
@@ -275,12 +276,34 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
     private final AccessGen2SdkWrapper sdkWrapper;
 
     /**
+     * 门禁命令确认服务
+     * <p>基于设备事件回调的命令确认机制，解决 SDK 返回值不可靠的问题</p>
+     */
+    private final cn.iocoder.yudao.module.iot.newgateway.plugins.accessgen1.DoorCommandConfirmationService doorCommandConfirmationService;
+
+    /**
      * 门禁事件回调（EVENT_IVS_ACCESS_CTL）
      * <p>
      * 必须保持强引用，避免被 GC 导致回调失效
      * </p>
      */
     private final NetSDKLib.fAnalyzerDataCallBack accessCtlCallback = new AccessCtlAnalyzerDataCallBack(this);
+
+    /**
+     * 事件去重缓存：key = "deviceId:channelNo:eventType:result"，value = 上次事件时间戳
+     * <p>
+     * 用于过滤短时间内重复的事件（如远程开门可能触发多次回调）
+     * </p>
+     */
+    private final java.util.concurrent.ConcurrentHashMap<String, Long> eventDedupeCache = new java.util.concurrent.ConcurrentHashMap<>();
+    
+    /**
+     * 事件去重时间窗口（毫秒）
+     * <p>
+     * 在此时间窗口内，相同的事件（设备+通道+事件类型+结果）将被忽略
+     * </p>
+     */
+    private static final long EVENT_DEDUPE_WINDOW_MS = 500;
 
     /**
      * 重连调度器
@@ -470,7 +493,8 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
                 case CMD_CLOSE_DOOR:
                     return executeCloseDoor(deviceId, mappedCommand);
                 case CMD_DISPATCH_AUTH:
-                    return executeDispatchAuth(deviceId, mappedCommand);
+                    // 传递原始命令类型，以便区分 DISPATCH_USER 和 DISPATCH_CARD
+                    return executeDispatchAuth(deviceId, mappedCommand, commandType);
                 case CMD_REVOKE_AUTH:
                     return executeRevokeAuth(deviceId, mappedCommand);
                 case CMD_QUERY_AUTH:
@@ -538,6 +562,82 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
             return params != null ? params : new HashMap<>();
         }
         Map<String, Object> mappedParams = new HashMap<>(params);
+        
+        // 处理 faceInfo 对象，提取 userId 和 faceUrl 参数
+        // 新方案：传递 faceUrl 到网关，由网关下载图片（避免消息总线传输大量二进制数据）
+        Object faceInfoObj = mappedParams.get("faceInfo");
+        
+        log.info("{} mapParams 开始处理, faceInfo存在={}, faceInfo类型={}", 
+                LOG_PREFIX, faceInfoObj != null, 
+                faceInfoObj != null ? faceInfoObj.getClass().getName() : "null");
+        
+        if (faceInfoObj != null) {
+            String userId = null;
+            String faceUrl = null;
+            
+            if (faceInfoObj instanceof NetAccessFaceInfo) {
+                // 直接是 NetAccessFaceInfo 对象（本地调用）
+                NetAccessFaceInfo faceInfo = (NetAccessFaceInfo) faceInfoObj;
+                userId = faceInfo.getUserId();
+                faceUrl = faceInfo.getFaceUrl();
+                log.info("{} faceInfo 是 NetAccessFaceInfo 对象: userId={}, faceUrl={}", 
+                        LOG_PREFIX, userId, faceUrl);
+            } else if (faceInfoObj instanceof Map) {
+                // 反序列化后变成 Map（通过消息总线传输）
+                @SuppressWarnings("unchecked")
+                Map<String, Object> faceInfoMap = (Map<String, Object>) faceInfoObj;
+                userId = faceInfoMap.get("userId") != null ? faceInfoMap.get("userId").toString() : null;
+                faceUrl = faceInfoMap.get("faceUrl") != null ? faceInfoMap.get("faceUrl").toString() : null;
+                
+                log.info("{} faceInfo 是 Map 类型, keys={}, userId={}, faceUrl={}", 
+                        LOG_PREFIX, faceInfoMap.keySet(), userId, faceUrl);
+            } else {
+                log.warn("{} faceInfo 类型未知: {}", LOG_PREFIX, faceInfoObj.getClass().getName());
+            }
+            
+            // 设置 userId 和 faceUrl 参数
+            if (userId != null && !mappedParams.containsKey("userId")) {
+                mappedParams.put("userId", userId);
+            }
+            if (faceUrl != null && !mappedParams.containsKey("faceUrl")) {
+                mappedParams.put("faceUrl", faceUrl);
+            }
+            mappedParams.remove("faceInfo");
+            
+            log.info("{} mapParams 处理完成, 最终 userId={}, faceUrl={}", 
+                    LOG_PREFIX, mappedParams.get("userId"), mappedParams.get("faceUrl"));
+        }
+        
+        // 处理 userInfo 对象，提取 photoUrl 参数（用于 DISPATCH_USER 命令）
+        Object userInfoObj = mappedParams.get("userInfo");
+        if (userInfoObj != null) {
+            String photoUrl = null;
+            String password = null;
+            
+            if (userInfoObj instanceof NetAccessUserInfo) {
+                NetAccessUserInfo userInfo = (NetAccessUserInfo) userInfoObj;
+                photoUrl = userInfo.getPhotoUrl();
+                password = userInfo.getPassword();
+                log.info("{} userInfo 是 NetAccessUserInfo 对象: photoUrl={}, passwordLen={}", 
+                        LOG_PREFIX, photoUrl, password != null ? password.length() : 0);
+            } else if (userInfoObj instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> userInfoMap = (Map<String, Object>) userInfoObj;
+                photoUrl = userInfoMap.get("photoUrl") != null ? userInfoMap.get("photoUrl").toString() : null;
+                password = userInfoMap.get("password") != null ? userInfoMap.get("password").toString() : null;
+                log.info("{} userInfo 是 Map 类型, keys={}, photoUrl={}, passwordLen={}", 
+                        LOG_PREFIX, userInfoMap.keySet(), photoUrl, password != null ? password.length() : 0);
+            }
+            
+            // 设置 photoUrl 和 password 到顶层参数（便于后续处理）
+            if (photoUrl != null && !mappedParams.containsKey("photoUrl")) {
+                mappedParams.put("photoUrl", photoUrl);
+            }
+            if (password != null && !mappedParams.containsKey("password")) {
+                mappedParams.put("password", password);
+            }
+        }
+        
         PARAM_NAME_MAPPING.forEach((oldKey, newKey) -> {
             if (mappedParams.containsKey(oldKey) && !mappedParams.containsKey(newKey)) {
                 Object value = mappedParams.get(oldKey);
@@ -845,14 +945,23 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
     /**
      * 执行远程开门命令
      * 
-     * <p>包含自动重连机制：当检测到"数据发送失败"等网络错误时，
-     * 会自动清除旧连接并重新建立连接，然后重试开门操作。</p>
+     * <h2>完全事件驱动设计</h2>
+     * <p>采用专业门禁产品的标准模式：<b>所有命令都等待设备事件确认</b>，
+     * SDK 返回值仅作为"命令是否发出"的参考，不作为成功依据。</p>
+     * 
+     * <h3>流程</h3>
+     * <ol>
+     *     <li>注册待确认命令</li>
+     *     <li>发送开门命令（SDK 返回值仅用于判断命令是否发出）</li>
+     *     <li>等待设备事件回调确认（远程开门事件 command=12673）</li>
+     *     <li>收到确认 → 确定成功；超时 → 确定失败</li>
+     * </ol>
      */
     private CommandResult executeOpenDoor(Long deviceId, DeviceCommand command) {
-        // 获取通道号，默认为1（门禁通道从1开始，与旧gateway保持一致）
+        // 获取通道号，默认为1
         Integer channelNo = command.getParam("channelNo");
         if (channelNo == null) {
-            channelNo = 1; // 默认通道1
+            channelNo = 1;
         }
         // SDK的channelNo是从0开始的索引，需要减1
         int channelIndex = channelNo - 1;
@@ -860,93 +969,108 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
             channelIndex = 0;
         }
 
-        log.info("{} 执行远程开门: deviceId={}, channelNo={}, channelIndex={}", LOG_PREFIX, deviceId, channelNo, channelIndex);
+        log.info("{} 执行远程开门（事件驱动模式）: deviceId={}, channelNo={}, channelIndex={}", 
+                LOG_PREFIX, deviceId, channelNo, channelIndex);
+
+        // 【步骤1】注册待确认命令
+        String confirmationKey = doorCommandConfirmationService.registerPendingCommand(
+                deviceId, channelNo, 
+                cn.iocoder.yudao.module.iot.newgateway.plugins.accessgen1.DoorCommandConfirmationService.CMD_OPEN_DOOR);
 
         try {
-            // 确保设备已连接（支持按需连接）
+            // 确保设备已连接
             Long loginHandle = ensureConnected(deviceId, command);
             if (loginHandle == null || loginHandle <= 0) {
+                doorCommandConfirmationService.cancelPendingCommand(confirmationKey);
                 return CommandResult.failure("设备未连接");
             }
             
-            // 调用 SDK 开门（使用转换后的索引）
+            // 【步骤2】发送开门命令
+            // SDK 返回值仅用于判断命令是否发出，不作为执行成功的依据
             AccessGen2OperationResult sdkResult = sdkWrapper.openDoor(loginHandle, channelIndex);
             
-            if (sdkResult.isSuccess()) {
-                // 发布开门事件
+            // 检查是否为真正的发送失败（连接断开等）
+            if (!sdkResult.isSuccess() && isConnectionError(sdkResult.getMessage())) {
+                log.warn("{} 命令发送失败(连接错误)，尝试重连: deviceId={}, error={}", 
+                        LOG_PREFIX, deviceId, sdkResult.getMessage());
+                
+                connectionManager.unregister(deviceId);
+                Long newLoginHandle = ensureConnected(deviceId, command);
+                if (newLoginHandle == null || newLoginHandle <= 0) {
+                    doorCommandConfirmationService.cancelPendingCommand(confirmationKey);
+                    return CommandResult.failure("重连失败，设备无法建立连接");
+                }
+                
+                log.info("{} 重连成功，重试发送: deviceId={}", LOG_PREFIX, deviceId);
+                sdkResult = sdkWrapper.openDoor(newLoginHandle, channelIndex);
+                
+                if (!sdkResult.isSuccess() && isConnectionError(sdkResult.getMessage())) {
+                    doorCommandConfirmationService.cancelPendingCommand(confirmationKey);
+                    return CommandResult.failure("命令发送失败: " + sdkResult.getMessage());
+                }
+            }
+            
+            // 【步骤3】等待设备事件确认（核心逻辑）
+            log.info("{} 命令已发送，等待设备事件确认: deviceId={}, channelNo={}, sdkResult={}", 
+                    LOG_PREFIX, deviceId, channelNo, sdkResult.isSuccess() ? "SDK_OK" : sdkResult.getMessage());
+            
+            var confirmResult = doorCommandConfirmationService.waitForConfirmation(confirmationKey, 5);
+            
+            if (confirmResult.isConfirmed()) {
+                // 【确定成功】设备上报了远程开门事件
+                log.info("{} ✅ 开门成功（设备已确认）: deviceId={}, channelNo={}, alarmType={}", 
+                        LOG_PREFIX, deviceId, channelNo, confirmResult.getAlarmType());
+                
                 publishAccessEvent(deviceId, EVENT_DOOR_OPEN, Map.of(
                         "channelNo", channelNo,
-                        "action", "REMOTE_OPEN"
+                        "action", "REMOTE_OPEN",
+                        "confirmedBy", "DEVICE_EVENT"
                 ));
                 
                 return CommandResult.success(Map.of(
-                        "message", "开门命令已发送",
+                        "message", "开门成功",
                         "channelNo", channelNo
                 ));
             } else {
-                // 检查是否是网络/连接相关错误（错误码 516 = 数据发送失败）
-                String errorMsg = sdkResult.getMessage();
-                if (isConnectionError(errorMsg)) {
-                    log.warn("{} 开门失败(连接错误)，尝试重连: deviceId={}, error={}", LOG_PREFIX, deviceId, errorMsg);
-                    
-                    // 清除旧连接，强制重新连接
-                    connectionManager.unregister(deviceId);
-                    
-                    // 尝试重新登录
-                    Long newLoginHandle = ensureConnected(deviceId, command);
-                    if (newLoginHandle == null || newLoginHandle <= 0) {
-                        return CommandResult.failure("重连失败，设备无法建立连接");
-                    }
-                    
-                    // 使用新连接重试开门
-                    log.info("{} 重连成功，重试开门: deviceId={}, newHandle={}", LOG_PREFIX, deviceId, newLoginHandle);
-                    AccessGen2OperationResult retryResult = sdkWrapper.openDoor(newLoginHandle, channelIndex);
-                    
-                    if (retryResult.isSuccess()) {
-                        publishAccessEvent(deviceId, EVENT_DOOR_OPEN, Map.of(
-                                "channelNo", channelNo,
-                                "action", "REMOTE_OPEN"
-                        ));
-                        return CommandResult.success(Map.of(
-                                "message", "开门命令已发送（重连后成功）",
-                                "channelNo", channelNo
-                        ));
-                    } else {
-                        return CommandResult.failure("开门失败(重试): " + retryResult.getMessage());
-                    }
-                }
-                return CommandResult.failure("开门失败: " + sdkResult.getMessage());
+                // 【确定失败】超时未收到设备确认
+                log.warn("{} ❌ 开门失败（设备未确认）: deviceId={}, channelNo={}, result={}", 
+                        LOG_PREFIX, deviceId, channelNo, confirmResult);
+                return CommandResult.failure("开门失败: " + confirmResult.getMessage());
             }
+            
         } catch (Exception e) {
+            doorCommandConfirmationService.cancelPendingCommand(confirmationKey);
             log.error("{} 远程开门异常: deviceId={}, channelNo={}", LOG_PREFIX, deviceId, channelNo, e);
             return CommandResult.failure("开门异常: " + e.getMessage());
         }
     }
     
     /**
-     * 判断是否为连接/网络相关错误
+     * 判断是否为连接/发送失败错误
+     * <p>
+     * 在完全事件驱动模式下，此方法仅用于判断命令是否发送失败（需要重连）。
+     * 命令是否执行成功由设备事件回调确认，不依赖 SDK 返回值。
+     * </p>
      * 
-     * <p>常见的网络错误包括：</p>
-     * <ul>
-     *     <li>错误码 516 - 数据发送失败</li>
-     *     <li>网络连接断开</li>
-     *     <li>连接超时</li>
-     * </ul>
-     *
      * @param errorMsg 错误信息
-     * @return true=连接错误，需要重连；false=其他错误
+     * @return true=连接错误，命令未发出，需要重连；false=命令已发出
      */
     private boolean isConnectionError(String errorMsg) {
         if (errorMsg == null) {
             return false;
         }
-        // 错误码 516 对应 "数据发送失败"
+        // 仅匹配真正的连接/发送失败错误
+        // 错误码 516 = 数据发送失败
+        // 错误码 385 = 获取服务器实例失败（登录句柄已失效）
         return errorMsg.contains("516") 
+                || errorMsg.contains("385")
                 || errorMsg.contains("数据发送失败") 
                 || errorMsg.contains("发送失败")
                 || errorMsg.contains("网络")
                 || errorMsg.contains("连接断开")
-                || errorMsg.contains("超时");
+                || errorMsg.contains("服务器实例")
+                || errorMsg.contains("实例失败")
+                || errorMsg.contains("句柄无效");
     }
 
     /**
@@ -999,13 +1123,20 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
 
     /**
      * 执行下发授权命令（通过标准 API）
+     * 
+     * @param deviceId 设备ID
+     * @param command 命令
+     * @param originalCommandType 原始命令类型（DISPATCH_USER, DISPATCH_CARD 等），用于区分不同的下发逻辑
      */
     @SuppressWarnings("unchecked")
-    private CommandResult executeDispatchAuth(Long deviceId, DeviceCommand command) {
+    private CommandResult executeDispatchAuth(Long deviceId, DeviceCommand command, String originalCommandType) {
         // 支持三种参数格式：
         // 1. 直接参数: cardNo, userId, userName, ...
         // 2. userInfo 对象: { cardNo, userId, userName, ... }
         // 3. cardInfo 对象: { cardNo, userId, ... } (DISPATCH_CARD 命令)
+        
+        // 判断是否只需要添加卡片（DISPATCH_CARD 命令只需要添加卡片，不需要重新添加用户）
+        boolean cardOnlyMode = "DISPATCH_CARD".equals(originalCommandType);
         String cardNo;
         String userId;
         String userName;
@@ -1027,8 +1158,9 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
             cardNo = userInfo.getCardNo();
             userId = userInfo.getUserId();
             userName = userInfo.getUserName();
-            validStartTime = normalizeValidTime(userInfo.getValidStartTime());
-            validEndTime = normalizeValidTime(userInfo.getValidEndTime());
+            // 使用双参数版本，设置默认有效期
+            validStartTime = normalizeValidTime(userInfo.getValidStartTime(), true);
+            validEndTime = normalizeValidTime(userInfo.getValidEndTime(), false);
             password = userInfo.getPassword();
             doors = userInfo.getDoors();
         } else if (userInfoObj instanceof Map) {
@@ -1037,8 +1169,9 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
             cardNo = getStringFromMap(userInfoMap, "cardNo");
             userId = getStringFromMap(userInfoMap, "userId");
             userName = getStringFromMap(userInfoMap, "userName");
-            validStartTime = normalizeValidTime(getStringFromMap(userInfoMap, "validStartTime"));
-            validEndTime = normalizeValidTime(getStringFromMap(userInfoMap, "validEndTime"));
+            // 使用双参数版本，设置默认有效期
+            validStartTime = normalizeValidTime(getStringFromMap(userInfoMap, "validStartTime"), true);
+            validEndTime = normalizeValidTime(getStringFromMap(userInfoMap, "validEndTime"), false);
             password = getStringFromMap(userInfoMap, "password");
             
             // 获取门权限
@@ -1057,8 +1190,9 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
             cardNo = command.getStringParam("cardNo");
             userId = command.getStringParam("userId");
             userName = command.getStringParam("userName");
-            validStartTime = normalizeValidTime(command.getStringParam("validStartTime"));
-            validEndTime = normalizeValidTime(command.getStringParam("validEndTime"));
+            // 使用双参数版本，设置默认有效期
+            validStartTime = normalizeValidTime(command.getStringParam("validStartTime"), true);
+            validEndTime = normalizeValidTime(command.getStringParam("validEndTime"), false);
             password = command.getStringParam("password");
             
             Object doorsParam = command.getParam("doors");
@@ -1077,8 +1211,13 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
             return CommandResult.failure("缺少 cardNo 参数");
         }
 
-        log.info("{} 执行下发授权: deviceId={}, cardNo={}, userId={}", 
-                LOG_PREFIX, deviceId, cardNo, userId);
+        // 详细日志：打印所有参数（密码只显示长度）
+        log.info("{} 执行下发授权: deviceId={}, cardNo={}, userId={}, userName={}, password={}, validStart={}, validEnd={}, doors={}, cardOnlyMode={}", 
+                LOG_PREFIX, deviceId, cardNo, userId, userName,
+                password != null ? "***(" + password.length() + "字符)" : "无",
+                validStartTime, validEndTime,
+                doors != null ? java.util.Arrays.toString(doors) : "无",
+                cardOnlyMode);
 
         try {
             // 确保设备已连接（支持按需连接）
@@ -1102,15 +1241,40 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
                 accessUserInfo.setDoors(doors);
             }
             
-            // 先添加用户（如果失败则尝试更新）
-            AccessGen2OperationResult userResult = sdkWrapper.addUser(loginHandle, accessUserInfo);
-            if (!userResult.isSuccess()) {
-                // 添加失败，可能是用户已存在，尝试更新
-                log.info("{} 添加用户失败，尝试更新: userId={}, msg={}", LOG_PREFIX, accessUserInfo.getUserId(), userResult.getMessage());
-                userResult = sdkWrapper.updateUser(loginHandle, accessUserInfo);
+            AccessGen2OperationResult userResult = AccessGen2OperationResult.success("跳过用户添加");
+            
+            // 如果不是只添加卡片模式，才执行用户添加和密码设置
+            // DISPATCH_CARD 命令只需要添加卡片，不需要重新添加用户（避免覆盖之前设置的密码）
+            if (!cardOnlyMode) {
+                // 先添加用户（如果失败则尝试更新）
+                userResult = sdkWrapper.addUser(loginHandle, accessUserInfo);
+                if (!userResult.isSuccess()) {
+                    // 添加失败，可能是用户已存在，尝试更新
+                    log.info("{} 添加用户失败，尝试更新: userId={}, msg={}", LOG_PREFIX, accessUserInfo.getUserId(), userResult.getMessage());
+                    userResult = sdkWrapper.updateUser(loginHandle, accessUserInfo);
+                }
+                
+                // 用户添加/更新成功后，设置密码（密码需要使用专门的API设置）
+                if (userResult.isSuccess() && password != null && !password.isEmpty()) {
+                    AccessGen2OperationResult pwdResult = sdkWrapper.setPassword(
+                            loginHandle, 
+                            accessUserInfo.getUserId(), 
+                            password, 
+                            0  // 门禁通道号，默认0
+                    );
+                    if (pwdResult.isSuccess()) {
+                        log.info("{} 设置密码成功: userId={}", LOG_PREFIX, accessUserInfo.getUserId());
+                    } else {
+                        // 密码设置失败不影响整体结果，只记录警告
+                        log.warn("{} 设置密码失败（不影响用户下发）: userId={}, msg={}", 
+                                LOG_PREFIX, accessUserInfo.getUserId(), pwdResult.getMessage());
+                    }
+                }
+            } else {
+                log.info("{} 仅添加卡片模式，跳过用户添加和密码设置: userId={}", LOG_PREFIX, accessUserInfo.getUserId());
             }
             
-            // 再添加卡号（如果失败则尝试删除后重新添加）
+            // 添加卡号（如果失败则尝试删除后重新添加）
             AccessGen2OperationResult cardResult = sdkWrapper.addCard(loginHandle, accessUserInfo);
             if (!cardResult.isSuccess()) {
                 // 添加失败，可能是卡号已存在，尝试删除后重新添加
@@ -1281,7 +1445,28 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
 
     /**
      * 规范化有效期时间
-     * 将 epoch time (1970-01-01) 视为 null，因为这表示"未设置有效期"
+     * 如果是 null、空或 1970-01-01（epoch time），返回默认值
+     * 
+     * @param timeStr 时间字符串
+     * @param isStart 是否是开始时间（决定默认值）
+     * @return 规范化后的时间字符串
+     */
+    private String normalizeValidTime(String timeStr, boolean isStart) {
+        if (timeStr == null || timeStr.isEmpty() || timeStr.startsWith("1970-01-01")) {
+            // 设置默认有效期：开始时间=当前时间，结束时间=5年后
+            java.time.LocalDateTime now = java.time.LocalDateTime.now();
+            java.time.LocalDateTime defaultTime = isStart ? now : now.plusYears(5);
+            String result = defaultTime.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            log.info("{} 有效期为空或无效，使用默认值: original={}, isStart={}, default={}", 
+                    LOG_PREFIX, timeStr, isStart, result);
+            return result;
+        }
+        return timeStr;
+    }
+    
+    /**
+     * 规范化有效期时间（单参数版本，向后兼容）
+     * 仅过滤 epoch time，不设置默认值
      * 
      * @param timeStr 时间字符串
      * @return 规范化后的时间字符串，如果是 epoch time 则返回 null
@@ -1290,7 +1475,6 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
         if (timeStr == null || timeStr.isEmpty()) {
             return null;
         }
-        // 过滤 epoch time (1970-01-01)，这表示未设置有效期
         if (timeStr.startsWith("1970-01-01")) {
             log.debug("{} 忽略 epoch time 有效期: {}", LOG_PREFIX, timeStr);
             return null;
@@ -1338,24 +1522,36 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
 
     /**
      * 执行下发人脸命令
+     * 
+     * <p>新方案：从 faceUrl 下载图片，在网关侧进行处理（压缩、格式转换），然后下发到设备</p>
      */
     private CommandResult executeDispatchFace(Long deviceId, DeviceCommand command) {
         if (!config.isFaceDownloadEnabled()) {
             return CommandResult.failure("人脸下发功能未启用");
         }
 
+        // 打印所有参数以便调试
+        Map<String, Object> params = command.getParams();
+        log.info("{} 下发人脸命令参数: deviceId={}, params keys={}", 
+                LOG_PREFIX, deviceId, params != null ? params.keySet() : "null");
+        
         // 使用 getStringParam 避免类型转换异常
         String userId = command.getStringParam("userId");
-        String faceData = command.getStringParam("faceData"); // Base64 编码的人脸图片
+        String faceUrl = command.getStringParam("faceUrl"); // 人脸图片 URL（推荐方式）
+
+        log.info("{} 提取参数: userId={}, faceUrl={}", LOG_PREFIX, userId, faceUrl);
 
         if (userId == null || userId.isEmpty()) {
+            log.warn("{} 缺少 userId 参数, params={}", LOG_PREFIX, params);
             return CommandResult.failure("缺少 userId 参数");
         }
-        if (faceData == null || faceData.isEmpty()) {
-            return CommandResult.failure("缺少 faceData 参数");
+        if (faceUrl == null || faceUrl.isEmpty()) {
+            log.warn("{} 缺少 faceUrl 参数, 可用参数: {}", LOG_PREFIX, params != null ? params.keySet() : "null");
+            return CommandResult.failure("缺少 faceUrl 参数");
         }
 
-        log.info("{} 执行下发人脸: deviceId={}, userId={}", LOG_PREFIX, deviceId, userId);
+        log.info("{} 执行下发人脸: deviceId={}, userId={}, faceUrl={}", 
+                LOG_PREFIX, deviceId, userId, faceUrl);
 
         try {
             // 获取登录句柄（支持按需连接）
@@ -1369,14 +1565,43 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
                 return CommandResult.failure("设备不支持人脸识别");
             }
             
+            // 从 URL 下载并处理图片
+            String faceDataBase64 = downloadAndProcessFaceImage(faceUrl);
+            if (faceDataBase64 == null || faceDataBase64.isEmpty()) {
+                log.error("{} 下载或处理人脸图片失败: faceUrl={}", LOG_PREFIX, faceUrl);
+                return CommandResult.failure("下载或处理人脸图片失败");
+            }
+            
+            log.info("{} 人脸图片处理完成: userId={}, base64Len={}", 
+                    LOG_PREFIX, userId, faceDataBase64.length());
+            
             // 构建人脸信息
             AccessGen2FaceInfo faceInfo = AccessGen2FaceInfo.builder()
                     .userId(userId)
-                    .faceData(faceData)
+                    .faceData(faceDataBase64)
                     .build();
             
-            // 调用 SDK 下发人脸
+            // 调用 SDK 下发人脸（如果失败则尝试删除后重新添加）
             AccessGen2OperationResult sdkResult = sdkWrapper.addFace(loginHandle, faceInfo);
+            
+            if (!sdkResult.isSuccess()) {
+                // 添加失败，可能是人脸已存在，尝试删除后重新添加
+                log.info("{} 添加人脸失败，尝试删除后重新添加: userId={}, msg={}", LOG_PREFIX, userId, sdkResult.getMessage());
+                AccessGen2OperationResult deleteResult = sdkWrapper.deleteFace(loginHandle, userId);
+                log.info("{} 删除人脸结果: userId={}, success={}, msg={}", 
+                        LOG_PREFIX, userId, deleteResult.isSuccess(), deleteResult.getMessage());
+                
+                // 等待设备处理删除操作
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                
+                sdkResult = sdkWrapper.addFace(loginHandle, faceInfo);
+                log.info("{} 重新添加人脸结果: userId={}, success={}, msg={}", 
+                        LOG_PREFIX, userId, sdkResult.isSuccess(), sdkResult.getMessage());
+            }
             
             if (sdkResult.isSuccess()) {
                 // 发布人脸下发事件
@@ -1396,6 +1621,203 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
             log.error("{} 下发人脸异常: deviceId={}, userId={}", LOG_PREFIX, deviceId, userId, e);
             return CommandResult.failure("下发人脸异常: " + e.getMessage());
         }
+    }
+    
+    /**
+     * 从 URL 下载人脸图片并处理
+     * 
+     * @param faceUrl 图片 URL
+     * @return Base64 编码的图片数据，失败返回 null
+     */
+    private String downloadAndProcessFaceImage(String faceUrl) {
+        try {
+            log.info("{} 开始处理人脸图片: url={}", LOG_PREFIX, 
+                    faceUrl != null && faceUrl.length() > 100 ? faceUrl.substring(0, 100) + "..." : faceUrl);
+            
+            byte[] imageData;
+            
+            // 检查是否是 Base64 数据（以 base64:// 前缀标记）
+            if (faceUrl != null && faceUrl.startsWith("base64://")) {
+                // 直接解码 Base64 数据
+                String base64Data = faceUrl.substring("base64://".length());
+                log.info("{} 检测到 Base64 数据，开始解码: dataLen={}", LOG_PREFIX, base64Data.length());
+                try {
+                    imageData = java.util.Base64.getDecoder().decode(base64Data);
+                    log.info("{} Base64 解码完成: size={}KB", LOG_PREFIX, imageData.length / 1024);
+                } catch (IllegalArgumentException e) {
+                    log.error("{} Base64 解码失败: {}", LOG_PREFIX, e.getMessage());
+                    return null;
+                }
+            } else {
+                // 从 URL 下载图片
+                log.info("{} 从 URL 下载图片: url={}", LOG_PREFIX, faceUrl);
+                java.net.URL url = new java.net.URL(faceUrl);
+                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+                connection.setConnectTimeout(10000);  // 10秒连接超时
+                connection.setReadTimeout(30000);     // 30秒读取超时
+                connection.setRequestMethod("GET");
+                connection.setRequestProperty("User-Agent", "AccessGen2Plugin/1.0");
+                
+                int responseCode = connection.getResponseCode();
+                if (responseCode != java.net.HttpURLConnection.HTTP_OK) {
+                    log.error("{} 下载图片失败: url={}, responseCode={}", LOG_PREFIX, faceUrl, responseCode);
+                    return null;
+                }
+                
+                // 读取图片数据
+                try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = connection.getInputStream().read(buffer)) != -1) {
+                        baos.write(buffer, 0, bytesRead);
+                    }
+                    imageData = baos.toByteArray();
+                } finally {
+                    connection.disconnect();
+                }
+                
+                log.info("{} 图片下载完成: size={}KB", LOG_PREFIX, imageData.length / 1024);
+            }
+            
+            // 处理图片：压缩到 100KB 以内，最大分辨率 720x576（大华门禁标准要求）
+            byte[] processedData = processImage(imageData, 100, 720, 576);
+            if (processedData == null) {
+                log.error("{} 处理图片失败", LOG_PREFIX);
+                return null;
+            }
+            
+            log.info("{} 图片处理完成: originalSize={}KB, processedSize={}KB", 
+                    LOG_PREFIX, imageData.length / 1024, processedData.length / 1024);
+            
+            // 转换为 Base64
+            return java.util.Base64.getEncoder().encodeToString(processedData);
+            
+        } catch (java.net.SocketTimeoutException e) {
+            log.error("{} 下载图片超时: url={}", LOG_PREFIX, faceUrl);
+            return null;
+        } catch (java.io.IOException e) {
+            log.error("{} 下载图片失败: url={}, error={}", LOG_PREFIX, faceUrl, e.getMessage());
+            return null;
+        } catch (Exception e) {
+            log.error("{} 处理图片异常: url={}", LOG_PREFIX, faceUrl, e);
+            return null;
+        }
+    }
+    
+    /**
+     * 处理图片：调整尺寸和压缩
+     * 
+     * @param imageData 原始图片数据
+     * @param maxSizeKB 最大文件大小（KB）
+     * @param maxWidth 最大宽度
+     * @param maxHeight 最大高度
+     * @return 处理后的图片数据，失败返回 null
+     */
+    private byte[] processImage(byte[] imageData, int maxSizeKB, int maxWidth, int maxHeight) {
+        try {
+            // 读取图片
+            java.awt.image.BufferedImage image = javax.imageio.ImageIO.read(
+                    new java.io.ByteArrayInputStream(imageData));
+            if (image == null) {
+                log.warn("{} 无法解析图片数据", LOG_PREFIX);
+                return null;
+            }
+            
+            int originalWidth = image.getWidth();
+            int originalHeight = image.getHeight();
+            
+            // 检查是否需要调整尺寸
+            if (originalWidth > maxWidth || originalHeight > maxHeight) {
+                double widthRatio = (double) maxWidth / originalWidth;
+                double heightRatio = (double) maxHeight / originalHeight;
+                double ratio = Math.min(widthRatio, heightRatio);
+                
+                int newWidth = (int) (originalWidth * ratio);
+                int newHeight = (int) (originalHeight * ratio);
+                
+                java.awt.image.BufferedImage resized = new java.awt.image.BufferedImage(
+                        newWidth, newHeight, java.awt.image.BufferedImage.TYPE_INT_RGB);
+                java.awt.Graphics2D g2d = resized.createGraphics();
+                g2d.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, 
+                        java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g2d.setColor(java.awt.Color.WHITE);
+                g2d.fillRect(0, 0, newWidth, newHeight);
+                g2d.drawImage(image, 0, 0, newWidth, newHeight, null);
+                g2d.dispose();
+                image = resized;
+                
+                log.info("{} 图片调整尺寸: {}x{} -> {}x{}", 
+                        LOG_PREFIX, originalWidth, originalHeight, newWidth, newHeight);
+            }
+            
+            // 确保是 RGB 格式
+            if (image.getType() != java.awt.image.BufferedImage.TYPE_INT_RGB) {
+                java.awt.image.BufferedImage rgbImage = new java.awt.image.BufferedImage(
+                        image.getWidth(), image.getHeight(), java.awt.image.BufferedImage.TYPE_INT_RGB);
+                java.awt.Graphics2D g2d = rgbImage.createGraphics();
+                g2d.setColor(java.awt.Color.WHITE);
+                g2d.fillRect(0, 0, image.getWidth(), image.getHeight());
+                g2d.drawImage(image, 0, 0, null);
+                g2d.dispose();
+                image = rgbImage;
+            }
+            
+            // 压缩为 JPEG 格式
+            float quality = 0.9f;
+            byte[] result = null;
+            
+            while (quality >= 0.3f) {
+                result = compressToJpeg(image, quality);
+                if (result.length <= maxSizeKB * 1024) {
+                    return result;
+                }
+                quality -= 0.1f;
+            }
+            
+            // 如果仍然超过限制，进一步缩小尺寸
+            if (result != null && result.length > maxSizeKB * 1024) {
+                int newWidth = image.getWidth() * 3 / 4;
+                int newHeight = image.getHeight() * 3 / 4;
+                
+                if (newWidth > 100 && newHeight > 100) {
+                    java.awt.image.BufferedImage smaller = new java.awt.image.BufferedImage(
+                            newWidth, newHeight, java.awt.image.BufferedImage.TYPE_INT_RGB);
+                    java.awt.Graphics2D g2d = smaller.createGraphics();
+                    g2d.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, 
+                            java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                    g2d.drawImage(image, 0, 0, newWidth, newHeight, null);
+                    g2d.dispose();
+                    result = compressToJpeg(smaller, 0.3f);
+                }
+            }
+            
+            return result;
+            
+        } catch (Exception e) {
+            log.error("{} 处理图片异常: {}", LOG_PREFIX, e.getMessage());
+            return imageData;  // 处理失败返回原始数据
+        }
+    }
+    
+    /**
+     * 压缩图片为 JPEG 格式
+     */
+    private byte[] compressToJpeg(java.awt.image.BufferedImage image, float quality) throws java.io.IOException {
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        
+        javax.imageio.ImageWriter writer = javax.imageio.ImageIO.getImageWritersByFormatName("jpeg").next();
+        javax.imageio.ImageWriteParam param = writer.getDefaultWriteParam();
+        param.setCompressionMode(javax.imageio.ImageWriteParam.MODE_EXPLICIT);
+        param.setCompressionQuality(quality);
+        
+        try (javax.imageio.stream.ImageOutputStream ios = javax.imageio.ImageIO.createImageOutputStream(baos)) {
+            writer.setOutput(ios);
+            writer.write(null, new javax.imageio.IIOImage(image, null, null), param);
+        } finally {
+            writer.dispose();
+        }
+        
+        return baos.toByteArray();
     }
 
     /**
@@ -1716,6 +2138,9 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
     /**
      * 处理刷卡事件回调
      *
+     * <p>【重要】二代门禁的远程开门操作会触发刷卡事件（设备将远程开门视为一种"刷卡开门"）。
+     * 因此，当收到刷卡成功事件（result=0）时，需要尝试确认开门命令。</p>
+     *
      * @param deviceId   设备ID
      * @param cardNo     卡号
      * @param userId     用户ID
@@ -1725,8 +2150,40 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
      */
     public void handleCardSwipeEvent(Long deviceId, String cardNo, String userId, 
                                       int channelNo, long accessTime, int result) {
+        // 事件去重：防止SDK短时间内触发多次相同事件
+        String dedupeKey = deviceId + ":" + channelNo + ":" + EVENT_CARD_SWIPE + ":" + result + ":" + cardNo;
+        Long lastEventTime = eventDedupeCache.get(dedupeKey);
+        long now = System.currentTimeMillis();
+        
+        if (lastEventTime != null && (now - lastEventTime) < EVENT_DEDUPE_WINDOW_MS) {
+            log.debug("{} 忽略重复刷卡事件（{}ms内）: deviceId={}, channel={}, cardNo={}", 
+                    LOG_PREFIX, EVENT_DEDUPE_WINDOW_MS, deviceId, channelNo, cardNo);
+            return;
+        }
+        
+        // 更新去重缓存
+        eventDedupeCache.put(dedupeKey, now);
+        
+        // 清理过期的缓存条目（避免内存泄漏）
+        cleanupExpiredDedupeEntries();
+        
         log.info("{} 收到刷卡事件: deviceId={}, cardNo={}, userId={}, channel={}, result={}", 
                 LOG_PREFIX, deviceId, cardNo, userId, channelNo, result);
+
+        // 【关键】二代门禁的远程开门会触发刷卡成功事件（result=0）
+        // 当收到刷卡成功且是空卡号（远程开门特征），尝试确认开门命令
+        if (result == 0) {
+            // 使用虚拟的 alarmType=12673（远程开门事件）来确认命令
+            // 这样可以复用一代门禁的确认机制
+            var matchResult = doorCommandConfirmationService.confirmCommand(
+                    deviceId, channelNo, 
+                    cn.iocoder.yudao.module.iot.newgateway.plugins.accessgen1.DoorCommandConfirmationService.ALARM_REMOTE_OPEN_DOOR);
+            
+            if (matchResult.isMatched()) {
+                log.info("{} ✅ 二代门禁开门命令已通过刷卡成功事件确认: deviceId={}, channelNo={}, matchedChannelNo={}", 
+                        LOG_PREFIX, deviceId, channelNo, matchResult.getChannelNo());
+            }
+        }
 
         Map<String, Object> eventData = new HashMap<>();
         eventData.put("cardNo", cardNo);
@@ -1737,6 +2194,14 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
         eventData.put("resultDesc", result == 0 ? "成功" : "失败");
 
         publishAccessEvent(deviceId, EVENT_CARD_SWIPE, eventData);
+    }
+    
+    /**
+     * 清理过期的去重缓存条目
+     */
+    private void cleanupExpiredDedupeEntries() {
+        long expireThreshold = System.currentTimeMillis() - (EVENT_DEDUPE_WINDOW_MS * 10);
+        eventDedupeCache.entrySet().removeIf(entry -> entry.getValue() < expireThreshold);
     }
 
     /**
@@ -1849,9 +2314,20 @@ public class AccessGen2Plugin implements ActiveDeviceHandler {
         log.info("{} 收到报警事件: deviceId={}, alarmType={}, channel={}", 
                 LOG_PREFIX, deviceId, alarmType, channelNo);
 
+        // 【关键】尝试确认待确认的命令（基于设备事件回调的可靠确认机制）
+        var matchResult = doorCommandConfirmationService.confirmCommand(deviceId, channelNo, alarmType);
+        
+        // 【关键】使用匹配到的 channelNo（用户实际操作的门），而不是设备上报的 channelNo（可能是 0）
+        int effectiveChannelNo = channelNo;
+        if (matchResult.isMatched() && matchResult.getChannelNo() != null) {
+            effectiveChannelNo = matchResult.getChannelNo();
+            log.info("{} 命令已通过设备事件确认: deviceId={}, alarmType={}, eventChannelNo={}, effectiveChannelNo={}", 
+                    LOG_PREFIX, deviceId, alarmType, channelNo, effectiveChannelNo);
+        }
+
         Map<String, Object> eventData = new HashMap<>();
         eventData.put("alarmType", alarmType);
-        eventData.put("channelNo", channelNo);
+        eventData.put("channelNo", effectiveChannelNo);  // 使用有效的 channelNo
         eventData.put("alarmTime", alarmTime);
         eventData.put("alarmTypeDesc", getAlarmTypeDescription(alarmType));
 

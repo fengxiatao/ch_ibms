@@ -121,6 +121,11 @@ public class IotAccessAuthTaskDO extends TenantBaseDO {
     private String errorMessage;
 
     /**
+     * 创建时间（显式声明以解决 Lombok 方法引用问题）
+     */
+    private LocalDateTime createTime;
+
+    /**
      * 计算任务最终状态
      * 根据成功/失败计数确定最终状态
      */

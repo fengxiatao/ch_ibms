@@ -38,6 +38,11 @@ public class EpatrolPlanPeriodDO extends BaseDO {
     private Long planId;
 
     /**
+     * 巡更路线ID
+     */
+    private Long routeId;
+
+    /**
      * 开始时间
      */
     private LocalTime startTime;

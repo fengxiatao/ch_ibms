@@ -751,6 +751,7 @@ public class IotAccessDeviceSyncServiceImpl implements IotAccessDeviceSyncServic
 
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
+            configDeviceType = config.getAccessDeviceType();
             supportVideo = config.getSupportVideo();
         } else if (device.getConfig() instanceof GenericDeviceConfig) {
             GenericDeviceConfig cfg = (GenericDeviceConfig) device.getConfig();

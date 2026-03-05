@@ -133,17 +133,33 @@
       <el-table-column label="报警状态" align="center" width="120">
         <template #default="scope">
           <span v-if="scope.row.type === 'host'">
-            <el-tag :type="getAlarmStatusType(scope.row.alarmStatus)" size="small">
+            <el-tag 
+              :type="getAlarmStatusType(scope.row.alarmStatus)" 
+              size="small"
+              :class="getAlarmBlinkClass(scope.row.alarmStatus)"
+            >
               {{ getAlarmStatusText(scope.row.alarmStatus) }}
             </el-tag>
           </span>
           <span v-else-if="scope.row.type === 'partition'">
-            <el-tag :type="getPartitionAlarmStatusType(scope.row)" size="small">
+            <el-tag 
+              :type="getPartitionAlarmStatusType(scope.row)" 
+              size="small"
+              :class="getPartitionAlarmBlinkClass(scope.row)"
+            >
               {{ getPartitionAlarmStatusText(scope.row) }}
             </el-tag>
           </span>
           <span v-else-if="scope.row.type === 'zone'">
-            <dict-tag :type="DICT_TYPE.IOT_ZONE_ALARM_STATUS" :value="scope.row.alarmStatus" />
+            <el-tag 
+              v-if="scope.row.alarmStatus >= 1" 
+              :type="getZoneAlarmTagType(scope.row.alarmStatus)" 
+              size="small"
+              :class="getZoneAlarmBlinkClass(scope.row.alarmStatus)"
+            >
+              {{ getZoneAlarmTagText(scope.row.alarmStatus) }}
+            </el-tag>
+            <dict-tag v-else :type="DICT_TYPE.IOT_ZONE_ALARM_STATUS" :value="scope.row.alarmStatus" />
           </span>
         </template>
       </el-table-column>
@@ -1113,13 +1129,58 @@ const getPartitionStatusText = (status: number) => {
 /** 获取报警状态文本 */
 const getAlarmStatusText = (status: number | undefined) => {
   if (status === undefined || status === null) return '无报警'
-  return status === 1 ? '正在报警' : '无报警'
+  if (status === 1) return '正在报警'
+  // 11-17 为特定类型报警（协议定义）
+  if (status >= 11 && status <= 17) return '故障告警'
+  return '无报警'
 }
 
 /** 获取报警状态标签类型 */
 const getAlarmStatusType = (status: number | undefined) => {
   if (status === undefined || status === null) return 'success'
-  return status === 1 ? 'danger' : 'success'
+  if (status === 1) return 'danger'  // 紧急报警 - 红色
+  if (status >= 11 && status <= 17) return 'warning'  // 故障告警 - 橙色
+  return 'success'
+}
+
+/**
+ * 获取报警状态闪烁样式类
+ * - alarmStatus = 1: 紧急报警，红色快速闪烁
+ * - alarmStatus = 11-17: 故障告警，橙色慢速闪烁
+ */
+const getAlarmBlinkClass = (status: number | undefined) => {
+  if (status === undefined || status === null) return ''
+  if (status === 1) return 'alarm-blink-critical'  // 紧急报警
+  if (status >= 11 && status <= 17) return 'alarm-blink-warning'  // 故障告警
+  return ''
+}
+
+/** 获取分区报警闪烁样式类 */
+const getPartitionAlarmBlinkClass = (row: any) => {
+  if (row.isAlarming === true || row.alarmStatus === 1) return 'alarm-blink-critical'
+  if (row.alarmStatus >= 11 && row.alarmStatus <= 17) return 'alarm-blink-warning'
+  return ''
+}
+
+/** 获取防区报警标签类型 */
+const getZoneAlarmTagType = (status: number | undefined) => {
+  if (status === 1) return 'danger'  // 紧急报警
+  if (status !== undefined && status >= 11 && status <= 17) return 'warning'  // 故障
+  return 'danger'
+}
+
+/** 获取防区报警标签文本 */
+const getZoneAlarmTagText = (status: number | undefined) => {
+  if (status === 1) return '正在报警'
+  if (status !== undefined && status >= 11 && status <= 17) return '故障告警'
+  return '正在报警'
+}
+
+/** 获取防区报警闪烁样式类 */
+const getZoneAlarmBlinkClass = (status: number | undefined) => {
+  if (status === 1) return 'alarm-blink-critical'
+  if (status !== undefined && status >= 11 && status <= 17) return 'alarm-blink-warning'
+  return 'alarm-blink-critical'
 }
 
 /** 获取分区状态标签类型 */
@@ -1379,7 +1440,7 @@ const handleAlarmEvent = (data: any) => {
       message: `\n        <div>时间：${timeText}</div>\n        <div>主机：${hostName}</div>\n        ${zoneText ? `<div>${zoneText}</div>` : ''}\n        <div>描述：${eventDesc || eventType || '-'}</div>\n      `,
       dangerouslyUseHTMLString: true,
       type: 'error',
-      duration: 0, // 不自动关闭
+      duration: 15000, // 15秒后自动关闭，用户也可以手动点击关闭
       position: 'top-right'
     })
 
@@ -1437,3 +1498,68 @@ onUnmounted(() => {
   iotWebSocket.off('alarm_event', handleAlarmEvent)
 })
 </script>
+
+<style lang="scss" scoped>
+/* ==================== 多级报警闪烁动画 ==================== */
+
+/**
+ * 紧急报警（红色快速闪烁）
+ * 适用于：防区报警(1130)、火警(1144)、挟持报警(1121)、电子围栏报警等
+ */
+.alarm-blink-critical {
+  animation: alarm-blink-critical 0.6s ease-in-out infinite;
+}
+
+@keyframes alarm-blink-critical {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 4px rgba(245, 108, 108, 0.4);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.08);
+    box-shadow: 0 0 12px rgba(245, 108, 108, 0.8);
+  }
+}
+
+/* 紧急报警标签发光效果 */
+:deep(.alarm-blink-critical.el-tag--danger) {
+  box-shadow: 0 0 10px rgba(245, 108, 108, 0.7);
+}
+
+/**
+ * 故障告警（橙色慢速闪烁）
+ * 适用于：通信故障(1333)、电源故障(1301)、电池低电(1302)、线路断开(1351)等
+ */
+.alarm-blink-warning {
+  animation: alarm-blink-warning 1.5s ease-in-out infinite;
+}
+
+@keyframes alarm-blink-warning {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 4px rgba(230, 162, 60, 0.3);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.03);
+    box-shadow: 0 0 8px rgba(230, 162, 60, 0.6);
+  }
+}
+
+/* 故障告警标签发光效果 */
+:deep(.alarm-blink-warning.el-tag--warning) {
+  box-shadow: 0 0 8px rgba(230, 162, 60, 0.5);
+}
+
+/* 兼容旧的 alarm-blink 类名（向后兼容） */
+.alarm-blink {
+  animation: alarm-blink-critical 0.6s ease-in-out infinite;
+}
+
+:deep(.alarm-blink.el-tag--danger) {
+  box-shadow: 0 0 10px rgba(245, 108, 108, 0.7);
+}
+</style>

@@ -872,7 +872,7 @@ onMounted(() => {
       .map-container {
         position: relative;
         height: 600px;
-        background: #f5f7fa;
+        background: var(--el-fill-color-light);
         border-radius: 4px;
         display: flex;
         align-items: center;
@@ -880,7 +880,7 @@ onMounted(() => {
 
         .map-placeholder {
           text-align: center;
-          color: #909399;
+          color: var(--el-text-color-secondary);
 
           .map-icon {
             font-size: 64px;
@@ -893,7 +893,7 @@ onMounted(() => {
 
             &.map-desc {
               font-size: 14px;
-              color: #c0c4cc;
+              color: var(--el-text-color-secondary);
             }
           }
         }
@@ -902,7 +902,7 @@ onMounted(() => {
           position: absolute;
           top: 20px;
           right: 20px;
-          background: #1a1a1a;
+          background: var(--el-bg-color-overlay);
           padding: 15px;
           border-radius: 4px;
           box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
@@ -910,7 +910,7 @@ onMounted(() => {
           h4 {
             margin: 0 0 10px 0;
             font-size: 14px;
-            color: #303133;
+            color: var(--el-text-color-primary);
           }
 
           .legend-items {

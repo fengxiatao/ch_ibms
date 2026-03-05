@@ -64,10 +64,9 @@
               </el-form-item>
               <el-form-item label="处理状态">
                 <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 100px">
-                  <el-option label="待处理" value="pending" />
-                  <el-option label="处理中" value="processing" />
-                  <el-option label="已处理" value="completed" />
-                  <el-option label="已忽略" value="ignored" />
+                  <el-option label="未处理" :value="0" />
+                  <el-option label="已处理" :value="1" />
+                  <el-option label="已忽略" :value="2" />
                 </el-select>
               </el-form-item>
               <el-form-item class="search-buttons">
@@ -167,7 +166,7 @@
                 link
                 type="success"
                 @click="handleProcess(row)"
-                :disabled="row.status === 'completed'"
+                :disabled="row.status !== 0"
               >
                 <el-icon><Check /></el-icon>
                 处理
@@ -176,7 +175,7 @@
                 link
                 type="warning"
                 @click="handleIgnore(row)"
-                :disabled="row.status !== 'pending'"
+                :disabled="row.status !== 0"
               >
                 <el-icon><Close /></el-icon>
                 忽略
@@ -269,18 +268,18 @@
         >
           <el-form-item label="处理结果" prop="result">
             <el-radio-group v-model="processForm.result">
-              <el-radio label="confirmed">确认告警</el-radio>
-              <el-radio label="false_alarm">误报</el-radio>
-              <el-radio label="resolved">已解决</el-radio>
+              <el-radio value="confirmed">确认告警</el-radio>
+              <el-radio value="false_alarm">误报</el-radio>
+              <el-radio value="resolved">已解决</el-radio>
             </el-radio-group>
           </el-form-item>
 
           <el-form-item label="处理措施" prop="actions">
             <el-checkbox-group v-model="processForm.actions">
-              <el-checkbox label="现场检查">现场检查</el-checkbox>
-              <el-checkbox label="联系安保">联系安保</el-checkbox>
-              <el-checkbox label="设备检修">设备检修</el-checkbox>
-              <el-checkbox label="记录存档">记录存档</el-checkbox>
+              <el-checkbox value="现场检查">现场检查</el-checkbox>
+              <el-checkbox value="联系安保">联系安保</el-checkbox>
+              <el-checkbox value="设备检修">设备检修</el-checkbox>
+              <el-checkbox value="记录存档">记录存档</el-checkbox>
             </el-checkbox-group>
           </el-form-item>
 
@@ -343,7 +342,7 @@ const searchForm = reactive({
   alarmTime: [] as string[],
   eventLevel: '',
   hostId: undefined as number | undefined,
-  status: ''
+  status: undefined as number | undefined
 })
 
 // 分页信息
@@ -361,8 +360,9 @@ const processForm = reactive({
 })
 
 const processRules = {
-  result: [{ required: true, message: '请选择处理结果', trigger: 'change' }],
-  remark: [{ required: true, message: '请输入处理备注', trigger: 'blur' }]
+  // 去掉必填验证，方便快速处理
+  // result: [{ required: true, message: '请选择处理结果', trigger: 'change' }],
+  // remark: [{ required: true, message: '请输入处理备注', trigger: 'blur' }]
 }
 
 // 统计数据
@@ -397,26 +397,24 @@ const isRestoreEvent = (event: IotAlarmEventVO) => {
   return event.isRestore === true
 }
 
-// 获取状态颜色
-const getStatusColor = (status?: string) => {
-  const colors: Record<string, string> = {
-    pending: 'danger',
-    processing: 'warning',
-    completed: 'success',
-    ignored: 'info'
+// 获取状态颜色（根据 status 数字：0-未处理，1-已处理，2-已忽略）
+const getStatusColor = (status?: number) => {
+  const colors: Record<number, string> = {
+    0: 'danger',
+    1: 'success',
+    2: 'info'
   }
-  return colors[status || 'pending'] || 'info'
+  return colors[status ?? 0] || 'danger'
 }
 
-// 获取状态文本
-const getStatusText = (status?: string) => {
-  const texts: Record<string, string> = {
-    pending: '待处理',
-    processing: '处理中',
-    completed: '已处理',
-    ignored: '已忽略'
+// 获取状态文本（根据 status 数字：0-未处理，1-已处理，2-已忽略）
+const getStatusText = (status?: number) => {
+  const texts: Record<number, string> = {
+    0: '未处理',
+    1: '已处理',
+    2: '已忽略'
   }
-  return texts[status || 'pending'] || status || '待处理'
+  return texts[status ?? 0] || '未处理'
 }
 
 // 事件处理
@@ -430,7 +428,7 @@ const handleReset = () => {
     alarmTime: [],
     eventLevel: '',
     hostId: undefined,
-    status: ''
+    status: undefined
   })
   handleSearch()
 }
@@ -551,10 +549,13 @@ const loadData = async () => {
         isAlarm: item?.isAlarm,
         isRestore: item?.isRestore,
         needRecord: item?.needRecord,
-        status: item?.status,
-        processor: item?.processor,
-        processTime: item?.processTime,
-        processRemark: item?.processRemark,
+        // 处理状态：0-未处理，1-已处理，2-已忽略（统一使用 status 字段）
+        status: item?.status ?? 0,
+        // 处理人：优先使用 handledByName（用户名称），兼容 handledBy（用户ID）
+        processor: item?.handledByName || item?.handledBy || '',
+        // 处理时间：格式化为可读时间
+        processTime: item?.handledTime ? formatDateTime(item.handledTime) : '',
+        processRemark: item?.handleRemark ?? '',
         createTime: item?.createTime
       }
       return vo

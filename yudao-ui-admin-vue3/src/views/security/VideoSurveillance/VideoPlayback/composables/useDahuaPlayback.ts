@@ -276,7 +276,10 @@ export function useDahuaPlayback() {
           pane.isLoading = false
           pane.isPlaying = true
           pane.error = null
-          pane.channel = { name: channelName || `通道${channelNo}` } as any
+          // 只在 channel 为空时才设置，避免覆盖已有的完整通道信息（包含 channelNo）
+          if (!pane.channel) {
+            pane.channel = { name: channelName || `通道${channelNo}`, channelNo } as any
+          }
           
           // 如果指定了跳转时间，则跳转到指定位置
           if (seekSeconds && seekSeconds > 0) {
@@ -330,6 +333,8 @@ export function useDahuaPlayback() {
 
   /**
    * 停止回放
+   * 注意：不清除 channel、channelNo、hasRecording 等用户绑定的通道信息
+   * 这些信息应该保留，以便用户可以重新点击时间轴继续播放
    */
   const stopPlayback = async (pane: PlaybackPane): Promise<void> => {
     if (pane.jessibucaPlayer) {
@@ -342,7 +347,7 @@ export function useDahuaPlayback() {
       pane.jessibucaPlayer = null
     }
 
-    pane.channel = null
+    // 只清除播放状态，不清除通道绑定信息（channel、channelNo、hasRecording）
     pane.isPlaying = false
     pane.isLoading = false
     pane.isPaused = false

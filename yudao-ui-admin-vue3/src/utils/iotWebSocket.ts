@@ -35,23 +35,21 @@ class IotWebSocketClient {
       return
     }
 
-    // 构建 WebSocket URL（支持环境变量覆盖，默认跟随当前站点）
+    // 构建 WebSocket URL
+    // ⚠️ WebSocket 始终使用当前站点的 host，由 Nginx 代理到后端
+    // 不要从 VITE_BASE_URL 提取 host，因为那是 API 地址，不是 WebSocket 代理地址
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    
     // 1) 若提供完整的 WS URL，则直接使用（需包含 ws:// 或 wss://）
     const fullWsUrl = (import.meta as any).env?.VITE_IOT_WS_URL as string | undefined
     if (fullWsUrl && /^wss?:\/\//i.test(fullWsUrl)) {
       const sep = fullWsUrl.includes('?') ? '&' : '?'
       this.url = `${fullWsUrl}${sep}userId=${userId}`
     } else {
-      // 2) 组合 host + path（无则使用当前 host 与默认路径）
+      // 2) 使用当前站点 host（Nginx 会代理 /ws/* 到后端）
+      // 仅当明确设置了 VITE_IOT_WS_HOST 时才使用环境变量
       const envHost = (import.meta as any).env?.VITE_IOT_WS_HOST as string | undefined
-      const baseUrl = (import.meta as any).env?.VITE_BASE_URL as string | undefined
-      let baseHost = ''
-      try {
-        baseHost = baseUrl ? new URL(baseUrl).host : ''
-      } catch {}
-      const host = envHost || baseHost || window.location.host
-      // ✅ WebSocket 路径不需要 /admin-api 前缀
+      const host = envHost || window.location.host
       const path = (import.meta as any).env?.VITE_IOT_WS_PATH || '/ws/iot'
       this.url = `${protocol}//${host}${path}?userId=${userId}`
     }
@@ -227,8 +225,19 @@ class IotWebSocketClient {
   }
 }
 
-// 导出单例
-export const iotWebSocket = new IotWebSocketClient()
+// 导出单例（挂载到 window 确保全局唯一，避免打包后模块分割导致多实例问题）
+declare global {
+  interface Window {
+    __iotWebSocket?: IotWebSocketClient
+  }
+}
+
+// 确保全局只有一个实例
+if (!window.__iotWebSocket) {
+  window.__iotWebSocket = new IotWebSocketClient()
+}
+
+export const iotWebSocket = window.__iotWebSocket
 
 // 自动连接（在用户登录后）
 export function initIotWebSocket() {
@@ -238,4 +247,13 @@ export function initIotWebSocket() {
 // 断开连接（在用户登出时）
 export function closeIotWebSocket() {
   iotWebSocket.disconnect()
+}
+
+// 调试用：获取监听器数量
+export function getIotWebSocketListeners() {
+  const listeners: Record<string, number> = {}
+  ;(iotWebSocket as any).listeners.forEach((value: Set<Function>, key: string) => {
+    listeners[key] = value.size
+  })
+  return listeners
 }

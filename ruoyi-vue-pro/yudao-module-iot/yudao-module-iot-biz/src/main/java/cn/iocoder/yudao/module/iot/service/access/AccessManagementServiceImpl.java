@@ -49,6 +49,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
 import cn.iocoder.yudao.module.iot.service.access.dto.DispatchResult;
+import cn.iocoder.yudao.module.iot.websocket.DeviceMessagePushService;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
@@ -107,6 +108,12 @@ public class AccessManagementServiceImpl implements AccessManagementService {
      */
     @Resource
     private IotAccessOperationLogService operationLogService;
+
+    /**
+     * 设备消息推送服务，用于推送门状态变化到前端
+     */
+    @Resource
+    private DeviceMessagePushService deviceMessagePushService;
 
     @Override
     public List<AccessControllerTreeVO> getControllerTree() {
@@ -171,12 +178,14 @@ public class AccessManagementServiceImpl implements AccessManagementService {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
 
-        // 通过统一命令总线触发一次“在线检测/状态刷新”
+        // 通过统一命令总线触发一次"在线检测/状态刷新"
         // 前端状态刷新依赖 DEVICE_STATE_CHANGED + WebSocket 推送
         String configDeviceType = null;
         Boolean supportVideo = null;
         if (device.getConfig() instanceof AccessDeviceConfig) {
-            supportVideo = ((AccessDeviceConfig) device.getConfig()).getSupportVideo();
+            AccessDeviceConfig cfg = (AccessDeviceConfig) device.getConfig();
+            configDeviceType = cfg.getAccessDeviceType();
+            supportVideo = cfg.getSupportVideo();
         } else if (device.getConfig() instanceof GenericDeviceConfig) {
             GenericDeviceConfig cfg = (GenericDeviceConfig) device.getConfig();
             Object dt = cfg.get("deviceType");
@@ -222,14 +231,16 @@ public class AccessManagementServiceImpl implements AccessManagementService {
             // 设备类型（ACCESS_GEN1/ACCESS_GEN2）：优先从 config.deviceType 读取，兜底用 supportVideo 推断
             String configDeviceType = null;
             Boolean supportVideo = null;
-            if (device.getConfig() instanceof GenericDeviceConfig) {
+            if (device.getConfig() instanceof AccessDeviceConfig) {
+                AccessDeviceConfig cfg = (AccessDeviceConfig) device.getConfig();
+                configDeviceType = cfg.getAccessDeviceType();
+                supportVideo = cfg.getSupportVideo();
+            } else if (device.getConfig() instanceof GenericDeviceConfig) {
                 GenericDeviceConfig cfg = (GenericDeviceConfig) device.getConfig();
                 Object dt = cfg.get("deviceType");
                 Object sv = cfg.get("supportVideo");
                 configDeviceType = dt != null ? dt.toString() : null;
                 supportVideo = (sv instanceof Boolean) ? (Boolean) sv : null;
-            } else if (device.getConfig() instanceof AccessDeviceConfig) {
-                supportVideo = ((AccessDeviceConfig) device.getConfig()).getSupportVideo();
             }
             treeVO.setDeviceType(AccessDeviceTypeConstants.resolveDeviceType(configDeviceType, supportVideo));
             
@@ -326,14 +337,16 @@ public class AccessManagementServiceImpl implements AccessManagementService {
         // 设备类型（ACCESS_GEN1/ACCESS_GEN2）：优先从 config.deviceType 读取，兜底用 supportVideo 推断
         String configDeviceType = null;
         Boolean supportVideo = null;
-        if (device.getConfig() instanceof GenericDeviceConfig) {
+        if (device.getConfig() instanceof AccessDeviceConfig) {
+            AccessDeviceConfig cfg = (AccessDeviceConfig) device.getConfig();
+            configDeviceType = cfg.getAccessDeviceType();
+            supportVideo = cfg.getSupportVideo();
+        } else if (device.getConfig() instanceof GenericDeviceConfig) {
             GenericDeviceConfig cfg = (GenericDeviceConfig) device.getConfig();
             Object dt = cfg.get("deviceType");
             Object sv = cfg.get("supportVideo");
             configDeviceType = dt != null ? dt.toString() : null;
             supportVideo = (sv instanceof Boolean) ? (Boolean) sv : null;
-        } else if (device.getConfig() instanceof AccessDeviceConfig) {
-            supportVideo = ((AccessDeviceConfig) device.getConfig()).getSupportVideo();
         }
         detailVO.setDeviceType(AccessDeviceTypeConstants.resolveDeviceType(configDeviceType, supportVideo));
         
@@ -539,6 +552,92 @@ public class AccessManagementServiceImpl implements AccessManagementService {
         }
     }
 
+    /**
+     * 【关键】在执行门控操作前检查通道状态
+     * <p>根据当前的常开/常闭模式，拦截不合理的操作请求</p>
+     *
+     * @param channel 通道信息
+     * @param action  操作类型（open/close/alwaysOpen/alwaysClose/cancelAlways）
+     * @return 错误信息，如果为 null 表示可以执行
+     */
+    private String checkDoorStateBeforeAction(IotDeviceChannelDO channel, String action) {
+        if (channel == null || action == null) {
+            return null;
+        }
+
+        // 获取通道的当前模式：0-正常, 1-常开, 2-常闭
+        Integer alwaysMode = parseAlwaysMode(channel);
+        // 也可以从 doorMode 字段读取
+        Map<String, Object> config = channel.getConfig();
+        if (config != null && config.containsKey("doorMode")) {
+            Object doorMode = config.get("doorMode");
+            if ("常开".equals(doorMode) || "alwaysOpen".equalsIgnoreCase(String.valueOf(doorMode))) {
+                alwaysMode = 1;
+            } else if ("常闭".equals(doorMode) || "alwaysClosed".equalsIgnoreCase(String.valueOf(doorMode))) {
+                alwaysMode = 2;
+            }
+        }
+
+        log.debug("[checkDoorStateBeforeAction] channelId={}, action={}, alwaysMode={}", 
+                channel.getId(), action, alwaysMode);
+
+        // 根据操作类型和当前模式进行校验
+        switch (action.toLowerCase()) {
+            case "open":
+                // 开门操作
+                if (alwaysMode == 1) {
+                    return "门已处于常开状态，无需开门";
+                }
+                if (alwaysMode == 2) {
+                    return "门处于常闭（锁定）状态，请先取消常闭后再开门";
+                }
+                break;
+
+            case "close":
+                // 关门操作
+                if (alwaysMode == 2) {
+                    return "门已处于常闭状态，无需关门";
+                }
+                if (alwaysMode == 1) {
+                    return "门处于常开状态，请先取消常开后再关门";
+                }
+                break;
+
+            case "alwaysopen":
+                // 设置常开
+                if (alwaysMode == 1) {
+                    return "门已处于常开状态，无需重复设置";
+                }
+                if (alwaysMode == 2) {
+                    return "门当前为常闭状态，请先取消常闭后再设置常开";
+                }
+                break;
+
+            case "alwaysclose":
+                // 设置常闭
+                if (alwaysMode == 2) {
+                    return "门已处于常闭状态，无需重复设置";
+                }
+                if (alwaysMode == 1) {
+                    return "门当前为常开状态，请先取消常开后再设置常闭";
+                }
+                break;
+
+            case "cancelalways":
+                // 取消常开/常闭
+                if (alwaysMode == 0) {
+                    return "门当前为正常模式，无需取消";
+                }
+                break;
+
+            default:
+                // 其他操作不做限制
+                break;
+        }
+
+        return null; // 允许执行
+    }
+
     private Integer getIntFromConfig(Map<String, Object> config, String key, Integer defaultValue) {
         if (config == null || !config.containsKey(key)) {
             return defaultValue;
@@ -575,6 +674,15 @@ public class AccessManagementServiceImpl implements AccessManagementService {
         if (channel == null || !channel.getDeviceId().equals(reqVO.getDeviceId())) {
             return DoorControlRespVO.failure(reqVO.getDeviceId(), reqVO.getChannelId(), 
                     reqVO.getAction(), "通道不存在或不属于该设备");
+        }
+
+        // 2.1 【关键】检查通道当前状态，根据常开/常闭模式拦截不合理的操作
+        String stateCheckError = checkDoorStateBeforeAction(channel, reqVO.getAction());
+        if (stateCheckError != null) {
+            log.warn("[doorControl] 操作被拦截: deviceId={}, channelId={}, action={}, reason={}", 
+                    reqVO.getDeviceId(), reqVO.getChannelId(), reqVO.getAction(), stateCheckError);
+            return DoorControlRespVO.failure(reqVO.getDeviceId(), reqVO.getChannelId(), 
+                    reqVO.getAction(), stateCheckError);
         }
 
         // 3. 获取设备连接配置
@@ -625,21 +733,32 @@ public class AccessManagementServiceImpl implements AccessManagementService {
         // 5. 确定设备类型（ACCESS_GEN1 或 ACCESS_GEN2）
         // 现场可能在 config.deviceType 中直接标识 ACCESS_GEN1/ACCESS_GEN2，优先使用
         String configDeviceType = null;
-        if (device.getConfig() instanceof GenericDeviceConfig) {
+        if (device.getConfig() instanceof AccessDeviceConfig) {
+            // 从 AccessDeviceConfig 中获取设备子类型
+            AccessDeviceConfig accessConfig = (AccessDeviceConfig) device.getConfig();
+            configDeviceType = accessConfig.getAccessDeviceType();
+            log.debug("[doorControl] AccessDeviceConfig.accessDeviceType={}", configDeviceType);
+        } else if (device.getConfig() instanceof GenericDeviceConfig) {
+            // 兼容 GenericDeviceConfig
             Object dt = ((GenericDeviceConfig) device.getConfig()).get("deviceType");
             configDeviceType = dt != null ? dt.toString() : null;
         }
         String deviceType = AccessDeviceTypeConstants.resolveDeviceType(configDeviceType, supportVideo);
+        log.info("[doorControl] 设备类型判定: configDeviceType={}, supportVideo={}, 最终deviceType={}", 
+                configDeviceType, supportVideo, deviceType);
 
         // 6. 构建命令参数
         Integer channelNo = reqVO.getChannelNo() != null ? reqVO.getChannelNo() : channel.getChannelNo();
         Map<String, Object> params = new HashMap<>();
+        params.put("deviceType", deviceType);  // 【关键】传递正确的设备类型，用于网关路由到正确的插件
+        params.put("deviceId", reqVO.getDeviceId());
         params.put("channelId", reqVO.getChannelId());
         params.put("channelNo", channelNo);
         params.put("ipAddress", DeviceConfigHelper.getIpAddress(device));
         params.put("port", port);
         params.put("username", username);
         params.put("password", password);
+        params.put("tenantId", device.getTenantId());
 
         // 7. 获取当前操作人信息（用于记录操作日志）
         Long operatorId = getLoginUserId();
@@ -649,22 +768,14 @@ public class AccessManagementServiceImpl implements AccessManagementService {
         String deviceName = device.getDeviceName();
         String channelName = channel.getChannelName();
 
-        // 8. 使用统一命令发布器发送命令
+        // 8. 使用统一命令发布器发送命令并等待响应
         // Requirements: 9.1 - 门禁设备命令通过 DEVICE_SERVICE_INVOKE 主题发送
         try {
             log.info("[doorControl] 执行门控操作: deviceId={}, channelId={}, action={}, deviceType={}, operator={}", 
                     reqVO.getDeviceId(), reqVO.getChannelId(), reqVO.getAction(), deviceType, operatorName);
             
-            // 发送命令到统一主题
-            String requestId = deviceCommandPublisher.publishCommand(deviceType, reqVO.getDeviceId(), commandType, params);
-            log.info("[doorControl] 命令已发布: requestId={}, deviceType={}, commandType={}", 
-                    requestId, deviceType, commandType);
-            
-            // 9. 等待响应（使用现有的消息总线客户端）
-            // TODO: 后续迁移到统一的 DeviceServiceResultConsumer 处理响应
-            // 构建兼容的命令对象用于等待响应
+            // 构建命令对象（sendAndWait 内部会发送到统一主题，不要重复发送）
             AccessControlDeviceCommand command = AccessControlDeviceCommand.builder()
-                    .requestId(requestId)
                     .deviceId(reqVO.getDeviceId())
                     .channelId(reqVO.getChannelId())
                     .channelNo(channelNo)
@@ -673,9 +784,14 @@ public class AccessManagementServiceImpl implements AccessManagementService {
                     .username(username)
                     .password(password)
                     .commandType(commandType)
+                    .params(params)  // 包含 deviceType
                     .build();
             
+            // 发送命令并等待响应（注意：不要在此之前单独调用 publishCommand，会导致重复发送）
             AccessControlDeviceResponse response = messageBusClient.sendAndWait(command, 10);
+            String requestId = command.getRequestId();
+            log.info("[doorControl] 命令已发布: requestId={}, deviceType={}, commandType={}", 
+                    requestId, deviceType, commandType);
             long duration = System.currentTimeMillis() - startTime;
             
             if (response != null && Boolean.TRUE.equals(response.getSuccess())) {
@@ -686,8 +802,12 @@ public class AccessManagementServiceImpl implements AccessManagementService {
                 logOperationSafely(reqVO.getDeviceId(), deviceName, reqVO.getChannelId(), channelName,
                         reqVO.getAction(), operatorId, operatorName, 1, null);
 
-                // 门控命令后的“状态回推校验点”：异步触发一次 QUERY_CHANNELS，同步通道状态到 DB
+                // 门控命令后的"状态回推校验点"：异步触发一次 QUERY_CHANNELS，同步通道状态到 DB
                 triggerAccessChannelSyncAfterDoorControl(deviceType, reqVO.getDeviceId(), params);
+                
+                // 实时推送门状态变化到前端 WebSocket
+                pushDoorStateChangeToFrontend(reqVO.getDeviceId(), deviceType, reqVO.getChannelId(), 
+                        channelNo, reqVO.getAction());
                 
                 return DoorControlRespVO.success(reqVO.getDeviceId(), reqVO.getChannelId(), 
                         reqVO.getAction(), duration);
@@ -789,6 +909,67 @@ public class AccessManagementServiceImpl implements AccessManagementService {
             // 记录日志失败不影响主流程
             log.error("[logOperationSafely] 记录操作日志失败: deviceId={}, channelId={}, operationType={}, error={}",
                     deviceId, channelId, operationType, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 推送门状态变化到前端 WebSocket
+     * <p>根据操作类型计算预期的门状态、锁状态、控制模式，并推送到前端</p>
+     *
+     * @param deviceId   设备ID
+     * @param deviceType 设备类型
+     * @param channelId  通道ID
+     * @param channelNo  通道号
+     * @param action     操作类型
+     */
+    private void pushDoorStateChangeToFrontend(Long deviceId, String deviceType, Long channelId, 
+                                                Integer channelNo, String action) {
+        try {
+            // 根据操作类型计算预期状态
+            Integer doorStatus = null;  // 门状态：0-关闭, 1-打开, 2-未知
+            Integer lockStatus = null;  // 锁状态：0-已锁, 1-已解锁, 2-未知
+            Integer alwaysMode = 0;     // 控制模式：0-正常, 1-常开, 2-常闭
+
+            switch (action) {
+                case DoorControlReqVO.Action.OPEN_DOOR:
+                    doorStatus = 1;      // 预期门会打开
+                    lockStatus = 1;      // 预期锁已解锁
+                    alwaysMode = 0;      // 正常模式
+                    break;
+                case DoorControlReqVO.Action.CLOSE_DOOR:
+                    doorStatus = 0;      // 预期门关闭
+                    lockStatus = 0;      // 预期锁已锁
+                    alwaysMode = 0;      // 正常模式
+                    break;
+                case DoorControlReqVO.Action.ALWAYS_OPEN:
+                    doorStatus = 1;      // 常开模式，门预期打开
+                    lockStatus = 1;      // 锁已解锁
+                    alwaysMode = 1;      // 常开模式
+                    break;
+                case DoorControlReqVO.Action.ALWAYS_CLOSED:
+                    doorStatus = 0;      // 常闭模式，门预期关闭
+                    lockStatus = 0;      // 锁已锁
+                    alwaysMode = 2;      // 常闭模式
+                    break;
+                case DoorControlReqVO.Action.CANCEL_ALWAYS:
+                    // 取消常开/常闭，恢复正常模式，状态未知（需要设备回报）
+                    doorStatus = 2;      // 未知，等待设备回报
+                    lockStatus = 2;      // 未知，等待设备回报
+                    alwaysMode = 0;      // 正常模式
+                    break;
+                default:
+                    doorStatus = 2;
+                    lockStatus = 2;
+                    alwaysMode = 0;
+            }
+
+            // 推送到前端 WebSocket
+            deviceMessagePushService.pushDoorStateChange(deviceId, deviceType, channelId, channelNo,
+                    doorStatus, lockStatus, alwaysMode, action);
+        } catch (Exception e) {
+            log.warn("[pushDoorStateChangeToFrontend] 推送门状态变化失败: deviceId={}, channelId={}, action={}, error={}",
+                    deviceId, channelId, action, e.getMessage(), e);
+            // 推送失败不影响主流程
         }
     }
 

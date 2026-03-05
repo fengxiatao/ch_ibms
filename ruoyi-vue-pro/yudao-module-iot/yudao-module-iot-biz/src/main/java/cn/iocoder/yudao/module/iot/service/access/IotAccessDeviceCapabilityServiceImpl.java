@@ -309,6 +309,7 @@ public class IotAccessDeviceCapabilityServiceImpl implements IotAccessDeviceCapa
         String configDeviceType = null;
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig cfg = (AccessDeviceConfig) device.getConfig();
+            configDeviceType = cfg.getAccessDeviceType();
             supportVideo = cfg.getSupportVideo();
         } else if (device.getConfig() instanceof GenericDeviceConfig) {
             GenericDeviceConfig cfg = (GenericDeviceConfig) device.getConfig();

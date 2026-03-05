@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.iot.websocket.DeviceMessagePushService;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -54,7 +55,7 @@ public class DeviceEventConsumer implements IotMessageSubscriber<IotMessageEnvel
      * @param handlerList 设备事件处理器列表（Spring 自动注入所有实现）
      */
     @Autowired
-    public DeviceEventConsumer(IotMessageBus messageBus,
+    public DeviceEventConsumer(@Qualifier("iotRocketMQMessageBus") IotMessageBus messageBus,
                                 DeviceMessagePushService pushService,
                                 @Autowired(required = false) List<DeviceEventHandler> handlerList) {
         this.messageBus = messageBus;
@@ -140,10 +141,10 @@ public class DeviceEventConsumer implements IotMessageSubscriber<IotMessageEnvel
 
 
     /**
-     * 从消息中提取设备类型
+     * 将 payload 解析为 Map
      * 
-     * @param message 设备消息
-     * @return 设备类型，如果无法提取则返回 "UNKNOWN"
+     * @param payload 消息载荷
+     * @return 解析后的 Map，解析失败返回 null
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> parsePayloadToMap(Object payload) {
@@ -252,7 +253,7 @@ public class DeviceEventConsumer implements IotMessageSubscriber<IotMessageEnvel
      * @param deviceId 设备ID
      * @param deviceType 设备类型
      * @param eventType 事件类型
-     * @param message 原始消息
+     * @param eventData 事件数据
      */
     void pushToFrontend(Long deviceId, String deviceType, String eventType, Object eventData) {
         try {

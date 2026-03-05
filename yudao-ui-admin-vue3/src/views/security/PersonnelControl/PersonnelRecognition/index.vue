@@ -518,20 +518,20 @@ onUnmounted(() => {
     align-items: center;
     margin-bottom: 20px;
     padding: 20px;
-    background: #1a1a1a;
+    background: var(--el-bg-color-overlay);
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 
     .header-title {
       h2 {
         margin: 0 0 8px 0;
-        color: #303133;
+        color: var(--el-text-color-primary);
         font-size: 24px;
       }
 
       p {
         margin: 0;
-        color: #909399;
+        color: var(--el-text-color-secondary);
         font-size: 14px;
       }
     }
@@ -557,7 +557,7 @@ onUnmounted(() => {
       .video-container {
         position: relative;
         height: 320px;
-        background: #f5f7fa;
+        background: var(--el-fill-color-light);
         border-radius: 8px;
         display: flex;
         align-items: center;
@@ -565,7 +565,7 @@ onUnmounted(() => {
 
         .video-placeholder {
           text-align: center;
-          color: #909399;
+          color: var(--el-text-color-secondary);
 
           .el-icon {
             margin-bottom: 16px;
@@ -721,7 +721,6 @@ onUnmounted(() => {
   }
 }
 </style>
-
 
 
 

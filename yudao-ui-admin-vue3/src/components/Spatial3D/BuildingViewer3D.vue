@@ -407,9 +407,12 @@ const initCesiumViewer = () => {
   
   if (!cesiumContainer.value) return
 
-  // 使用OpenStreetMap作为底图，不需要Token
-  const osmProvider = new Cesium.OpenStreetMapImageryProvider({
-    url: 'https://a.tile.openstreetmap.org/'
+  // 使用高德地图瓦片，国内访问更稳定
+  const gaodeProvider = new Cesium.UrlTemplateImageryProvider({
+    url: 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+    subdomains: ['1', '2', '3', '4'],
+    minimumLevel: 1,
+    maximumLevel: 18
   })
 
   // 创建Cesium Viewer
@@ -418,7 +421,7 @@ const initCesiumViewer = () => {
     animation: false,
     timeline: false,
     baseLayerPicker: false,
-    imageryProvider: osmProvider
+    imageryProvider: gaodeProvider
   })
 
   // 添加建筑3D模型（按楼层叠加）

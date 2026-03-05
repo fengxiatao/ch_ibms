@@ -42,6 +42,7 @@
                 @update:active-pane="activePane = $event"
                 @pane-drop="handlePaneDrop"
                 @pane-ref="handlePaneRef"
+                @pane-dblclick="handlePaneDblClick"
               />
                     </div>
                     
@@ -163,7 +164,7 @@
  * 录像回放页面（组件化重构版）
  * - 使用大华 SDK 进行录像查询和回放
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ContentWrap } from '@/components/ContentWrap'
 import { Icon } from '@/components/Icon'
@@ -573,6 +574,11 @@ const handleTimelineClick = async (clickTime: Date, percent: number) => {
 
   // 开始回放（使用大华 SDK）
   const channelNo = pane.channelNo || 1
+  
+  // 保存录像文件的开始时间，用于后续同步计算
+  pane.playbackStartTime = targetSegment.startTime
+  pane.playbackEndTime = targetSegment.endTime
+  
   const success = await startDahuaPlayback(
     pane,
     activePane.value,
@@ -583,6 +589,8 @@ const handleTimelineClick = async (clickTime: Date, percent: number) => {
   )
 
   if (success) {
+    // 更新当前播放秒数
+    pane.currentPlaySeconds = seekSeconds
     ElMessage.success(`窗口 ${activePane.value + 1} 开始回放`)
   } else {
     ElMessage.error('回放失败，请重试')
@@ -705,6 +713,155 @@ const handleLayoutChange = async (layout: GridLayoutType) => {
   activePane.value = 0
 
   console.log(`[录像回放] 布局切换为 ${layout} 窗口`)
+}
+
+// 保存双击最大化前的布局和播放状态，用于恢复
+const previousLayout = ref<GridLayoutType>(6)
+const previousPanesState = ref<Array<{
+  channelNo: number | null
+  channelName: string | null
+  hasRecording: boolean
+  isPlaying: boolean
+  playbackStartTime: string | null
+  playbackEndTime: string | null
+  currentPlaySeconds: number
+  filePath: string | null
+}>>([])
+const maximizedFromPaneIndex = ref<number>(-1) // 记录从哪个窗口最大化的
+
+// 双击窗口切换最大化
+const handlePaneDblClick = async (paneIndex: number) => {
+  if (gridLayout.value === 1 && maximizedFromPaneIndex.value >= 0) {
+    // 当前是全屏，恢复到之前的布局
+    console.log('[录像回放] 准备恢复布局，之前状态:', previousPanesState.value)
+    
+    // 停止当前播放
+    await stopAllPanes()
+    
+    // 恢复布局（不调用 handleLayoutChange，避免清空状态）
+    gridLayout.value = previousLayout.value
+    panes.value = createPlaybackPanes(previousLayout.value)
+    
+    await nextTick()
+    
+    // 恢复所有窗格的播放状态
+    for (let i = 0; i < previousPanesState.value.length && i < panes.value.length; i++) {
+      const savedState = previousPanesState.value[i]
+      const pane = panes.value[i]
+      
+      if (savedState.channelNo && savedState.channelName) {
+        // 恢复通道信息
+        pane.channel = { name: savedState.channelName, channelNo: savedState.channelNo }
+        pane.channelNo = savedState.channelNo
+        pane.hasRecording = savedState.hasRecording
+        pane.playbackStartTime = savedState.playbackStartTime
+        pane.playbackEndTime = savedState.playbackEndTime
+        
+        // 如果之前正在播放且有录像路径，恢复播放
+        if (savedState.isPlaying && savedState.filePath) {
+          console.log(`[录像回放] 恢复窗口 ${i + 1} 播放:`, savedState.channelName)
+          
+          // 延迟启动播放，确保 DOM 已就绪
+          setTimeout(async () => {
+            const success = await startDahuaPlayback(
+              pane,
+              i,
+              savedState.channelNo!,
+              savedState.filePath!,
+              savedState.channelName!,
+              savedState.currentPlaySeconds
+            )
+            if (success) {
+              pane.currentPlaySeconds = savedState.currentPlaySeconds
+            }
+          }, i * 300) // 错开启动时间
+        }
+      }
+    }
+    
+    // 恢复后激活之前的窗口
+    activePane.value = maximizedFromPaneIndex.value
+    maximizedFromPaneIndex.value = -1
+    
+    console.log(`[录像回放] 已恢复为 ${previousLayout.value} 窗口布局`)
+  } else {
+    // 保存当前所有窗格的状态
+    previousPanesState.value = panes.value.map(pane => {
+      // 查找该通道当前播放的录像文件路径
+      let filePath: string | null = null
+      if (pane.channelNo && pane.playbackStartTime) {
+        const recordingInfo = recordingInfoList.value.find(
+          r => String(r.channelId) === String(pane.channelNo)
+        )
+        if (recordingInfo) {
+          // 根据 playbackStartTime 找到正在播放的录像片段
+          const segment = recordingInfo.segments.find(
+            s => s.hasRecording && s.filePath && s.startTime === pane.playbackStartTime
+          )
+          filePath = segment?.filePath || null
+        }
+      }
+      
+      return {
+        channelNo: pane.channelNo,
+        channelName: pane.channel?.name || null,
+        hasRecording: pane.hasRecording,
+        isPlaying: pane.isPlaying,
+        playbackStartTime: pane.playbackStartTime,
+        playbackEndTime: pane.playbackEndTime,
+        currentPlaySeconds: pane.currentPlaySeconds || 0,
+        filePath
+      }
+    })
+    
+    // 保存当前布局和被最大化的窗口索引
+    previousLayout.value = gridLayout.value
+    maximizedFromPaneIndex.value = paneIndex
+    
+    // 获取当前点击窗口的状态
+    const clickedPaneState = previousPanesState.value[paneIndex]
+    
+    console.log('[录像回放] 保存状态并最大化窗口', paneIndex + 1, clickedPaneState)
+    
+    // 停止所有播放
+    await stopAllPanes()
+    
+    // 切换到单窗口布局
+    gridLayout.value = 1
+    panes.value = createPlaybackPanes(1)
+    
+    await nextTick()
+    
+    // 如果点击的窗口有通道，在新的单窗口中恢复
+    if (clickedPaneState.channelNo && clickedPaneState.channelName) {
+      const pane = panes.value[0]
+      pane.channel = { name: clickedPaneState.channelName, channelNo: clickedPaneState.channelNo }
+      pane.channelNo = clickedPaneState.channelNo
+      pane.hasRecording = clickedPaneState.hasRecording
+      pane.playbackStartTime = clickedPaneState.playbackStartTime
+      pane.playbackEndTime = clickedPaneState.playbackEndTime
+      
+      // 如果之前在播放，恢复播放
+      if (clickedPaneState.isPlaying && clickedPaneState.filePath) {
+        setTimeout(async () => {
+          const success = await startDahuaPlayback(
+            pane,
+            0,
+            clickedPaneState.channelNo!,
+            clickedPaneState.filePath!,
+            clickedPaneState.channelName!,
+            clickedPaneState.currentPlaySeconds
+          )
+          if (success) {
+            pane.currentPlaySeconds = clickedPaneState.currentPlaySeconds
+          }
+        }, 100)
+      }
+    }
+    
+    activePane.value = 0
+    console.log(`[录像回放] 双击窗口 ${paneIndex + 1} 最大化`)
+  }
 }
 
 // 剪切录像状态
@@ -856,10 +1013,30 @@ const handleSyncAll = async () => {
     return
   }
   
-  const syncTime = new Date(currentPlayTime.value)
+  // 计算活动窗口的实际播放时间点
+  // 使用录像文件开始时间 + 当前播放秒数
+  let syncTime: Date
+  
+  if (activeP.playbackStartTime && activeP.currentPlaySeconds !== undefined) {
+    // 根据录像文件开始时间和当前播放位置计算实际时间
+    const recordStartTimestamp = parseTimeString(activeP.playbackStartTime)
+    const actualPlayTimestamp = recordStartTimestamp + activeP.currentPlaySeconds * 1000
+    syncTime = new Date(actualPlayTimestamp)
+    console.log('[录像回放] 使用活动窗口实际播放时间:', {
+      窗口: activePane.value + 1,
+      录像开始时间: activeP.playbackStartTime,
+      播放秒数: activeP.currentPlaySeconds,
+      计算时间: syncTime.toISOString()
+    })
+  } else {
+    // 回退到全局 currentPlayTime（兼容旧逻辑）
+    syncTime = new Date(currentPlayTime.value)
+    console.log('[录像回放] 使用全局时间轴时间:', syncTime.toISOString())
+  }
+  
   const syncTimeStr = formatDateTime(syncTime)
   
-  console.log('[录像回放] 同步所有窗口到:', syncTimeStr)
+  console.log('[录像回放] 同步所有窗口到:', syncTimeStr, '(活动窗口:', activePane.value + 1, ')')
   
   let syncCount = 0
   
@@ -905,6 +1082,10 @@ const handleSyncAll = async () => {
     }
     
     if (targetSegment?.filePath) {
+      // 保存录像文件的开始时间
+      pane.playbackStartTime = targetSegment.startTime
+      pane.playbackEndTime = targetSegment.endTime
+      
       // 开始回放
       const success = await startDahuaPlayback(
         pane,
@@ -916,6 +1097,8 @@ const handleSyncAll = async () => {
       )
       
       if (success) {
+        // 更新当前播放秒数
+        pane.currentPlaySeconds = seekSeconds
         syncCount++
       }
     }

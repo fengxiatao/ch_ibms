@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.iot.service.access;
 
 import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.iot.core.gateway.dto.AccessControlEventMessage;
 import cn.iocoder.yudao.module.iot.dal.dataobject.access.IotAccessEventLogDO;
@@ -13,6 +14,7 @@ import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPersonMapper;
 import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
 import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.websocket.DeviceMessagePushService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -69,8 +71,33 @@ public class AccessEventHandlerImpl implements AccessEventHandler {
     @Resource
     private IotDeviceChannelService channelService;
 
+    @Resource
+    private DeviceMessagePushService deviceMessagePushService;
+
     /** 抓拍图片存储目录 */
     private static final String CAPTURE_DIRECTORY = "access/capture";
+    
+    // ========== 门禁报警类型常量（大华SDK定义）==========
+    /** 远程开门事件 */
+    private static final int ALARM_REMOTE_OPEN_DOOR = 12673;
+    /** 关门事件 */
+    private static final int ALARM_DOOR_CLOSED = 12658;
+    /** 门状态变化事件 */
+    private static final int ALARM_DOOR_STATE_CHANGE = 12300;
+    /** 门常开开始 */
+    private static final int ALARM_ALWAYS_OPEN_START = 12291;
+    /** 门常开结束 */
+    private static final int ALARM_ALWAYS_OPEN_END = 12292;
+    /** 门常闭开始 */
+    private static final int ALARM_ALWAYS_CLOSED_START = 12293;
+    /** 门常闭结束 */
+    private static final int ALARM_ALWAYS_CLOSED_END = 12294;
+    /** 远程常开 */
+    private static final int ALARM_REMOTE_ALWAYS_OPEN = 12675;
+    /** 远程常闭 */
+    private static final int ALARM_REMOTE_ALWAYS_CLOSED = 12676;
+    /** 取消常开常闭 */
+    private static final int ALARM_CANCEL_ALWAYS = 12677;
 
     @Override
     public void handleEvent(AccessControlEventMessage event) {
@@ -82,7 +109,41 @@ public class AccessEventHandlerImpl implements AccessEventHandler {
         log.info("[handleEvent] 开始处理门禁事件: deviceId={}, eventType={}, eventTime={}",
                 event.getDeviceId(), event.getEventType(), event.getEventTime());
 
+        // 【关键】获取租户ID：优先从消息中获取，否则从设备信息中查询
+        Long tenantId = event.getTenantId();
+        if (tenantId == null && event.getDeviceId() != null) {
+            // 使用 getDeviceFromCache 方法（带 @TenantIgnore）获取设备的租户ID
+            IotDeviceDO device = deviceService.getDeviceFromCache(event.getDeviceId());
+            if (device != null) {
+                tenantId = device.getTenantId();
+                log.debug("[handleEvent] 从设备信息获取租户ID: deviceId={}, tenantId={}", 
+                        event.getDeviceId(), tenantId);
+            }
+        }
+        
+        // 在正确的租户上下文中执行事件处理
+        final Long finalTenantId = tenantId;
+        Runnable processLogic = () -> doHandleEvent(event);
+        
+        if (finalTenantId != null) {
+            TenantUtils.execute(finalTenantId, processLogic);
+        } else {
+            log.warn("[handleEvent] 无法获取租户ID，使用忽略租户模式处理: deviceId={}", event.getDeviceId());
+            TenantUtils.executeIgnore(processLogic);
+        }
+    }
+    
+    /**
+     * 实际的事件处理逻辑（在正确的租户上下文中执行）
+     */
+    private void doHandleEvent(AccessControlEventMessage event) {
         try {
+            // 0. 【关键】处理门状态变化事件（常开/常闭/取消），同步到数据库
+            handleDoorStateChangeIfNeeded(event);
+            
+            // 0.5 【新增】实时推送门状态变化到前端WebSocket（用户可以看到门的开关状态变化）
+            pushDoorStateChangeToWebSocket(event);
+            
             // 1. 关联人员信息
             enrichPersonInfo(event);
 
@@ -104,6 +165,293 @@ public class AccessEventHandlerImpl implements AccessEventHandler {
             log.error("[handleEvent] 处理门禁事件失败: deviceId={}, error={}",
                     event.getDeviceId(), e.getMessage(), e);
         }
+    }
+    
+    /**
+     * 【关键】处理门状态变化事件
+     * <p>当设备（通过官方页面或其他方式）进行常开/常闭操作时，需要同步到数据库</p>
+     * 
+     * @param event 事件消息
+     */
+    private void handleDoorStateChangeIfNeeded(AccessControlEventMessage event) {
+        Map<String, Object> extData = event.getExtData();
+        if (extData == null) {
+            return;
+        }
+        
+        // 检查是否需要同步门状态
+        Object needSync = extData.get("needSyncDoorState");
+        if (!Boolean.TRUE.equals(needSync)) {
+            return;
+        }
+        
+        String newDoorMode = (String) extData.get("newDoorMode");
+        Object channelNoObj = extData.get("channelNo");
+        if (newDoorMode == null || channelNoObj == null) {
+            log.warn("[handleDoorStateChangeIfNeeded] 缺少必要参数: newDoorMode={}, channelNo={}", 
+                    newDoorMode, channelNoObj);
+            return;
+        }
+        
+        int channelNo = channelNoObj instanceof Number ? ((Number) channelNoObj).intValue() : 0;
+        Long deviceId = event.getDeviceId();
+        
+        log.info("[handleDoorStateChangeIfNeeded] 检测到外部门状态变化: deviceId={}, channelNo={}, newDoorMode={}", 
+                deviceId, channelNo, newDoorMode);
+        
+        try {
+            // 查找对应的通道
+            IotDeviceChannelDO channel = channelService.getChannelByDeviceIdAndChannelNo(deviceId, channelNo);
+            if (channel == null) {
+                log.warn("[handleDoorStateChangeIfNeeded] 未找到通道: deviceId={}, channelNo={}", 
+                        deviceId, channelNo);
+                return;
+            }
+            
+            // 更新通道配置中的门模式
+            Map<String, Object> config = channel.getConfig();
+            if (config == null) {
+                config = new HashMap<>();
+            }
+            
+            String oldDoorMode = (String) config.get("doorMode");
+            if (newDoorMode.equals(oldDoorMode)) {
+                log.debug("[handleDoorStateChangeIfNeeded] 门模式未变化，跳过更新: deviceId={}, channelNo={}, mode={}", 
+                        deviceId, channelNo, newDoorMode);
+                return;
+            }
+            
+            // 更新门模式
+            config.put("doorMode", newDoorMode);
+            config.put("alwaysMode", newDoorMode);
+            int alwaysModeCode = "常开".equals(newDoorMode) ? 1 : ("常闭".equals(newDoorMode) ? 2 : 0);
+            config.put("alwaysModeCode", alwaysModeCode);
+            
+            channel.setConfig(config);
+            channelService.updateChannelConfig(channel.getId(), config);
+            
+            log.info("[handleDoorStateChangeIfNeeded] ✅ 门状态同步成功: deviceId={}, channelNo={}, oldMode={}, newMode={}", 
+                    deviceId, channelNo, oldDoorMode, newDoorMode);
+            
+        } catch (Exception e) {
+            log.error("[handleDoorStateChangeIfNeeded] 同步门状态失败: deviceId={}, channelNo={}, error={}", 
+                    deviceId, channelNo, e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * 【关键】实时推送门状态变化到前端 WebSocket
+     * <p>
+     * 当设备上报门状态变化事件时（如远程开门、关门等），通过 WebSocket 实时通知前端更新门状态。
+     * 这样用户可以在界面上看到门的实时开关状态变化。
+     * </p>
+     * 
+     * <p>支持的事件类型（alarmType）：</p>
+     * <ul>
+     *   <li>12673 - 远程开门事件：门状态变为"打开"</li>
+     *   <li>12658 - 关门事件：门状态变为"关闭"</li>
+     *   <li>12300 - 门状态变化事件</li>
+     *   <li>12675 - 远程常开：锁状态变为"常开"</li>
+     *   <li>12676 - 远程常闭：锁状态变为"常闭"</li>
+     *   <li>12677 - 取消常开/常闭：锁状态变为"正常"</li>
+     * </ul>
+     * 
+     * @param event 门禁事件消息
+     */
+    private void pushDoorStateChangeToWebSocket(AccessControlEventMessage event) {
+        Map<String, Object> extData = event.getExtData();
+        if (extData == null) {
+            return;
+        }
+        
+        // 获取报警类型
+        Object alarmTypeObj = extData.get("alarmType");
+        if (alarmTypeObj == null) {
+            return;
+        }
+        
+        int alarmType = alarmTypeObj instanceof Number ? ((Number) alarmTypeObj).intValue() : 0;
+        
+        // 只处理门状态相关的报警类型
+        if (!isDoorStateRelatedAlarm(alarmType)) {
+            return;
+        }
+        
+        Long deviceId = event.getDeviceId();
+        Object channelNoObj = extData.get("channelNo");
+        int channelNo = channelNoObj instanceof Number ? ((Number) channelNoObj).intValue() : 0;
+        
+        try {
+            // 查找设备信息
+            IotDeviceDO device = deviceService.getDevice(deviceId);
+            if (device == null) {
+                log.warn("[pushDoorStateChangeToWebSocket] 未找到设备: deviceId={}", deviceId);
+                return;
+            }
+            // 优先使用事件中的 deviceType（String 格式，如 "ACCESS_GEN1"），
+            // 否则从设备表的 deviceType（Integer）转换
+            String deviceType = event.getDeviceType();
+            if (deviceType == null && device.getDeviceType() != null) {
+                deviceType = String.valueOf(device.getDeviceType());
+            }
+            
+            // 查找通道信息
+            IotDeviceChannelDO channel = null;
+            if (channelNo > 0) {
+                channel = channelService.getChannelByDeviceIdAndChannelNo(deviceId, channelNo);
+            } else {
+                // channelNo 为 0 时，尝试获取第一个通道
+                List<IotDeviceChannelDO> channels = channelService.getChannelsByDeviceId(deviceId);
+                if (channels != null && !channels.isEmpty()) {
+                    channel = channels.get(0);
+                    channelNo = channel.getChannelNo();
+                }
+            }
+            
+            if (channel == null) {
+                log.debug("[pushDoorStateChangeToWebSocket] 未找到通道，跳过推送: deviceId={}, channelNo={}", 
+                        deviceId, channelNo);
+                return;
+            }
+            
+            // 根据报警类型计算门状态
+            DoorStateInfo stateInfo = parseDoorStateFromAlarm(alarmType, channel);
+            
+            // 推送门状态变化到前端
+            deviceMessagePushService.pushDoorStateChange(
+                    deviceId,
+                    deviceType,
+                    channel.getId(),
+                    channelNo,
+                    stateInfo.doorStatus,
+                    stateInfo.lockStatus,
+                    stateInfo.alwaysMode,
+                    stateInfo.action
+            );
+            
+            log.info("[pushDoorStateChangeToWebSocket] 📡 实时推送门状态: deviceId={}, channelNo={}, alarmType={}, " +
+                    "doorStatus={}, lockStatus={}, alwaysMode={}, action={}", 
+                    deviceId, channelNo, alarmType, 
+                    stateInfo.doorStatus, stateInfo.lockStatus, stateInfo.alwaysMode, stateInfo.action);
+            
+        } catch (Exception e) {
+            log.warn("[pushDoorStateChangeToWebSocket] 推送门状态变化失败: deviceId={}, alarmType={}, error={}",
+                    deviceId, alarmType, e.getMessage(), e);
+            // 推送失败不影响主流程
+        }
+    }
+    
+    /**
+     * 判断是否是门状态相关的报警类型
+     */
+    private boolean isDoorStateRelatedAlarm(int alarmType) {
+        return alarmType == ALARM_REMOTE_OPEN_DOOR      // 远程开门
+            || alarmType == ALARM_DOOR_CLOSED           // 关门
+            || alarmType == ALARM_DOOR_STATE_CHANGE     // 门状态变化
+            || alarmType == ALARM_ALWAYS_OPEN_START     // 常开开始
+            || alarmType == ALARM_ALWAYS_OPEN_END       // 常开结束
+            || alarmType == ALARM_ALWAYS_CLOSED_START   // 常闭开始
+            || alarmType == ALARM_ALWAYS_CLOSED_END     // 常闭结束
+            || alarmType == ALARM_REMOTE_ALWAYS_OPEN    // 远程常开
+            || alarmType == ALARM_REMOTE_ALWAYS_CLOSED  // 远程常闭
+            || alarmType == ALARM_CANCEL_ALWAYS;        // 取消常开常闭
+    }
+    
+    /**
+     * 根据报警类型解析门状态信息
+     * 
+     * @param alarmType 报警类型
+     * @param channel   通道信息（用于获取当前配置状态）
+     * @return 门状态信息
+     */
+    private DoorStateInfo parseDoorStateFromAlarm(int alarmType, IotDeviceChannelDO channel) {
+        DoorStateInfo info = new DoorStateInfo();
+        
+        // 从通道配置中获取当前的常开/常闭模式
+        Map<String, Object> config = channel.getConfig();
+        int currentAlwaysMode = 0; // 默认正常
+        if (config != null) {
+            Object alwaysModeCode = config.get("alwaysModeCode");
+            if (alwaysModeCode instanceof Number) {
+                currentAlwaysMode = ((Number) alwaysModeCode).intValue();
+            }
+        }
+        
+        switch (alarmType) {
+            case ALARM_REMOTE_OPEN_DOOR:
+                // 远程开门：门状态=打开，锁状态=已解锁
+                info.doorStatus = 1;    // 打开
+                info.lockStatus = 1;    // 已解锁
+                info.alwaysMode = currentAlwaysMode;
+                info.action = "OPEN_DOOR";
+                break;
+                
+            case ALARM_DOOR_CLOSED:
+                // 关门：门状态=关闭，锁状态=已锁
+                info.doorStatus = 0;    // 关闭
+                info.lockStatus = 0;    // 已锁
+                info.alwaysMode = currentAlwaysMode;
+                info.action = "CLOSE_DOOR";
+                break;
+                
+            case ALARM_DOOR_STATE_CHANGE:
+                // 门状态变化：通常是门磁检测到的物理状态变化，需要根据实际情况判断
+                // 默认设为关闭状态
+                info.doorStatus = 0;
+                info.lockStatus = 0;
+                info.alwaysMode = currentAlwaysMode;
+                info.action = "STATE_CHANGE";
+                break;
+                
+            case ALARM_ALWAYS_OPEN_START:
+            case ALARM_REMOTE_ALWAYS_OPEN:
+                // 常开模式：门状态=打开，锁状态=已解锁，模式=常开
+                info.doorStatus = 1;
+                info.lockStatus = 1;
+                info.alwaysMode = 1;    // 常开
+                info.action = "ALWAYS_OPEN";
+                break;
+                
+            case ALARM_ALWAYS_CLOSED_START:
+            case ALARM_REMOTE_ALWAYS_CLOSED:
+                // 常闭模式：门状态=关闭，锁状态=已锁，模式=常闭
+                info.doorStatus = 0;
+                info.lockStatus = 0;
+                info.alwaysMode = 2;    // 常闭
+                info.action = "ALWAYS_CLOSED";
+                break;
+                
+            case ALARM_ALWAYS_OPEN_END:
+            case ALARM_ALWAYS_CLOSED_END:
+            case ALARM_CANCEL_ALWAYS:
+                // 取消常开/常闭：只恢复控制模式，门状态和锁状态保持不变（不推送）
+                // 这个事件是设备自动上报的，表示门从某个特殊状态恢复到正常模式
+                // 不应该改变门的物理状态
+                info.doorStatus = null;  // null 表示不更新
+                info.lockStatus = null;  // null 表示不更新
+                info.alwaysMode = 0;    // 正常
+                info.action = "CANCEL_ALWAYS";
+                break;
+                
+            default:
+                // 未知类型，使用默认值
+                info.doorStatus = 2;    // 未知
+                info.lockStatus = 2;    // 未知
+                info.alwaysMode = currentAlwaysMode;
+                info.action = "UNKNOWN";
+        }
+        
+        return info;
+    }
+    
+    /**
+     * 门状态信息封装类
+     */
+    private static class DoorStateInfo {
+        Integer doorStatus;     // 0-关闭, 1-打开, 2-未知, null-不更新
+        Integer lockStatus;     // 0-已锁, 1-已解锁, 2-未知, null-不更新
+        Integer alwaysMode;     // 0-正常, 1-常开, 2-常闭
+        String action;          // 操作类型
     }
 
     /**

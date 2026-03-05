@@ -139,7 +139,7 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import Map from 'ol/Map'
 import View from 'ol/View'
 import { Tile as TileLayer, Vector as VectorLayer } from 'ol/layer'
-import { OSM, Vector as VectorSource } from 'ol/source'
+import { XYZ, Vector as VectorSource } from 'ol/source'
 import { Feature } from 'ol'
 import { Polygon, Point } from 'ol/geom'
 import { Style, Fill, Stroke, Circle as CircleStyle, Text, Icon } from 'ol/style'
@@ -473,9 +473,12 @@ const generateMockDevices = (roomsList: any[]) => {
 
 // 初始化平面图
 const initFloorPlan = () => {
-  // 创建底图（使用空白底图或简单的 OSM）
+  // 创建底图（使用高德地图瓦片，国内访问更稳定）
   const baseLayer = new TileLayer({
-    source: new OSM(),
+    source: new XYZ({
+      url: 'https://webrd0{1-4}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+      crossOrigin: 'anonymous'
+    }),
     opacity: 0.1  // 非常淡的底图，只作为参考
   })
 

@@ -200,11 +200,11 @@ export const AccessPersonApi = {
   },
   // 设置密码
   setPassword: async (personId: number, password: string) => {
-    return await request.post({ url: '/iot/access/person/set-password', data: { personId, password } })
+    return await request.post({ url: '/iot/access/person/set-password', data: { personId, credentialData: password } })
   },
   // 添加卡片
   addCard: async (personId: number, cardNo: string) => {
-    return await request.post({ url: '/iot/access/person/add-card', data: { personId, cardNo } })
+    return await request.post({ url: '/iot/access/person/add-card', data: { personId, credentialData: cardNo } })
   },
   // 录入指纹
   addFingerprint: async (personId: number, fingerprintData: string) => {
@@ -248,6 +248,14 @@ export const AccessPersonApi = {
   // 换卡 - SmartPSS认证Tab
   replaceCard: async (credentialId: number, newCardNo: string) => {
     return await request.put({ url: '/iot/access/person/card/replace', params: { credentialId, newCardNo } })
+  },
+  // 保存卡片二维码图片到服务器
+  saveCardQrCode: async (personId: number, credentialId: number, file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('personId', String(personId))
+    formData.append('credentialId', String(credentialId))
+    return await request.post({ url: '/iot/access/person/card/save-qrcode', data: formData })
   }
 }
 

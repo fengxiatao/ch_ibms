@@ -110,7 +110,7 @@ const props = withDefaults(defineProps<Props>(), {
     { name: 'room', label: '房间一览图', workspace: 'ch_ibms_gis', visible: false, opacity: 100, zIndex: 2 },
     { name: 'device', label: '设备一览图', workspace: 'ch_ibms_gis', visible: true, opacity: 100, zIndex: 1 }
   ],
-  baseMapType: 'osm',
+  baseMapType: 'gaode',  // 默认使用高德地图，国内访问更稳定
   showLayerControl: true,
   enableClick: true
 })
@@ -134,10 +134,25 @@ const initMap = () => {
   const layers: any[] = []
 
   // 添加底图
-  if (props.baseMapType === 'osm') {
+  if (props.baseMapType === 'gaode') {
+    // 高德地图瓦片 - 国内访问稳定
     layers.push(
       new TileLayer({
-        source: new OSM(),
+        source: new XYZ({
+          url: 'https://webrd0{1-4}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+          crossOrigin: 'anonymous'
+        }),
+        zIndex: 0
+      })
+    )
+  } else if (props.baseMapType === 'osm') {
+    // OSM 使用国内镜像，避免连接超时
+    layers.push(
+      new TileLayer({
+        source: new XYZ({
+          url: 'https://{a-c}.tile.openstreetmap.de/{z}/{x}/{y}.png',  // 德国镜像，相对稳定
+          crossOrigin: 'anonymous'
+        }),
         zIndex: 0
       })
     )

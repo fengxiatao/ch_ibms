@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>访客预约弹窗</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .card-shadow {
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+            }
+            .card-hover {
+                transition: all 0.2s ease;
+            }
+            .card-hover:hover {
+                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+                transform: translateY(-1px);
+            }
+            .form-input-focus {
+                @apply focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary;
+            }
+            .required-field::after {
+                content: '*';
+                color: #ff4d4f;
+                margin-left: 2px;
+            }
+            /* 弹窗遮罩层样式 */
+            .modal-overlay {
+                @apply fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4;
+                backdrop-filter: blur(2px);
+            }
+            /* 弹窗容器样式 */
+            .modal-container {
+                @apply w-full max-w-2xl bg-white rounded-xl shadow-lg max-h-[90vh] overflow-y-auto;
+                animation: modalFadeIn 0.3s ease;
+            }
+            /* 弹窗头部样式 */
+            .modal-header {
+                @apply flex justify-between items-center px-6 py-4 border-b border-gray-100;
+            }
+            /* 弹窗动画 */
+            @keyframes modalFadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(-20px) scale(0.98);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                }
+            }
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1677ff',
+                        success: '#52c41a',
+                        warning: '#faad14',
+                        danger: '#ff4d4f',
+                        neutral: '#f0f2f5',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        };
+    </script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
+    <!-- 打开弹窗按钮 -->
+    <button id="openModalBtn" class="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors shadow-sm flex items-center gap-2">
+        <i class="fa fa-plus"></i> 新增访客预约
+    </button>
+
+    <!-- 弹窗遮罩层 (默认隐藏) -->
+    <div id="modalOverlay" class="modal-overlay hidden">
+        <!-- 弹窗容器 -->
+        <div class="modal-container">
+            <!-- 弹窗头部 -->
+            <div class="modal-header">
+                <h1 class="text-xl font-semibold text-gray-800">新增访客预约</h1>
+                <button id="closeModalBtn" class="text-gray-500 hover:text-gray-700 transition-colors">
+                    <i class="fa fa-times text-lg"></i>
+                </button>
+            </div>
+            
+            <!-- 弹窗内容 (原有表单内容) -->
+            <div class="p-6">
+                <form id="visitorForm">
+                    <!-- 来访人信息 -->
+                    <div class="mb-8">
+                        <h3 class="text-lg font-medium text-gray-800 mb-4 pb-2 border-b border-gray-100">来访人信息</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 required-field mb-1.5">姓名</label>
+                                <input type="text" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus" placeholder="请输入来访人姓名">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1.5">性别</label>
+                                <select class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus appearance-none bg-white">
+                                    <option value="">请选择性别</option>
+                                    <option value="male">男</option>
+                                    <option value="female">女</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-600 required-field mb-1.5">身份证号码</label>
+                            <input type="text" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus" placeholder="请输入18位身份证号码">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-600 required-field mb-1.5">联系电话</label>
+                            <input type="tel" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus" placeholder="请输入手机号码">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-600 mb-1.5">访客单位</label>
+                            <input type="text" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus" placeholder="请输入来访单位名称（选填）">
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 required-field mb-1.5">来访事由</label>
+                                <select class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus appearance-none bg-white">
+                                    <option value="">请选择来访事由</option>
+                                    <option value="visit">参观</option>
+                                    <option value="meet">拜访</option>
+                                    <option value="interview">面试开会</option>
+                                    <option value="delivery">外卖快递</option>
+                                    <option value="repair">装修维修</option>
+                                    <option value="other">其他</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1.5">事由说明</label>
+                                <input type="text" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus" placeholder="请补充说明来访事由（选填）">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-600 mb-1.5">人脸图片（用于人脸识别）</label>
+                            <div class="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
+                                <div class="flex flex-col items-center">
+                                    <i class="fa fa-cloud-upload text-3xl text-gray-400 mb-2"></i>
+                                    <p class="text-sm text-gray-500 mb-1">点击上传或拖拽文件至此处</p>
+                                    <p class="text-xs text-gray-400">支持JPG、PNG格式，大小不超过2MB</p>
+                                    <input type="file" class="hidden" accept="image/jpeg,image/png" id="faceImage">
+                                    <button type="button" onclick="document.getElementById('faceImage').click()" class="mt-3 px-4 py-1.5 text-sm bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors">
+                                        选择文件
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 被访人信息 -->
+                    <div class="mb-8">
+                        <h3 class="text-lg font-medium text-gray-800 mb-4 pb-2 border-b border-gray-100 flex justify-between items-center">
+                            <span>被访人信息</span>
+                            <button type="button" class="px-3 py-1 text-xs bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1">
+                                <i class="fa fa-user-plus text-xs"></i> 选择联系人
+                            </button>
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 required-field mb-1.5">姓名</label>
+                                <input type="text" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus" placeholder="请输入被访人姓名">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 required-field mb-1.5">联系电话</label>
+                                <input type="tel" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus" placeholder="请输入被访人手机号码">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-600 mb-1.5">单位/部门</label>
+                            <input type="text" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus" placeholder="请输入被访人所在单位/部门">
+                        </div>
+                    </div>
+
+                    <!-- 预约信息 -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-medium text-gray-800 mb-4 pb-2 border-b border-gray-100">预约信息</h3>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-600 mb-1.5">预约车牌号</label>
+                            <input type="text" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus" placeholder="请输入预约车牌号（选填）">
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 required-field mb-1.5">来访日期</label>
+                                <div class="relative">
+                                    <input type="date" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus">
+                                    <i class="fa fa-calendar absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 required-field mb-1.5">来访时间</label>
+                                <div class="relative">
+                                    <input type="time" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus">
+                                    <i class="fa fa-clock-o absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 required-field mb-1.5">预计访问时长</label>
+                            <div class="flex items-center gap-4">
+                                <div class="flex items-center gap-2 flex-1">
+                                    <input type="number" min="0" value="0" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus">
+                                    <span class="text-sm text-gray-600">天</span>
+                                </div>
+                                <div class="flex items-center gap-2 flex-1">
+                                    <input type="number" min="0" value="0" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus">
+                                    <span class="text-sm text-gray-600">小时</span>
+                                </div>
+                                <div class="flex items-center gap-2 flex-1">
+                                    <input type="number" min="0" value="0" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg form-input-focus">
+                                    <span class="text-sm text-gray-600">分钟</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 操作按钮 -->
+                    <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                        <button type="button" id="cancelBtn" class="px-5 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                            取消
+                        </button>
+                        <button type="submit" class="px-5 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors shadow-sm">
+                            确认提交
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const modalOverlay = document.getElementById('modalOverlay');
+        const openModalBtn = document.getElementById('openModalBtn');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const visitorForm = document.getElementById('visitorForm');
+
+        // 打开弹窗
+        openModalBtn.addEventListener('click', function() {
+            modalOverlay.classList.remove('hidden');
+            // 禁止背景滚动
+            document.body.style.overflow = 'hidden';
+        });
+
+        // 关闭弹窗函数
+        function closeModal() {
+            modalOverlay.classList.add('hidden');
+            // 恢复背景滚动
+            document.body.style.overflow = 'auto';
+        }
+
+        // 关闭弹窗按钮
+        closeModalBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+
+        // 点击遮罩层关闭弹窗
+        modalOverlay.addEventListener('click', function(e) {
+            if (e.target === modalOverlay) {
+                closeModal();
+            }
+        });
+
+        // 按ESC键关闭弹窗
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !modalOverlay.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
+        // 表单提交处理
+        visitorForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            alert('预约申请已提交，等待审核！');
+            closeModal(); // 提交后关闭弹窗
+            // 这里可以添加表单验证和提交逻辑
+        });
+    </script>
+</body>
+</html>

@@ -15,6 +15,8 @@ import cn.iocoder.yudao.module.iot.dal.mysql.alarm.IotAlarmZoneMapper;
 import cn.iocoder.yudao.module.iot.websocket.AlertWebSocketHandler;
 import cn.iocoder.yudao.module.iot.websocket.IotWebSocketHandler;
 import cn.iocoder.yudao.module.iot.websocket.message.AlarmEventMessage;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -53,12 +55,16 @@ public class IotAlarmEventServiceImpl implements IotAlarmEventService {
     @Resource
     private IotWebSocketHandler iotWebSocketHandler;
 
+    @Resource
+    private AdminUserApi adminUserApi;
+
     @Override
     public PageResult<IotAlarmEventDO> getEventPage(IotAlarmEventPageReqVO pageReqVO) {
+        // 统一使用 status 字段查询，废弃 isHandled
         return alarmEventMapper.selectEventPage(pageReqVO, 
                 pageReqVO.getHostId(), 
                 pageReqVO.getEventType(), 
-                pageReqVO.getIsHandled(), 
+                pageReqVO.getStatus(),
                 pageReqVO.getCreateTime());
     }
 
@@ -72,6 +78,7 @@ public class IotAlarmEventServiceImpl implements IotAlarmEventService {
         List<IotAlarmEventDO> list = page.getList();
         Map<Long, String> hostNameMap = buildHostNameMap(list);
         Map<String, String> zoneNameMap = buildZoneNameMap(list);
+        Map<Long, String> userNameMap = buildUserNameMap(list);
 
         List<IotAlarmEventRespVO> voList = list.stream().map(e -> {
             IotAlarmEventRespVO vo = new IotAlarmEventRespVO();
@@ -92,8 +99,19 @@ public class IotAlarmEventServiceImpl implements IotAlarmEventService {
             vo.setEventDesc(e.getEventDesc());
             vo.setRawData(e.getRawData());
             vo.setIsNewEvent(e.getIsNewEvent());
-            vo.setIsHandled(e.getIsHandled());
+            // 处理状态：0-未处理，1-已处理，2-已忽略
+            vo.setStatus(e.getStatus() != null ? e.getStatus() : 0);
             vo.setHandledBy(e.getHandledBy());
+            // 设置处理人名称
+            if (e.getHandledBy() != null && !e.getHandledBy().isEmpty()) {
+                try {
+                    Long userId = Long.parseLong(e.getHandledBy());
+                    vo.setHandledByName(userNameMap.get(userId));
+                } catch (NumberFormatException ex) {
+                    // handledBy 不是数字，直接作为名称使用
+                    vo.setHandledByName(e.getHandledBy());
+                }
+            }
             vo.setHandledTime(e.getHandledTime());
             vo.setHandleRemark(e.getHandleRemark());
             vo.setCreateTime(e.getCreateTime());
@@ -111,6 +129,7 @@ public class IotAlarmEventServiceImpl implements IotAlarmEventService {
         }
         Map<Long, String> hostNameMap = buildHostNameMap(List.of(e));
         Map<String, String> zoneNameMap = buildZoneNameMap(List.of(e));
+        Map<Long, String> userNameMap = buildUserNameMap(List.of(e));
         IotAlarmEventRespVO vo = new IotAlarmEventRespVO();
         vo.setId(e.getId());
         vo.setHostId(e.getHostId());
@@ -128,8 +147,18 @@ public class IotAlarmEventServiceImpl implements IotAlarmEventService {
         vo.setEventDesc(e.getEventDesc());
         vo.setRawData(e.getRawData());
         vo.setIsNewEvent(e.getIsNewEvent());
-        vo.setIsHandled(e.getIsHandled());
+        // 处理状态：0-未处理，1-已处理，2-已忽略
+        vo.setStatus(e.getStatus() != null ? e.getStatus() : 0);
         vo.setHandledBy(e.getHandledBy());
+        // 设置处理人名称
+        if (e.getHandledBy() != null && !e.getHandledBy().isEmpty()) {
+            try {
+                Long userId = Long.parseLong(e.getHandledBy());
+                vo.setHandledByName(userNameMap.get(userId));
+            } catch (NumberFormatException ex) {
+                vo.setHandledByName(e.getHandledBy());
+            }
+        }
         vo.setHandledTime(e.getHandledTime());
         vo.setHandleRemark(e.getHandleRemark());
         vo.setCreateTime(e.getCreateTime());
@@ -143,7 +172,7 @@ public class IotAlarmEventServiceImpl implements IotAlarmEventService {
                         .eqIfPresent(IotAlarmEventDO::getHostId, reqVO.getHostId())
                         .eqIfPresent(IotAlarmEventDO::getEventType, reqVO.getEventType())
                         .eqIfPresent(IotAlarmEventDO::getEventLevel, reqVO.getEventLevel())
-                        .eqIfPresent(IotAlarmEventDO::getIsHandled, reqVO.getIsHandled())
+                        .eqIfPresent(IotAlarmEventDO::getStatus, reqVO.getStatus()) // 使用 status 替代 isHandled
                         .eqIfPresent(IotAlarmEventDO::getAreaNo, reqVO.getAreaNo())
                         .eqIfPresent(IotAlarmEventDO::getZoneNo, reqVO.getZoneNo())
                         .betweenIfPresent(IotAlarmEventDO::getCreateTime, reqVO.getCreateTime())
@@ -154,6 +183,7 @@ public class IotAlarmEventServiceImpl implements IotAlarmEventService {
         }
         Map<Long, String> hostNameMap = buildHostNameMap(list);
         Map<String, String> zoneNameMap = buildZoneNameMap(list);
+        Map<Long, String> userNameMap = buildUserNameMap(list);
         return list.stream().map(e -> {
             IotAlarmEventRespVO vo = new IotAlarmEventRespVO();
             vo.setId(e.getId());
@@ -172,8 +202,18 @@ public class IotAlarmEventServiceImpl implements IotAlarmEventService {
             vo.setEventDesc(e.getEventDesc());
             vo.setRawData(e.getRawData());
             vo.setIsNewEvent(e.getIsNewEvent());
-            vo.setIsHandled(e.getIsHandled());
+            // 处理状态：0-未处理，1-已处理，2-已忽略
+            vo.setStatus(e.getStatus() != null ? e.getStatus() : 0);
             vo.setHandledBy(e.getHandledBy());
+            // 设置处理人名称
+            if (e.getHandledBy() != null && !e.getHandledBy().isEmpty()) {
+                try {
+                    Long userId = Long.parseLong(e.getHandledBy());
+                    vo.setHandledByName(userNameMap.get(userId));
+                } catch (NumberFormatException ex) {
+                    vo.setHandledByName(e.getHandledBy());
+                }
+            }
             vo.setHandledTime(e.getHandledTime());
             vo.setHandleRemark(e.getHandleRemark());
             vo.setCreateTime(e.getCreateTime());
@@ -189,11 +229,11 @@ public class IotAlarmEventServiceImpl implements IotAlarmEventService {
         LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
         LocalDateTime todayEnd = LocalDateTime.now().toLocalDate().atTime(23, 59, 59);
         
-        // 1. 统计紧急报警数量（未处理的 CRITICAL 级别）
+        // 1. 统计紧急报警数量（未处理的 CRITICAL 级别，status=0）
         Long urgentCount = alarmEventMapper.selectCount(
                 new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<IotAlarmEventDO>()
                         .eq(IotAlarmEventDO::getEventLevel, "CRITICAL")
-                        .eq(IotAlarmEventDO::getIsHandled, false)
+                        .eq(IotAlarmEventDO::getStatus, 0)
         );
         stats.setUrgentCount(urgentCount);
         
@@ -214,11 +254,11 @@ public class IotAlarmEventServiceImpl implements IotAlarmEventService {
         );
         stats.setActiveHosts((long) todayEvents.size());
         
-        // 4. 计算处理率
+        // 4. 计算处理率（status != 0 表示已处理或已忽略）
         Long totalCount = alarmEventMapper.selectCount();
         Long handledCount = alarmEventMapper.selectCount(
                 new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<IotAlarmEventDO>()
-                        .eq(IotAlarmEventDO::getIsHandled, true)
+                        .ne(IotAlarmEventDO::getStatus, 0)
         );
         double processedRate = totalCount > 0 ? (handledCount * 100.0 / totalCount) : 0.0;
         stats.setProcessedRate(Math.round(processedRate * 10) / 10.0); // 保留一位小数
@@ -259,17 +299,17 @@ public class IotAlarmEventServiceImpl implements IotAlarmEventService {
             throw new IllegalArgumentException("报警事件不存在");
         }
         
-        // 2. 更新事件状态
+        // 2. 更新事件状态（统一使用 status 字段，废弃 isHandled）
         IotAlarmEventDO updateObj = IotAlarmEventDO.builder()
                 .id(reqVO.getId())
-                .isHandled(true)
+                .status(1) // 1-已处理
                 .handledBy(String.valueOf(SecurityFrameworkUtils.getLoginUserId()))
                 .handledTime(LocalDateTime.now())
                 .handleRemark(reqVO.getHandleRemark())
                 .build();
         alarmEventMapper.updateById(updateObj);
         
-        log.info("[handleEvent][事件处理成功] eventId={}, handledBy={}", 
+        log.info("[handleEvent][事件处理成功] eventId={}, handledBy={}, status=1", 
                 reqVO.getId(), updateObj.getHandledBy());
     }
 
@@ -280,16 +320,16 @@ public class IotAlarmEventServiceImpl implements IotAlarmEventService {
         if (event == null) {
             throw new IllegalArgumentException("报警事件不存在");
         }
-        String handleRemark = "[IGNORED]" + (remark != null && !remark.isEmpty() ? (" " + remark) : "");
+        String handleRemark = remark != null && !remark.isEmpty() ? remark : "用户忽略";
         IotAlarmEventDO updateObj = IotAlarmEventDO.builder()
                 .id(id)
-                .isHandled(true)
+                .status(2) // 2-已忽略（统一使用 status 字段，废弃 isHandled）
                 .handledBy(String.valueOf(SecurityFrameworkUtils.getLoginUserId()))
                 .handledTime(LocalDateTime.now())
                 .handleRemark(handleRemark)
                 .build();
         alarmEventMapper.updateById(updateObj);
-        log.info("[ignoreEvent][事件已忽略] eventId={}, handledBy={}", id, updateObj.getHandledBy());
+        log.info("[ignoreEvent][事件已忽略] eventId={}, handledBy={}, status=2", id, updateObj.getHandledBy());
     }
 
     private Map<Long, String> buildHostNameMap(List<IotAlarmEventDO> events) {
@@ -336,6 +376,41 @@ public class IotAlarmEventServiceImpl implements IotAlarmEventService {
                     map.put(z.getHostId() + "-" + z.getZoneNo(), z.getZoneName());
                 }
             }
+        }
+        return map;
+    }
+
+    /**
+     * 构建用户ID到用户名称的映射
+     */
+    private Map<Long, String> buildUserNameMap(List<IotAlarmEventDO> events) {
+        List<Long> userIds = events.stream()
+                .map(IotAlarmEventDO::getHandledBy)
+                .filter(Objects::nonNull)
+                .filter(s -> !s.isEmpty())
+                .map(s -> {
+                    try {
+                        return Long.parseLong(s);
+                    } catch (NumberFormatException e) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (userIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<Long, String> map = new HashMap<>();
+        try {
+            List<AdminUserRespDTO> users = adminUserApi.getUserList(userIds);
+            if (users != null) {
+                for (AdminUserRespDTO user : users) {
+                    map.put(user.getId(), user.getNickname());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[buildUserNameMap] 查询用户信息失败: {}", e.getMessage());
         }
         return map;
     }

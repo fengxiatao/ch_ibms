@@ -31,20 +31,20 @@ export default ({command, mode}: ConfigEnv): UserConfig => {
             // 本地跨域代理
             proxy: {
               '/admin-api': {
-                target: env.VITE_BASE_URL || 'http://127.0.0.1:48888',
+                target: env.VITE_BASE_URL || 'http://192.168.1.4:48888',
                 ws: true,  // ✅ 启用 WebSocket 代理
                 changeOrigin: true,
                 // 不重写路径，保持 /admin-api 前缀
               },
               // WebSocket 代理 - 设备状态、门禁事件等
               '/ws': {
-                target: env.VITE_BASE_URL || 'http://127.0.0.1:48888',
+                target: env.VITE_BASE_URL || 'http://192.168.1.4:48888',
                 ws: true,  // ✅ 启用 WebSocket 代理
                 changeOrigin: true,
               },
               // WebSocket 代理 - 报警事件
               '/websocket': {
-                target: env.VITE_BASE_URL || 'http://127.0.0.1:48888',
+                target: env.VITE_BASE_URL || 'http://192.168.1.4:48888',
                 ws: true,  // ✅ 启用 WebSocket 代理
                 changeOrigin: true,
               },
@@ -67,20 +67,6 @@ export default ({command, mode}: ConfigEnv): UserConfig => {
                 ws: false,
                 changeOrigin: true,
                 rewrite: (path) => path.replace(/^\/RPC2_Login/, '/RPC2_Login')
-              },
-              // WVP 视频平台 API 代理
-              '/wvp-api': {
-                target: 'http://127.0.0.1:18080',  // WVP 后端地址
-                ws: true,
-                changeOrigin: true,
-                rewrite: (path) => path.replace(/^\/wvp-api/, '/api')
-              },
-              // ZLMediaKit 流媒体代理（用于 WebSocket FLV 播放）
-              '/zlm': {
-                target: 'http://192.168.1.246:80',  // ZLMediaKit 地址
-                ws: true,
-                changeOrigin: true,
-                rewrite: (path) => path.replace(/^\/zlm/, '')
               },
               // 大华设备 WebSocket 代理 - 192.168.1.200 (NVR)
               '/dahua-device/192.168.1.200': {

@@ -11,9 +11,7 @@ import cn.iocoder.yudao.module.system.dal.dataobject.permission.MenuDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.enums.permission.MenuTypeEnum;
-import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.factory.Mappers;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
@@ -22,10 +20,9 @@ import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.filterList;
 import static cn.iocoder.yudao.module.system.dal.dataobject.permission.MenuDO.ID_ROOT;
 
-@Mapper
 public interface AuthConvert {
 
-    AuthConvert INSTANCE = Mappers.getMapper(AuthConvert.class);
+    AuthConvert INSTANCE = new AuthConvertImpl();
 
     AuthLoginRespVO convert(OAuth2AccessTokenDO bean);
 

@@ -330,4 +330,22 @@ public interface IotDeviceMapper extends BaseMapperX<IotDeviceDO> {
                 .ne(IotDeviceDO::getDxfEntityId, ""));
     }
 
+    /**
+     * 查询所有NVR设备
+     * <p>
+     * 查询条件（满足任一即可）：
+     * 1. product_id = 4（NVR产品）
+     * 2. config JSON 字段中 deviceType = "NVR"
+     *
+     * @return NVR设备列表
+     */
+    default List<IotDeviceDO> selectNvrDevices() {
+        return selectList(new LambdaQueryWrapperX<IotDeviceDO>()
+                .and(w -> w
+                        .eq(IotDeviceDO::getProductId, 4L)
+                        .or()
+                        .apply("JSON_UNQUOTE(JSON_EXTRACT(config, '$.deviceType')) = 'NVR'")
+                ));
+    }
+
 }

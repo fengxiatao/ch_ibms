@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.iot.controller.admin.visitor.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -51,9 +52,11 @@ public class IotVisitorApplyCreateReqVO {
 
     @Schema(description = "计划来访时间", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "计划来访时间不能为空")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime planVisitTime;
 
     @Schema(description = "计划离开时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime planLeaveTime;
 
     // ========== 授权信息 ==========
@@ -65,9 +68,11 @@ public class IotVisitorApplyCreateReqVO {
     private String faceUrl;
 
     @Schema(description = "授权开始时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime authStartTime;
 
     @Schema(description = "授权结束时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime authEndTime;
 
     @Schema(description = "授权设备ID列表")

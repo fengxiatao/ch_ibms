@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智慧停车管理系统 - 报表分析</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Microsoft Yahei", sans-serif;
+    }
+    body {
+      background-color: #f5f7fa;
+      color: #333;
+    }
+    .header {
+      height: 64px;
+      background-color: #1890ff;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .logo-icon {
+      font-size: 24px;
+    }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background-color: rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .main-container {
+      display: flex;
+      height: calc(100vh - 64px);
+    }
+    .sidebar {
+      width: 200px;
+      background-color: #fff;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+    }
+    .menu-item {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 14px;
+      color: #666;
+    }
+    .menu-item.active {
+      background-color: #e6f7ff;
+      color: #1890ff;
+      border-right: 3px solid #1890ff;
+    }
+    .menu-item:hover:not(.active) {
+      background-color: #f5f5f5;
+    }
+    .menu-icon {
+      width: 16px;
+      height: 16px;
+    }
+    .content {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+    }
+    .report-header {
+      background: #fff;
+      padding: 16px 24px;
+      border-radius: 4px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .report-tabs {
+      display: flex;
+      border-bottom: 1px solid #e8e8e8;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .tab-item {
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #666;
+      position: relative;
+    }
+    .tab-item.active {
+      color: #1890ff;
+    }
+    .tab-item.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: #1890ff;
+    }
+    .query-form {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .form-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .form-item label {
+      font-size: 14px;
+      color: #666;
+    }
+    .form-item input,
+    .form-item select {
+      padding: 6px 12px;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      font-size: 14px;
+      width: 180px;
+    }
+    .btn {
+      padding: 6px 16px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn-primary {
+      background: #1890ff;
+      color: #fff;
+    }
+    .btn-default {
+      background: #f5f5f5;
+      color: #666;
+    }
+    .report-content {
+      background: #fff;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .report-toolbar {
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    .export-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #1890ff;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .chart-container {
+      padding: 24px;
+      height: 400px;
+    }
+    .dual-charts {
+      display: flex;
+      gap: 24px;
+      padding: 24px;
+    }
+    .half-chart {
+      flex: 1;
+      height: 400px;
+    }
+    .table-container {
+      padding: 16px 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 12px 8px;
+      text-align: left;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    th {
+      background: #fafafa;
+      font-weight: 600;
+    }
+    .summary-card {
+      display: flex;
+      gap: 16px;
+      padding: 16px 24px;
+      flex-wrap: wrap;
+    }
+    .card-item {
+      flex: 1;
+      min-width: 200px;
+      padding: 16px;
+      background: #f5f7fa;
+      border-radius: 4px;
+    }
+    .card-title {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 8px;
+    }
+    .card-value {
+      font-size: 24px;
+      font-weight: 600;
+      color: #1890ff;
+    }
+    .report-panel {
+      display: none;
+    }
+    .report-panel.active {
+      display: block;
+    }
+    @media (max-width:768px) {
+      .dual-charts {
+        flex-direction: column;
+      }
+      .half-chart, .chart-container {
+        height: 300px;
+      }
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">🚗</div>
+    <span>智慧停车管理系统</span>
+  </div>
+  <div class="user-info">
+    <span>管理员</span>
+    <div class="user-avatar">管</div>
+  </div>
+</div>
+
+<div class="main-container">
+  <div class="sidebar">
+    <div class="menu-item">
+      <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+        <path d="M928 160H96c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h832c17.7 0 32-14.3 32-32V192c0-17.7-14.3-32-32-32zM480 832H160V256h320v576zm128-640H160v-64h448v64zm320 640H608V256h320v576z"/>
+      </svg>
+      <span>在场车辆监控</span>
+    </div>
+    <div class="menu-item">
+      <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+        <path d="M832 64H192c-17.7 0-32 14.3-32 32v832c0 17.7 14.3 32 192 32h640c17.7 0 32-14.3 32-32V96c0-17.7-14.3-32-32-32zM648.3 426.8L537.9 345.5c-3.1-2.3-7.3-2.3-10.4 0L375.7 426.8a8.32 8.32 0 0 0-1.7 11.9l89.9 118.8c3.1 4.1 9.2 4.1 12.3 0l142.4-188.3a8.32 8.32 0 0 0-1.7-11.9z"/>
+      </svg>
+      <span>出入场记录</span>
+    </div>
+    <div class="menu-item">
+      <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+        <path d="M864 256H736v-64c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v64H416v-64c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v64H160c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h704c17.7 0 32-14.3 32-32V288c0-17.7-14.3-32-32-32zM640 832H384c-17.7 0-32-14.3-32-32V480c0-17.7 14.3-32 32-32h256c17.7 0 32 14.3 32 32v320c0 17.7-14.3 32-32 32zM352 384h320v64H352v-64z"/>
+      </svg>
+      <span>收费管理</span>
+    </div>
+    <div class="menu-item active">
+      <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+        <path d="M896 112H128c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h768c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32zM792 768H232V248h560v520zM232 168h246v48h-246v-48zm560 0h-246v48h246v-48zM232 848v48h560v-48H232z"/>
+      </svg>
+      <span>报表分析</span>
+    </div>
+    <div class="menu-item">
+      <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+        <path d="M928 160H96c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h832c17.7 0 32-14.3 32-32V192c0-17.7-14.3-32-32-32zm-40 656H136V240h752v576zM480 384c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm192-384c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64z"/>
+      </svg>
+      <span>系统设置</span>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="report-header">
+      <div class="report-tabs">
+        <div class="tab-item active" data-tab="duration-analysis">停车时长分布分析</div>
+        <div class="tab-item" data-tab="peak-analysis">时段流量分析</div>
+        <div class="tab-item" data-tab="car-type-analysis">车辆类型分析</div>
+        <div class="tab-item" data-tab="revenue-trend">收益趋势分析</div>
+      </div>
+      <div class="query-form">
+        <div class="form-item">
+          <label>开始日期：</label>
+          <input type="date" id="start-date" value="2026-02-01">
+        </div>
+        <div class="form-item">
+          <label>结束日期：</label>
+          <input type="date" id="end-date" value="2026-02-13">
+        </div>
+        <div class="form-item">
+          <label>统计粒度：</label>
+          <select>
+            <option value="day">按天</option>
+            <option value="week">按周</option>
+            <option value="month">按月</option>
+          </select>
+        </div>
+        <button class="btn btn-primary">查询</button>
+        <button class="btn btn-default">重置</button>
+      </div>
+    </div>
+
+    <!-- 1 停车时长分布分析 -->
+    <div class="report-panel active" id="duration-analysis-panel">
+      <div class="report-content">
+        <div class="report-toolbar">
+          <h3>停车时长分布分析</h3>
+          <div class="export-btn">导出报表</div>
+        </div>
+        <div class="summary-card">
+          <div class="card-item">
+            <div class="card-title">短时停车（≤2小时）</div>
+            <div class="card-value">245 辆</div>
+          </div>
+          <div class="card-item">
+            <div class="card-title">中时停车（2-8小时）</div>
+            <div class="card-value">218 辆</div>
+          </div>
+          <div class="card-item">
+            <div class="card-title">长时停车（>8小时）</div>
+            <div class="card-value">65 辆</div>
+          </div>
+          <div class="card-item">
+            <div class="card-title">平均停车时长</div>
+            <div class="card-value">3小时45分钟</div>
+          </div>
+        </div>
+        <div class="dual-charts">
+          <div class="half-chart" id="duration-pie"></div>
+          <div class="half-chart" id="duration-bar"></div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>时长区间</th>
+                <th>车辆数量</th>
+                <th>占比</th>
+                <th>平均收费金额</th>
+                <th>总收入贡献</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>0-1小时</td><td>128</td><td>24.2%</td><td>¥8.50</td><td>¥1,088.00</td></tr>
+              <tr><td>1-2小时</td><td>117</td><td>22.2%</td><td>¥12.80</td><td>¥1,497.60</td></tr>
+              <tr><td>2-4小时</td><td>105</td><td>19.8%</td><td>¥18.60</td><td>¥1,953.00</td></tr>
+              <tr><td>4-8小时</td><td>113</td><td>21.4%</td><td>¥28.50</td><td>¥3,220.50</td></tr>
+              <tr><td>8-12小时</td><td>42</td><td>7.9%</td><td>¥45.00</td><td>¥1,890.00</td></tr>
+              <tr><td>>12小时</td><td>23</td><td>4.3%</td><td>¥68.00</td><td>¥1,564.00</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 时段流量分析 -->
+    <div class="report-panel" id="peak-analysis-panel">
+      <div class="report-content">
+        <div class="report-toolbar">
+          <h3>时段流量分析</h3>
+          <div class="export-btn">导出报表</div>
+        </div>
+        <div class="summary-card">
+          <div class="card-item">
+            <div class="card-title">早高峰时段</div>
+            <div class="card-value">07:30-09:30</div>
+          </div>
+          <div class="card-item">
+            <div class="card-title">晚高峰时段</div>
+            <div class="card-value">17:30-19:30</div>
+          </div>
+          <div class="card-item">
+            <div class="card-title">平峰时段</div>
+            <div class="card-value">10:00-17:00</div>
+          </div>
+          <div class="card-item">
+            <div class="card-title">低谷时段</div>
+            <div class="card-value">22:00-06:00</div>
+          </div>
+        </div>
+        <div class="chart-container" id="peak-flow"></div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>时段</th>
+                <th>入场车辆数</th>
+                <th>离场车辆数</th>
+                <th>净增车辆数</th>
+                <th>平均通行时间</th>
+                <th>拥堵指数</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>06:00-08:00</td><td>75</td><td>25</td><td>+50</td><td>45秒/辆</td><td>★★★☆☆</td></tr>
+              <tr><td>08:00-10:00</td><td>88</td><td>45</td><td>+43</td><td>68秒/辆</td><td>★★★★★</td></tr>
+              <tr><td>10:00-12:00</td><td>62</td><td>72</td><td>-10</td><td>32秒/辆</td><td>★★☆☆☆</td></tr>
+              <tr><td>12:00-14:00</td><td>55</td><td>60</td><td>-5</td><td>28秒/辆</td><td>★☆☆☆☆</td></tr>
+              <tr><td>14:00-16:00</td><td>58</td><td>58</td><td>0</td><td>30秒/辆</td><td>★★☆☆☆</td></tr>
+              <tr><td>16:00-18:00</td><td>70</td><td>75</td><td>-5</td><td>55秒/辆</td><td>★★★★☆</td></tr>
+              <tr><td>18:00-20:00</td><td>80</td><td>78</td><td>+2</td><td>62秒/辆</td><td>★★★★★</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 车辆类型分析 -->
+    <div class="report-panel" id="car-type-analysis-panel">
+      <div class="report-content">
+        <div class="report-toolbar">
+          <h3>车辆类型分析</h3>
+          <div class="export-btn">导出报表</div>
+        </div>
+        <div class="summary-card">
+          <div class="card-item">
+            <div class="card-title">固定车（月/年租）</div>
+            <div class="card-value">156 辆</div>
+          </div>
+          <div class="card-item">
+            <div class="card-title">临时车</div>
+            <div class="card-value">352 辆</div>
+          </div>
+          <div class="card-item">
+            <div class="card-title">免费车</div>
+            <div class="card-value">20 辆</div>
+          </div>
+          <div class="card-item">
+            <div class="card-title">月卡收入占比</div>
+            <div class="card-value">42.8%</div>
+          </div>
+        </div>
+        <div class="dual-charts">
+          <div class="half-chart" id="car-type-pie"></div>
+          <div class="half-chart" id="car-type-revenue"></div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>车辆类型</th>
+                <th>数量</th>
+                <th>占比</th>
+                <th>月均消费</th>
+                <th>总收入贡献</th>
+                <th>收入占比</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>月租车</td><td>128</td><td>24.2%</td><td>¥300.00/辆</td><td>¥38,400.00</td><td>38.2%</td></tr>
+              <tr><td>年租车</td><td>28</td><td>5.3%</td><td>¥2,800.00/辆</td><td>¥78,400.00</td><td>4.6%</td></tr>
+              <tr><td>临时车</td><td>352</td><td>66.7%</td><td>¥120.00/辆</td><td>¥42,240.00</td><td>55.8%</td></tr>
+              <tr><td>免费车</td><td>20</td><td>3.8%</td><td>¥0.00/辆</td><td>¥0.00</td><td>0.0%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 收益趋势分析 -->
+    <div class="report-panel" id="revenue-trend-panel">
+      <div class="report-content">
+        <div class="report-toolbar">
+          <h3>收益趋势分析</h3>
+          <div class="export-btn">导出报表</div>
+        </div>
+        <div class="summary-card">
+          <div class="card-item">
+            <div class="card-title">日均收入</div>
+            <div class="card-value">¥8,134.00</div>
+          </div>
+          <div class="card-item">
+            <div class="card-title">周末vs工作日</div>
+            <div class="card-value">1.8:1</div>
+          </div>
+          <div class="card-item">
+            <div class="card-title">节假日增长</div>
+            <div class="card-value">+45.6%</div>
+          </div>
+          <div class="card-item">
+            <div class="card-title">月度增长率</div>
+            <div class="card-value">+8.2%</div>
+          </div>
+        </div>
+        <div class="chart-container" id="revenue-trend"></div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>统计周期</th>
+                <th>总收入</th>
+                <th>环比增长</th>
+                <th>同比增长</th>
+                <th>日均收入</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>2026年1月</td><td>¥172,500.00</td><td>+5.8%</td><td>+12.5%</td><td>¥5,564.50</td></tr>
+              <tr><td>2026年2月（截至13日）</td><td>¥105,742.00</td><td>+8.2%</td><td>+15.3%</td><td>¥8,134.00</td></tr>
+              <tr><td>近7天</td><td>¥58,020.00</td><td>+2.8%</td><td>+9.6%</td><td>¥8,288.60</td></tr>
+              <tr><td>近30天</td><td>¥244,020.00</td><td>+4.5%</td><td>+11.8%</td><td>¥8,134.00</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 切换面板
+document.querySelectorAll('.tab-item').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'))
+    tab.classList.add('active')
+    const key = tab.dataset.tab
+    document.querySelectorAll('.report-panel').forEach(p => p.classList.remove('active'))
+    document.getElementById(key + '-panel').classList.add('active')
+    
+    // 切换面板后重新渲染图表（解决切换后图表可能显示异常的问题）
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 100);
+  })
+})
+
+// 1 停车时长分布 - 饼图
+const pie1 = echarts.init(document.getElementById('duration-pie'))
+pie1.setOption({
+  title: { 
+    text: '停车时长占比',
+    left: 'center',
+    textStyle: { fontSize: 16, fontWeight: 600 }
+  },
+  tooltip: { 
+    trigger: 'item',
+    formatter: '{a} <br/>{b}: {c} 辆 ({d}%)'
+  },
+  legend: {
+    orient: 'vertical',
+    left: 'left',
+    data: ['0-1小时', '1-2小时', '2-4小时', '4-8小时', '8-12小时', '>12小时']
+  },
+  series: [{
+    name: '停车数量',
+    type: 'pie',
+    radius: ['40%', '70%'],
+    center: ['50%', '50%'],
+    avoidLabelOverlap: false,
+    label: {
+      show: false,
+      position: 'center'
+    },
+    emphasis: {
+      label: {
+        show: true,
+        fontSize: 14,
+        fontWeight: 600
+      }
+    },
+    labelLine: {
+      show: false
+    },
+    color: ['#1890ff', '#40a9ff', '#69b1ff', '#91c5ff', '#b8d8ff', '#e6f7ff'],
+    data: [
+      { value: 128, name: '0-1小时' },
+      { value: 117, name: '1-2小时' },
+      { value: 105, name: '2-4小时' },
+      { value: 113, name: '4-8小时' },
+      { value: 42, name: '8-12小时' },
+      { value: 23, name: '>12小时' }
+    ]
+  }]
+})
+
+// 1 停车时长 - 柱状图
+const bar1 = echarts.init(document.getElementById('duration-bar'))
+bar1.setOption({
+  title: { 
+    text: '各时长停车数量',
+    left: 'center',
+    textStyle: { fontSize: 16, fontWeight: 600 }
+  },
+  tooltip: {
+    trigger: 'axis',
+    axisPointer: { type: 'shadow' }
+  },
+  grid: {
+    left: '3%',
+    right: '4%',
+    bottom: '3%',
+    containLabel: true
+  },
+  xAxis: { 
+    type: 'category', 
+    data: ['0-1h','1-2h','2-4h','4-8h','8-12h','>12h'],
+    axisLabel: { fontSize: 12 }
+  },
+  yAxis: { 
+    type: 'value',
+    name: '车辆数量（辆）',
+    axisLabel: { fontSize: 12 }
+  },
+  series: [{
+    name: '停车数量',
+    type: 'bar',
+    barWidth: '60%',
+    color: '#1890ff',
+    data: [128,117,105,113,42,23]
+  }]
+})
+
+// 2 时段流量 - 柱状图（优化版）
+const peak = echarts.init(document.getElementById('peak-flow'))
+peak.setOption({
+  title: { 
+    text: '时段出入流量',
+    left: 'center',
+    textStyle: { fontSize: 16, fontWeight: 600 }
+  },
+  tooltip: {
+    trigger: 'axis',
+    axisPointer: { type: 'shadow' },
+    formatter: '{a}：{c} 辆'
+  },
+  legend: {
+    top: 30,
+    data: ['入场', '离场'],
+    textStyle: { fontSize: 12 }
+  },
+  grid: {
+    left: '3%',
+    right: '4%',
+    bottom: '3%',
+    containLabel: true
+  },
+  xAxis: { 
+    data: ['06-08','08-10','10-12','12-14','14-16','16-18','18-20'],
+    axisLabel: { fontSize: 12 }
+  },
+  yAxis: { 
+    type: 'value',
+    name: '车辆数量（辆）',
+    axisLabel: { fontSize: 12 }
+  },
+  series: [
+    { 
+      name: '入场', 
+      type: 'bar', 
+      data: [75,88,62,55,58,70,80],
+      color: '#1890ff',
+      barWidth: '60%'
+    },
+    { 
+      name: '离场', 
+      type: 'bar', 
+      data: [25,45,72,60,58,75,78],
+      color: '#722ed1',
+      barWidth: '60%'
+    }
+  ]
+})
+
+// 3 车辆类型 - 饼图（优化版）
+const pie2 = echarts.init(document.getElementById('car-type-pie'))
+pie2.setOption({
+  title: { 
+    text: '车辆类型结构',
+    left: 'center',
+    textStyle: { fontSize: 16, fontWeight: 600 }
+  },
+  tooltip: { 
+    trigger: 'item',
+    formatter: '{a} <br/>{b}: {c} 辆 ({d}%)'
+  },
+  legend: {
+    orient: 'vertical',
+    left: 'left',
+    data: ['月租车', '年租车', '临时车', '免费车'],
+    textStyle: { fontSize: 12 }
+  },
+  series: [{
+    name: '车辆数量',
+    type: 'pie',
+    radius: ['40%', '70%'],
+    center: ['50%', '50%'],
+    avoidLabelOverlap: false,
+    label: {
+      show: false,
+      position: 'center'
+    },
+    emphasis: {
+      label: {
+        show: true,
+        fontSize: 14,
+        fontWeight: 600
+      }
+    },
+    labelLine: {
+      show: false
+    },
+    color: ['#1890ff', '#52c41a', '#faad14', '#f5222d'],
+    data: [
+      { value: 128, name: '月租车' },
+      { value: 28, name: '年租车' },
+      { value: 352, name: '临时车' },
+      { value: 20, name: '免费车' }
+    ]
+  }]
+})
+
+// 3 车辆收入贡献（优化版）
+const bar2 = echarts.init(document.getElementById('car-type-revenue'))
+bar2.setOption({
+  title: { 
+    text: '收入贡献（元）',
+    left: 'center',
+    textStyle: { fontSize: 16, fontWeight: 600 }
+  },
+  tooltip: {
+    trigger: 'axis',
+    axisPointer: { type: 'shadow' },
+    formatter: '{a}：¥{c}'
+  },
+  grid: {
+    left: '3%',
+    right: '4%',
+    bottom: '3%',
+    containLabel: true
+  },
+  xAxis: { 
+    data: ['月租车','年租车','临时车','免费车'],
+    axisLabel: { fontSize: 12 }
+  },
+  yAxis: { 
+    type: 'value',
+    name: '收入金额（元）',
+    axisLabel: { 
+      fontSize: 12,
+      formatter: '¥{value}'
+    }
+  },
+  series: [{
+    name: '收入贡献',
+    type: 'bar',
+    barWidth: '60%',
+    color: ['#1890ff', '#52c41a', '#faad14', '#f5222d'],
+    data: [38400,78400,42240,0]
+  }]
+})
+
+// 4 收益趋势 - 折线图（优化版）
+const trend = echarts.init(document.getElementById('revenue-trend'))
+trend.setOption({
+  title: { 
+    text: '收入趋势（元）',
+    left: 'center',
+    textStyle: { fontSize: 16, fontWeight: 600 }
+  },
+  tooltip: {
+    trigger: 'axis',
+    formatter: '{a}：¥{c}'
+  },
+  legend: {
+    top: 30,
+    data: ['总收入'],
+    textStyle: { fontSize: 12 }
+  },
+  grid: {
+    left: '3%',
+    right: '4%',
+    bottom: '3%',
+    containLabel: true
+  },
+  xAxis: { 
+    data: ['1月','2月(截至13日)','近7天','近30天'],
+    axisLabel: { fontSize: 12 }
+  },
+  yAxis: { 
+    type: 'value',
+    name: '收入金额（元）',
+    axisLabel: { 
+      fontSize: 12,
+      formatter: '¥{value}'
+    }
+  },
+  series: [{
+    name: '总收入',
+    type: 'line',
+    smooth: true,
+    symbol: 'circle',
+    symbolSize: 8,
+    lineStyle: {
+      width: 3,
+      color: '#1890ff'
+    },
+    itemStyle: {
+      color: '#1890ff'
+    },
+    areaStyle: {
+      color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
+        offset: 0,
+        color: 'rgba(24, 144, 255, 0.3)'
+      }, {
+        offset: 1,
+        color: 'rgba(24, 144, 255, 0.05)'
+      }])
+    },
+    data: [172500, 105742, 58020, 244020]
+  }]
+})
+
+// 窗口大小变化时重新调整图表大小
+window.addEventListener('resize', () => {
+  pie1.resize()
+  bar1.resize()
+  peak.resize()
+  pie2.resize()
+  bar2.resize()
+  trend.resize()
+})
+
+// 初始加载时触发一次resize，确保图表正常显示
+window.dispatchEvent(new Event('resize'));
+</script>
+</body>
+</html>

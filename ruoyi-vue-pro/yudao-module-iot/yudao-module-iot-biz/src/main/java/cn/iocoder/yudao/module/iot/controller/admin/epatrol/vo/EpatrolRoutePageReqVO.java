@@ -15,6 +15,9 @@ public class EpatrolRoutePageReqVO extends PageParam {
     @Schema(description = "路线名称", example = "白班巡更路线")
     private String routeName;
 
+    @Schema(description = "巡更点位名称", example = "1号楼大厅")
+    private String pointName;
+
     @Schema(description = "状态", example = "1")
     private Integer status;
 

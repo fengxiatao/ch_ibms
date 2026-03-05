@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>开门记录 - 弹窗版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .card-shadow {
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            }
+            .table-hover-row {
+                transition: background-color 0.2s ease;
+            }
+            .table-hover-row:hover {
+                background-color: rgba(22, 119, 255, 0.03);
+            }
+            .form-input-focus {
+                @apply focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary;
+            }
+            .door-method-tag {
+                @apply px-2 py-0.5 text-xs rounded-full whitespace-nowrap;
+            }
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1677ff',
+                        success: '#52c41a',
+                        warning: '#faad14',
+                        danger: '#ff4d4f',
+                        info: '#40a9ff',
+                        face: '#1890ff',
+                        card: '#722ed1',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        };
+    </script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <!-- 弹窗遮罩层 -->
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <!-- 弹窗主体 - 调整宽度适配内容 -->
+        <div class="bg-white rounded-xl w-full max-w-xl card-shadow overflow-hidden">
+            <!-- 弹窗头部 -->
+            <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/70 flex justify-between items-center">
+                <h3 class="text-lg font-medium text-gray-800">开门记录</h3>
+                <button class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            
+            <!-- 弹窗内容区 -->
+            <div class="p-6 max-h-[70vh] overflow-y-auto">
+                <!-- 开门记录表格 - 优化列宽分配 -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm min-w-[580px]">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="px-4 py-3 text-left text-gray-600 font-medium text-xs w-[60px]">序号</th>
+                                <th class="px-4 py-3 text-left text-gray-600 font-medium text-xs w-[200px]">开门通道</th>
+                                <th class="px-4 py-3 text-left text-gray-600 font-medium text-xs w-[100px]">开门方式</th>
+                                <th class="px-4 py-3 text-left text-gray-600 font-medium text-xs w-[160px]">开门时间</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-gray-100 table-hover-row">
+                                <td class="px-4 py-3 text-gray-700">1</td>
+                                <td class="px-4 py-3 text-gray-800 whitespace-nowrap">长辉公司大门</td>
+                                <td class="px-4 py-3">
+                                    <span class="door-method-tag bg-face/10 text-face">人脸开门</span>
+                                </td>
+                                <td class="px-4 py-3 text-gray-700 text-xs whitespace-nowrap">2025/12/20 10:00:00</td>
+                            </tr>
+                            <tr class="border-b border-gray-100 table-hover-row">
+                                <td class="px-4 py-3 text-gray-700">2</td>
+                                <td class="px-4 py-3 text-gray-800 whitespace-nowrap">叶总办公室门</td>
+                                <td class="px-4 py-3">
+                                    <span class="door-method-tag bg-face/10 text-face">人脸开门</span>
+                                </td>
+                                <td class="px-4 py-3 text-gray-700 text-xs whitespace-nowrap">2025/12/20 11:00:00</td>
+                            </tr>
+                            <tr class="table-hover-row">
+                                <td class="px-4 py-3 text-gray-700">3</td>
+                                <td class="px-4 py-3 text-gray-800 whitespace-nowrap">杂物间门</td>
+                                <td class="px-4 py-3">
+                                    <span class="door-method-tag bg-card/10 text-card">刷卡开门</span>
+                                </td>
+                                <td class="px-4 py-3 text-gray-700 text-xs whitespace-nowrap">2025/12/20 13:00:00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 分页区域 -->
+                <div class="mt-4 px-4 py-3 flex justify-between items-center border-t border-gray-100 bg-gray-50/50 rounded-lg">
+                    <div class="text-xs text-gray-500">
+                        显示 <span class="text-primary">1</span> - <span class="text-primary">3</span> 条，共 <span class="text-primary">3</span> 条
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:border-primary hover:text-primary transition-colors text-xs">
+                            <i class="fa fa-angle-left"></i>
+                        </button>
+                        <button class="w-7 h-7 flex items-center justify-center rounded-lg bg-primary text-white text-xs">1</button>
+                        <button class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-primary hover:text-primary transition-colors text-xs">2</button>
+                        <button class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-primary hover:text-primary transition-colors text-xs">
+                            <i class="fa fa-angle-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 弹窗底部操作区 -->
+            <div class="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+                <button type="button" class="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                    关闭
+                </button>
+                <button type="button" class="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                    <i class="fa fa-download mr-1 text-xs"></i> 导出记录
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

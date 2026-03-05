@@ -453,9 +453,13 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
         Boolean audioSupport = false;
         String deviceType = null;
         String resolution = null;
+        String sdkChannelName = null;  // ✅ 从SDK获取的通道名称
         try {
             cn.hutool.json.JSONObject cfg = cn.hutool.json.JSONUtil.parseObj(configStr);
             channelNo = cfg.getInt("channel");
+            
+            // ✅ 从SDK返回的config中获取通道名称
+            sdkChannelName = cfg.getStr("channelName");
             
             // ✅ 调试日志：查看SDK返回的config内容
             log.info("[通道同步] SDK返回的config: nvrId={}, channelNo={}, config={}", 
@@ -564,16 +568,18 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
             IotDeviceChannelDO updateObj = new IotDeviceChannelDO();
             updateObj.setId(existing.getId());
             
-            // ✅ 保留已有的自定义通道名称，只有当数据库中是默认名称或为空时才更新
+            // ✅ 使用SDK返回的通道名称更新（优先使用sdkChannelName，如果为空则保留原有名称）
             String existingName = existing.getChannelName();
-            String newName = channelInfo.getDeviceName();
-            boolean isDefaultName = existingName == null || existingName.isEmpty() 
-                    || existingName.matches("^通道\\d+$");  // 匹配"通道1"、"通道2"等默认名称
-            if (isDefaultName && newName != null && !newName.isEmpty()) {
+            // SDK 返回的通道名称优先
+            String newName = sdkChannelName;
+            // 只有当 SDK 返回了有效的非默认名称时才更新
+            boolean hasValidSdkName = newName != null && !newName.isEmpty() 
+                    && !newName.matches("^通道\\d+$");  // SDK 返回的不是默认名称
+            if (hasValidSdkName && !newName.equals(existingName)) {
                 updateObj.setChannelName(newName);
                 log.info("[通道同步] 更新通道名称: channelNo={}, {} -> {}", channelNo, existingName, newName);
             }
-            // 如果已有自定义名称，不覆盖
+            // 如果 SDK 返回的是默认名称或为空，保留数据库中的名称
             
             updateObj.setTargetIp(DeviceConfigHelper.getIpAddress(channelInfo));
             updateObj.setOnlineStatus(channelInfo.getState());
@@ -592,8 +598,10 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
                 log.info("[通道同步] 自动启用通道: nvrId={}, channelNo={}", nvrId, channelNo);
             }
             channelMapper.updateById(updateObj);
+            // 显示更新后的名称（如果更新了就显示新名称，否则显示原名称）
+            String displayName = updateObj.getChannelName() != null ? updateObj.getChannelName() : existingName;
             log.info("[通道同步] 更新通道: nvrId={}, channelNo={}, name={}, onlineStatus={}, ptzSupport={}", 
-                    nvrId, channelNo, existing.getChannelName(), channelInfo.getState(), ptzSupport);
+                    nvrId, channelNo, displayName, channelInfo.getState(), ptzSupport);
         } else {
             // 创建新通道
             IotDeviceChannelDO newChannel = new IotDeviceChannelDO();
@@ -601,7 +609,10 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
             newChannel.setDeviceType("NVR");
             newChannel.setProductId(4L);
             newChannel.setChannelNo(channelNo);
-            newChannel.setChannelName(channelInfo.getDeviceName());
+            // ✅ 优先使用SDK返回的通道名称，否则使用默认名称
+            String insertName = (sdkChannelName != null && !sdkChannelName.isEmpty()) 
+                    ? sdkChannelName : "通道" + channelNo;
+            newChannel.setChannelName(insertName);
             newChannel.setChannelType("VIDEO");
             newChannel.setChannelSubType(deviceType != null ? deviceType : "IPC");
             newChannel.setTargetIp(DeviceConfigHelper.getIpAddress(channelInfo));
@@ -619,7 +630,7 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
             newChannel.setEnableStatus(1);
             newChannel.setLastSyncTime(LocalDateTime.now());
             channelMapper.insert(newChannel);
-            log.info("[通道同步] 新增通道: nvrId={}, channelNo={}, name={}", nvrId, channelNo, channelInfo.getDeviceName());
+            log.info("[通道同步] 新增通道: nvrId={}, channelNo={}, name={}", nvrId, channelNo, insertName);
         }
     }
     
@@ -684,6 +695,35 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void updateChannelConfig(Long channelId, java.util.Map<String, Object> config) {
+        if (channelId == null) {
+            return;
+        }
+        IotDeviceChannelDO channel = channelMapper.selectById(channelId);
+        if (channel == null) {
+            log.warn("[通道管理] 更新配置失败，通道不存在: channelId={}", channelId);
+            return;
+        }
+        
+        // 合并新配置到现有配置
+        java.util.Map<String, Object> existingConfig = channel.getConfig();
+        if (existingConfig == null) {
+            existingConfig = new java.util.HashMap<>();
+        }
+        if (config != null) {
+            existingConfig.putAll(config);
+        }
+        
+        IotDeviceChannelDO updateObj = new IotDeviceChannelDO();
+        updateObj.setId(channelId);
+        updateObj.setConfig(existingConfig);
+        channelMapper.updateById(updateObj);
+        
+        log.info("[通道管理] 更新通道配置: channelId={}, config={}", channelId, config);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void batchSetPatrol(List<Long> channelIds, Boolean isPatrol) {
         channelIds.forEach(id -> {
             IotDeviceChannelDO updateObj = new IotDeviceChannelDO();
@@ -707,15 +747,27 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void batchAssignSpatial(List<Long> channelIds, Long campusId, Long buildingId, Long floorId, Long areaId) {
         if (channelIds == null || channelIds.isEmpty()) {
             return;
         }
-        // 先查询空间信息
+        // 先查询空间信息（在事务外执行，使用PostgreSQL数据源）
         SpatialInfo spatialInfo = querySpatialInfo(campusId, buildingId, floorId, areaId);
         
-        // 然后更新通道信息
+        // 然后在事务中更新通道信息（使用MySQL数据源）
+        batchAssignSpatialInTransaction(channelIds, buildingId, floorId, areaId, spatialInfo.location);
+        
+        log.info("[通道管理] 批量指派空间: count={}, campusId={}, buildingId={}, floorId={}", channelIds.size(), campusId, buildingId, floorId);
+    }
+    
+    /**
+     * 在事务中批量指派空间（仅更新MySQL中的通道表）
+     */
+    /**
+     * 批量分配空间（内部事务方法）
+     * 注意：private 方法的 @Transactional 不会生效，事务由调用方 batchAssignSpatial 控制
+     */
+    private void batchAssignSpatialInTransaction(List<Long> channelIds, Long buildingId, Long floorId, Long areaId, String location) {
         for (Long id : channelIds) {
             IotDeviceChannelDO updateObj = new IotDeviceChannelDO();
             updateObj.setId(id);
@@ -723,11 +775,9 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
             updateObj.setFloorId(floorId);
             updateObj.setAreaId(areaId);
             updateObj.setSpaceId(null);
-            updateObj.setLocation(spatialInfo.location);
+            updateObj.setLocation(location);
             channelMapper.updateById(updateObj);
         }
-        
-        log.info("[通道管理] 批量指派空间: count={}, campusId={}, buildingId={}, floorId={}", channelIds.size(), campusId, buildingId, floorId);
     }
 
     // ========== 多屏预览专用 ==========

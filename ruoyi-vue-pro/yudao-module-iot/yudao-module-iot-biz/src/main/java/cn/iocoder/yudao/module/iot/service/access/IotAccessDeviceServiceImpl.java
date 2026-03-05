@@ -89,7 +89,9 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
     private String getDeviceType(IotDeviceDO device) {
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
-            return AccessDeviceTypeConstants.getDeviceType(config.getSupportVideo());
+            String configDeviceType = config.getAccessDeviceType();
+            Boolean supportVideo = config.getSupportVideo();
+            return AccessDeviceTypeConstants.resolveDeviceType(configDeviceType, supportVideo);
         }
         if (device.getConfig() instanceof GenericDeviceConfig) {
             GenericDeviceConfig cfg = (GenericDeviceConfig) device.getConfig();

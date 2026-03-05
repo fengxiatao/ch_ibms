@@ -42,6 +42,9 @@ public class DispatchDataConverterImpl implements DispatchDataConverter {
     /** 人脸图片最大高度 */
     private static final int FACE_MAX_HEIGHT = 1080;
 
+    /** 默认有效期年数 */
+    private static final int DEFAULT_VALID_YEARS = 5;
+
     @Override
     public NetAccessUserInfo convertToUserInfo(IotAccessPersonDO person,
                                                List<IotAccessPersonCredentialDO> credentials,
@@ -51,14 +54,28 @@ public class DispatchDataConverterImpl implements DispatchDataConverter {
             return null;
         }
         
+        // 处理有效期：如果为空，默认从当前时间开始到5年后结束
+        LocalDateTime validStart = person.getValidStart();
+        LocalDateTime validEnd = person.getValidEnd();
+        if (validStart == null) {
+            validStart = LocalDateTime.now();
+            log.info("[DispatchDataConverter] 人员有效期开始时间为空，使用默认值: personId={}, validStart={}", 
+                    person.getId(), validStart);
+        }
+        if (validEnd == null) {
+            validEnd = validStart.plusYears(DEFAULT_VALID_YEARS);
+            log.info("[DispatchDataConverter] 人员有效期结束时间为空，使用默认值(5年后): personId={}, validEnd={}", 
+                    person.getId(), validEnd);
+        }
+        
         // 构建用户信息
         NetAccessUserInfo.NetAccessUserInfoBuilder builder = NetAccessUserInfo.builder()
             .userId(person.getPersonCode())
             .userName(person.getPersonName())
             .userType(convertPersonType(person.getPersonType()))
             .userStatus(convertPersonStatus(person.getStatus()))
-            .validStartTime(formatDateTime(person.getValidStart()))
-            .validEndTime(formatDateTime(person.getValidEnd()))
+            .validStartTime(formatDateTime(validStart))
+            .validEndTime(formatDateTime(validEnd))
             .citizenIdNo(person.getIdCard())
             .phoneNo(person.getPhone())
             .remark(person.getRemark());
@@ -79,9 +96,10 @@ public class DispatchDataConverterImpl implements DispatchDataConverter {
             builder.timeSectionNo(timeSections);
         }
         
-        // 从凭证中提取卡号和密码（一代设备需要）
+        // 从凭证中提取卡号、密码
         // 使用 CredentialTypeConstants 进行大小写不敏感的凭证类型比较
         String cardNo = null;
+        String password = null;
         if (!CollectionUtils.isEmpty(credentials)) {
             for (IotAccessPersonCredentialDO credential : credentials) {
                 String credentialType = credential.getCredentialType();
@@ -91,18 +109,31 @@ public class DispatchDataConverterImpl implements DispatchDataConverter {
                 }
                 // 密码凭证
                 if (CredentialTypeConstants.isPassword(credentialType) && StringUtils.hasText(credential.getCredentialData())) {
-                    builder.password(credential.getCredentialData());
+                    password = credential.getCredentialData();
+                    builder.password(password);
+                    log.info("[DispatchDataConverter] 提取密码凭证: personId={}, passwordLen={}", 
+                            person.getId(), password.length());
                 }
             }
         }
         
-        // 卡号兜底：如果没有卡片凭证，使用 personCode 作为卡号（一代门禁设备必须有卡号）
-        if (!StringUtils.hasText(cardNo)) {
-            cardNo = person.getPersonCode();
-            log.info("[DispatchDataConverter] 人员无卡片凭证，使用personCode作为卡号兜底: personId={}, cardNo={}", 
-                    person.getId(), cardNo);
+        // 人脸/照片 URL：优先使用 person.faceUrl（推荐方式，避免消息总线传输大量二进制数据）
+        String photoUrl = person.getFaceUrl();
+        if (StringUtils.hasText(photoUrl)) {
+            builder.photoUrl(photoUrl);
+            log.info("[DispatchDataConverter] 设置照片URL: personId={}, photoUrl={}", 
+                    person.getId(), photoUrl);
+        } else {
+            log.info("[DispatchDataConverter] 人员无照片URL: personId={}", person.getId());
         }
-        builder.cardNo(cardNo);
+        
+        // 卡号处理：如果没有卡片凭证，不再使用 personCode 作为卡号兜底
+        // 因为在 dispatchPersonToDevice 中已经检查了凭证，无凭证时会直接返回错误
+        if (StringUtils.hasText(cardNo)) {
+            builder.cardNo(cardNo);
+        } else {
+            log.info("[DispatchDataConverter] 人员无卡片凭证: personId={}", person.getId());
+        }
         
         return builder.build();
     }
@@ -116,14 +147,28 @@ public class DispatchDataConverterImpl implements DispatchDataConverter {
             return null;
         }
         
+        // 处理有效期：如果为空，默认从当前时间开始到5年后结束（与convertToUserInfo保持一致）
+        LocalDateTime validStart = person.getValidStart();
+        LocalDateTime validEnd = person.getValidEnd();
+        if (validStart == null) {
+            validStart = LocalDateTime.now();
+            log.info("[convertToCardInfo] 人员有效期开始时间为空，使用默认值: personId={}, validStart={}", 
+                    person.getId(), validStart);
+        }
+        if (validEnd == null) {
+            validEnd = validStart.plusYears(DEFAULT_VALID_YEARS);
+            log.info("[convertToCardInfo] 人员有效期结束时间为空，使用默认值(5年后): personId={}, validEnd={}", 
+                    person.getId(), validEnd);
+        }
+        
         NetAccessCardInfo.NetAccessCardInfoBuilder builder = NetAccessCardInfo.builder()
             .cardNo(credential.getCardNo())
             .userId(person.getPersonCode())
             .cardName(person.getPersonName())
             .cardType(0)  // 默认普通卡
             .cardStatus(0)  // 默认正常
-            .validStartTime(formatDateTime(person.getValidStart()))
-            .validEndTime(formatDateTime(person.getValidEnd()));
+            .validStartTime(formatDateTime(validStart))
+            .validEndTime(formatDateTime(validEnd));
         
         // 设置门权限
         if (doors != null && doors.length > 0) {
@@ -148,32 +193,51 @@ public class DispatchDataConverterImpl implements DispatchDataConverter {
     public NetAccessFaceInfo convertToFaceInfo(IotAccessPersonCredentialDO credential,
                                                IotAccessPersonDO person) {
         if (credential == null || person == null) {
+            log.warn("[DispatchDataConverter] convertToFaceInfo 参数为空: credential={}, person={}", 
+                    credential != null, person != null);
             return null;
         }
         
-        // 加载人脸图片数据
-        byte[] faceData = null;
-        if (StringUtils.hasText(credential.getCredentialData())) {
-            faceData = faceImageLoader.loadAndProcessFaceImage(
-                credential.getCredentialData(),
-                FACE_MAX_SIZE_KB,
-                FACE_MAX_WIDTH,
-                FACE_MAX_HEIGHT
-            );
-            
-            if (faceData == null) {
-                log.warn("[DispatchDataConverter] 加载人脸图片失败: personId={}, credentialId={}",
-                    person.getId(), credential.getId());
+        log.info("[DispatchDataConverter] 开始转换人脸凭证: personId={}, personCode={}, credentialId={}, faceUrl={}", 
+                person.getId(), person.getPersonCode(), credential.getId(), person.getFaceUrl());
+        
+        // 优先使用 person.faceUrl 作为图片 URL（推荐方式，避免在消息总线传输大量二进制数据）
+        String faceUrl = person.getFaceUrl();
+        String credentialData = credential.getCredentialData();
+        
+        // 如果 person.faceUrl 为空，检查 credential.credentialData
+        if (!StringUtils.hasText(faceUrl) && StringUtils.hasText(credentialData)) {
+            String trimmedData = credentialData.trim();
+            // 检查是否是 URL（以 http:// 或 https:// 开头）
+            if (trimmedData.startsWith("http://") || trimmedData.startsWith("https://")) {
+                faceUrl = trimmedData;
+                log.info("[DispatchDataConverter] 使用 credentialData 作为 faceUrl: {}", faceUrl);
+            } else {
+                // 凭证数据不是 URL，可能是 Base64 编码的图片数据
+                // 使用特殊前缀标记，让网关侧知道这是 Base64 数据
+                faceUrl = "base64://" + trimmedData;
+                log.info("[DispatchDataConverter] credentialData 是 Base64 数据，添加前缀: dataLen={}", trimmedData.length());
             }
         }
         
-        return NetAccessFaceInfo.builder()
+        if (!StringUtils.hasText(faceUrl)) {
+            log.warn("[DispatchDataConverter] 无法获取人脸图片数据: personId={}, faceUrl={}, credentialDataLen={}", 
+                    person.getId(), person.getFaceUrl(),
+                    credentialData != null ? credentialData.length() : 0);
+            return null;
+        }
+        
+        NetAccessFaceInfo result = NetAccessFaceInfo.builder()
             .userId(person.getPersonCode())
             .faceIndex(0)  // 默认第一张人脸
-            .faceData(faceData)
-            .faceDataLen(faceData != null ? faceData.length : 0)
+            .faceUrl(faceUrl)  // 传递 URL，让网关侧下载处理
             .format("JPEG")
             .build();
+        
+        log.info("[DispatchDataConverter] 人脸信息转换完成: personId={}, userId={}, faceUrl={}", 
+                person.getId(), result.getUserId(), result.getFaceUrl());
+        
+        return result;
     }
 
     @Override

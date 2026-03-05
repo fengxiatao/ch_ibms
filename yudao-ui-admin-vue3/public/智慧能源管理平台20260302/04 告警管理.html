@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧能源管理平台 - 告警管理</title>
+    <style>
+        :root {
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --secondary: #6366f1;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --border: #e5e7eb;
+            --bg-primary: #f3f4f6;
+            --bg-secondary: #ffffff;
+            --sidebar-bg: #1f2937;
+            --sidebar-width: 260px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); font-size: 14px; line-height: 1.5; }
+        .app-container { display: flex; min-height: 100vh; }
+        .sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); color: #fff; position: fixed; height: 100vh; overflow-y: auto; z-index: 100; transition: transform 0.3s ease; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 12px; }
+        .sidebar-logo { width: 40px; height: 40px; background: var(--primary); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .sidebar-title { font-size: 18px; font-weight: 600; }
+        .sidebar-subtitle { font-size: 11px; color: rgba(255,255,255,0.5); }
+        .nav-menu { padding: 15px 0; }
+        .nav-section { margin-bottom: 10px; }
+        .nav-section-title { padding: 10px 20px; font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.4); letter-spacing: 1px; font-weight: 600; }
+        .nav-item { display: flex; align-items: center; padding: 12px 20px; color: rgba(255,255,255,0.7); cursor: pointer; transition: all 0.2s ease; gap: 12px; border-left: 3px solid transparent; }
+        .nav-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+        .nav-item.active { background: rgba(16, 185, 129, 0.15); color: var(--primary); border-left-color: var(--primary); }
+        .nav-item-icon { width: 20px; text-align: center; font-size: 16px; }
+        .nav-item-text { flex: 1; }
+        .nav-item-badge { background: var(--danger); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .main-content { flex: 1; margin-left: var(--sidebar-width); padding: 20px 30px; min-height: 100vh; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding: 20px 25px; background: var(--bg-secondary); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 14px; }
+        .breadcrumb-item { color: var(--text-secondary); }
+        .breadcrumb-item.active { color: var(--text-primary); font-weight: 500; }
+        .header-actions { display: flex; align-items: center; gap: 15px; }
+        .datetime-display { display: flex; align-items: center; gap: 8px; padding: 8px 15px; background: var(--bg-primary); border-radius: 8px; color: var(--text-secondary); font-size: 13px; }
+        .data-table-container { background: var(--bg-secondary); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 25px; }
+        .table-header { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--border); }
+        .table-title { font-size: 16px; font-weight: 600; }
+        .table-filters { display: flex; gap: 10px; align-items: center; }
+        .filter-select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; color: var(--text-primary); background: var(--bg-secondary); cursor: pointer; outline: none; transition: border-color 0.2s ease; }
+        .filter-select:focus { border-color: var(--primary); }
+        .filter-input { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; outline: none; transition: border-color 0.2s ease; }
+        .filter-input:focus { border-color: var(--primary); }
+        .btn { padding: 8px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-secondary { background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: var(--border); }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th { background: var(--bg-primary); padding: 14px 20px; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+        .data-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+        .data-table tr:hover td { background: var(--bg-primary); }
+        .data-table tr:last-child td { border-bottom: none; }
+        .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+        .status-online { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+        .status-offline { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .status-warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .status-normal { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+        .status-abnormal { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .alarm-level { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+        .alarm-level.critical { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .alarm-level.major { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .alarm-level.minor { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .alarm-level.info { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
+        .alarm-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; }
+        .alarm-stat-card { background: var(--bg-secondary); border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-left: 4px solid var(--border); transition: transform 0.2s ease; }
+        .alarm-stat-card:hover { transform: translateY(-2px); }
+        .alarm-stat-card.critical { border-left-color: #ef4444; }
+        .alarm-stat-card.major { border-left-color: #f59e0b; }
+        .alarm-stat-card.minor { border-left-color: #3b82f6; }
+        .alarm-stat-card.total { border-left-color: var(--primary); }
+        .alarm-stat-value { font-size: 36px; font-weight: 700; margin-bottom: 5px; }
+        .alarm-stat-value.critical { color: #ef4444; }
+        .alarm-stat-value.major { color: #f59e0b; }
+        .alarm-stat-value.minor { color: #3b82f6; }
+        .alarm-stat-value.total { color: var(--text-primary); }
+        .alarm-stat-label { font-size: 13px; color: var(--text-secondary); }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease; }
+        .modal-overlay.active { display: flex; opacity: 1; }
+        .modal { background: var(--bg-secondary); border-radius: 16px; width: 100%; max-width: 600px; max-height: 90vh; overflow: hidden; transform: scale(0.9); transition: transform 0.3s ease; }
+        .modal-overlay.active .modal { transform: scale(1); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 25px; border-bottom: 1px solid var(--border); }
+        .modal-title { font-size: 18px; font-weight: 600; }
+        .modal-close { width: 32px; height: 32px; border: none; background: var(--bg-primary); border-radius: 8px; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); transition: all 0.2s ease; }
+        .modal-close:hover { background: var(--border); color: var(--text-primary); }
+        .modal-body { padding: 25px; overflow-y: auto; max-height: calc(90vh - 140px); }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 20px 25px; border-top: 1px solid var(--border); }
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 8px; }
+        .form-control { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; color: var(--text-primary); background: var(--bg-secondary); outline: none; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+        .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1); }
+        .page-section { display: none; }
+        .page-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .page-section.active { animation: fadeIn 0.3s ease; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+        @media (max-width: 992px) { .sidebar { transform: translateX(-100%); } .main-content { margin-left: 0; } }
+        
+        /* 补充能源类型标签样式 */
+        .energy-tag {
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .energy-tag.electricity {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+        .energy-tag.water {
+            background: rgba(34, 197, 94, 0.1);
+            color: #22c55e;
+        }
+        .energy-tag.gas {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+        }
+        .energy-tag.thermal {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+        
+        /* 详情页信息网格样式 */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        .info-item {
+            margin-bottom: 10px;
+        }
+        .info-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        .info-value {
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        /* 处理意见弹窗样式 */
+        .handle-modal .modal {
+            max-width: 500px;
+        }
+        .handle-form-group {
+            margin-bottom: 15px;
+        }
+        .handle-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        .handle-textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+            outline: none;
+            resize: vertical;
+            min-height: 120px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .handle-textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+        .handle-tips {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 侧边栏（保留框架，仅突出告警管理） -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">⚡</div>
+                <div>
+                    <div class="sidebar-title">智慧能源管理</div>
+                    <div class="sidebar-subtitle">Smart Energy Platform</div>
+                </div>
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-section">
+                </div>
+                <div class="nav-section">
+                </div>
+                <div class="nav-section">
+                </div>
+                <div class="nav-section">
+                    <!-- 告警管理高亮 -->
+                    <div class="nav-item active" data-page="alarms"><span class="nav-item-icon">🚨</span><span class="nav-item-text">告警管理</span><span class="nav-item-badge" id="alarmBadge">5</span></div>
+                </div>
+                <div class="nav-section">
+                </div>
+            </nav>
+        </aside>
+
+        <!-- 主内容区 - 告警管理页面 -->
+        <main class="main-content">
+            <section id="page-alarms" class="page-section active">
+                <div class="page-header">
+                    <div class="breadcrumb">
+                        <span class="breadcrumb-item">首页</span>
+                        <span>/</span>
+                        <span class="breadcrumb-item active">告警管理</span>
+                    </div>
+                    <div class="header-actions">
+                        <div class="datetime-display">
+                            <span>📅</span>
+                            <span id="currentDateTime">2026-02-11 18:23:00</span>
+                        </div>
+                        <div class="user-info">
+                            <div class="user-avatar">管</div>
+                            <span class="user-name">管理员</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 告警统计卡片 -->
+                <div class="alarm-grid">
+                    <div class="alarm-stat-card critical">
+                        <div class="alarm-stat-value critical">8</div>
+                        <div class="alarm-stat-label">紧急告警</div>
+                    </div>
+                    <div class="alarm-stat-card major">
+                        <div class="alarm-stat-value major">15</div>
+                        <div class="alarm-stat-label">重要告警</div>
+                    </div>
+                    <div class="alarm-stat-card minor">
+                        <div class="alarm-stat-value minor">27</div>
+                        <div class="alarm-stat-label">次要告警</div>
+                    </div>
+                    <div class="alarm-stat-card total">
+                        <div class="alarm-stat-value total">50</div>
+                        <div class="alarm-stat-label">总计告警</div>
+                    </div>
+                </div>
+
+                <!-- 告警列表 -->
+                <div class="data-table-container">
+                    <div class="table-header">
+                        <div class="table-title">🚨 告警列表</div>
+                        <div class="table-filters">
+                            <select class="filter-select">
+                                <option value="">全部级别</option>
+                                <option value="critical">紧急</option>
+                                <option value="major">重要</option>
+                                <option value="minor">次要</option>
+                                <option value="info">提示</option>
+                            </select>
+                            <!-- 仅保留未处理/已处理筛选 -->
+                            <select class="filter-select">
+                                <option value="">全部状态</option>
+                                <option value="unhandled">未处理</option>
+                                <option value="handled">已处理</option>
+                            </select>
+                            <input type="text" class="filter-input" placeholder="搜索告警...">
+                            <button class="btn btn-primary btn-sm">查询</button>
+                            <button class="btn btn-secondary btn-sm">重置</button>
+                        </div>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>告警ID</th>
+                                <th>告警时间</th>
+                                <th>级别</th>
+                                <th>类型</th>
+                                <th>设备/区域</th>
+                                <th>描述</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- 未处理告警 - 显示查看+处理按钮 -->
+                            <tr>
+                                <td>ALM20260211001</td>
+                                <td>2026-02-11 17:45:23</td>
+                                <td><span class="alarm-level critical">紧急</span></td>
+                                <td><span class="energy-tag electricity">电力</span></td>
+                                <td>2层办公区-配电柜A</td>
+                                <td>电压异常波动，超出安全阈值</td>
+                                <td><span class="status-badge status-abnormal">未处理</span></td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm" onclick="viewAlarmDetail('ALM20260211001')">查看</button>
+                                    <button class="btn btn-secondary btn-sm" onclick="openHandleModal('ALM20260211001')">处理</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>ALM20260211002</td>
+                                <td>2026-02-11 16:30:15</td>
+                                <td><span class="alarm-level major">重要</span></td>
+                                <td><span class="energy-tag water">水务</span></td>
+                                <td>1层卫生间-水表01</td>
+                                <td>用水量突增，疑似管道泄漏</td>
+                                <td><span class="status-badge status-abnormal">未处理</span></td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm" onclick="viewAlarmDetail('ALM20260211002')">查看</button>
+                                    <button class="btn btn-secondary btn-sm" onclick="openHandleModal('ALM20260211002')">处理</button>
+                                </td>
+                            </tr>
+                            <!-- 已处理告警 - 仅显示查看按钮，移除处理按钮 -->
+                            <tr>
+                                <td>ALM20260211003</td>
+                                <td>2026-02-11 15:12:47</td>
+                                <td><span class="alarm-level minor">次要</span></td>
+                                <td><span class="energy-tag gas">燃气</span></td>
+                                <td>厨房-燃气表02</td>
+                                <td>燃气压力略低于正常范围</td>
+                                <td><span class="status-badge status-normal">已处理</span></td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm" onclick="viewAlarmDetail('ALM20260211003')">查看</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>ALM20260211004</td>
+                                <td>2026-02-11 14:05:33</td>
+                                <td><span class="alarm-level info">提示</span></td>
+                                <td><span class="energy-tag electricity">电力</span></td>
+                                <td>3层会议室-空调05</td>
+                                <td>设备运行时长超过阈值，建议维护</td>
+                                <td><span class="status-badge status-normal">已处理</span></td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm" onclick="viewAlarmDetail('ALM20260211004')">查看</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>ALM20260211005</td>
+                                <td>2026-02-11 13:20:18</td>
+                                <td><span class="alarm-level critical">紧急</span></td>
+                                <td><span class="energy-tag thermal">热力</span></td>
+                                <td>地下室-热力管道B</td>
+                                <td>温度异常升高，存在安全隐患</td>
+                                <td><span class="status-badge status-abnormal">未处理</span></td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm" onclick="viewAlarmDetail('ALM20260211005')">查看</button>
+                                    <button class="btn btn-secondary btn-sm" onclick="openHandleModal('ALM20260211005')">处理</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 告警详情弹窗 -->
+    <div class="modal-overlay" id="alarmDetailModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">告警详情</div>
+                <button class="modal-close" onclick="closeModal('alarmDetailModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">告警ID</div>
+                        <div class="info-value" id="detail-alarm-id">ALM20260211001</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">告警级别</div>
+                        <div class="info-value"><span class="alarm-level critical" id="detail-alarm-level">紧急</span></div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">告警时间</div>
+                        <div class="info-value" id="detail-alarm-time">2026-02-11 17:45:23</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">告警类型</div>
+                        <div class="info-value"><span class="energy-tag electricity" id="detail-alarm-type">电力</span></div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">所属区域/设备</div>
+                        <div class="info-value" id="detail-alarm-device">2层办公区-配电柜A</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">当前状态</div>
+                        <div class="info-value"><span class="status-badge status-abnormal" id="detail-alarm-status">未处理</span></div>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 20px;">
+                    <div class="form-label">告警描述</div>
+                    <div id="detail-alarm-desc">电压异常波动，超出安全阈值</div>
+                </div>
+                <div class="form-group">
+                    <div class="form-label">处理记录</div>
+                    <textarea class="form-control" rows="4" placeholder="暂无处理记录..." id="detail-handle-record" disabled></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('alarmDetailModal')">关闭</button>
+                <button class="btn btn-primary" id="detail-handle-btn" onclick="openHandleModal(document.getElementById('detail-alarm-id').textContent)">处理告警</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 处理意见弹窗 -->
+    <div class="modal-overlay handle-modal" id="handleAlarmModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="handle-modal-title">处理告警 - ALM20260211001</div>
+                <button class="modal-close" onclick="closeModal('handleAlarmModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="current-handle-alarm-id">
+                <div class="handle-form-group">
+                    <label class="handle-label" for="handle-opinion">处理意见 <span style="color: var(--danger);">*</span></label>
+                    <textarea class="handle-textarea" id="handle-opinion" placeholder="请详细描述告警的处理过程、结果和后续建议..." required></textarea>
+                    <div class="handle-tips">提示：请包含处理人、处理时间、处理措施、处理结果等关键信息</div>
+                </div>
+                <div class="handle-form-group">
+                    <label class="handle-label" for="handle-person">处理人</label>
+                    <input type="text" class="form-control" id="handle-person" placeholder="请输入处理人姓名" value="管理员">
+                </div>
+                <div class="handle-form-group">
+                    <label class="handle-label" for="handle-time">处理时间</label>
+                    <input type="datetime-local" class="form-control" id="handle-time">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('handleAlarmModal')">取消</button>
+                <button class="btn btn-primary" onclick="submitHandleForm()">确认提交</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量存储当前处理的告警ID
+        let currentHandleAlarmId = '';
+        
+        // 更新当前时间
+        function updateDateTime() {
+            const now = new Date();
+            const formatted = now.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            }).replace(/\//g, '-');
+            document.getElementById('currentDateTime').textContent = formatted;
+            
+            // 设置默认处理时间为当前时间
+            const dateTimeValue = now.toISOString().slice(0, 16);
+            if (!document.getElementById('handle-time').value) {
+                document.getElementById('handle-time').value = dateTimeValue;
+            }
+        }
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+
+        // 模态框操作
+        function viewAlarmDetail(alarmId) {
+            // 模拟填充详情数据
+            const modal = document.getElementById('alarmDetailModal');
+            const handleBtn = document.getElementById('detail-handle-btn');
+            document.getElementById('detail-alarm-id').textContent = alarmId;
+            
+            // 告警数据（仅保留未处理/已处理状态）
+            const alarmData = {
+                'ALM20260211001': {
+                    level: 'critical',
+                    levelText: '紧急',
+                    time: '2026-02-11 17:45:23',
+                    type: 'electricity',
+                    typeText: '电力',
+                    device: '2层办公区-配电柜A',
+                    status: 'abnormal',
+                    statusText: '未处理',
+                    desc: '电压异常波动，超出安全阈值（当前电压：385V，阈值范围：380±5V）'
+                },
+                'ALM20260211002': {
+                    level: 'major',
+                    levelText: '重要',
+                    time: '2026-02-11 16:30:15',
+                    type: 'water',
+                    typeText: '水务',
+                    device: '1层卫生间-水表01',
+                    status: 'abnormal',
+                    statusText: '未处理',
+                    desc: '用水量突增，疑似管道泄漏（5分钟内用水量：0.8m³，正常均值：0.1m³/5分钟）'
+                },
+                'ALM20260211003': {
+                    level: 'minor',
+                    levelText: '次要',
+                    time: '2026-02-11 15:12:47',
+                    type: 'gas',
+                    typeText: '燃气',
+                    device: '厨房-燃气表02',
+                    status: 'normal',
+                    statusText: '已处理',
+                    desc: '燃气压力略低于正常范围（当前压力：2.8kPa，正常范围：3.0±0.2kPa），已排查无泄漏'
+                },
+                'ALM20260211004': {
+                    level: 'info',
+                    levelText: '提示',
+                    time: '2026-02-11 14:05:33',
+                    type: 'electricity',
+                    typeText: '电力',
+                    device: '3层会议室-空调05',
+                    status: 'normal',
+                    statusText: '已处理',
+                    desc: '设备运行时长超过阈值，建议维护（连续运行时长：8小时，阈值：6小时）'
+                },
+                'ALM20260211005': {
+                    level: 'critical',
+                    levelText: '紧急',
+                    time: '2026-02-11 13:20:18',
+                    type: 'thermal',
+                    typeText: '热力',
+                    device: '地下室-热力管道B',
+                    status: 'abnormal',
+                    statusText: '未处理',
+                    desc: '温度异常升高，存在安全隐患（当前温度：85℃，安全阈值：≤70℃）'
+                }
+            };
+
+            const data = alarmData[alarmId] || alarmData['ALM20260211001'];
+            // 填充详情数据
+            document.getElementById('detail-alarm-level').className = `alarm-level ${data.level}`;
+            document.getElementById('detail-alarm-level').textContent = data.levelText;
+            document.getElementById('detail-alarm-time').textContent = data.time;
+            document.getElementById('detail-alarm-type').className = `energy-tag ${data.type}`;
+            document.getElementById('detail-alarm-type').textContent = data.typeText;
+            document.getElementById('detail-alarm-device').textContent = data.device;
+            document.getElementById('detail-alarm-status').className = `status-badge status-${data.status}`;
+            document.getElementById('detail-alarm-status').textContent = data.statusText;
+            document.getElementById('detail-alarm-desc').textContent = data.desc;
+
+            // 控制详情页的处理按钮显示：已处理告警隐藏处理按钮
+            if (data.status === 'normal') { // 已处理
+                handleBtn.style.display = 'none';
+                // 填充处理记录（模拟）
+                if (alarmId === 'ALM20260211003') {
+                    document.getElementById('detail-handle-record').value = '已安排维修人员现场排查，确认无燃气泄漏，压力略低为正常波动，已记录备案。处理人：张三，处理时间：2026-02-11 15:30';
+                } else if (alarmId === 'ALM20260211004') {
+                    document.getElementById('detail-handle-record').value = '已通知运维人员对空调进行维护，清理滤网并检查运行状态，设备恢复正常。处理人：李四，处理时间：2026-02-11 14:20';
+                }
+            } else { // 未处理
+                handleBtn.style.display = 'inline-flex';
+                document.getElementById('detail-handle-record').value = '';
+                document.getElementById('detail-handle-record').placeholder = '暂无处理记录...';
+            }
+
+            // 显示模态框
+            modal.classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+            // 清空处理意见表单
+            if (modalId === 'handleAlarmModal') {
+                document.getElementById('handle-opinion').value = '';
+                document.getElementById('handle-person').value = '管理员';
+                currentHandleAlarmId = '';
+            }
+        }
+
+        // 打开处理意见弹窗
+        function openHandleModal(alarmId) {
+            currentHandleAlarmId = alarmId;
+            const modal = document.getElementById('handleAlarmModal');
+            document.getElementById('handle-modal-title').textContent = `处理告警 - ${alarmId}`;
+            document.getElementById('current-handle-alarm-id').value = alarmId;
+            
+            // 设置当前时间为默认处理时间
+            const now = new Date();
+            const dateTimeValue = now.toISOString().slice(0, 16);
+            document.getElementById('handle-time').value = dateTimeValue;
+            
+            // 显示模态框
+            modal.classList.add('active');
+        }
+
+        // 提交处理意见表单
+        function submitHandleForm() {
+            const alarmId = currentHandleAlarmId;
+            const opinion = document.getElementById('handle-opinion').value.trim();
+            const person = document.getElementById('handle-person').value.trim();
+            const time = document.getElementById('handle-time').value;
+
+            // 表单验证
+            if (!opinion) {
+                alert('请填写处理意见！');
+                document.getElementById('handle-opinion').focus();
+                return;
+            }
+            
+            if (!person) {
+                alert('请填写处理人！');
+                document.getElementById('handle-person').focus();
+                return;
+            }
+            
+            if (!time) {
+                alert('请选择处理时间！');
+                document.getElementById('handle-time').focus();
+                return;
+            }
+
+            // 格式化处理时间
+            const formattedTime = time.replace('T', ' ');
+            
+            // 拼接完整的处理记录
+            const handleRecord = `${opinion} 处理人：${person}，处理时间：${formattedTime}`;
+            
+            // 更新告警详情
+            viewAlarmDetail(alarmId);
+            document.getElementById('detail-handle-record').value = handleRecord;
+            document.getElementById('detail-handle-record').disabled = false;
+            document.getElementById('detail-alarm-status').className = 'status-badge status-normal';
+            document.getElementById('detail-alarm-status').textContent = '已处理';
+            
+            // 隐藏详情页的处理按钮
+            document.getElementById('detail-handle-btn').style.display = 'none';
+            
+            // 关闭处理弹窗
+            closeModal('handleAlarmModal');
+            
+            // 提示处理完成
+            alert(`告警 ${alarmId} 已处理完成！`);
+            
+            // 更新列表中的按钮显示
+            const rows = document.querySelectorAll('.data-table tbody tr');
+            rows.forEach(row => {
+                const td = row.querySelector('td:first-child');
+                if (td && td.textContent === alarmId) {
+                    // 更新状态显示
+                    const statusTd = row.querySelector('td:nth-child(7)');
+                    statusTd.innerHTML = '<span class="status-badge status-normal">已处理</span>';
+                    
+                    // 移除处理按钮
+                    const actionTd = row.querySelector('td:last-child');
+                    const handleBtn = actionTd.querySelector('.btn-secondary');
+                    if (handleBtn) {
+                        handleBtn.remove();
+                    }
+                }
+            });
+        }
+
+        // 页面切换（保留框架）
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+                this.classList.add('active');
+                const pageId = `page-${this.dataset.page}`;
+                document.querySelectorAll('.page-section').forEach(section => {
+                    section.classList.remove('active');
+                });
+                const targetPage = document.getElementById(pageId);
+                if (targetPage) {
+                    targetPage.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

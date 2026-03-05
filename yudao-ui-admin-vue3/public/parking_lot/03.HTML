@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在场车辆管理系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        body {
+            background-color: #f5f7fa;
+            padding: 0;
+            color: #303133;
+        }
+        /* 顶部导航 */
+        .header {
+            background-color: #1e293b;
+            color: #fff;
+            padding: 0 20px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background-color: #409eff;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: #409eff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+        
+        /* 主容器 */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+        /* 侧边菜单 */
+        .sidebar {
+            width: 200px;
+            background-color: #fff;
+            border-right: 1px solid #e8e8e8;
+            padding-top: 20px;
+        }
+        .menu-item {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            color: #606266;
+            transition: all 0.2s;
+        }
+        .menu-item.active {
+            background-color: #ecf5ff;
+            color: #409eff;
+            border-right: 3px solid #409eff;
+        }
+        .menu-item:hover {
+            background-color: #f5f7fa;
+        }
+        .menu-icon {
+            width: 18px;
+            height: 18px;
+        }
+        
+        /* 内容区域 */
+        .content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .page-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* 数据统计卡片 */
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .stat-title {
+            font-size: 14px;
+            color: #606266;
+            margin-bottom: 8px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #303133;
+        }
+        .stat-value.primary {
+            color: #409eff;
+        }
+        .stat-value.success {
+            color: #67c23a;
+        }
+        .stat-value.warning {
+            color: #e6a23c;
+        }
+        .stat-value.danger {
+            color: #f56c6c;
+        }
+        .stat-desc {
+            font-size: 12px;
+            color: #909399;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        /* 搜索栏优化 */
+        .search-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .search-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .search-item label {
+            font-size: 14px;
+            color: #606266;
+        }
+        .search-item input,
+        .search-item select {
+            height: 40px;
+            padding: 0 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #606266;
+            background-color: #fff;
+            min-width: 180px;
+        }
+        .search-item input:focus,
+        .search-item select:focus {
+            border-color: #409eff;
+            outline: none;
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .btn {
+            height: 40px;
+            padding: 0 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background-color: #409eff;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background-color: #66b1ff;
+        }
+        .btn-default {
+            background-color: #fff;
+            color: #606266;
+            border: 1px solid #dcdfe6;
+        }
+        .btn-default:hover {
+            color: #409eff;
+            border-color: #c6e2ff;
+        }
+        .btn-danger {
+            background-color: #f56c6c;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background-color: #f78989;
+        }
+        
+        /* 表格区域 */
+        .table-section {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid #e8e8e8;
+        }
+        .table-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 18px;
+            font-weight: 500;
+            color: #303133;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background-color: #ecf5ff;
+            color: #409eff;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .table-actions {
+            display: flex;
+            gap: 12px;
+        }
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        thead {
+            background-color: #fafafa;
+        }
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #ebeef5;
+        }
+        th {
+            font-weight: 500;
+            color: #606266;
+        }
+        tbody tr:hover {
+            background-color: #f5f7fa;
+        }
+        
+        /* 状态样式 */
+        .status-normal {
+            display: inline-block;
+            padding: 4px 8px;
+            background-color: #f0f9ff;
+            color: #13c2c2;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-warning {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background-color: #fdf6ec;
+            color: #e6a23c;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-danger {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background-color: #fef0f0;
+            color: #f56c6c;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background-color: #f4f4ff;
+            color: #722ed1;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-success {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background-color: #f0f9ff;
+            color: #67c23a;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-info .count {
+            background-color: #722ed1;
+            color: #fff;
+            padding: 0 4px;
+            border-radius: 2px;
+            font-size: 11px;
+        }
+        
+        /* 自定义样式 */
+        .plate-number {
+            color: #409eff;
+            font-weight: 500;
+        }
+        .vehicle-type {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .vehicle-temp {
+            background-color: #f0f9ff;
+            color: #13c2c2;
+        }
+        .vehicle-monthly {
+            background-color: #f9f0ff;
+            color: #722ed1;
+        }
+        .vehicle-inner {
+            background-color: #e8f4ec;
+            color: #52c41a;
+        }
+        .vehicle-visitor {
+            background-color: #fff7e6;
+            color: #fa8c16;
+        }
+        .duration-green {
+            color: #67c23a;
+        }
+        .duration-red {
+            color: #f56c6c;
+        }
+        .duration-orange {
+            color: #e6a23c;
+        }
+        .fee {
+            color: #f56c6c;
+            font-weight: 500;
+        }
+        .fee-free {
+            color: #67c23a;
+        }
+        .photo-placeholder {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #c0c4cc;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .photo-placeholder:hover {
+            border-color: #409eff;
+        }
+        .btn-link {
+            color: #409eff;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 4px;
+        }
+        .btn-link:hover {
+            color: #66b1ff;
+        }
+        .btn-handle {
+            color: #f56c6c;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 4px;
+        }
+        .btn-handle:hover {
+            color: #f78989;
+        }
+        
+        /* 弹窗样式 */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: #fff;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e8e8e8;
+        }
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .modal-close {
+            cursor: pointer;
+            font-size: 20px;
+            color: #909399;
+        }
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e8e8e8;
+        }
+        
+        /* 催缴弹窗样式 */
+        .reminder-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .form-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .form-item label {
+            font-size: 14px;
+            color: #303133;
+            font-weight: 500;
+        }
+        .form-item input, .form-item textarea, .form-item select {
+            padding: 10px 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .form-item textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        .reminder-methods {
+            display: flex;
+            gap: 16px;
+            margin: 10px 0;
+        }
+        .reminder-method {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        /* 详情页面样式 */
+        .detail-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .detail-label {
+            font-size: 13px;
+            color: #909399;
+        }
+        .detail-value {
+            font-size: 14px;
+            color: #303133;
+            font-weight: 500;
+        }
+        .visitor-info {
+            background-color: #f8f9fa;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .visitor-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #409eff;
+        }
+        
+        /* 图片预览 */
+        .photo-preview {
+            max-width: 100%;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .photos-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+        .photo-card {
+            border: 1px solid #e8e8e8;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .photo-card-title {
+            font-size: 14px;
+            color: #606266;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        
+        /* 分页样式 */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            gap: 8px;
+        }
+        .page-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 4px;
+            border: 1px solid #dcdfe6;
+            background-color: #fff;
+            color: #606266;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .page-btn:hover {
+            border-color: #409eff;
+            color: #409eff;
+        }
+        .page-btn.active {
+            background-color: #409eff;
+            color: #fff;
+            border-color: #409eff;
+        }
+        .page-btn.disabled {
+            color: #c0c4cc;
+            cursor: not-allowed;
+            border-color: #e8e8e8;
+        }
+        .page-btn.disabled:hover {
+            border-color: #e8e8e8;
+            color: #c0c4cc;
+        }
+        
+        /* 高级搜索样式 */
+        .advanced-search {
+            display: none;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px dashed #e8e8e8;
+            width: 100%;
+        }
+        .advanced-search.show {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        
+        /* 操作列样式 */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        /* 响应式适配 */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 60px;
+            }
+            .menu-item span {
+                display: none;
+            }
+            .stats-cards {
+                grid-template-columns: 1fr;
+            }
+            .search-bar {
+                gap: 10px;
+            }
+            .search-item {
+                width: 100%;
+            }
+            .reminder-methods {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .photos-container {
+                grid-template-columns: 1fr;
+            }
+            .action-buttons {
+                flex-direction: column;
+                gap: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">🚗</div>
+            <span>智慧停车管理系统</span>
+        </div>
+        <div class="user-info">
+            <span>管理员</span>
+            <div class="user-avatar">管</div>
+        </div>
+    </div>
+    
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 侧边菜单 -->
+        <div class="sidebar">
+            <div class="menu-item" id="menu-monitor">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M928 160H96c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h832c17.7 0 32-14.3 32-32V192c0-17.7-14.3-32-32-32zM480 832H160V256h320v576zm128-640H160v-64h448v64zm320 640H608V256h320v576z"/>
+                </svg>
+                <span>在场车辆监控</span>
+            </div>
+            <div class="menu-item active" id="menu-records">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M832 64H192c-17.7 0-32 14.3-32 32v832c0 17.7 14.3 32 32 32h640c17.7 0 32-14.3 32-32V96c0-17.7-14.3-32-32-32zM648.3 426.8L537.9 345.5c-3.1-2.3-7.3-2.3-10.4 0L375.7 426.8a8.32 8.32 0 0 0-1.7 11.9l89.9 118.8c3.1 4.1 9.2 4.1 12.3 0l142.4-188.3a8.32 8.32 0 0 0-1.7-11.9z"/>
+                </svg>
+                <span>出入场记录</span>
+            </div>
+            <div class="menu-item" id="menu-parking">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M864 256H736v-64c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v64H416v-64c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v64H160c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h704c17.7 0 32-14.3 32-32V288c0-17.7-14.3-32-32-32zM640 832H384c-17.7 0-32-14.3-32-32V480c0-17.7 14.3-32 32-32h256c17.7 0 32 14.3 32 32v320c0 17.7-14.3 32-32 32zM352 384h320v64H352v-64z"/>
+                </svg>
+                <span>收费管理</span>
+            </div>
+            <div class="menu-item" id="menu-report">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M896 112H128c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h768c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32zM792 768H232V248h560v520zM232 168h246v48h-246v-48zm560 0h-246v48h246v-48zM232 848v48h560v-48H232z"/>
+                </svg>
+                <span>报表统计</span>
+            </div>
+            <div class="menu-item" id="menu-settings">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M928 160H96c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h832c17.7 0 32-14.3 32-32V192c0-17.7-14.3-32-32-32zm-40 656H136V240h752v576zM480 384c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm192-384c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-8v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64z"/>
+                </svg>
+                <span>系统设置</span>
+            </div>
+        </div>
+        
+        <!-- 内容区域 -->
+        <div class="content">
+            <!-- 在场车辆监控页面 -->
+            <div id="page-monitor" style="display: none;">
+                <div class="page-title">在场车辆监控</div>
+                
+                <!-- 数据统计卡片 -->
+                <div class="stats-cards">
+                    <div class="stat-card">
+                        <div class="stat-title">在场车辆总数</div>
+                        <div class="stat-value primary" id="totalVehicles">4</div>
+                        <div class="stat-desc">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 19V5M5 12l7 7 7-7"/>
+                            </svg>
+                            实时更新 · 最后更新：2026-01-16 15:00:00
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">总车位数</div>
+                        <div class="stat-value">500</div>
+                        <div class="stat-desc">固定车位：450 · 临时车位：50</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">已用车位</div>
+                        <div class="stat-value warning">386</div>
+                        <div class="stat-desc">占用率：77.2%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">剩余车位</div>
+                        <div class="stat-value success">114</div>
+                        <div class="stat-desc">临时车位剩余：12</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">今日收费总额</div>
+                        <div class="stat-value danger">¥12,856.00</div>
+                        <div class="stat-desc">临时车：¥9,680 · 月卡车：¥3,176</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">今日异常记录</div>
+                        <div class="stat-value danger">3</div>
+                        <div class="stat-desc">冲卡：1 · 无牌车：2</div>
+                    </div>
+                </div>
+                
+                <!-- 搜索栏 -->
+                <div class="search-bar">
+                    <div class="search-item">
+                        <label>车牌号码</label>
+                        <input type="text" placeholder="请输入车牌号" id="plateNumberInput">
+                    </div>
+                    <div class="search-item">
+                        <label>车辆类型</label>
+                        <select id="vehicleTypeSelect">
+                            <option value="all">全部类型</option>
+                            <option value="temp">临时车</option>
+                            <option value="monthly">月卡车</option>
+                            <option value="inner">内部车</option>
+                            <option value="visitor">访客车</option>
+                        </select>
+                    </div>
+                    <div class="search-item">
+                        <label>预警类型</label>
+                        <select id="warningTypeSelect">
+                            <option value="all">全部类型</option>
+                            <option value="space">余位不足预警</option>
+                            <option value="blacklist">黑名单预警</option>
+                            <option value="repeat">反复进场预警</option>
+                            <option value="longtime">长时间停车预警</option>
+                            <option value="noplate">无牌车预警</option>
+                            <option value="device">设备离线预警</option>
+                        </select>
+                    </div>
+                    <div class="search-item">
+                        <label>出入口</label>
+                        <select id="entranceSelect">
+                            <option value="all">全部出入口</option>
+                            <option value="east">东门</option>
+                            <option value="west">西门</option>
+                            <option value="south">南门</option>
+                            <option value="north">北门</option>
+                        </select>
+                    </div>
+                    <div class="search-item">
+                        <label>进场时间</label>
+                        <input type="text" placeholder="年/月/日" onfocus="(this.type='date')" onblur="if(!this.value) this.type='text'" id="entranceTimeInput">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="searchBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M11 19C15.4183 19 19 15.4183 19 11C19 6.58172 15.4183 3 11 3C6.58172 3 3 6.58172 3 11C3 15.4183 6.58172 19 11 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M21 21L16.65 16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            搜索
+                        </button>
+                        <button class="btn btn-default" id="resetBtn">重置</button>
+                        <button class="btn btn-default" id="remoteControlBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M18 9.5V6C18 5.46957 17.7893 4.96086 17.4142 4.58579C17.0391 4.21071 16.5304 4 16 4H8C7.46957 4 6.96086 4.21071 6.58579 4.58579C6.21071 4.96086 6 5.46957 6 6V9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M6 14.5V18C6 18.5304 6.21071 19.0391 6.58579 19.4142C6.96086 19.7893 7.46957 20 8 20H16C16.5304 20 17.0391 19.7893 17.4142 19.4142C17.7893 19.0391 18 18.5304 18 18V14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M3 12H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            远程开闸
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 表格区域 -->
+                <div class="table-section">
+                    <div class="table-header">
+                        <div class="table-title">
+                            在场车辆列表
+                            <span class="badge">实时更新</span>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-default" id="exportBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                导出清单
+                            </button>
+                            <button class="btn btn-default" id="refreshBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M23 4V10H17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M1 20V14H7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M3.51 9.51C6.39999 6.63 11.28 6.63 14.16 9.51C16.33 11.68 17.41 14.42 17.41 16.18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M20.49 14.49C17.6 17.37 12.72 17.37 9.84 14.49C7.67 12.32 6.59 9.58 6.59 7.82" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                刷新数据
+                            </button>
+                            <button class="btn btn-danger" id="abnormalRecordBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                异常登记
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="vehicleTable">
+                            <thead>
+                                <tr>
+                                    <th>序号</th>
+                                    <th>进场照片</th>
+                                    <th>车牌号码</th>
+                                    <th>车辆类型</th>
+                                    <th>出入口</th>
+                                    <th>进场时间</th>
+                                    <th>停车时长</th>
+                                    <th>当前费用</th>
+                                    <th>预警状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td><div class="photo-placeholder" onclick="showPhotoPreview('in', 1)">📷</div></td>
+                                    <td><span class="plate-number">粤BD12345</span></td>
+                                    <td><span class="vehicle-type vehicle-temp">临时车</span></td>
+                                    <td>东门</td>
+                                    <td>2026-01-16 14:23:15</td>
+                                    <td><span class="duration-green">30分钟</span></td>
+                                    <td><span class="fee">¥5.00</span></td>
+                                    <td><span class="status-normal">正常</span></td>
+                                    <td>
+                                        <button class="btn-link" onclick="viewVehicleDetail(1)">查看</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td><div class="photo-placeholder" onclick="showPhotoPreview('in', 2)">📷</div></td>
+                                    <td><span class="plate-number">粤B66666</span></td>
+                                    <td><span class="vehicle-type vehicle-temp">临时车</span></td>
+                                    <td>西门</td>
+                                    <td>2026-01-15 08:30:00</td>
+                                    <td><span class="duration-red">30小时15分</span></td>
+                                    <td><span class="fee">¥150.00</span></td>
+                                    <td><span class="status-warning">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                        长时间停车
+                                    </span></td>
+                                    <td>
+                                        <button class="btn-link" onclick="viewVehicleDetail(2)">查看</button>
+                                        <button class="btn-handle" onclick="handleWarning(2)">处理</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>3</td>
+                                    <td><div class="photo-placeholder" onclick="showPhotoPreview('in', 3)">📷</div></td>
+                                    <td><span class="plate-number">粤B77777</span></td>
+                                    <td><span class="vehicle-type vehicle-temp">临时车</span></td>
+                                    <td>南门</td>
+                                    <td>2026-01-16 02:15:30</td>
+                                    <td><span class="duration-orange">12小时20分</span></td>
+                                    <td><span class="fee">¥45.00</span></td>
+                                    <td><span class="status-danger">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                        异常停留
+                                    </span></td>
+                                    <td>
+                                        <button class="btn-link" onclick="viewVehicleDetail(3)">查看</button>
+                                        <button class="btn-handle" onclick="handleWarning(3)">处理</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>4</td>
+                                    <td><div class="photo-placeholder" onclick="showPhotoPreview('in', 4)">📷</div></td>
+                                    <td><span class="plate-number">粤B88888</span></td>
+                                    <td><span class="vehicle-type vehicle-monthly">月卡车</span></td>
+                                    <td>北门</td>
+                                    <td>2026-01-16 13:45:00</td>
+                                    <td><span class="duration-green">45分钟</span></td>
+                                    <td><span class="fee-free">¥0.00</span></td>
+                                    <td><span class="status-info">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M16 3H8C6.89543 3 6 3.89543 6 5V19C6 20.1046 6.89543 21 8 21H16C17.1046 21 18 20.1046 18 19V5C18 3.89543 17.1046 3 16 3Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            <path d="M12 15V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            <path d="M12 7V11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                        反复进出
+                                        <span class="count">5次</span>
+                                    </span></td>
+                                    <td>
+                                        <button class="btn-link" onclick="viewVehicleDetail(4)">查看</button>
+                                        <button class="btn-handle" onclick="handleWarning(4)">处理</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 出入场记录页面 -->
+            <div id="page-records" style="display: block;">
+                <div class="page-title">出入场记录</div>
+                
+                <!-- 数据统计卡片 -->
+                <div class="stats-cards">
+                    <div class="stat-card">
+                        <div class="stat-title">今日入场总数</div>
+                        <div class="stat-value primary">128</div>
+                        <div class="stat-desc">较昨日 +12%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">今日出场总数</div>
+                        <div class="stat-value success">115</div>
+                        <div class="stat-desc">较昨日 +8%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">今日收费笔数</div>
+                        <div class="stat-value warning">98</div>
+                        <div class="stat-desc">收费率：85.2%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">今日异常记录</div>
+                        <div class="stat-value danger">7</div>
+                        <div class="stat-desc">冲卡：3 · 无牌：4</div>
+                    </div>
+                </div>
+                
+                <!-- 搜索栏 -->
+                <div class="search-bar">
+                    <div class="search-item">
+                        <label>车牌号码</label>
+                        <input type="text" placeholder="请输入车牌号" id="recordPlateInput">
+                    </div>
+                    <div class="search-item">
+                        <label>车辆类型</label>
+                        <select id="recordVehicleType">
+                            <option value="all">全部类型</option>
+                            <option value="temp">临时车</option>
+                            <option value="monthly">月卡车</option>
+                            <option value="inner">内部车</option>
+                            <option value="visitor">访客车</option>
+                        </select>
+                    </div>
+                    <div class="search-item">
+                        <label>出入类型</label>
+                        <select id="recordType">
+                            <option value="all">全部类型</option>
+                            <option value="in">入场</option>
+                            <option value="out">出场</option>
+                        </select>
+                    </div>
+                    <div class="search-item">
+                        <label>支付状态</label>
+                        <select id="payStatus">
+                            <option value="all">全部状态</option>
+                            <option value="paid">已支付</option>
+                            <option value="unpaid">未支付</option>
+                            <option value="free">免费</option>
+                        </select>
+                    </div>
+                    <div class="search-item">
+                        <label>开始时间</label>
+                        <input type="text" placeholder="年/月/日" onfocus="(this.type='date')" onblur="if(!this.value) this.type='text'" id="startTimeInput">
+                    </div>
+                    <div class="search-item">
+                        <label>结束时间</label>
+                        <input type="text" placeholder="年/月/日" onfocus="(this.type='date')" onblur="if(!this.value) this.type='text'" id="endTimeInput">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="searchRecordBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M11 19C15.4183 19 19 15.4183 19 11C19 6.58172 15.4183 3 11 3C6.58172 3 3 6.58172 3 11C3 15.4183 6.58172 19 11 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M21 21L16.65 16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            搜索
+                        </button>
+                        <button class="btn btn-default" id="resetRecordBtn">重置</button>
+                        <button class="btn btn-default" id="advancedSearchBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 3V21M3 12H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            高级搜索
+                        </button>
+                    </div>
+                    
+                    <!-- 高级搜索区域 -->
+                    <div class="advanced-search" id="advancedSearchArea">
+                        <div class="search-item">
+                            <label>收费方式</label>
+                            <select id="paymentMethod">
+                                <option value="all">全部方式</option>
+                                <option value="wechat">微信支付</option>
+                                <option value="alipay">支付宝</option>
+                                <option value="cash">现金</option>
+                                <option value="card">刷卡</option>
+                            </select>
+                        </div>
+                        <div class="search-item">
+                            <label>停车时长</label>
+                            <select id="parkingDuration">
+                                <option value="all">全部时长</option>
+                                <option value="short">1小时以内</option>
+                                <option value="medium">1-4小时</option>
+                                <option value="long">4-12小时</option>
+                                <option value="xl">12小时以上</option>
+                            </select>
+                        </div>
+                        <div class="search-item">
+                            <label>收费金额</label>
+                            <select id="feeRange">
+                                <option value="all">全部金额</option>
+                                <option value="0-10">0-10元</option>
+                                <option value="10-50">10-50元</option>
+                                <option value="50-100">50-100元</option>
+                                <option value="100+">100元以上</option>
+                            </select>
+                        </div>
+                        <div class="search-item">
+                            <label>操作员</label>
+                            <input type="text" placeholder="请输入操作员姓名" id="operatorInput">
+                        </div>
+                        <div class="search-item">
+                            <label>备注关键词</label>
+                            <input type="text" placeholder="请输入备注关键词" id="remarkInput">
+                        </div>
+                        <div class="search-item">
+                            <label>是否异常</label>
+                            <select id="abnormalStatus">
+                                <option value="all">全部</option>
+                                <option value="yes">异常</option>
+                                <option value="no">正常</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 表格区域 -->
+                <div class="table-section">
+                    <div class="table-header">
+                        <div class="table-title">
+                            出入场记录列表
+                            <span class="badge">今日</span>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-default" id="exportRecordBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                导出记录
+                            </button>
+                            <button class="btn btn-default" id="refreshRecordBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M23 4V10H17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M1 20V14H7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M3.51 9.51C6.39999 6.63 11.28 6.63 14.16 9.51C16.33 11.68 17.41 14.42 17.41 16.18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M20.49 14.49C17.6 17.37 12.72 17.37 9.84 14.49C7.67 12.32 6.59 9.58 6.59 7.82" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                刷新数据
+                            </button>
+                            <button class="btn btn-primary" id="importRecordBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M17 15V19C17 19.5304 16.7893 20.0391 16.4142 20.4142C16.0391 20.7893 15.5304 21 15 21H9C8.46957 21 7.96086 20.7893 7.58579 20.4142C7.21071 20.0391 7 19.5304 7 19V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M12 12L15 9M12 12L9 9M12 12V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                导入记录
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="recordTable">
+                            <thead>
+                                <tr>
+                                    <th>序号</th>
+                                    <th>车牌号码</th>
+                                    <th>车辆类型</th>
+                                    <th>入场照片</th>
+                                    <th>出场照片</th>
+                                    <th>入场时间</th>
+                                    <th>出场时间</th>
+                                    <th>停车时长</th>
+                                    <th>出入口</th>
+                                    <th>收费金额</th>
+                                    <th>支付状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td><span class="plate-number">粤A12345</span></td>
+                                    <td><span class="vehicle-type vehicle-temp">临时车</span></td>
+                                    <td><div class="photo-placeholder" onclick="showRecordPhoto('in', 1)">📷</div></td>
+                                    <td><div class="photo-placeholder" onclick="showRecordPhoto('out', 1)">📷</div></td>
+                                    <td>2026-01-16 08:15:20</td>
+                                    <td>2026-01-16 10:30:45</td>
+                                    <td>2小时15分</td>
+                                    <td>东门</td>
+                                    <td><span class="fee">¥10.00</span></td>
+                                    <td><span class="status-success">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                        已支付
+                                    </span></td>
+                                    <td class="action-buttons">
+                                        <button class="btn-link" onclick="viewRecordDetail(1)">详情</button>
+                                        <button class="btn-link" onclick="editRecord(1)">编辑</button>
+                                        <button class="btn-link" onclick="exportRecord(1)">导出</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td><span class="plate-number">
+<!-- 在body末尾添加完善的弹窗结构 -->
+<!-- 记录详情弹窗 -->
+<div class="modal" id="recordDetailModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">出入场记录详情</div>
+            <div class="modal-close" onclick="closeModal('recordDetailModal')">×</div>
+        </div>
+        <div class="modal-body">
+            <div id="recordDetailContent">
+                <!-- 详情内容将通过JS动态填充 -->
+                <div class="detail-section">
+                    <div class="detail-item">
+                        <div class="detail-label">车牌号码</div>
+                        <div class="detail-value plate-number" id="detailPlateNumber">粤A12345</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">车辆类型</div>
+                        <div class="detail-value" id="detailVehicleType"><span class="vehicle-type vehicle-temp">临时车</span></div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">入场时间</div>
+                        <div class="detail-value" id="detailInTime">2026-01-16 08:15:20</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">出场时间</div>
+                        <div class="detail-value" id="detailOutTime">2026-01-16 10:30:45</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">停车时长</div>
+                        <div class="detail-value" id="detailDuration">2小时15分</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">出入口</div>
+                        <div class="detail-value" id="detailEntrance">东门</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">收费金额</div>
+                        <div class="detail-value fee" id="detailFee">¥10.00</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">支付状态</div>
+                        <div class="detail-value" id="detailPayStatus"><span class="status-success">已支付</span></div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">支付方式</div>
+                        <div class="detail-value" id="detailPayMethod">微信支付</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">支付时间</div>
+                        <div class="detail-value" id="detailPayTime">2026-01-16 10:31:20</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">操作员</div>
+                        <div class="detail-value" id="detailOperator">系统自动</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">交易单号</div>
+                        <div class="detail-value" id="detailTradeNo">wx202601161031200000012345</div>
+                    </div>
+                </div>
+
+                <!-- 费用明细 -->
+                <div style="margin: 20px 0;">
+                    <h4 style="margin-bottom: 10px; color: #303133;">费用明细</h4>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background-color: #f5f7fa;">
+                                <th style="padding: 8px; text-align: left; border: 1px solid #ebeef5;">计费项</th>
+                                <th style="padding: 8px; text-align: right; border: 1px solid #ebeef5;">时长</th>
+                                <th style="padding: 8px; text-align: right; border: 1px solid #ebeef5;">单价</th>
+                                <th style="padding: 8px; text-align: right; border: 1px solid #ebeef5;">金额</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ebeef5;">首小时费用</td>
+                                <td style="padding: 8px; text-align: right; border: 1px solid #ebeef5;">1小时</td>
+                                <td style="padding: 8px; text-align: right; border: 1px solid #ebeef5;">¥5.00/小时</td>
+                                <td style="padding: 8px; text-align: right; border: 1px solid #ebeef5;">¥5.00</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ebeef5;">第二小时费用</td>
+                                <td style="padding: 8px; text-align: right; border: 1px solid #ebeef5;">1小时15分</td>
+                                <td style="padding: 8px; text-align: right; border: 1px solid #ebeef5;">¥4.00/小时</td>
+                                <td style="padding: 8px; text-align: right; border: 1px solid #ebeef5;">¥5.00</td>
+                            </tr>
+                            <tr style="font-weight: 600;">
+                                <td style="padding: 8px; border: 1px solid #ebeef5;" colspan="3">合计</td>
+                                <td style="padding: 8px; text-align: right; border: 1px solid #ebeef5;">¥10.00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 车辆照片展示 -->
+                <div class="photos-container">
+                    <div class="photo-card">
+                        <div class="photo-card-title">入场照片</div>
+                        <img src="https://picsum.photos/seed/car-in-1/400/200" alt="入场照片" class="photo-preview">
+                    </div>
+                    <div class="photo-card">
+                        <div class="photo-card-title">出场照片</div>
+                        <img src="https://picsum.photos/seed/car-out-1/400/200" alt="出场照片" class="photo-preview">
+                    </div>
+                </div>
+
+                <!-- 备注信息 -->
+                <div style="margin-top: 20px;">
+                    <h4 style="margin-bottom: 10px; color: #303133;">备注信息</h4>
+                    <div style="background-color: #f8f9fa; padding: 12px; border-radius: 4px; min-height: 60px;" id="detailRemark">
+                        无特殊备注，正常出入场
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-default" onclick="printRecordDetail()">打印详情</button>
+            <button class="btn btn-default" onclick="exportRecordDetail()">导出PDF</button>
+            <button class="btn btn-primary" onclick="closeModal('recordDetailModal')">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- 照片预览弹窗 -->
+<div class="modal" id="photoPreviewModal">
+    <div class="modal-content" style="max-width: 90%; width: auto;">
+        <div class="modal-header">
+            <div class="modal-title" id="photoPreviewTitle">照片预览</div>
+            <div class="modal-close" onclick="closeModal('photoPreviewModal')">×</div>
+        </div>
+        <div class="modal-body" style="text-align: center;">
+            <img id="previewImage" src="" alt="车辆照片" style="max-width: 100%; max-height: 70vh; border-radius: 4px;">
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-default" onclick="downloadPhoto()">下载照片</button>
+            <button class="btn btn-primary" onclick="closeModal('photoPreviewModal')">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑记录弹窗 -->
+<div class="modal" id="editRecordModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">编辑出入场记录</div>
+            <div class="modal-close" onclick="closeModal('editRecordModal')">×</div>
+        </div>
+        <div class="modal-body">
+            <div class="reminder-form">
+                <div class="form-item">
+                    <label>车牌号码</label>
+                    <input type="text" id="editPlateNumber" value="粤A12345" readonly>
+                </div>
+                <div class="form-item">
+                    <label>入场时间</label>
+                    <input type="datetime-local" id="editInTime" value="2026-01-16T08:15:20">
+                </div>
+                <div class="form-item">
+                    <label>出场时间</label>
+                    <input type="datetime-local" id="editOutTime" value="2026-01-16T10:30:45">
+                </div>
+                <div class="form-item">
+                    <label>收费金额</label>
+                    <input type="number" step="0.01" id="editFee" value="10.00">
+                </div>
+                <div class="form-item">
+                    <label>支付状态</label>
+                    <select id="editPayStatus">
+                        <option value="paid" selected>已支付</option>
+                        <option value="unpaid">未支付</option>
+                        <option value="free">免费</option>
+                    </select>
+                </div>
+                <div class="form-item">
+                    <label>支付方式</label>
+                    <select id="editPayMethod">
+                        <option value="wechat" selected>微信支付</option>
+                        <option value="alipay">支付宝</option>
+                        <option value="cash">现金</option>
+                        <option value="card">刷卡</option>
+                    </select>
+                </div>
+                <div class="form-item">
+                    <label>备注信息</label>
+                    <textarea id="editRemark">无特殊备注，正常出入场</textarea>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-default" onclick="closeModal('editRecordModal')">取消</button>
+            <button class="btn btn-primary" onclick="saveRecordEdit()">保存修改</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// 菜单切换功能
+document.getElementById('menu-monitor').addEventListener('click', function() {
+    document.getElementById('page-monitor').style.display = 'block';
+    document.getElementById('page-records').style.display = 'none';
+    // 更新菜单激活状态
+    document.querySelectorAll('.menu-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    this.classList.add('active');
+});
+
+document.getElementById('menu-records').addEventListener('click', function() {
+    document.getElementById('page-monitor').style.display = 'none';
+    document.getElementById('page-records').style.display = 'block';
+    // 更新菜单激活状态
+    document.querySelectorAll('.menu-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    this.classList.add('active');
+});
+
+// 高级搜索切换
+document.getElementById('advancedSearchBtn').addEventListener('click', function() {
+    const advancedArea = document.getElementById('advancedSearchArea');
+    advancedArea.classList.toggle('show');
+    this.innerHTML = advancedArea.classList.contains('show') 
+        ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3V21M3 12H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>收起高级搜索'
+        : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3V21M3 12H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>高级搜索';
+});
+
+// 弹窗操作函数
+function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+    modal.style.display = 'flex';
+    // 防止页面滚动
+    document.body.style.overflow = 'hidden';
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    modal.style.display = 'none';
+    // 恢复页面滚动
+    document.body.style.overflow = 'auto';
+}
+
+// 查看记录详情
+function viewRecordDetail(recordId) {
+    // 模拟根据ID加载数据
+    // 实际项目中这里会通过AJAX请求后端数据
+    openModal('recordDetailModal');
+    
+    // 可以根据recordId加载不同的记录数据
+    // 这里仅展示第一条记录的示例数据
+    if (recordId === 1) {
+        document.getElementById('detailPlateNumber').textContent = '粤A12345';
+        document.getElementById('detailVehicleType').innerHTML = '<span class="vehicle-type vehicle-temp">临时车</span>';
+        document.getElementById('detailInTime').textContent = '2026-01-16 08:15:20';
+        document.getElementById('detailOutTime').textContent = '2026-01-16 10:30:45';
+        document.getElementById('detailDuration').textContent = '2小时15分';
+        document.getElementById('detailEntrance').textContent = '东门';
+        document.getElementById('detailFee').textContent = '¥10.00';
+        document.getElementById('detailPayStatus').innerHTML = '<span class="status-success">已支付</span>';
+        document.getElementById('detailPayMethod').textContent = '微信支付';
+        document.getElementById('detailPayTime').textContent = '2026-01-16 10:31:20';
+        document.getElementById('detailOperator').textContent = '系统自动';
+        document.getElementById('detailTradeNo').textContent = 'wx202601161031200000012345';
+        document.getElementById('detailRemark').textContent = '无特殊备注，正常出入场';
+    }
+}
+
+// 查看照片预览
+function showRecordPhoto(type, recordId) {
+    const previewModal = document.getElementById('photoPreviewModal');
+    const previewImage = document.getElementById('previewImage');
+    const previewTitle = document.getElementById('photoPreviewTitle');
+    
+    // 设置预览标题和图片
+    previewTitle.textContent = type === 'in' ? '入场照片预览' : '出场照片预览';
+    previewImage.src = `https://picsum.photos/seed/car-${type}-${recordId}/800/400`;
+    
+    openModal('photoPreviewModal');
+}
+
+// 编辑记录
+function editRecord(recordId) {
+    openModal('editRecordModal');
+    // 这里可以根据recordId加载要编辑的数据
+}
+
+// 保存编辑
+function saveRecordEdit() {
+    // 模拟保存操作
+    alert('记录修改已保存！');
+    closeModal('editRecordModal');
+    // 实际项目中这里会发送AJAX请求保存数据
+}
+
+// 导出单条记录
+function exportRecord(recordId) {
+    alert(`正在导出记录 ${recordId} 的数据...`);
+    // 实际项目中这里会生成并下载Excel/PDF文件
+}
+
+// 打印详情
+function printRecordDetail() {
+    alert('正在打印记录详情...');
+    // 实际项目中可以使用window.print()或生成打印版本
+}
+
+// 导出PDF详情
+function exportRecordDetail() {
+    alert('正在导出PDF格式的记录详情...');
+    // 实际项目中可以使用jsPDF等库生成PDF
+}
+
+// 下载照片
+function downloadPhoto() {
+    alert('正在下载照片...');
+    // 实际项目中可以创建下载链接
+}
+
+// 其他辅助函数
+function showPhotoPreview(type, vehicleId) {
+    // 在场车辆照片预览
+    const previewModal = document.getElementById('photoPreviewModal');
+    const previewImage = document.getElementById('previewImage');
+    const previewTitle = document.getElementById('photoPreviewTitle');
+    
+    previewTitle.textContent = '进场照片预览';
+    previewImage.src = `https://picsum.photos/seed/car-in-${vehicleId}/800/400`;
+    
+    openModal('photoPreviewModal');
+}
+
+function viewVehicleDetail(vehicleId) {
+    // 查看在场车辆详情
+    alert(`查看车辆 ${vehicleId} 的详细信息`);
+}
+
+function handleWarning(vehicleId) {
+    // 处理预警
+    alert(`正在处理车辆 ${vehicleId} 的预警`);
+}
+</script>
+
+

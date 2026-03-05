@@ -47,6 +47,11 @@ public interface EpatrolPlanService {
     PageResult<EpatrolPlanDO> getPlanPage(EpatrolPlanPageReqVO pageReqVO);
 
     /**
+     * 获得巡更计划分页（包含详细信息：路线名称、人员名称）
+     */
+    PageResult<EpatrolPlanRespVO> getPlanPageWithDetails(EpatrolPlanPageReqVO pageReqVO);
+
+    /**
      * 获得所有执行中的计划
      */
     List<EpatrolPlanDO> getActivePlanList();
@@ -60,5 +65,14 @@ public interface EpatrolPlanService {
      * 生成每日任务（定时任务调用）
      */
     void generateDailyTasks();
+
+    /**
+     * 自动更新所有计划的状态
+     * 根据当前日期和计划的开始/结束日期自动计算状态：
+     * - 0: 未开始 (当前日期 < 开始日期)
+     * - 1: 执行中 (开始日期 <= 当前日期 <= 结束日期)
+     * - 2: 已过期 (当前日期 > 结束日期)
+     */
+    void updateAllPlanStatus();
 
 }

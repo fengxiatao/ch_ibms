@@ -6,12 +6,22 @@ const { default_headers } = config
 
 const request = (option: any) => {
   const { headersType, headers, ...otherOption } = option
+  
+  // 如果 data 是 FormData，不设置 Content-Type，让浏览器自动处理
+  const isFormData = otherOption.data instanceof FormData
+  const finalHeaders: Record<string, any> = { ...headers }
+  
+  if (!isFormData) {
+    finalHeaders['Content-Type'] = headersType || default_headers
+  }
+  // 如果是 FormData 且明确指定了 headersType，则使用指定的值
+  else if (headersType) {
+    finalHeaders['Content-Type'] = headersType
+  }
+  
   return service({
     ...otherOption,
-    headers: {
-      'Content-Type': headersType || default_headers,
-      ...headers
-    }
+    headers: finalHeaders
   })
 }
 export default {

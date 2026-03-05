@@ -27,7 +27,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.validation.annotation.Validated;
 
 import jakarta.annotation.Resource;
-import org.springframework.beans.factory.annotation.Qualifier;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -98,8 +97,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
      * 异步执行器 - 用于在 afterCommit 回调中真正异步提交任务
      * 避免 @Async 自调用问题
      */
-    @Resource
-    @Qualifier("accessDispatchExecutor")
+    @Resource(name = "accessDispatchExecutor")
     private Executor accessDispatchExecutor;
     
     // 正在执行的任务集合（用于取消任务）
@@ -275,6 +273,12 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
             
             List<IotAccessPersonCredentialDO> credentials = personService.getPersonCredentials(personId);
             
+            // 1.1 检查是否有有效凭证（Requirements: 无凭证时提示无法下发）
+            if (credentials == null || credentials.isEmpty()) {
+                log.warn("[dispatchPersonToDevice] 人员没有任何凭证，无法下发: personId={}", personId);
+                return DispatchResult.failure(-1, "该人员没有任何凭证，无法下发到设备");
+            }
+            
             // 2. 获取设备信息
             IotDeviceDO device = deviceService.getAccessDevice(deviceId);
             if (device == null) {
@@ -341,7 +345,10 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
             IotAccessDeviceCapabilityDO capability = capabilityService.getCapability(deviceId);
             
             // 7. 构造SDK数据结构
-            int[] doors = {0}; // 默认门0，实际应根据通道配置
+            // 根据权限组配置的 channelId 设置门权限
+            int[] doors = calculateDoors(personId, deviceId, channelId);
+            log.info("[dispatchPersonToDevice] 门权限: personId={}, deviceId={}, channelId={}, doors={}", 
+                    personId, deviceId, channelId, java.util.Arrays.toString(doors));
             NetAccessUserInfo userInfo = dataConverter.convertToUserInfo(person, credentials, null, doors);
             
             // 8. 下发用户信息
@@ -941,6 +948,70 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
     // ========== 私有方法 ==========
 
     /**
+     * 根据人员关联的权限组计算门权限数组
+     * 
+     * <p>一个人员可能关联多个权限组，每个权限组可能包含同一设备的不同通道。
+     * 此方法汇总所有权限组的通道配置，生成该人员在该设备上的门权限数组。</p>
+     * 
+     * @param personId  人员ID
+     * @param deviceId  设备ID
+     * @param channelId 当前下发的通道ID（可能为空，表示需要汇总所有通道）
+     * @return 门权限数组（门编号从0开始）
+     */
+    private int[] calculateDoors(Long personId, Long deviceId, Long channelId) {
+        Set<Integer> doorSet = new TreeSet<>(); // 使用 TreeSet 保持有序
+        
+        // 1. 获取人员关联的所有权限组
+        List<IotAccessPermissionGroupPersonDO> personGroups = permissionGroupService.getPersonGroups(personId);
+        
+        if (personGroups == null || personGroups.isEmpty()) {
+            // 没有权限组，使用传入的 channelId 或默认门0
+            if (channelId != null) {
+                doorSet.add(channelId.intValue());
+            } else {
+                doorSet.add(0);
+            }
+        } else {
+            // 2. 遍历所有权限组，收集该设备的所有通道
+            for (IotAccessPermissionGroupPersonDO pg : personGroups) {
+                List<IotAccessPermissionGroupDeviceDO> groupDevices = 
+                        permissionGroupService.getGroupDevices(pg.getGroupId());
+                
+                for (IotAccessPermissionGroupDeviceDO gd : groupDevices) {
+                    // 只处理当前设备的通道
+                    if (gd.getDeviceId().equals(deviceId)) {
+                        if (gd.getChannelId() != null) {
+                            // 通道ID对应门编号（通道ID从1开始，门编号从0开始）
+                            // 注意：大多数设备通道ID=1对应门0，通道ID=2对应门1
+                            int doorNo = gd.getChannelId().intValue() - 1;
+                            if (doorNo >= 0) {
+                                doorSet.add(doorNo);
+                            }
+                        } else {
+                            // channelId 为空表示设备所有通道，默认添加门0和门1
+                            doorSet.add(0);
+                            doorSet.add(1);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 3. 如果没有找到任何通道，使用当前下发的 channelId 或默认门0
+        if (doorSet.isEmpty()) {
+            if (channelId != null) {
+                int doorNo = channelId.intValue() - 1;
+                doorSet.add(Math.max(doorNo, 0));
+            } else {
+                doorSet.add(0);
+            }
+        }
+        
+        // 4. 转换为数组
+        return doorSet.stream().mapToInt(Integer::intValue).toArray();
+    }
+
+    /**
      * 创建任务明细
      */
     private List<IotAccessAuthTaskDetailDO> createTaskDetails(List<Long> personIds, 
@@ -1166,17 +1237,23 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
         // 使用 CredentialTypeConstants 的大小写不敏感比较方法
         if (CredentialTypeConstants.isFace(type)) {
             if (capability != null && capability.getSupFaceService() != 1) {
-                log.warn("[dispatchCredential] 设备不支持人脸: personId={}", person.getId());
+                log.warn("[dispatchCredential] 设备不支持人脸: personId={}, deviceId={}, capability.supFaceService={}", 
+                        person.getId(), deviceId, capability.getSupFaceService());
                 return false;
             }
+            log.info("[dispatchCredential] 开始转换人脸凭证: personId={}, credentialId={}, faceUrl={}", 
+                    person.getId(), credential.getId(), person.getFaceUrl());
+            
             NetAccessFaceInfo faceInfo = dataConverter.convertToFaceInfo(credential, person);
-            if (faceInfo == null || faceInfo.getFaceData() == null || faceInfo.getFaceData().length == 0) {
-                log.warn("[dispatchCredential] 人脸数据为空或加载失败: personId={}, credentialId={}", 
-                        person.getId(), credential.getId());
+            // 改为检查 faceUrl（推荐方式，由网关侧下载图片）
+            if (faceInfo == null || !org.springframework.util.StringUtils.hasText(faceInfo.getFaceUrl())) {
+                log.warn("[dispatchCredential] 人脸 URL 为空: personId={}, credentialId={}, faceInfo={}", 
+                        person.getId(), credential.getId(), 
+                        faceInfo != null ? "userId=" + faceInfo.getUserId() + ",faceUrl=" + faceInfo.getFaceUrl() : "null");
                 return false;
             }
-            log.info("[dispatchCredential] 开始下发人脸: personId={}, deviceId={}, faceDataLen={}", 
-                    person.getId(), deviceId, faceInfo.getFaceDataLen());
+            log.info("[dispatchCredential] 开始下发人脸: personId={}, deviceId={}, userId={}, faceUrl={}", 
+                    person.getId(), deviceId, faceInfo.getUserId(), faceInfo.getFaceUrl());
             return sendDispatchFaceCommand(deviceId, ip, port, faceInfo);
         }
         
@@ -1281,6 +1358,12 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
             String username = device != null ? getDeviceUsername(device) : "admin";
             String password = device != null ? getDevicePassword(device) : "";
             
+            // 详细日志：打印 faceInfo 内容（现在使用 faceUrl 而不是 faceData）
+            log.info("[sendDispatchFaceCommand] faceInfo详情: userId={}, faceUrl={}, faceIndex={}", 
+                    faceInfo != null ? faceInfo.getUserId() : "null",
+                    faceInfo != null ? faceInfo.getFaceUrl() : "null",
+                    faceInfo != null ? faceInfo.getFaceIndex() : "null");
+            
             // 构建命令参数，确保包含 deviceType 和登录凭据以支持按需连接
             Map<String, Object> params = new HashMap<>();
             params.put("deviceType", deviceType);  // 关键：传递设备类型
@@ -1302,7 +1385,8 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
                     .params(params)  // 包含 deviceType 和登录凭据
                     .build();
             
-            log.info("[sendDispatchFaceCommand] 发送命令: deviceType={}, deviceId={}", deviceType, deviceId);
+            log.info("[sendDispatchFaceCommand] 发送命令: deviceType={}, deviceId={}, userId={}", 
+                    deviceType, deviceId, faceInfo != null ? faceInfo.getUserId() : "null");
             
             AccessControlDeviceResponse response = messageBusClient.sendAndWait(command, 30);
             return response != null && Boolean.TRUE.equals(response.getSuccess());
@@ -1595,6 +1679,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
 
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
+            configDeviceType = config.getAccessDeviceType();
             supportVideo = config.getSupportVideo();
         } else if (device.getConfig() instanceof GenericDeviceConfig) {
             GenericDeviceConfig cfg = (GenericDeviceConfig) device.getConfig();

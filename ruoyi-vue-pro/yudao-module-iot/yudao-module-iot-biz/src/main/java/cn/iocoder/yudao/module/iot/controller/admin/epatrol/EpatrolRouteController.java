@@ -69,8 +69,7 @@ public class EpatrolRouteController {
     @Operation(summary = "获得巡更路线分页")
     @PreAuthorize("@ss.hasPermission('iot:epatrol-route:query')")
     public CommonResult<PageResult<EpatrolRouteRespVO>> getRoutePage(@Valid EpatrolRoutePageReqVO pageReqVO) {
-        PageResult<EpatrolRouteDO> pageResult = routeService.getRoutePage(pageReqVO);
-        return success(BeanUtils.toBean(pageResult, EpatrolRouteRespVO.class));
+        return success(routeService.getRoutePageWithPoints(pageReqVO));
     }
 
     @GetMapping("/list-all-enabled")

@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white p-20px dark-theme-page">
+  <div class="ai-square-page p-20px dark-theme-page">
     <!-- TODO @fan：style 建议换成 unocss -->
     <!-- TODO @fan：Search 可以换成 Icon 组件么？ -->
     <el-input
@@ -10,9 +10,13 @@
       :suffix-icon="Search"
       @keyup.enter="handleQuery"
     />
-    <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-10px bg-white shadow-[0_0_10px_rgba(0,0,0,0.1)]">
+    <div class="ai-square-grid grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-10px">
       <!-- TODO @fan：这个图片的风格，要不和 ImageCard.vue 界面一致？（只有卡片，没有操作）；因为看着更有相框的感觉~~~ -->
-      <div v-for="item in list" :key="item.id" class="relative overflow-hidden bg-gray-100 cursor-pointer transition-transform duration-300 hover:scale-105">
+      <div
+        v-for="item in list"
+        :key="item.id"
+        class="ai-square-item relative overflow-hidden cursor-pointer transition-transform duration-300 hover:scale-105"
+      >
         <img :src="item.picUrl" class="w-full h-auto block transition-transform duration-300 hover:scale-110" />
       </div>
     </div>
@@ -67,4 +71,15 @@ onMounted(async () => {
 
 <style scoped lang="scss">
 @use '@/styles/dark-theme.scss';
+
+.ai-square-grid {
+  padding: 10px;
+  border-radius: 8px;
+  background: #2d2d2d;
+  border: 1px solid #404040;
+}
+
+.ai-square-item {
+  background: #2d2d2d;
+}
 </style>

@@ -4,13 +4,19 @@ import cn.iocoder.yudao.module.iot.core.alarm.AlarmCidEventCodes;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.dal.dataobject.alarm.IotAlarmEventDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.alarm.IotAlarmHostDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.alarm.IotAlarmZoneDO;
 import cn.iocoder.yudao.module.iot.service.alarm.IotAlarmEventService;
 import cn.iocoder.yudao.module.iot.service.alarm.IotAlarmHostService;
 import cn.iocoder.yudao.module.iot.service.alarm.IotAlarmZoneService;
+import cn.iocoder.yudao.module.iot.websocket.IotWebSocketHandler;
+import cn.iocoder.yudao.module.iot.websocket.message.AlarmHostStatusMessage;
+import cn.iocoder.yudao.module.iot.websocket.message.IotMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.Resource;
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -44,6 +50,9 @@ public class AlarmDeviceEventHandler implements DeviceEventHandler {
     private final IotAlarmHostService alarmHostService;
     private final IotAlarmZoneService alarmZoneService;
     private final IotAlarmEventService alarmEventService;
+    
+    @Resource(name = "iotWebSocketHandler")
+    private IotWebSocketHandler webSocketHandler;
 
     @Override
     public String getDeviceType() {
@@ -125,6 +134,9 @@ public class AlarmDeviceEventHandler implements DeviceEventHandler {
             alarmZoneService.updateZoneStatusByDeviceIdAndZoneNo(deviceId, area, point, "ALARM");
             log.info("{} 防区报警状态已更新: deviceId={}, area={}, point={}, status=ALARM",
                     LOG_PREFIX, deviceId, area, point);
+            
+            // 【关键】推送 WebSocket 消息到前端
+            pushZoneAlarmStatusToWebSocket(deviceId, point, 1); // 1=报警中
         } else if (AlarmCidEventCodes.isZoneAlarmRestoreEvent(eventCode)) {
             // 防区报警恢复
             String area = getStringParam(params, "area");
@@ -132,6 +144,9 @@ public class AlarmDeviceEventHandler implements DeviceEventHandler {
             alarmZoneService.updateZoneStatusByDeviceIdAndZoneNo(deviceId, area, point, "NORMAL");
             log.info("{} 防区报警状态已恢复: deviceId={}, area={}, point={}, status=NORMAL",
                     LOG_PREFIX, deviceId, area, point);
+            
+            // 【关键】推送 WebSocket 消息到前端
+            pushZoneAlarmStatusToWebSocket(deviceId, point, 0); // 0=正常
         }
     }
 
@@ -227,7 +242,7 @@ public class AlarmDeviceEventHandler implements DeviceEventHandler {
                 .eventDesc(eventName)
                 .rawData(params.toString())
                 .isNewEvent(AlarmCidEventCodes.isAlarmEvent(eventCode))
-                .isHandled(false)
+                .status(0) // 0-未处理（统一使用 status 字段）
                 .build();
             // 从主机继承租户ID（由于 @Builder 不包含父类字段，需单独设置）
             eventDO.setTenantId(host.getTenantId() != null ? host.getTenantId() : 1L);
@@ -319,5 +334,68 @@ public class AlarmDeviceEventHandler implements DeviceEventHandler {
         }
         // 默认为 WARNING 级别
         return "WARNING";
+    }
+    
+    /**
+     * 【关键】推送防区报警状态到前端 WebSocket
+     * <p>
+     * 当设备上报防区报警/恢复事件时，实时推送给前端更新界面状态。
+     * </p>
+     * 
+     * @param deviceId 设备ID
+     * @param zoneNo   防区号（字符串，如 "003"）
+     * @param alarmStatus 报警状态：0=正常，1=报警中
+     */
+    private void pushZoneAlarmStatusToWebSocket(Long deviceId, String zoneNo, Integer alarmStatus) {
+        try {
+            // 1. 根据 deviceId 获取主机信息
+            IotAlarmHostDO host = alarmHostService.getAlarmHostByDeviceId(deviceId);
+            if (host == null) {
+                log.warn("{} 推送防区状态失败，未找到主机: deviceId={}", LOG_PREFIX, deviceId);
+                return;
+            }
+            
+            // 2. 根据主机ID和防区号获取防区信息
+            Integer zoneNoInt = parseIntSafe(zoneNo);
+            if (zoneNoInt == null) {
+                log.warn("{} 推送防区状态失败，防区号无效: zoneNo={}", LOG_PREFIX, zoneNo);
+                return;
+            }
+            
+            IotAlarmZoneDO zone = alarmZoneService.getZoneByHostIdAndZoneNo(host.getId(), zoneNoInt);
+            if (zone == null) {
+                log.warn("{} 推送防区状态失败，未找到防区: hostId={}, zoneNo={}", 
+                        LOG_PREFIX, host.getId(), zoneNoInt);
+                return;
+            }
+            
+            // 3. 构建防区状态消息
+            AlarmHostStatusMessage.ZoneStatus zoneStatus = AlarmHostStatusMessage.ZoneStatus.builder()
+                    .id(zone.getId())
+                    .zoneNo(zone.getZoneNo())
+                    .zoneName(zone.getZoneName())
+                    .armStatus(zone.getArmStatus())
+                    .alarmStatus(alarmStatus)
+                    .build();
+            
+            // 4. 构建主机状态消息（包含防区列表）
+            AlarmHostStatusMessage message = AlarmHostStatusMessage.builder()
+                    .hostId(host.getId())
+                    .account(host.getAccount())
+                    .hostName(host.getHostName())
+                    .alarmStatus(alarmStatus > 0 ? 1 : host.getAlarmStatus())
+                    .zones(Collections.singletonList(zoneStatus))
+                    .build();
+            
+            // 5. 推送到前端
+            webSocketHandler.broadcast(IotMessage.alarmHostStatus(message));
+            
+            log.info("{} 📡 已推送防区报警状态: hostId={}, zoneNo={}, alarmStatus={}", 
+                    LOG_PREFIX, host.getId(), zoneNoInt, alarmStatus);
+            
+        } catch (Exception e) {
+            log.error("{} 推送防区报警状态失败: deviceId={}, zoneNo={}, error={}", 
+                    LOG_PREFIX, deviceId, zoneNo, e.getMessage(), e);
+        }
     }
 }

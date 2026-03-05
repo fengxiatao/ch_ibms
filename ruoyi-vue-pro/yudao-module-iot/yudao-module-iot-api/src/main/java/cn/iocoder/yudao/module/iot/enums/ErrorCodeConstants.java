@@ -185,6 +185,10 @@ public interface ErrorCodeConstants {
     ErrorCode VISITOR_WHITELIST_NOT_EXISTS = new ErrorCode(1_050_037_001, "访客白名单不存在");
     ErrorCode VISITOR_WHITELIST_ALREADY_EXISTS = new ErrorCode(1_050_037_002, "访客白名单已存在");
 
+    // ========== 访客来访事由相关 1-050-089-000 ==========
+    ErrorCode VISITOR_REASON_NOT_EXISTS = new ErrorCode(1_050_089_001, "来访事由不存在");
+    ErrorCode VISITOR_REASON_NAME_EXISTS = new ErrorCode(1_050_089_002, "来访事由名称已存在");
+
     // ========== 访客黑名单相关 1-050-038-000 ==========
     ErrorCode VISITOR_BLACKLIST_NOT_EXISTS = new ErrorCode(1_050_038_001, "访客黑名单不存在");
     ErrorCode VISITOR_BLACKLIST_ALREADY_EXISTS = new ErrorCode(1_050_038_002, "访客黑名单已存在");
@@ -413,6 +417,10 @@ public interface ErrorCodeConstants {
     // ========== 月卡充值相关 1-050-087-000 ==========
     ErrorCode PARKING_MONTHLY_RECHARGE_NOT_EXISTS = new ErrorCode(1_050_087_001, "月卡充值记录不存在");
 
+    // ========== 停车场黑名单相关 1-050-095-000 ==========
+    ErrorCode PARKING_BLACKLIST_NOT_EXISTS = new ErrorCode(1_050_095_001, "黑名单车辆不存在");
+    ErrorCode PARKING_BLACKLIST_PLATE_EXISTS = new ErrorCode(1_050_095_002, "该车牌已在黑名单中");
+
     // ========== 微信支付相关 1-050-088-000 ==========
     ErrorCode WECHAT_AUTH_FAILED = new ErrorCode(1_050_088_001, "微信授权失败");
     ErrorCode WECHAT_PAY_FAILED = new ErrorCode(1_050_088_002, "微信支付失败");
@@ -439,6 +447,58 @@ public interface ErrorCodeConstants {
     // ========== 电子巡更-任务相关 1-050-094-000 ==========
     ErrorCode EPATROL_TASK_NOT_EXISTS = new ErrorCode(1_050_094_001, "巡更任务不存在");
     ErrorCode EPATROL_TASK_ALREADY_SUBMITTED = new ErrorCode(1_050_094_002, "巡更任务已提交");
+
+    // ========== 环境监测-传感器相关 1-050-095-000 ==========
+    ErrorCode ENV_SENSOR_NOT_EXISTS = new ErrorCode(1_050_095_001, "环境传感器不存在");
+    ErrorCode ENV_SENSOR_CODE_EXISTS = new ErrorCode(1_050_095_002, "传感器编码已存在");
+
+    // ========== 环境监测-告警相关 1-050-096-000 ==========
+    ErrorCode ENV_ALARM_NOT_EXISTS = new ErrorCode(1_050_096_001, "环境告警不存在");
+    ErrorCode ENV_ALARM_ALREADY_HANDLED = new ErrorCode(1_050_096_002, "环境告警已处理");
+
+    // ========== 智能照明-回路相关 1-050-097-000 ==========
+    ErrorCode LIGHTING_CIRCUIT_NOT_EXISTS = new ErrorCode(1_050_097_001, "照明回路不存在");
+    ErrorCode LIGHTING_CIRCUIT_CODE_EXISTS = new ErrorCode(1_050_097_002, "回路编码已存在");
+
+    // ========== 智能照明-场景相关 1-050-098-000 ==========
+    ErrorCode LIGHTING_SCENE_NOT_EXISTS = new ErrorCode(1_050_098_001, "照明场景不存在");
+    ErrorCode LIGHTING_SCENE_CODE_EXISTS = new ErrorCode(1_050_098_002, "场景编码已存在");
+
+    // ========== 智能照明-定时任务相关 1-050-099-000 ==========
+    ErrorCode LIGHTING_SCHEDULE_NOT_EXISTS = new ErrorCode(1_050_099_001, "照明定时任务不存在");
+
+    // ========== 智能照明-告警相关 1-050-100-000 ==========
+    ErrorCode LIGHTING_ALARM_NOT_EXISTS = new ErrorCode(1_050_100_001, "照明告警不存在");
+    ErrorCode LIGHTING_ALARM_ALREADY_HANDLED = new ErrorCode(1_050_100_002, "照明告警已处理");
+
+    // ========== 楼宇自控-暖通设备相关 1-050-101-000 ==========
+    ErrorCode HVAC_DEVICE_NOT_EXISTS = new ErrorCode(1_050_101_001, "暖通设备不存在");
+    ErrorCode HVAC_DEVICE_CODE_EXISTS = new ErrorCode(1_050_101_002, "暖通设备编码已存在");
+    ErrorCode HVAC_DEVICE_OFFLINE = new ErrorCode(1_050_101_003, "暖通设备离线");
+
+    // ========== 楼宇自控-给排水设备相关 1-050-102-000 ==========
+    ErrorCode WATER_DEVICE_NOT_EXISTS = new ErrorCode(1_050_102_001, "给排水设备不存在");
+    ErrorCode WATER_DEVICE_CODE_EXISTS = new ErrorCode(1_050_102_002, "给排水设备编码已存在");
+    ErrorCode WATER_DEVICE_OFFLINE = new ErrorCode(1_050_102_003, "给排水设备离线");
+
+    // ========== 楼宇自控-告警相关 1-050-103-000 ==========
+    ErrorCode BAC_ALARM_NOT_EXISTS = new ErrorCode(1_050_103_001, "楼宇自控告警不存在");
+    ErrorCode BAC_ALARM_ALREADY_HANDLED = new ErrorCode(1_050_103_002, "楼宇自控告警已处理");
+
+    // ========== 能耗计量-仪表相关 1-050-104-000 ==========
+    ErrorCode ENERGY_METER_NOT_EXISTS = new ErrorCode(1_050_104_001, "能耗仪表不存在");
+    ErrorCode ENERGY_METER_CODE_EXISTS = new ErrorCode(1_050_104_002, "仪表编码已存在");
+    ErrorCode ENERGY_METER_OFFLINE = new ErrorCode(1_050_104_003, "能耗仪表离线");
+
+    // ========== 能耗计量-告警相关 1-050-105-000 ==========
+    ErrorCode ENERGY_ALARM_NOT_EXISTS = new ErrorCode(1_050_105_001, "能耗告警不存在");
+    ErrorCode ENERGY_ALARM_ALREADY_HANDLED = new ErrorCode(1_050_105_002, "能耗告警已处理");
+
+    // ========== 能耗计量-费率相关 1-050-106-000 ==========
+    ErrorCode ENERGY_RATE_NOT_EXISTS = new ErrorCode(1_050_106_001, "能耗费率不存在");
+
+    // ========== 能耗计量-人工抄表相关 1-050-107-000 ==========
+    ErrorCode ENERGY_MANUAL_READING_NOT_EXISTS = new ErrorCode(1_050_107_001, "人工抄表记录不存在");
 
 }
 

@@ -425,4 +425,15 @@ public interface IotDeviceService {
     void updateDeviceVideoCapability(Long deviceId, Boolean supportVideo, Integer videoChannelCount, 
                                       Integer httpPort, Integer rtspPort);
 
+    /**
+     * 获取所有NVR设备
+     * <p>
+     * 查询条件（满足任一即可）：
+     * 1. product_id = 4（NVR产品）
+     * 2. config JSON 字段中 deviceType = "NVR"
+     *
+     * @return NVR设备列表
+     */
+    List<IotDeviceDO> getNvrDevices();
+
 }

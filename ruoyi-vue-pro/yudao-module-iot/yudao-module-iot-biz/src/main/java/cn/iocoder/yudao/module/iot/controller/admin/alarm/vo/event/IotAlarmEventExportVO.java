@@ -44,8 +44,8 @@ public class IotAlarmEventExportVO {
     @ExcelProperty("是否新事件")
     private Boolean isNewEvent;
 
-    @ExcelProperty("是否已处理")
-    private Boolean isHandled;
+    @ExcelProperty("处理状态")
+    private String statusText; // 0-未处理，1-已处理，2-已忽略
 
     @ExcelProperty("处理人")
     private String handledBy;

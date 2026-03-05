@@ -12,6 +12,7 @@
           playing: pane.isPlaying
         }"
         @click="handlePaneClick(idx)"
+        @dblclick="handlePaneDblClick(idx)"
         @drop="handleDrop($event, idx)"
         @dragover.prevent="handleDragOver(idx)"
         @dragleave="handleDragLeave"
@@ -96,6 +97,7 @@ const emit = defineEmits<{
   (e: 'update:activePane', idx: number): void
   (e: 'pane-drop', event: DragEvent, paneIndex: number): void
   (e: 'pane-ref', paneIndex: number, el: HTMLElement | null): void
+  (e: 'pane-dblclick', paneIndex: number): void
 }>()
 
 // 状态
@@ -121,6 +123,12 @@ onMounted(() => {
 // 事件处理
 const handlePaneClick = (idx: number) => {
   emit('update:activePane', idx)
+}
+
+// 双击窗口最大化
+const handlePaneDblClick = (idx: number) => {
+  emit('update:activePane', idx)
+  emit('pane-dblclick', idx)
 }
 
 const handleDragOver = (idx: number) => {

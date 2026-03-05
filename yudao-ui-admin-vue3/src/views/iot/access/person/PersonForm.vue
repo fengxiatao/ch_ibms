@@ -196,9 +196,23 @@
       </el-tab-pane>
     </el-tabs>
 
+    <!-- 底部按钮：根据当前 Tab 显示不同按钮 -->
     <template #footer>
-      <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" @click="handleSubmit" :loading="submitLoading">确定</el-button>
+      <!-- 基本信息 Tab：显示取消和保存按钮 -->
+      <template v-if="activeTab === 'basic'">
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmit" :loading="submitLoading">
+          {{ formType === 'create' ? '保存' : '保存修改' }}
+        </el-button>
+      </template>
+      <!-- 认证 Tab：显示关闭按钮 -->
+      <template v-else-if="activeTab === 'auth'">
+        <el-button @click="dialogVisible = false">关闭</el-button>
+      </template>
+      <!-- 权限配置 Tab：显示关闭按钮（权限变更实时生效） -->
+      <template v-else-if="activeTab === 'permission'">
+        <el-button @click="dialogVisible = false">关闭</el-button>
+      </template>
     </template>
 
     <!-- 密码设置对话框 -->
@@ -244,13 +258,22 @@
     </el-dialog>
 
     <!-- 二维码对话框 -->
-    <el-dialog v-model="showQrCodeDialog" title="卡片二维码" width="300px" append-to-body>
+    <el-dialog v-model="showQrCodeDialog" title="卡片二维码" width="350px" append-to-body>
       <div class="qrcode-container">
-        <div class="qrcode-placeholder">
-          <el-icon :size="100"><Picture /></el-icon>
-          <p>卡号: {{ currentCard?.cardNo }}</p>
-        </div>
+        <Qrcode 
+          v-if="currentCard?.cardNo"
+          :text="currentCard.cardNo" 
+          :width="200"
+          @done="handleQrCodeDone"
+        />
+        <p class="qrcode-cardno">卡号: {{ currentCard?.cardNo }}</p>
       </div>
+      <template #footer>
+        <el-button @click="showQrCodeDialog = false">关闭</el-button>
+        <el-button type="primary" :icon="Download" @click="handleSaveQrCode" :loading="qrCodeSaving">
+          保存到服务器
+        </el-button>
+      </template>
     </el-dialog>
   </el-dialog>
 </template>
@@ -258,11 +281,12 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Picture } from '@element-plus/icons-vue'
+import { Plus, Picture, Download } from '@element-plus/icons-vue'
 import { AccessPersonApi, AccessPersonTypeOptions, AccessCardStatusOptions, type AccessDepartmentVO, type AccessPersonCredentialVO } from '@/api/iot/access'
 import { getAccessToken, getTenantId } from '@/utils/auth'
 import { formatDate } from '@/utils/formatTime'
 import PermissionConfig from './PermissionConfigInline.vue'
+import { Qrcode } from '@/components/Qrcode'
 
 defineOptions({ name: 'PersonForm' })
 
@@ -541,7 +565,55 @@ const handleConfirmReplaceCard = async () => {
 
 const handleShowQrCode = (row: AccessPersonCredentialVO) => {
   currentCard.value = row
+  qrCodeDataUrl.value = ''
   showQrCodeDialog.value = true
+}
+
+// ========== 二维码操作 ==========
+const qrCodeSaving = ref(false)
+const qrCodeDataUrl = ref('')
+
+// 二维码生成完成回调
+const handleQrCodeDone = (dataUrl: string) => {
+  qrCodeDataUrl.value = dataUrl
+}
+
+// 保存二维码到服务器
+const handleSaveQrCode = async () => {
+  if (!qrCodeDataUrl.value) {
+    ElMessage.warning('二维码尚未生成完成，请稍候')
+    return
+  }
+  if (!currentCard.value?.cardNo || !formData.id) {
+    ElMessage.warning('卡号或人员信息不完整')
+    return
+  }
+  
+  qrCodeSaving.value = true
+  try {
+    // 将 base64 转换为 Blob
+    const base64Data = qrCodeDataUrl.value.split(',')[1]
+    const byteCharacters = atob(base64Data)
+    const byteNumbers = new Array(byteCharacters.length)
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i)
+    }
+    const byteArray = new Uint8Array(byteNumbers)
+    const blob = new Blob([byteArray], { type: 'image/png' })
+    
+    // 创建 File 对象
+    const fileName = `qrcode_${currentCard.value.cardNo}_${Date.now()}.png`
+    const file = new File([blob], fileName, { type: 'image/png' })
+    
+    // 调用后端接口保存二维码
+    await AccessPersonApi.saveCardQrCode(formData.id, currentCard.value.id, file)
+    ElMessage.success('二维码已保存到服务器')
+  } catch (error) {
+    console.error('保存二维码失败:', error)
+    ElMessage.error('保存二维码失败，请重试')
+  } finally {
+    qrCodeSaving.value = false
+  }
 }
 
 const handleDeleteCard = async (row: AccessPersonCredentialVO) => {
@@ -656,11 +728,14 @@ defineExpose({ open })
 }
 .qrcode-container {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
   padding: 20px;
 }
-.qrcode-placeholder {
-  text-align: center;
-  color: #909399;
+.qrcode-cardno {
+  margin-top: 15px;
+  font-size: 14px;
+  color: #606266;
 }
 </style>

@@ -488,6 +488,39 @@ public class IotAccessPersonServiceImpl implements IotAccessPersonService {
         return credentialMapper.selectListByPersonId(personId);
     }
 
+    @Override
+    public String saveCardQrCode(Long personId, Long credentialId, byte[] qrCodeData) {
+        validatePersonExists(personId);
+        
+        // 校验凭证存在
+        IotAccessPersonCredentialDO credential = credentialMapper.selectById(credentialId);
+        if (credential == null) {
+            throw exception(ACCESS_CREDENTIAL_NOT_EXISTS);
+        }
+        if (!CredentialTypeConstants.isCard(credential.getCredentialType())) {
+            throw exception(ACCESS_CREDENTIAL_TYPE_INVALID);
+        }
+        
+        try {
+            // 使用 infra 文件管理服务保存二维码图片
+            String directory = String.format("access/qrcodes/%d/%04d%02d%02d", personId,
+                    LocalDateTime.now().getYear(),
+                    LocalDateTime.now().getMonthValue(),
+                    LocalDateTime.now().getDayOfMonth());
+            String fileName = String.format("qrcode_%s_%d.png", credential.getCardNo(), System.currentTimeMillis());
+            String qrCodeUrl = fileApi.createFile(qrCodeData, fileName, directory, "image/png");
+            
+            log.info("[saveCardQrCode] 保存卡片二维码成功, personId={}, cardNo={}, qrCodeUrl={}", 
+                    personId, credential.getCardNo(), qrCodeUrl);
+            
+            return qrCodeUrl;
+        } catch (Exception e) {
+            log.error("[saveCardQrCode] 保存卡片二维码失败, personId={}, cardNo={}", 
+                    personId, credential.getCardNo(), e);
+            throw exception(ACCESS_PERSON_FACE_UPLOAD_FAILED); // 复用错误码
+        }
+    }
+
     // ========== 冻结/解冻 ==========
 
     @Override

@@ -118,7 +118,12 @@ export const generateRoute = (routes: AppCustomRouteRecordRaw[]): AppRouteRecord
       const index = route?.component
         ? modulesRoutesKeys.findIndex((ev) => ev.includes(route.component))
         : modulesRoutesKeys.findIndex((ev) => ev.includes(route.path))
-      childrenData.component = modules[modulesRoutesKeys[index]]
+      if (index > -1) {
+        childrenData.component = modules[modulesRoutesKeys[index]]
+      } else {
+        childrenData.component = () => import('@/views/Error/404.vue')
+        console.warn('[routerHelper] missing view component:', route.component || route.path)
+      }
       data.children = [childrenData]
     } else {
       // 目录
@@ -141,7 +146,12 @@ export const generateRoute = (routes: AppCustomRouteRecordRaw[]): AppRouteRecord
         const index = route?.component
           ? modulesRoutesKeys.findIndex((ev) => ev.includes(route.component))
           : modulesRoutesKeys.findIndex((ev) => ev.includes(route.path))
-        data.component = modules[modulesRoutesKeys[index]]
+        if (index > -1) {
+          data.component = modules[modulesRoutesKeys[index]]
+        } else {
+          data.component = () => import('@/views/Error/404.vue')
+          console.warn('[routerHelper] missing view component:', route.component || route.path)
+        }
       }
       if (route.children) {
         data.children = generateRoute(route.children)

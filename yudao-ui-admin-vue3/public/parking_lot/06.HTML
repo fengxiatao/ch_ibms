@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧停车管理系统 - 系统设置</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft Yahei", sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        /* 顶部导航样式 */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 64px;
+            padding: 0 24px;
+            background-color: #fff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .logo-icon {
+            font-size: 24px;
+            margin-right: 8px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: #1890ff;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            margin-left: 12px;
+        }
+
+        /* 主容器样式 */
+        .main-container {
+            display: flex;
+            padding-top: 64px;
+            min-height: 100vh;
+        }
+
+        /* 侧边菜单样式 */
+        .sidebar {
+            width: 200px;
+            background-color: #fff;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
+            padding-top: 24px;
+            height: calc(100vh - 64px);
+            position: fixed;
+            overflow-y: auto;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 24px;
+            cursor: pointer;
+            color: #666;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .menu-item.active {
+            background-color: #e6f7ff;
+            color: #1890ff;
+            border-right: 3px solid #1890ff;
+        }
+
+        .menu-item:hover:not(.active) {
+            background-color: #f5f5f5;
+        }
+
+        .menu-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+        }
+
+        /* 内容区域样式 */
+        .content {
+            flex: 1;
+            margin-left: 200px;
+            padding: 24px;
+        }
+
+        .content-card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .content-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        /* 系统设置表单样式 */
+        .settings-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            background-color: #fff;
+        }
+
+        .form-textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .btn-group {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+        }
+
+        .btn-cancel {
+            background-color: #f5f5f5;
+            color: #666;
+            margin-right: 12px;
+        }
+
+        .btn-cancel:hover {
+            background-color: #e6e6e6;
+        }
+
+        .btn-save {
+            background-color: #1890ff;
+            color: #fff;
+        }
+
+        .btn-save:hover {
+            background-color: #40a9ff;
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">🚗</div>
+            <span>智慧停车管理系统</span>
+        </div>
+        <div class="user-info">
+            <span>管理员</span>
+            <div class="user-avatar">管</div>
+        </div>
+    </div>
+    
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 侧边菜单 -->
+        <div class="sidebar">
+            <div class="menu-item" id="menu-monitor">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M928 160H96c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h832c17.7 0 32-14.3 32-32V192c0-17.7-14.3-32-32-32zM480 832H160V256h320v576zm128-640H160v-64h448v64zm320 640H608V256h320v576z"/>
+                </svg>
+                <span>在场车辆监控</span>
+            </div>
+            <div class="menu-item" id="menu-records">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M832 64H192c-17.7 0-32 14.3-32 32v832c0 17.7 14.3 32 32 32h640c17.7 0 32-14.3 32-32V96c0-17.7-14.3-32-32-32zM648.3 426.8L537.9 345.5c-3.1-2.3-7.3-2.3-10.4 0L375.7 426.8a8.32 8.32 0 0 0-1.7 11.9l89.9 118.8c3.1 4.1 9.2 4.1 12.3 0l142.4-188.3a8.32 8.32 0 0 0-1.7-11.9z"/>
+                </svg>
+                <span>出入场记录</span>
+            </div>
+            <div class="menu-item" id="menu-parking">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M864 256H736v-64c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v64H416v-64c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v64H160c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h704c17.7 0 32-14.3 32-32V288c0-17.7-14.3-32-32-32zM640 832H384c-17.7 0-32-14.3-32-32V480c0-17.7 14.3-32 32-32h256c17.7 0 32 14.3 32 32v320c0 17.7-14.3-32 32-32zM352 384h320v64H352v-64z"/>
+                </svg>
+                <span>收费管理</span>
+            </div>
+            <div class="menu-item" id="menu-report">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M896 112H128c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h768c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32zM792 768H232V248h560v520zM232 168h246v48h-246v-48zm560 0h-246v48h246v-48zM232 848v48h560v-48H232z"/>
+                </svg>
+                <span>报表统计</span>
+            </div>
+            <div class="menu-item active" id="menu-settings">
+                <svg class="menu-icon" viewBox="0 0 1024 1024" fill="currentColor">
+                    <path d="M928 160H96c-17.7 0-32 14.3-32 32v640c0 17.7 14.3 32 32 32h832c17.7 0 32-14.3 32-32V192c0-17.7-14.3-32-32-32zm-40 656H136V240h752v576zM480 384c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm192-384c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm192 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64zm0 192c0 4.4-3.6 8-8 8h-64c-4.4 0-8-3.6-8-v-64c0-4.4 3.6-8 8-8h64c4.4 0 8 3.6 8 8v64z"/>
+                </svg>
+                <span>系统设置</span>
+            </div>
+        </div>
+
+        <!-- 系统设置内容区域 -->
+        <div class="content">
+            <div class="content-card">
+                <div class="content-title">系统设置</div>
+
+                <!-- 基础设置 -->
+                <div class="settings-form">
+                    <div class="form-column">
+                        <div class="form-group">
+                            <label class="form-label">停车场名称</label>
+                            <input type="text" class="form-input" value="智慧园区停车场" placeholder="请输入停车场名称">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">停车场地址</label>
+                            <input type="text" class="form-input" value="北京市海淀区中关村南大街5号" placeholder="请输入停车场地址">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">联系电话</label>
+                            <input type="tel" class="form-input" value="010-12345678" placeholder="请输入联系电话">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">总车位数</label>
+                            <input type="number" class="form-input" value="500" placeholder="请输入总车位数">
+                        </div>
+                    </div>
+                    <div class="form-column">
+                        <div class="form-group">
+                            <label class="form-label">营业时间</label>
+                            <input type="text" class="form-input" value="00:00-24:00" placeholder="请输入营业时间">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">停车场类型</label>
+                            <select class="form-select">
+                                <option value="indoor" selected>室内停车场</option>
+                                <option value="outdoor">室外停车场</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">备注信息</label>
+                            <textarea class="form-textarea" placeholder="请输入备注信息">24小时无人值守停车场，支持微信、支付宝支付</textarea>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-cancel">取消</button>
+                        <button class="btn btn-save">保存设置</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 侧边菜单点击逻辑
+        const menuItems = document.querySelectorAll('.menu-item');
+        menuItems.forEach(item => {
+            item.addEventListener('click', () => {
+                menuItems.forEach(mi => mi.classList.remove('active'));
+                item.classList.add('active');
+                const menuId = item.id;
+                console.log(`点击了菜单: ${menuId}`);
+            });
+        });
+
+        // 保存按钮
+        document.querySelector('.btn-save').addEventListener('click', () => {
+            alert('设置保存成功！');
+        });
+
+        // 取消按钮
+        document.querySelector('.btn-cancel').addEventListener('click', () => {
+            if (confirm('确定要取消修改吗？所有未保存的更改将会丢失。')) {
+                console.log('取消修改');
+            }
+        });
+    </script>
+</body>
+</html>

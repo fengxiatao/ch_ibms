@@ -20,20 +20,36 @@ public interface IotVisitorApplyMapper extends BaseMapperX<IotVisitorApplyDO> {
     default PageResult<IotVisitorApplyDO> selectPage(String visitorName, String visiteeName, String visitReason,
                                                       Integer visitStatus, Integer approveStatus,
                                                       LocalDateTime visitTimeStart, LocalDateTime visitTimeEnd,
+                                                      Boolean hasVisited,
                                                       Integer pageNo, Integer pageSize) {
         cn.iocoder.yudao.framework.common.pojo.PageParam pageParam = new cn.iocoder.yudao.framework.common.pojo.PageParam();
         pageParam.setPageNo(pageNo);
         pageParam.setPageSize(pageSize);
-        return selectPage(pageParam,
-                new LambdaQueryWrapperX<IotVisitorApplyDO>()
-                        .likeIfPresent(IotVisitorApplyDO::getVisitorName, visitorName)
-                        .likeIfPresent(IotVisitorApplyDO::getVisiteeName, visiteeName)
-                        .likeIfPresent(IotVisitorApplyDO::getVisitReason, visitReason)
-                        .eqIfPresent(IotVisitorApplyDO::getVisitStatus, visitStatus)
-                        .eqIfPresent(IotVisitorApplyDO::getApproveStatus, approveStatus)
-                        .geIfPresent(IotVisitorApplyDO::getPlanVisitTime, visitTimeStart)
-                        .leIfPresent(IotVisitorApplyDO::getPlanVisitTime, visitTimeEnd)
-                        .orderByDesc(IotVisitorApplyDO::getId));
+        
+        LambdaQueryWrapperX<IotVisitorApplyDO> wrapper = new LambdaQueryWrapperX<IotVisitorApplyDO>()
+                .likeIfPresent(IotVisitorApplyDO::getVisitorName, visitorName)
+                .likeIfPresent(IotVisitorApplyDO::getVisiteeName, visiteeName)
+                .likeIfPresent(IotVisitorApplyDO::getVisitReason, visitReason)
+                .eqIfPresent(IotVisitorApplyDO::getVisitStatus, visitStatus)
+                .eqIfPresent(IotVisitorApplyDO::getApproveStatus, approveStatus);
+        
+        // 根据 hasVisited 参数决定查询的时间字段
+        // hasVisited=true 时，查询已签到的记录，使用实际来访时间筛选
+        // hasVisited=false 或 null 时，查询预约记录，使用计划来访时间筛选
+        if (Boolean.TRUE.equals(hasVisited)) {
+            // 来访记录：只查询已签到的（actualVisitTime 不为空）
+            wrapper.isNotNull(IotVisitorApplyDO::getActualVisitTime);
+            // 使用实际来访时间筛选
+            wrapper.geIfPresent(IotVisitorApplyDO::getActualVisitTime, visitTimeStart)
+                   .leIfPresent(IotVisitorApplyDO::getActualVisitTime, visitTimeEnd);
+        } else {
+            // 预约列表：使用计划来访时间筛选
+            wrapper.geIfPresent(IotVisitorApplyDO::getPlanVisitTime, visitTimeStart)
+                   .leIfPresent(IotVisitorApplyDO::getPlanVisitTime, visitTimeEnd);
+        }
+        
+        wrapper.orderByDesc(IotVisitorApplyDO::getId);
+        return selectPage(pageParam, wrapper);
     }
 
     default IotVisitorApplyDO selectByApplyCode(String applyCode) {

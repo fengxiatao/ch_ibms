@@ -20,6 +20,8 @@ import jakarta.annotation.PreDestroy;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * 门禁二代设备 SDK 封装
@@ -97,10 +99,40 @@ public class AccessGen2SdkWrapper {
     private final ThreadLocal<Integer> lastErrorCode = ThreadLocal.withInitial(() -> 0);
     private final ThreadLocal<String> lastErrorMessage = ThreadLocal.withInitial(() -> "");
     
+    /** 
+     * 设备锁映射表 - 按登录句柄存储锁，确保同一设备的操作串行化
+     * <p>大华 SDK 对同一登录句柄的并发操作可能导致数据校验错误（错误码 21），
+     * 因此需要对同一设备的操作进行串行化控制。</p>
+     */
+    private final ConcurrentHashMap<Long, ReentrantLock> deviceLocks = new ConcurrentHashMap<>();
+    
+    /** 设备锁等待超时时间（秒） */
+    private static final int DEVICE_LOCK_TIMEOUT_SECONDS = 15;
+    
     // 注意：移除运行态"内存模拟存储"。若后续需要支持用户/卡/人脸/指纹管理，请对接 NetSDK 标准接口。
     
     /** 断线监听器列表 */
     private final List<DisconnectListener> disconnectListeners = new ArrayList<>();
+    
+    /**
+     * 获取设备锁（按登录句柄）
+     * <p>如果锁不存在则创建一个新的锁</p>
+     *
+     * @param loginHandle 登录句柄
+     * @return 对应的设备锁
+     */
+    private ReentrantLock getDeviceLock(long loginHandle) {
+        return deviceLocks.computeIfAbsent(loginHandle, k -> new ReentrantLock(true)); // 使用公平锁
+    }
+    
+    /**
+     * 移除设备锁（在设备登出时调用）
+     *
+     * @param loginHandle 登录句柄
+     */
+    public void removeDeviceLock(long loginHandle) {
+        deviceLocks.remove(loginHandle);
+    }
     
     /**
      * 断线监听器接口
@@ -328,10 +360,15 @@ public class AccessGen2SdkWrapper {
                 log.warn("{} 登出失败: handle={}, error={}", LOG_PREFIX, loginHandle, ToolKits.getErrorCodePrint());
             }
             
+            // 清理设备锁
+            removeDeviceLock(loginHandle);
+            
             return result;
             
         } catch (Exception e) {
             log.error("{} 登出异常: handle={}, error={}", LOG_PREFIX, loginHandle, e.getMessage(), e);
+            // 即使登出失败，也尝试清理设备锁
+            removeDeviceLock(loginHandle);
             return false;
         }
     }
@@ -350,7 +387,18 @@ public class AccessGen2SdkWrapper {
             return AccessGen2OperationResult.failure("无效的登录句柄");
         }
         
+        // 获取设备锁，确保同一设备的操作串行化
+        ReentrantLock lock = getDeviceLock(loginHandle);
+        boolean lockAcquired = false;
+        
         try {
+            // 尝试获取锁，带超时
+            lockAcquired = lock.tryLock(DEVICE_LOCK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!lockAcquired) {
+                log.warn("{} 获取设备锁超时，设备可能正忙: handle={}, channelNo={}", LOG_PREFIX, loginHandle, channelNo);
+                return AccessGen2OperationResult.failure("设备忙，请稍后重试");
+            }
+            
             log.info("{} 远程开门: handle={}, channel={}", LOG_PREFIX, loginHandle, channelNo);
             
             NET_CTRL_ACCESS_OPEN openInfo = new NET_CTRL_ACCESS_OPEN();
@@ -377,9 +425,17 @@ public class AccessGen2SdkWrapper {
                 return AccessGen2OperationResult.failure("开门失败: " + errorMsg);
             }
             
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("{} 开门被中断: channelNo={}", LOG_PREFIX, channelNo);
+            return AccessGen2OperationResult.failure("操作被中断");
         } catch (Exception e) {
             log.error("{} 开门异常: channel={}, error={}", LOG_PREFIX, channelNo, e.getMessage(), e);
             return AccessGen2OperationResult.failure("开门异常: " + e.getMessage());
+        } finally {
+            if (lockAcquired) {
+                lock.unlock();
+            }
         }
     }
 
@@ -395,7 +451,18 @@ public class AccessGen2SdkWrapper {
             return AccessGen2OperationResult.failure("无效的登录句柄");
         }
         
+        // 获取设备锁，确保同一设备的操作串行化
+        ReentrantLock lock = getDeviceLock(loginHandle);
+        boolean lockAcquired = false;
+        
         try {
+            // 尝试获取锁，带超时
+            lockAcquired = lock.tryLock(DEVICE_LOCK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!lockAcquired) {
+                log.warn("{} 获取设备锁超时，设备可能正忙: handle={}, channelNo={}", LOG_PREFIX, loginHandle, channelNo);
+                return AccessGen2OperationResult.failure("设备忙，请稍后重试");
+            }
+            
             log.info("{} 远程关门: handle={}, channel={}", LOG_PREFIX, loginHandle, channelNo);
             
             NET_CTRL_ACCESS_CLOSE closeInfo = new NET_CTRL_ACCESS_CLOSE();
@@ -420,9 +487,17 @@ public class AccessGen2SdkWrapper {
                 return AccessGen2OperationResult.failure("关门失败: " + errorMsg);
             }
             
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("{} 关门被中断: channelNo={}", LOG_PREFIX, channelNo);
+            return AccessGen2OperationResult.failure("操作被中断");
         } catch (Exception e) {
             log.error("{} 关门异常: channel={}, error={}", LOG_PREFIX, channelNo, e.getMessage(), e);
             return AccessGen2OperationResult.failure("关门异常: " + e.getMessage());
+        } finally {
+            if (lockAcquired) {
+                lock.unlock();
+            }
         }
     }
 
@@ -443,12 +518,22 @@ public class AccessGen2SdkWrapper {
             return AccessGen2OperationResult.failure("userId 不能为空");
         }
         try {
+            // 详细日志：打印用户信息
+            log.info("{} 添加用户: userId={}, userName={}, password={}, validStart={}, validEnd={}, doors={}", 
+                    LOG_PREFIX, userInfo.getUserId(), userInfo.getUserName(),
+                    StringUtils.hasText(userInfo.getPassword()) ? "***(" + userInfo.getPassword().length() + "字符)" : "无",
+                    userInfo.getValidStartTime(), userInfo.getValidEndTime(),
+                    userInfo.getDoors() != null ? Arrays.toString(userInfo.getDoors()) : "无");
+            
             // 构建最小可用用户信息（按《智能楼宇分册》：CLIENT_OperateAccessUserService + NET_ACCESS_USER_INFO）
             NET_ACCESS_USER_INFO user = new NET_ACCESS_USER_INFO();
             fillBytes(user.szUserID, userInfo.getUserId());
             fillBytes(user.szName, StringUtils.hasText(userInfo.getUserName()) ? userInfo.getUserName() : userInfo.getUserId());
             if (StringUtils.hasText(userInfo.getPassword())) {
                 fillBytes(user.szPsw, userInfo.getPassword());
+                log.info("{} 设置用户密码: userId={}, passwordLen={}", LOG_PREFIX, userInfo.getUserId(), userInfo.getPassword().length());
+            } else {
+                log.warn("{} 用户没有密码: userId={}", LOG_PREFIX, userInfo.getUserId());
             }
 
             // 门权限：SDK 里 door 通常从 0 开始；业务侧常用从 1 开始
@@ -577,6 +662,140 @@ public class AccessGen2SdkWrapper {
     }
 
     /**
+     * 设置用户密码（使用密码记录集方式：NET_RECORDSET_ACCESS_CTL_PWD）
+     * 
+     * <p>大华门禁设备的密码需要通过密码记录集来设置，而不是通过 addUser 的 szPsw 字段。
+     * 使用 CLIENT_ControlDevice + CTRLTYPE_CTRL_RECORDSET_INSERT + NET_RECORD_ACCESSCTLPWD</p>
+     * 
+     * @param loginHandle 登录句柄
+     * @param userId      用户ID
+     * @param password    密码
+     * @param channelNo   门禁通道号（从0开始，默认0）
+     * @return 操作结果
+     */
+    public AccessGen2OperationResult setPassword(long loginHandle, String userId, String password, int channelNo) {
+        if (!validateHandle(loginHandle)) {
+            return AccessGen2OperationResult.failure("无效的登录句柄");
+        }
+        if (!StringUtils.hasText(userId)) {
+            return AccessGen2OperationResult.failure("userId 不能为空");
+        }
+        if (!StringUtils.hasText(password)) {
+            return AccessGen2OperationResult.failure("password 不能为空");
+        }
+        
+        try {
+            log.info("{} 设置用户密码（记录集方式）: userId={}, passwordLen={}, channelNo={}", 
+                    LOG_PREFIX, userId, password.length(), channelNo);
+            
+            // 构建密码记录集结构体
+            NET_RECORDSET_ACCESS_CTL_PWD pwdRecord = new NET_RECORDSET_ACCESS_CTL_PWD();
+            
+            // 设置用户ID
+            fillBytes(pwdRecord.szUserID, userId);
+            
+            // 设置开门密码
+            fillBytes(pwdRecord.szDoorOpenPwd, password);
+            
+            // 设置门权限 - 与用户门权限保持一致
+            pwdRecord.nDoorNum = 1;
+            pwdRecord.sznDoors[0] = channelNo;
+            pwdRecord.nTimeSectionNum = 1;
+            pwdRecord.nTimeSectionIndex[0] = 255; // 255表示全天有效
+            
+            // 设置有效期（默认5年）
+            java.time.LocalDateTime now = java.time.LocalDateTime.now();
+            java.time.LocalDateTime endTime = now.plusYears(5);
+            
+            pwdRecord.stuValidStartTime.dwYear = now.getYear();
+            pwdRecord.stuValidStartTime.dwMonth = now.getMonthValue();
+            pwdRecord.stuValidStartTime.dwDay = now.getDayOfMonth();
+            pwdRecord.stuValidStartTime.dwHour = now.getHour();
+            pwdRecord.stuValidStartTime.dwMinute = now.getMinute();
+            pwdRecord.stuValidStartTime.dwSecond = now.getSecond();
+            
+            pwdRecord.stuValidEndTime.dwYear = endTime.getYear();
+            pwdRecord.stuValidEndTime.dwMonth = endTime.getMonthValue();
+            pwdRecord.stuValidEndTime.dwDay = endTime.getDayOfMonth();
+            pwdRecord.stuValidEndTime.dwHour = endTime.getHour();
+            pwdRecord.stuValidEndTime.dwMinute = endTime.getMinute();
+            pwdRecord.stuValidEndTime.dwSecond = endTime.getSecond();
+            
+            // 构建记录集操作参数
+            NET_CTRL_RECORDSET_INSERT_PARAM insertParam = new NET_CTRL_RECORDSET_INSERT_PARAM();
+            insertParam.stuCtrlRecordSetInfo.emType = EM_NET_RECORD_TYPE.NET_RECORD_ACCESSCTLPWD; // 门禁密码记录类型
+            insertParam.stuCtrlRecordSetInfo.pBuf = pwdRecord.getPointer();
+            
+            pwdRecord.write();
+            insertParam.write();
+            
+            // 调用设备控制接口插入密码记录
+            boolean result = getNetSdk().CLIENT_ControlDevice(
+                    new LLong(loginHandle),
+                    CtrlType.CTRLTYPE_CTRL_RECORDSET_INSERT,
+                    insertParam.getPointer(),
+                    TIMEOUT_MS
+            );
+            
+            insertParam.read();
+            pwdRecord.read();
+            
+            if (result) {
+                log.info("{} 设置用户密码成功（记录集方式）: userId={}, recNo={}", 
+                        LOG_PREFIX, userId, insertParam.stuCtrlRecordSetResult.nRecNo);
+                return AccessGen2OperationResult.success("设置密码成功");
+            } else {
+                String errorMsg = ToolKits.getErrorCodePrint();
+                log.error("{} 设置用户密码失败（记录集方式）: userId={}, error={}", LOG_PREFIX, userId, errorMsg);
+                
+                // 如果记录集方式失败，尝试使用重置密码方式
+                log.info("{} 尝试使用重置密码方式设置密码: userId={}", LOG_PREFIX, userId);
+                return setPasswordByReset(loginHandle, userId, password, channelNo);
+            }
+        } catch (Exception e) {
+            log.error("{} 设置用户密码异常: userId={}, error={}", LOG_PREFIX, userId, e.getMessage(), e);
+            return AccessGen2OperationResult.failure("设置密码异常: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 使用重置密码方式设置密码（备用方案）
+     */
+    private AccessGen2OperationResult setPasswordByReset(long loginHandle, String userId, String password, int channelNo) {
+        try {
+            // 构建密码重置结构体
+            NET_CTRL_ACCESS_RESET_PASSWORD resetInfo = new NET_CTRL_ACCESS_RESET_PASSWORD();
+            resetInfo.nChannelID = channelNo;
+            resetInfo.emType = EM_ACCESS_PASSWORD_TYPE.EM_ACCESS_PASSWORD_OPENDOOR; // 开门密码
+            fillBytes(resetInfo.szUserID, userId);
+            fillBytes(resetInfo.szNewPassword, password);
+            resetInfo.write();
+            
+            // 调用设备控制接口
+            boolean result = getNetSdk().CLIENT_ControlDeviceEx(
+                    new LLong(loginHandle),
+                    CtrlType.CTRLTYPE_CTRL_ACCESS_RESET_PASSWORD,
+                    resetInfo.getPointer(),
+                    null,
+                    TIMEOUT_MS
+            );
+            resetInfo.read();
+            
+            if (result) {
+                log.info("{} 设置用户密码成功（重置方式）: userId={}", LOG_PREFIX, userId);
+                return AccessGen2OperationResult.success("设置密码成功（重置方式）");
+            } else {
+                String errorMsg = ToolKits.getErrorCodePrint();
+                log.error("{} 设置用户密码失败（重置方式）: userId={}, error={}", LOG_PREFIX, userId, errorMsg);
+                return AccessGen2OperationResult.failure("设置密码失败: " + errorMsg);
+            }
+        } catch (Exception e) {
+            log.error("{} 设置用户密码异常（重置方式）: userId={}, error={}", LOG_PREFIX, userId, e.getMessage(), e);
+            return AccessGen2OperationResult.failure("设置密码异常: " + e.getMessage());
+        }
+    }
+
+    /**
      * 清空所有用户
      * 
      * @param loginHandle 登录句柄
@@ -624,10 +843,12 @@ public class AccessGen2SdkWrapper {
         }
     }
 
-    // ==================== 卡号管理（未接入，禁止模拟） ====================
+    // ==================== 卡号管理（二代门禁使用标准API） ====================
 
     /**
-     * 添加卡号
+     * 添加卡号（二代门禁使用 CLIENT_OperateAccessCardService API）
+     * 注意：二代门禁的卡信息结构体(NET_ACCESS_CARD_INFO)不支持密码和有效期字段
+     *       密码和有效期需要通过 addUser 的 NET_ACCESS_USER_INFO 设置
      * 
      * @param loginHandle 登录句柄
      * @param userInfo    包含卡号的用户信息
@@ -641,6 +862,9 @@ public class AccessGen2SdkWrapper {
             return AccessGen2OperationResult.failure("cardNo 不能为空");
         }
         try {
+            log.info("{} 添加卡号（标准API）: cardNo={}, userId={}", 
+                    LOG_PREFIX, userInfo.getCardNo(), userInfo.getUserId());
+            
             NET_ACCESS_CARD_INFO card = new NET_ACCESS_CARD_INFO();
             fillBytes(card.szCardNo, userInfo.getCardNo());
             String uid = StringUtils.hasText(userInfo.getUserId()) ? userInfo.getUserId() : userInfo.getCardNo();
@@ -672,12 +896,20 @@ public class AccessGen2SdkWrapper {
             boolean ok = getNetSdk().CLIENT_OperateAccessCardService(new LLong(loginHandle), emType,
                     stIn.getPointer(), stOut.getPointer(), TIMEOUT_MS);
             if (!ok) {
-                return AccessGen2OperationResult.failure("添加卡号失败: " + ToolKits.getErrorCodePrint());
+                int errorCode = getNetSdk().CLIENT_GetLastError();
+                int actualErrorCode = errorCode & 0x7FFFFFFF;
+                String errorMsg = ToolKits.getErrorCodePrint();
+                log.error("{} 添加卡号失败: cardNo={}, errorCode={}, actualErrorCode={}, msg={}", 
+                        LOG_PREFIX, userInfo.getCardNo(), errorCode, actualErrorCode, errorMsg);
+                return AccessGen2OperationResult.failure("添加卡号失败: " + errorMsg, actualErrorCode);
             }
             ToolKits.GetPointerDataToStructArr(stOut.pFailCode, failCodes);
             if (failCodes[0].nFailCode != 0) {
+                log.error("{} 添加卡号失败: cardNo={}, failCode={}", 
+                        LOG_PREFIX, userInfo.getCardNo(), failCodes[0].nFailCode);
                 return AccessGen2OperationResult.failure("添加卡号失败: failCode=" + failCodes[0].nFailCode);
             }
+            log.info("{} ✅ 添加卡号成功: cardNo={}", LOG_PREFIX, userInfo.getCardNo());
             return AccessGen2OperationResult.success("添加卡号成功");
         } catch (Exception e) {
             log.error("{} 添加卡号异常: cardNo={}, error={}", LOG_PREFIX, userInfo.getCardNo(), e.getMessage(), e);
@@ -778,46 +1010,37 @@ public class AccessGen2SdkWrapper {
         }
         try {
             byte[] imgBytes = java.util.Base64.getDecoder().decode(faceInfo.getFaceData());
+            log.info("{} 添加人脸: userId={}, imageSize={}KB", LOG_PREFIX, faceInfo.getUserId(), imgBytes.length / 1024);
 
-            NET_ACCESS_FACE_INFO face = new NET_ACCESS_FACE_INFO();
-            fillBytes(face.szUserID, faceInfo.getUserId());
-            face.bUserIDEx = 1;
-            fillBytes(face.szUserIDEx, faceInfo.getUserId());
-            face.nFacePhoto = 1;
-            face.nInFacePhotoLen[0] = imgBytes.length;
-            face.pFacePhotos[0].pFacePhoto = new Memory(imgBytes.length);
-            face.pFacePhotos[0].pFacePhoto.clear(imgBytes.length);
-            face.pFacePhotos[0].pFacePhoto.write(0, imgBytes, 0, imgBytes.length);
-
-            NET_ACCESS_FACE_INFO[] faces = new NET_ACCESS_FACE_INFO[] { face };
-
-            NET_IN_ACCESS_FACE_SERVICE_INSERT stIn = new NET_IN_ACCESS_FACE_SERVICE_INSERT();
-            stIn.nFaceInfoNum = 1;
-            stIn.pFaceInfo = new Memory(faces[0].size());
-            stIn.pFaceInfo.clear(faces[0].size());
-            ToolKits.SetStructArrToPointerData(faces, stIn.pFaceInfo);
-
-            FAIL_CODE[] failCodes = new FAIL_CODE[] { new FAIL_CODE() };
-            NET_OUT_ACCESS_FACE_SERVICE_INSERT stOut = new NET_OUT_ACCESS_FACE_SERVICE_INSERT();
-            stOut.nMaxRetNum = 1;
-            stOut.pFailCode = new Memory(failCodes[0].size());
-            stOut.pFailCode.clear(failCodes[0].size());
-            ToolKits.SetStructArrToPointerData(failCodes, stOut.pFailCode);
-
-            faces[0].write();
+            // 使用 CLIENT_FaceInfoOpreate API（与大华官方Demo一致）
+            int emType = EM_FACEINFO_OPREATE_TYPE.EM_FACEINFO_OPREATE_ADD;
+            
+            // 入参
+            NET_IN_ADD_FACE_INFO stIn = new NET_IN_ADD_FACE_INFO();
+            // 用户ID
+            fillBytes(stIn.szUserID, faceInfo.getUserId());
+            // 人脸照片个数
+            stIn.stuFaceInfo.nFacePhoto = 1;
+            // 每张图片的大小
+            stIn.stuFaceInfo.nFacePhotoLen[0] = imgBytes.length;
+            // 人脸照片数据，大小不超过100K，图片格式为jpg
+            Memory imageMemory = new Memory(imgBytes.length);
+            imageMemory.clear(imgBytes.length);
+            imageMemory.write(0, imgBytes, 0, imgBytes.length);
+            stIn.stuFaceInfo.pszFacePhotoArr[0].pszFacePhoto = imageMemory;
+            
+            // 出参
+            NET_OUT_ADD_FACE_INFO stOut = new NET_OUT_ADD_FACE_INFO();
+            
             stIn.write();
             stOut.write();
-            failCodes[0].write();
-
-            int emType = NET_EM_ACCESS_CTL_FACE_SERVICE.NET_EM_ACCESS_CTL_FACE_SERVICE_INSERT;
-            boolean ok = getNetSdk().CLIENT_OperateAccessFaceService(new LLong(loginHandle), emType,
+            boolean ok = getNetSdk().CLIENT_FaceInfoOpreate(new LLong(loginHandle), emType, 
                     stIn.getPointer(), stOut.getPointer(), TIMEOUT_MS);
+            stIn.read();
+            stOut.read();
+            
             if (!ok) {
                 return AccessGen2OperationResult.failure("添加人脸失败: " + ToolKits.getErrorCodePrint());
-            }
-            ToolKits.GetPointerDataToStructArr(stOut.pFailCode, failCodes);
-            if (failCodes[0].nFailCode != 0) {
-                return AccessGen2OperationResult.failure("添加人脸失败: failCode=" + failCodes[0].nFailCode);
             }
             return AccessGen2OperationResult.success("添加人脸成功");
         } catch (Exception e) {
@@ -841,32 +1064,31 @@ public class AccessGen2SdkWrapper {
             return AccessGen2OperationResult.failure("userId 不能为空");
         }
         try {
-            NET_IN_ACCESS_FACE_SERVICE_REMOVE stIn = new NET_IN_ACCESS_FACE_SERVICE_REMOVE();
-            stIn.nUserNum = 1;
-            stIn.bUserIDEx = 0;
-            stIn.szUserIDs = new USERID[] { new USERID() };
-            fillBytes(stIn.szUserIDs[0].szUserID, userId);
-
-            FAIL_CODE[] failCodes = new FAIL_CODE[] { new FAIL_CODE() };
-            NET_OUT_ACCESS_FACE_SERVICE_REMOVE stOut = new NET_OUT_ACCESS_FACE_SERVICE_REMOVE();
-            stOut.nMaxRetNum = 1;
-            stOut.pFailCode = new Memory(failCodes[0].size());
-            stOut.pFailCode.clear(failCodes[0].size());
-            ToolKits.SetStructArrToPointerData(failCodes, stOut.pFailCode);
-
+            log.info("{} 删除人脸: userId={}", LOG_PREFIX, userId);
+            
+            // 使用 CLIENT_FaceInfoOpreate API（与大华官方Demo一致）
+            int emType = EM_FACEINFO_OPREATE_TYPE.EM_FACEINFO_OPREATE_REMOVE;
+            
+            // 入参
+            NET_IN_REMOVE_FACE_INFO stIn = new NET_IN_REMOVE_FACE_INFO();
+            // 用户ID
+            fillBytes(stIn.szUserID, userId);
+            
+            // 出参
+            NET_OUT_REMOVE_FACE_INFO stOut = new NET_OUT_REMOVE_FACE_INFO();
+            
             stIn.write();
             stOut.write();
-            failCodes[0].write();
-
-            int emType = NET_EM_ACCESS_CTL_FACE_SERVICE.NET_EM_ACCESS_CTL_FACE_SERVICE_REMOVE;
-            boolean ok = getNetSdk().CLIENT_OperateAccessFaceService(new LLong(loginHandle), emType,
+            boolean ok = getNetSdk().CLIENT_FaceInfoOpreate(new LLong(loginHandle), emType, 
                     stIn.getPointer(), stOut.getPointer(), TIMEOUT_MS);
+            stIn.read();
+            stOut.read();
+            
             if (!ok) {
-                return AccessGen2OperationResult.failure("删除人脸失败: " + ToolKits.getErrorCodePrint());
-            }
-            ToolKits.GetPointerDataToStructArr(stOut.pFailCode, failCodes);
-            if (failCodes[0].nFailCode != 0) {
-                return AccessGen2OperationResult.failure("删除人脸失败: failCode=" + failCodes[0].nFailCode);
+                // 删除失败可能是人脸不存在，不算严重错误
+                String errorMsg = ToolKits.getErrorCodePrint();
+                log.warn("{} 删除人脸失败（可能不存在）: userId={}, error={}", LOG_PREFIX, userId, errorMsg);
+                return AccessGen2OperationResult.failure("删除人脸失败: " + errorMsg);
             }
             return AccessGen2OperationResult.success("删除人脸成功");
         } catch (Exception e) {

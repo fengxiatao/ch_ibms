@@ -92,6 +92,11 @@ public class IotAlarmEventDO extends TenantBaseDO {
     private Boolean isHandled;
 
     /**
+     * 处理状态：0-未处理，1-已处理，2-已忽略
+     */
+    private Integer status;
+
+    /**
      * 处理人
      */
     private String handledBy;

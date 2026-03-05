@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.iot.service.parking;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.parking.vo.presentvehicle.ParkingPresentVehiclePageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.parking.vo.record.ParkingRecordPageReqVO;
+import cn.iocoder.yudao.module.iot.controller.admin.parking.vo.record.ParkingRecordManualPayReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.parking.ParkingPresentVehicleDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.parking.ParkingRecordDO;
 
@@ -126,4 +127,12 @@ public interface ParkingRecordService {
      * @return 收费规则名称
      */
     String getChargeRuleName(Long lotId, String vehicleCategory, Integer vehicleType);
+
+    /**
+     * 手工缴费
+     *
+     * @param reqVO 请求参数
+     * @return 记录ID
+     */
+    Long manualPay(ParkingRecordManualPayReqVO reqVO);
 }

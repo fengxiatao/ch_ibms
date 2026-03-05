@@ -73,7 +73,7 @@ CREATE TABLE `iot_access_person_credential` (
     `credential_data` varchar(500) DEFAULT NULL COMMENT '凭证数据（密码加密存储，卡号明文，指纹/人脸为文件路径）',
     `card_no` varchar(50) DEFAULT NULL COMMENT '卡号（仅卡片类型）',
     `finger_index` int DEFAULT NULL COMMENT '指纹序号（仅指纹类型，0-9）',
-    `device_synced` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否已同步到设备',
+    `device_synced` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否已同步到设备',
     `sync_time` datetime DEFAULT NULL COMMENT '同步时间',
     `status` tinyint NOT NULL DEFAULT 0 COMMENT '状态：0-正常，1-停用',
     `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户ID',

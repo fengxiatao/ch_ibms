@@ -521,8 +521,13 @@ export function useDahuaPlayer() {
 
     if (pane.player) {
       try {
+        // 按顺序调用：stop -> close -> destroy
+        // destroy 会终止底层的 Web Worker，防止内存泄漏和控制台日志残留
         pane.player.stop?.()
         pane.player.close?.()
+        // 调用 destroy 彻底销毁播放器实例和 Worker
+        pane.player.destroy?.()
+        console.log(`[大华] 窗格${pane.index + 1} 播放器已销毁`)
       } catch (e) {
         console.warn(`[大华] 窗格${pane.index + 1} 停止异常:`, e)
       }

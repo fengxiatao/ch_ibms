@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.iot.controller.admin.parking.vo.presentvehicle.Pa
 import cn.iocoder.yudao.module.iot.controller.admin.parking.vo.presentvehicle.ParkingPresentVehicleRespVO;
 import cn.iocoder.yudao.module.iot.controller.admin.parking.vo.record.ParkingRecordPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.parking.vo.record.ParkingRecordRespVO;
+import cn.iocoder.yudao.module.iot.controller.admin.parking.vo.record.ParkingRecordManualPayReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.parking.ParkingPresentVehicleDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.parking.ParkingRecordDO;
 import cn.iocoder.yudao.module.iot.service.parking.ParkingRecordService;
@@ -82,6 +83,16 @@ public class ParkingRecordController {
     public CommonResult<ParkingRecordRespVO> getRecord(@RequestParam("id") Long id) {
         ParkingRecordDO record = parkingRecordService.getRecord(id);
         return success(BeanUtils.toBean(record, ParkingRecordRespVO.class));
+    }
+
+    // ========== 手工缴费 ==========
+
+    @PostMapping("/manual-pay")
+    @Operation(summary = "手工缴费")
+    @PreAuthorize("@ss.hasPermission('iot:parking:record:manual-pay')")
+    public CommonResult<Long> manualPay(@Valid @RequestBody ParkingRecordManualPayReqVO reqVO) {
+        Long recordId = parkingRecordService.manualPay(reqVO);
+        return success(recordId);
     }
 
     // ========== 停车费用 ==========

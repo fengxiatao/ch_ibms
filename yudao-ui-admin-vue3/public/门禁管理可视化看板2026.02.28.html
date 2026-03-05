@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>门禁管理系统可视化看板</title>
+    <script src="https://cdn.tailwindcss.com"></script> 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"> 
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap'); 
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            min-height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 50;
+            transition: all 0.3s ease;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+
+        .sidebar.collapsed {
+            width: 70px;
+        }
+
+        .main-content {
+            margin-left: 260px;
+            transition: all 0.3s ease;
+        }
+
+        .main-content.expanded {
+            margin-left: 70px;
+        }
+
+        .menu-item {
+            padding: 14px 20px;
+            color: #cbd5e1;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+            border-left: 3px solid transparent;
+        }
+
+        .menu-item:hover {
+            background-color: #334155;
+            color: white;
+            border-left-color: #3b82f6;
+        }
+
+        .menu-item.active {
+            background-color: #2563eb;
+            color: white;
+            border-left-color: white;
+        }
+
+        .menu-item.has-children::after {
+            content: '▼';
+            position: absolute;
+            right: 20px;
+            font-size: 10px;
+            transition: transform 0.3s ease;
+        }
+
+        .menu-item.has-children.expanded::after {
+            transform: rotate(180deg);
+        }
+
+        .submenu {
+            background-color: #334155;
+            display: none;
+        }
+
+        .submenu.show {
+            display: block;
+        }
+
+        .metric-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+            border: 1px solid #f1f5f9;
+        }
+
+        .metric-card:hover {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid #f1f5f9;
+        }
+
+        .sidebar-toggle {
+            position: fixed;
+            bottom: 20px;
+            left: 275px;
+            background: #2563eb;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 51;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .sidebar-toggle:hover {
+            background: #1d4ed8;
+            transform: scale(1.1);
+        }
+
+        .sidebar.collapsed + .sidebar-toggle {
+            left: 85px;
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.show {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .sidebar-toggle {
+                left: 20px;
+            }
+        }
+
+        .badge {
+            position: absolute;
+            top: 8px;
+            right: 20px;
+            background-color: #ef4444;
+            color: white;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        /* 时间筛选器样式 */
+        .date-filter {
+            background: white;
+            border-radius: 16px;
+            padding: 20px 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid #f1f5f9;
+            margin-bottom: 24px;
+        }
+
+        .date-filter-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 0;
+            flex-wrap: wrap;
+        }
+
+        .date-filter-tab {
+            padding: 8px 16px;
+            border-radius: 8px;
+            background-color: #f1f5f9;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            font-weight: 500;
+            border: 2px solid transparent;
+        }
+
+        .date-filter-tab:hover {
+            background-color: #e2e8f0;
+            color: #334155;
+        }
+
+        .date-filter-tab.active {
+            background-color: #2563eb;
+            color: white;
+            border-color: #1d4ed8;
+        }
+
+        .date-range-picker {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .date-input {
+            padding: 8px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            min-width: 120px;
+        }
+
+        .date-input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .date-separator {
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .apply-btn {
+            padding: 8px 20px;
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .apply-btn:hover {
+            background-color: #1d4ed8;
+            transform: translateY(-1px);
+        }
+
+        /* 数据显示切换按钮样式 */
+        .data-toggle-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 13px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 2px solid transparent;
+        }
+
+        .data-toggle-btn.access {
+            background-color: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+
+        .data-toggle-btn.access.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .data-toggle-btn.reject {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+
+        .data-toggle-btn.reject.active {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        .data-toggle-group {
+            display: flex;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 移动端遮罩 -->
+    <div id="mobile-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden" onclick="toggleMobileSidebar()"></div>
+
+    <!-- 侧边栏 -->
+    <aside id="sidebar" class="sidebar">
+        <div class="p-6 border-b border-gray-700">
+            <div class="flex items-center gap-4">
+                <i class="fas fa-shield-alt text-blue-500 text-3xl"></i>
+                <div id="logo-text">
+                    <h1 class="text-white font-bold text-xl">门禁管理系统</h1>
+                    <p class="text-gray-400 text-xs">Access Control System</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="py-6">
+            <div class="menu-item active" onclick="navigateTo('dashboard', this)">
+                <i class="fas fa-chart-line w-6"></i>
+                <span>可视化看板</span>
+            </div>
+            <div class="menu-item" onclick="navigateTo('personnel', this)">
+                <i class="fas fa-users w-6"></i>
+                <span>人员管理</span>
+            </div>
+            <div class="menu-item has-children" onclick="toggleSubmenu(this)">
+                <i class="fas fa-shield-alt w-6"></i>
+                <span>权限配置</span>
+                <i class="fas fa-chevron-down ml-auto text-xs"></i>
+            </div>
+            <div class="submenu">
+                <div class="menu-item pl-12" onclick="navigateTo('permission-groups', this)">
+                    <i class="fas fa-cogs w-6"></i>
+                    <span>权限组设置</span>
+                </div>
+                <div class="menu-item pl-12" onclick="navigateTo('permission-assign', this)">
+                    <i class="fas fa-user-shield w-6"></i>
+                    <span>权限分配</span>
+                </div>
+                <div class="menu-item pl-12" onclick="navigateTo('permission-schedule', this)">
+                    <i class="fas fa-clock w-6"></i>
+                    <span>时间权限</span>
+                </div>
+            </div>
+            <div class="menu-item" onclick="navigateTo('doors', this)">
+                <i class="fas fa-door-open w-6"></i>
+                <span>门管理</span>
+            </div>
+            <div class="menu-item" onclick="navigateTo('events', this)">
+                <i class="fas fa-bell w-6"></i>
+                <span>事件监控</span>
+                <span class="badge">3</span>
+            </div>
+            <div class="menu-item" onclick="navigateTo('sync', this)">
+                <i class="fas fa-sync-alt w-6"></i>
+                <span>设备人员同步</span>
+            </div>
+            <div class="menu-item" onclick="navigateTo('analytics', this)">
+                <i class="fas fa-chart-bar w-6"></i>
+                <span>数据分析</span>
+            </div>
+            <div class="menu-item" onclick="navigateTo('settings', this)">
+                <i class="fas fa-cog w-6"></i>
+                <span>系统设置</span>
+            </div>
+        </nav>
+
+        <div class="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-700">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg">管</div>
+                <div id="admin-info">
+                    <p class="text-white text-sm font-medium">系统管理员</p>
+                    <p class="text-gray-400 text-xs">admin@company.com</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 侧边栏切换按钮 -->
+    <div class="sidebar-toggle" onclick="toggleSidebar()">
+        <i class="fas fa-chevron-left text-sm" id="toggle-icon"></i>
+    </div>
+
+    <!-- 主内容区 -->
+    <main id="main-content" class="main-content">
+        <!-- 顶部栏 -->
+        <header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6">
+            <div class="flex items-center gap-4">
+                <button class="lg:hidden p-2 rounded-lg hover:bg-gray-100" onclick="toggleMobileSidebar()">
+                    <i class="fas fa-bars text-gray-600"></i>
+                </button>
+                <div class="flex items-center gap-2 bg-gray-100 rounded-lg px-4 py-2">
+                    <i class="fas fa-search text-gray-400"></i>
+                    <input type="text" placeholder="搜索人员、门禁、设备..." class="bg-transparent border-none outline-none text-sm w-64">
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <button class="relative p-2 rounded-lg hover:bg-gray-100">
+                    <i class="fas fa-bell text-gray-600"></i>
+                    <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                </button>
+                <button class="p-2 rounded-lg hover:bg-gray-100">
+                    <i class="fas fa-expand text-gray-600"></i>
+                </button>
+                <div class="hidden md:block text-right">
+                    <p class="text-sm text-gray-600" id="current-date"></p>
+                    <p class="text-xs text-gray-400" id="current-time"></p>
+                </div>
+            </div>
+        </header>
+
+        <!-- 页面标题 -->
+        <div class="bg-white border-b border-gray-200 px-6 py-4">
+            <nav class="text-sm text-gray-500">
+                <span>首页</span>
+                <span class="mx-2">/</span>
+                <span class="text-gray-800 font-medium" id="page-title">可视化看板</span>
+            </nav>
+        </div>
+
+        <!-- 主内容 -->
+        <div class="p-6">
+            <!-- 核心指标 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <div class="metric-card">
+                    <div class="flex items-start justify-between">
+                        <div class="p-3 bg-purple-100 rounded-lg">
+                            <i class="fas fa-clock text-purple-600 text-xl"></i>
+                        </div>
+                        <div class="flex items-center gap-1 text-sm font-medium text-green-600">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>12.8%</span>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <p class="text-gray-500 text-sm">今日总通行人次</p>
+                        <p class="text-3xl font-bold text-gray-800" id="today-entry-count">2,876</p>
+                        <p class="text-gray-400 text-xs">人次</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="flex items-start justify-between">
+                        <div class="p-3 bg-blue-100 rounded-lg">
+                            <i class="fas fa-users text-blue-600 text-xl"></i>
+                        </div>
+                        <div class="flex items-center gap-1 text-sm font-medium text-green-600">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>8.5%</span>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <p class="text-gray-500 text-sm">今日在岗人员通行人次</p>
+                        <p class="text-3xl font-bold text-gray-800" id="today-staff-entry">2,658</p>
+                        <p class="text-gray-400 text-xs">人次</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="flex items-start justify-between">
+                        <div class="p-3 bg-red-100 rounded-lg">
+                            <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+                        </div>
+                        <div class="flex items-center gap-1 text-sm font-medium text-red-600">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>15.3%</span>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <p class="text-gray-500 text-sm">今日异常通行次数</p>
+                        <p class="text-3xl font-bold text-gray-800" id="today-alert-count">48</p>
+                        <p class="text-gray-400 text-xs">告警: 8 | 拒绝: 40</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="flex items-start justify-between">
+                        <div class="p-3 bg-green-100 rounded-lg">
+                            <i class="fas fa-door-open text-green-600 text-xl"></i>
+                        </div>
+                        <div class="flex items-center gap-1 text-sm font-medium text-green-600">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>6.2%</span>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <p class="text-gray-500 text-sm">门禁设备</p>
+                        <p class="text-3xl font-bold text-gray-800">28</p>
+                        <p class="text-gray-400 text-xs">在线: 26 | 离线: 2</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 第一行图表区域 -->
+            <div class="mb-6">
+                <!-- 时间筛选器 -->
+                <div class="date-filter mb-6">
+                    <div class="date-filter-tabs">
+                        <div class="date-filter-tab active" onclick="setDateRange('today')">今日</div>
+                        <div class="date-filter-tab" onclick="setDateRange('week')">本周</div>
+                        <div class="date-filter-tab" onclick="setDateRange('month')">本月</div>
+                        <div class="date-filter-tab" onclick="setDateRange('year')">本年</div>
+                        <div class="date-filter-tab" onclick="setDateRange('custom')">自定义</div>
+                    </div>
+                    
+                    <div id="date-range-picker" class="date-range-picker hidden mt-4">
+                        <input type="date" id="start-date" class="date-input">
+                        <span class="date-separator">至</span>
+                        <input type="date" id="end-date" class="date-input">
+                        <button class="apply-btn" onclick="applyCustomDateRange()">应用</button>
+                    </div>
+                </div>
+
+                <!-- 进入趋势图表 -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <div class="lg:col-span-3 chart-container">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800" id="access-trend-title">24小时进入趋势</h3>
+                            <div class="flex items-center gap-4">
+                                <!-- 新增：数据显示切换按钮组 -->
+                                <div class="data-toggle-group">
+                                    <div class="data-toggle-btn access active" onclick="toggleDataDisplay('access')">
+                                        <span class="w-3 h-3 bg-blue-500 rounded-full"></span>
+                                        <span>进入</span>
+                                    </div>
+                                    <div class="data-toggle-btn reject active" onclick="toggleDataDisplay('reject')">
+                                        <span class="w-3 h-3 bg-red-500 rounded-full"></span>
+                                        <span>拒绝</span>
+                                    </div>
+                                </div>
+                                <!-- 原有图例 -->
+                                <div class="flex items-center gap-4 text-sm hidden">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-3 h-3 bg-blue-500 rounded-full"></span>
+                                        <span class="text-gray-600">进入</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-3 h-3 bg-red-500 rounded-full"></span>
+                                        <span class="text-gray-600">拒绝</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="h-[320px]">
+                            <canvas id="accessTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 告警图表区域 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="chart-container">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4" id="alert-category-title">告警事件分类统计</h3>
+                    <div class="h-[300px]">
+                        <canvas id="alertCategoryChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4" id="alert-trend-title">告警趋势分析（今日）</h3>
+                    <div class="h-[300px]">
+                        <canvas id="alertTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- XX大厦各公司人员进入统计 -->
+            <div class="chart-container mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4" id="company-access-title">XX大厦各公司人员进入统计（今日）</h3>
+                <div class="h-[350px]">
+                    <canvas id="companyAccessChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 全局图表实例
+        let accessTrendChart, alertCategoryChart, alertTrendChart, companyAccessChart;
+        // 当前选中的时间范围
+        let currentDateRange = 'today';
+        // 新增：数据显示状态
+        let dataDisplayState = {
+            access: true,  // 进入数据是否显示
+            reject: true   // 拒绝数据是否显示
+        };
+
+        // 模拟数据集
+        const chartData = {
+            // 今日数据
+            today: {
+                accessTrend: {
+                    labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+                    accessData: [12, 19, 15, 8, 5, 3, 2, 5, 18, 45, 89, 120, 156, 145, 130, 110, 95, 80, 65, 78, 90, 65, 40, 25],
+                    rejectData: [2, 1, 3, 1, 0, 0, 1, 2, 5, 8, 12, 15, 18, 14, 10, 8, 5, 7, 4, 3, 2, 1, 1, 0]
+                },
+                alertCategory: {
+                    labels: ['无效卡', '未授权访问', '门异常开启', '超时未关门', '胁迫开门', '其他'],
+                    data: [18, 12, 8, 5, 3, 2]
+                },
+                alertTrend: {
+                    labels: ['0:00', '2:00', '4:00', '6:00', '8:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'],
+                    data: [0, 1, 0, 2, 5, 8, 7, 6, 5, 4, 3, 2]
+                },
+                companyAccess: {
+                    labels: ['科技有限公司', '金融服务公司', '文化传媒公司', '建筑工程公司', '咨询顾问公司', '电商平台公司', '物流运输公司'],
+                    data: [856, 628, 452, 389, 278, 215, 168]
+                }
+            },
+            // 本周数据
+            week: {
+                accessTrend: {
+                    labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+                    accessData: [2150, 2380, 2450, 2280, 2560, 980, 850],
+                    rejectData: [35, 42, 38, 45, 48, 15, 12]
+                },
+                alertCategory: {
+                    labels: ['无效卡', '未授权访问', '门异常开启', '超时未关门', '胁迫开门', '其他'],
+                    data: [95, 68, 42, 30, 18, 12]
+                },
+                alertTrend: {
+                    labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+                    data: [42, 48, 52, 45, 58, 20, 18]
+                },
+                companyAccess: {
+                    labels: ['科技有限公司', '金融服务公司', '文化传媒公司', '建筑工程公司', '咨询顾问公司', '电商平台公司', '物流运输公司'],
+                    data: [5280, 3850, 2860, 2450, 1850, 1420, 1080]
+                }
+            },
+            // 本月数据
+            month: {
+                accessTrend: {
+                    labels: Array.from({length: 30}, (_, i) => `${i+1}日`),
+                    accessData: [
+                        2150, 2380, 2450, 2280, 2560, 980, 850,
+                        2280, 2450, 2520, 2380, 2650, 1050, 920,
+                        2350, 2520, 2680, 2450, 2780, 1120, 980,
+                        2420, 2580, 2750, 2620, 2850, 1250, 1050,
+                        2380, 2550
+                    ],
+                    rejectData: [
+                        35, 42, 38, 45, 48, 15, 12,
+                        38, 45, 42, 48, 52, 18, 15,
+                        42, 48, 52, 45, 58, 20, 18,
+                        45, 52, 48, 55, 60, 22, 20,
+                        40, 46
+                    ]
+                },
+                alertCategory: {
+                    labels: ['无效卡', '未授权访问', '门异常开启', '超时未关门', '胁迫开门', '其他'],
+                    data: [420, 285, 185, 125, 75, 55]
+                },
+                alertTrend: {
+                    labels: ['第1周', '第2周', '第3周', '第4周'],
+                    data: [185, 205, 220, 210]
+                },
+                companyAccess: {
+                    labels: ['科技有限公司', '金融服务公司', '文化传媒公司', '建筑工程公司', '咨询顾问公司', '电商平台公司', '物流运输公司'],
+                    data: [21500, 15800, 11800, 9850, 7850, 6200, 4850]
+                }
+            },
+            // 本年数据
+            year: {
+                accessTrend: {
+                    labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+                    accessData: [48500, 45200, 52800, 56500, 62800, 65500, 68200, 70500, 68800, 65200, 60800, 58500],
+                    rejectData: [850, 780, 920, 980, 1050, 1120, 1180, 1250, 1180, 1080, 950, 880]
+                },
+                alertCategory: {
+                    labels: ['无效卡', '未授权访问', '门异常开启', '超时未关门', '胁迫开门', '其他'],
+                    data: [4850, 3250, 2150, 1450, 850, 650]
+                },
+                alertTrend: {
+                    labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+                    data: [850, 780, 920, 980, 1050, 1120, 1180, 1250, 1180, 1080, 950, 880]
+                },
+                companyAccess: {
+                    labels: ['科技有限公司', '金融服务公司', '文化传媒公司', '建筑工程公司', '咨询顾问公司', '电商平台公司', '物流运输公司'],
+                    data: [258000, 185000, 142000, 115000, 92000, 75000, 58000]
+                }
+            }
+        };
+
+        // 侧边栏切换
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('main-content');
+            const toggleIcon = document.getElementById('toggle-icon');
+            const logoText = document.getElementById('logo-text');
+            const adminInfo = document.getElementById('admin-info');
+            
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('expanded');
+            
+            if (sidebar.classList.contains('collapsed')) {
+                toggleIcon.classList.remove('fa-chevron-left');
+                toggleIcon.classList.add('fa-chevron-right');
+                logoText.style.display = 'none';
+                adminInfo.style.display = 'none';
+            } else {
+                toggleIcon.classList.remove('fa-chevron-right');
+                toggleIcon.classList.add('fa-chevron-left');
+                logoText.style.display = 'block';
+                adminInfo.style.display = 'block';
+            }
+        }
+
+        // 移动端侧边栏切换
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobile-overlay');
+            
+            sidebar.classList.toggle('show');
+            overlay.classList.toggle('hidden');
+        }
+
+        // 子菜单切换
+        function toggleSubmenu(element) {
+            element.classList.toggle('expanded');
+            const submenu = element.nextElementSibling;
+            submenu.classList.toggle('show');
+        }
+
+        // 导航菜单切换
+        function navigateTo(page, element) {
+            // 移除所有active类
+            document.querySelectorAll('.menu-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            // 给当前点击的菜单添加active类
+            element.classList.add('active');
+            // 更新页面标题
+            document.getElementById('page-title').textContent = element.querySelector('span').textContent;
+        }
+
+        // 日期范围选择
+        function setDateRange(range) {
+            currentDateRange = range;
+            
+            // 移除所有active类
+            document.querySelectorAll('.date-filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            // 给当前点击的标签添加active类
+            event.target.classList.add('active');
+            
+            const dateRangePicker = document.getElementById('date-range-picker');
+            
+            if (range === 'custom') {
+                dateRangePicker.classList.remove('hidden');
+                // 设置默认日期为今日
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('start-date').value = today;
+                document.getElementById('end-date').value = today;
+            } else {
+                dateRangePicker.classList.add('hidden');
+                // 更新所有图表数据
+                updateAllCharts(range);
+            }
+        }
+
+        // 应用自定义日期范围
+        function applyCustomDateRange() {
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            
+            if (startDate && endDate) {
+                // 简单处理：计算日期差，生成模拟数据
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                
+                // 生成自定义数据
+                const customData = {
+                    accessTrend: {
+                        labels: Array.from({length: daysDiff}, (_, i) => {
+                            const date = new Date(start);
+                            date.setDate(start.getDate() + i);
+                            return `${date.getMonth()+1}月${date.getDate()}日`;
+                        }),
+                        accessData: Array.from({length: daysDiff}, () => Math.floor(Math.random() * 2000 + 500)),
+                        rejectData: Array.from({length: daysDiff}, () => Math.floor(Math.random() * 50 + 5))
+                    },
+                    alertCategory: {
+                        labels: ['无效卡', '未授权访问', '门异常开启', '超时未关门', '胁迫开门', '其他'],
+                        data: [
+                            Math.floor(Math.random() * 50 + 10),
+                            Math.floor(Math.random() * 40 + 5),
+                            Math.floor(Math.random() * 30 + 3),
+                            Math.floor(Math.random() * 20 + 2),
+                            Math.floor(Math.random() * 10 + 1),
+                            Math.floor(Math.random() * 10 + 1)
+                        ]
+                    },
+                    alertTrend: {
+                        labels: Array.from({length: daysDiff}, (_, i) => {
+                            const date = new Date(start);
+                            date.setDate(start.getDate() + i);
+                            return `${date.getMonth()+1}月${date.getDate()}日`;
+                        }),
+                        data: Array.from({length: daysDiff}, () => Math.floor(Math.random() * 60 + 5))
+                    },
+                    companyAccess: {
+                        labels: ['科技有限公司', '金融服务公司', '文化传媒公司', '建筑工程公司', '咨询顾问公司', '电商平台公司', '物流运输公司'],
+                        data: Array.from({length: 7}, () => Math.floor(Math.random() * 5000 + 1000))
+                    }
+                };
+                
+                // 更新图表标题
+                document.getElementById('access-trend-title').textContent = `进入趋势 (${startDate} 至 ${endDate})`;
+                document.getElementById('alert-category-title').textContent = `告警事件分类统计 (${startDate} 至 ${endDate})`;
+                document.getElementById('alert-trend-title').textContent = `告警趋势分析 (${startDate} 至 ${endDate})`;
+                document.getElementById('company-access-title').textContent = `XX大厦各公司人员进入统计 (${startDate} 至 ${endDate})`;
+                
+                // 更新图表
+                updateAccessTrendChart(customData.accessTrend);
+                updateAlertCategoryChart(customData.alertCategory);
+                updateAlertTrendChart(customData.alertTrend);
+                updateCompanyAccessChart(customData.companyAccess);
+                
+            } else {
+                alert('请选择开始日期和结束日期');
+            }
+        }
+
+        // 新增：切换数据显示状态
+        function toggleDataDisplay(type) {
+            // 切换显示状态
+            dataDisplayState[type] = !dataDisplayState[type];
+            
+            // 更新按钮样式
+            const btn = document.querySelector(`.data-toggle-btn.${type}`);
+            btn.classList.toggle('active');
+            
+            // 更新图表显示
+            updateAccessTrendDisplay();
+        }
+
+        // 新增：更新进入趋势图的显示状态
+        function updateAccessTrendDisplay() {
+            if (accessTrendChart) {
+                // 设置数据集的隐藏状态
+                accessTrendChart.data.datasets[0].hidden = !dataDisplayState.access;
+                accessTrendChart.data.datasets[1].hidden = !dataDisplayState.reject;
+                
+                // 更新图表
+                accessTrendChart.update();
+            }
+        }
+
+        // 更新当前日期和时间
+        function updateDateTime() {
+            const now = new Date();
+            const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+            const dateString = now.toLocaleDateString('zh-CN', options);
+            const timeString = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            document.getElementById('current-date').textContent = dateString;
+            document.getElementById('current-time').textContent = timeString;
+        }
+
+        // 初始化所有图表
+        function initCharts() {
+            // 更新日期时间
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+
+            // 初始化进入趋势图
+            initAccessTrendChart();
+            
+            // 初始化告警分类图
+            initAlertCategoryChart();
+            
+            // 初始化告警趋势图
+            initAlertTrendChart();
+            
+            // 初始化公司访问统计图
+            initCompanyAccessChart();
+        }
+
+        // 初始化进入趋势图
+        function initAccessTrendChart() {
+            const ctx = document.getElementById('accessTrendChart').getContext('2d');
+            const data = chartData.today.accessTrend;
+            
+            accessTrendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [
+                        {
+                            label: '进入人次',
+                            data: data.accessData,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: true,
+                            hidden: false // 初始显示
+                        },
+                        {
+                            label: '拒绝次数',
+                            data: data.rejectData,
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: true,
+                            hidden: false // 初始显示
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 初始化告警分类图
+        function initAlertCategoryChart() {
+            const ctx = document.getElementById('alertCategoryChart').getContext('2d');
+            const data = chartData.today.alertCategory;
+            
+            alertCategoryChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.data,
+                        backgroundColor: [
+                            '#ef4444',
+                            '#f97316',
+                            '#eab308',
+                            '#22c55e',
+                            '#3b82f6',
+                            '#8b5cf6'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+        }
+
+        // 初始化告警趋势图
+        function initAlertTrendChart() {
+            const ctx = document.getElementById('alertTrendChart').getContext('2d');
+            const data = chartData.today.alertTrend;
+            
+            alertTrendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: '告警次数',
+                        data: data.data,
+                        backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                        borderColor: '#ef4444',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 初始化公司访问统计图
+        function initCompanyAccessChart() {
+            const ctx = document.getElementById('companyAccessChart').getContext('2d');
+            const data = chartData.today.companyAccess;
+            
+            companyAccessChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: '进入人次',
+                        data: data.data,
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.7)',
+                            'rgba(16, 185, 129, 0.7)',
+                            'rgba(249, 115, 22, 0.7)',
+                            'rgba(239, 68, 68, 0.7)',
+                            'rgba(139, 92, 246, 0.7)',
+                            'rgba(236, 72, 153, 0.7)',
+                            'rgba(107, 114, 128, 0.7)'
+                        ],
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 更新所有图表
+        function updateAllCharts(range) {
+            // 更新图表标题
+            const rangeTitles = {
+                today: '24小时',
+                week: '本周',
+                month: '本月',
+                year: '本年'
+            };
+            
+            document.getElementById('access-trend-title').textContent = `${rangeTitles[range]}进入趋势`;
+            document.getElementById('alert-category-title').textContent = `告警事件分类统计（${rangeTitles[range]}）`;
+            document.getElementById('alert-trend-title').textContent = `告警趋势分析（${rangeTitles[range]}）`;
+            document.getElementById('company-access-title').textContent = `XX大厦各公司人员进入统计（${rangeTitles[range]}）`;
+            
+            // 更新各个图表
+            updateAccessTrendChart(chartData[range].accessTrend);
+            updateAlertCategoryChart(chartData[range].alertCategory);
+            updateAlertTrendChart(chartData[range].alertTrend);
+            updateCompanyAccessChart(chartData[range].companyAccess);
+            
+            // 确保数据显示状态生效
+            updateAccessTrendDisplay();
+        }
+
+        // 更新进入趋势图
+        function updateAccessTrendChart(data) {
+            accessTrendChart.data.labels = data.labels;
+            accessTrendChart.data.datasets[0].data = data.accessData;
+            accessTrendChart.data.datasets[1].data = data.rejectData;
+            accessTrendChart.update();
+        }
+
+        // 更新告警分类图
+        function updateAlertCategoryChart(data) {
+            alertCategoryChart.data.labels = data.labels;
+            alertCategoryChart.data.datasets[0].data = data.data;
+            alertCategoryChart.update();
+        }
+
+        // 更新告警趋势图
+        function updateAlertTrendChart(data) {
+            alertTrendChart.data.labels = data.labels;
+            alertTrendChart.data.datasets[0].data = data.data;
+            alertTrendChart.update();
+        }
+
+        // 更新公司访问统计图
+        function updateCompanyAccessChart(data) {
+            companyAccessChart.data.labels = data.labels;
+            companyAccessChart.data.datasets[0].data = data.data;
+            companyAccessChart.update();
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+        });
+    </script>
+</body>
+</html>

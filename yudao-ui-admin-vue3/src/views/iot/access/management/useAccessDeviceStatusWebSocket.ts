@@ -27,6 +27,26 @@ export interface UnifiedDeviceStatusMessage {
   deviceName?: string
 }
 
+/** 门状态变化消息（后端：DOOR_STATE_CHANGE 事件） */
+export interface DoorStateChangeMessage {
+  deviceId: number
+  deviceType: string
+  eventType: string // DOOR_STATE_CHANGE
+  eventData: {
+    channelId: number
+    channelNo: number
+    doorStatus: number       // 0-关闭, 1-打开, 2-未知
+    doorStatusDesc: string
+    lockStatus: number       // 0-已锁, 1-已解锁, 2-未知
+    lockStatusDesc: string
+    alwaysMode: number       // 0-正常, 1-常开, 2-常闭
+    alwaysModeDesc: string
+    action: string           // 操作类型
+    timestamp: number
+  }
+  timestamp: number
+}
+
 export interface UseAccessDeviceStatusWebSocketOptions {
   /** 是否自动连接 */
   autoConnect?: boolean
@@ -34,6 +54,8 @@ export interface UseAccessDeviceStatusWebSocketOptions {
   onAccessDeviceStatus?: (data: AccessDeviceStatusMessage) => void
   /** 统一设备状态变更回调 */
   onUnifiedDeviceStatus?: (data: UnifiedDeviceStatusMessage) => void
+  /** 门状态变化回调（门控操作后的实时状态更新） */
+  onDoorStateChange?: (data: DoorStateChangeMessage) => void
   /** 连接状态变化回调 */
   onConnectionChange?: (connected: boolean) => void
   /** 错误回调 */
@@ -62,11 +84,13 @@ class AccessDeviceStatusWebSocketManager {
   private listeners: {
     accessDeviceStatus: Set<EventCallback<AccessDeviceStatusMessage>>
     unifiedDeviceStatus: Set<EventCallback<UnifiedDeviceStatusMessage>>
+    doorStateChange: Set<EventCallback<DoorStateChangeMessage>>
     connectionChange: Set<EventCallback<boolean>>
     error: Set<EventCallback<Error>>
   } = {
     accessDeviceStatus: new Set(),
     unifiedDeviceStatus: new Set(),
+    doorStateChange: new Set(),
     connectionChange: new Set(),
     error: new Set()
   }
@@ -283,10 +307,15 @@ class AccessDeviceStatusWebSocketManager {
           this.notifyListeners('unifiedDeviceStatus', message.data as UnifiedDeviceStatusMessage)
         }
         break
-      // ========== 以下消息类型由其他 WebSocket Manager 处理，这里静默忽略 ==========
-      case 'COMMAND_RESULT':
+      // ========== 设备事件：处理门状态变化 ==========
       case 'DEVICE_EVENT':
-        // 命令结果和设备事件由专门的处理器处理，这里不做处理
+        if (message.data?.eventType === 'DOOR_STATE_CHANGE') {
+          console.log('[Access Device WebSocket Manager] 📡 门状态变化:', message.data)
+          this.notifyListeners('doorStateChange', message.data as DoorStateChangeMessage)
+        }
+        break
+      case 'COMMAND_RESULT':
+        // 命令结果由专门的处理器处理，这里不做处理
         break
       case 'auth_task_progress':
       case 'auth_task_completed':
@@ -367,6 +396,7 @@ export function useAccessDeviceStatusWebSocket(options: UseAccessDeviceStatusWeb
     autoConnect = true,
     onAccessDeviceStatus,
     onUnifiedDeviceStatus,
+    onDoorStateChange,
     onConnectionChange,
     onError
   } = options
@@ -376,6 +406,7 @@ export function useAccessDeviceStatusWebSocket(options: UseAccessDeviceStatusWeb
   // 注册事件监听器
   if (onAccessDeviceStatus) manager.on('accessDeviceStatus', onAccessDeviceStatus)
   if (onUnifiedDeviceStatus) manager.on('unifiedDeviceStatus', onUnifiedDeviceStatus)
+  if (onDoorStateChange) manager.on('doorStateChange', onDoorStateChange)
   if (onConnectionChange) manager.on('connectionChange', onConnectionChange)
   if (onError) manager.on('error', onError)
 
@@ -392,6 +423,7 @@ export function useAccessDeviceStatusWebSocket(options: UseAccessDeviceStatusWeb
     // 移除事件监听器
     if (onAccessDeviceStatus) manager.off('accessDeviceStatus', onAccessDeviceStatus)
     if (onUnifiedDeviceStatus) manager.off('unifiedDeviceStatus', onUnifiedDeviceStatus)
+    if (onDoorStateChange) manager.off('doorStateChange', onDoorStateChange)
     if (onConnectionChange) manager.off('connectionChange', onConnectionChange)
     if (onError) manager.off('error', onError)
 

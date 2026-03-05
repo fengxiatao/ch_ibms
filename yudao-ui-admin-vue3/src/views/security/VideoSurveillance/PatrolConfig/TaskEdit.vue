@@ -172,6 +172,7 @@ import { Icon } from '@/components/Icon'
 import { ElMessage } from 'element-plus'
 import {
   getPatrolTask,
+  getPatrolTaskList,
   createPatrolTask,
   updatePatrolTask,
   getPatrolSceneByTaskId,
@@ -758,11 +759,35 @@ const handleCancel = () => {
 
 // ==================== 生命周期 ====================
 
+// 计算下一个任务顺序号
+const calculateNextTaskOrder = async () => {
+  if (mode === 'add' && planId) {
+    try {
+      const tasks = await getPatrolTaskList(planId)
+      if (tasks && tasks.length > 0) {
+        // 找到最大的 taskOrder
+        const maxOrder = Math.max(...tasks.map((t: any) => t.taskOrder || 0))
+        form.value.taskOrder = maxOrder + 1
+        form.value.taskName = `新任务${form.value.taskOrder}`
+      } else {
+        form.value.taskOrder = 1
+        form.value.taskName = '新任务1'
+      }
+    } catch (e) {
+      console.error('[任务编辑] 计算任务顺序失败:', e)
+      form.value.taskOrder = 1
+    }
+  }
+}
+
 onMounted(async () => {
   // 加载空间树
   await loadSpaceTree()
   
-  // 加载任务数据
+  // 新建模式下自动计算任务顺序
+  await calculateNextTaskOrder()
+  
+  // 加载任务数据（编辑模式）
   await loadTask()
 })
 
@@ -773,14 +798,14 @@ onBeforeUnmount(() => {
 
 <style scoped lang="scss">
 .task-edit-page { display: flex; flex-direction: column; height: 100%; }
-.header { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: #fff; z-index: 3; gap: 8px; flex-wrap: nowrap; margin-bottom: 2px; }
+.header { padding: 8px 12px; border-bottom: 1px solid var(--el-border-color-lighter); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--el-bg-color-overlay); z-index: 3; gap: 8px; flex-wrap: nowrap; margin-bottom: 2px; }
 .header-left { display: flex; align-items: center; gap: 8px; }
 .header-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .header .unit { margin-left: 6px; color: #64748b; }
 .header-left :deep(.el-form-item) { margin-bottom: 0; }
 .header .unit { line-height: 32px; }
 .content { flex: 1; display: grid; grid-template-columns: 280px 1fr; gap: 10px; padding: 2px 10px; }
-.left { border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
+.left { border-right: 1px solid var(--el-border-color-lighter); display: flex; flex-direction: column; }
 .left-toolbar { display: grid; gap: 8px; padding: 8px; }
 .org-tree { flex: 1; padding: 8px; overflow: auto; }
 
@@ -866,8 +891,8 @@ onBeforeUnmount(() => {
 .channel-list { display: flex; flex-direction: column; gap: 4px; }
 .channel-item { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #cbd5e1; padding: 2px 4px; background: rgba(255,255,255,0.05); border-radius: 2px; }
 .channel-more { font-size: 12px; color: #909399; text-align: center; margin-top: 4px; }
-.table-wrap { border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; background: #fff; height: 220px; margin-bottom: 2px; }
-.footer { padding: 2px 8px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 6px; background: #fff; }
+.table-wrap { border: 1px solid var(--el-border-color-lighter); border-radius: 6px; overflow: hidden; background: var(--el-bg-color-overlay); height: 220px; margin-bottom: 2px; }
+.footer { padding: 2px 8px; border-top: 1px solid var(--el-border-color-lighter); display: flex; justify-content: flex-end; gap: 6px; background: var(--el-bg-color-overlay); }
 .el-table .cell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ops { display: flex; align-items: center; gap: 8px; }
 .op-icon { cursor: pointer; color: #64748b; display: inline-flex; align-items: center; font-size: 16px; }

@@ -41,4 +41,7 @@ public class IotVisitorApplyPageReqVO extends PageParam {
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     private LocalDateTime visitTimeEnd;
 
+    @Schema(description = "是否已签到（用于来访记录查询）", example = "true")
+    private Boolean hasVisited;
+
 }

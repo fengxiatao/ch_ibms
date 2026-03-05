@@ -857,4 +857,9 @@ public class IotDeviceServiceImpl implements IotDeviceService {
                     deviceId, existingConfig != null ? existingConfig.getClass().getSimpleName() : "null");
         }
     }
+    
+    @Override
+    public List<IotDeviceDO> getNvrDevices() {
+        return deviceMapper.selectNvrDevices();
+    }
 }
