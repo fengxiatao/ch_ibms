@@ -72,6 +72,28 @@ const remainingRouter: AppRouteRecordRaw[] = [
     ]
   },
   {
+    path: '/iot/building/env/overview',
+    component: Layout,
+    name: 'IotBuildingEnvOverviewParent',
+    meta: {
+      hidden: true
+    },
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/iot/building/env/overview/index.vue'),
+        name: 'IotBuildingEnvOverview',
+        meta: {
+          title: '室内环境监测数据总览',
+          hidden: true,
+          canTo: true,
+          icon: 'ep:orange',
+          activeMenu: '/iot/building/env/sensor'
+        }
+      }
+    ]
+  },
+  {
     path: '/user',
     component: Layout,
     name: 'UserInfo',

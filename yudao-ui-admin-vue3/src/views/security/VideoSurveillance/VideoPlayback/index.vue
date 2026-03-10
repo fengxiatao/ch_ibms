@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <ContentWrap
     :body-style="{ padding: '0', height: '100%', display: 'flex', flexDirection: 'column' }"
     style="height: 100%; margin-bottom: 0"

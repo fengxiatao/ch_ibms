@@ -137,6 +137,10 @@ $prefix-cls: #{$namespace}-menu;
     width: 100% !important;
     border-right: none;
 
+    .v-menu__item--hidden {
+      display: none !important;
+    }
+
     // 设置选中时子标题的颜色
     .is-active {
       & > .#{$elNamespace}-sub-menu__title {
