@@ -17,7 +17,6 @@ import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceEventLogMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.epatrol.EpatrolTaskMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.parking.ParkingLotMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.visitor.VisitorRecordMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -58,8 +57,6 @@ public class IotDashboardServiceImpl implements IotDashboardService {
     private EpatrolTaskMapper epatrolTaskMapper;
     @Resource
     private ParkingLotMapper parkingLotMapper;
-    @Resource
-    private VisitorRecordMapper visitorRecordMapper;
 
     @Override
     public DeviceStatisticsRespVO getDeviceStatistics() {

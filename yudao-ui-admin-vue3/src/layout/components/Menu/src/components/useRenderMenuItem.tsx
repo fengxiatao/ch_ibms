@@ -7,17 +7,27 @@ import { pathResolve } from '@/utils/routerHelper'
 
 const { renderMenuTitle } = useRenderMenuTitle()
 
-const clickableDirectoryTitles = new Set(['门禁管理', '智慧建筑', '智慧能源'])
+const clickableDirectoryTitles = new Set(['门禁管理', '智慧建筑', '智慧能源', '环境监测'])
 const directoryTitleNavigateTarget = new Map<string, string>([
   ['门禁管理', 'visual-dashboard'],
   ['智慧建筑', '/building/visual-dashboard'],
-  ['智慧能源', '/energy/overview']
+  ['智慧能源', '/energy/overview'],
+  ['环境监测', '/iot/building/env/overview']
 ])
 
 export const useRenderMenuItem = () =>
   // allRouters: AppRouteRecordRaw[] = [],
   {
     const { push } = useRouter()
+
+    const shouldHideMenuItem = (
+      meta: AppRouteRecordRaw['meta'],
+      parentMeta: AppRouteRecordRaw['meta']
+    ) => {
+      const parentTitle = parentMeta?.title != null ? String(parentMeta.title) : ''
+      const title = meta?.title != null ? String(meta.title) : ''
+      return parentTitle === '访客管理' && title === '首页'
+    }
 
     const shouldNavigateDirectoryTitle = (meta: AppRouteRecordRaw['meta']) => {
       if (!meta) return false
@@ -42,7 +52,66 @@ export const useRenderMenuItem = () =>
       }
     }
 
-    const renderMenuItem = (routers: AppRouteRecordRaw[], parentPath = '/') => {
+    const resolveFirstNavigableIndex = (route: AppRouteRecordRaw, routeFullPath: string) => {
+      const resolveFromNode = (node: AppRouteRecordRaw, parentFullPath: string): string | undefined => {
+        if (node?.meta?.hidden) return undefined
+
+        const nodeFullPath = isUrl(node.path) ? node.path : pathResolve(parentFullPath, node.path)
+        if (isUrl(nodeFullPath)) return nodeFullPath
+
+        const { oneShowingChild, onlyOneChild } = hasOneShowingChild(node.children, node)
+        const meta = node.meta ?? {}
+
+        if (
+          oneShowingChild &&
+          (!onlyOneChild?.children || onlyOneChild?.noShowingChildren) &&
+          !meta?.alwaysShow
+        ) {
+          return onlyOneChild ? pathResolve(nodeFullPath, onlyOneChild.path) : nodeFullPath
+        }
+
+        const children = (node.children ?? []).filter((v) => !v.meta?.hidden)
+        if (!children.length) return nodeFullPath
+        for (const child of children) {
+          const hit = resolveFromNode(child, nodeFullPath)
+          if (hit) return hit
+        }
+        return undefined
+      }
+
+      const children = (route.children ?? []).filter((v) => !v.meta?.hidden)
+      if (!children.length) return undefined
+      for (const child of children) {
+        const hit = resolveFromNode(child, routeFullPath)
+        if (hit) return hit
+      }
+      return undefined
+    }
+
+    const handleDirectoryTitleClick = (
+      event: MouseEvent,
+      fullPath: string,
+      meta: AppRouteRecordRaw['meta'],
+      route: AppRouteRecordRaw
+    ) => {
+      if (shouldNavigateDirectoryTitle(meta)) {
+        navigate(event, fullPath, meta)
+        return
+      }
+      const firstIndex = resolveFirstNavigableIndex(route, fullPath)
+      if (!firstIndex) return
+      if (isUrl(firstIndex)) {
+        window.open(firstIndex)
+      } else {
+        push(firstIndex)
+      }
+    }
+
+    const renderMenuItem = (
+      routers: AppRouteRecordRaw[],
+      parentPath = '/',
+      parentRoute?: AppRouteRecordRaw
+    ) => {
       return routers
         .filter((v) => !v.meta?.hidden)
         .map((v) => {
@@ -55,9 +124,12 @@ export const useRenderMenuItem = () =>
             (!onlyOneChild?.children || onlyOneChild?.noShowingChildren) &&
             !meta?.alwaysShow
           ) {
+            const menuItemMeta = (onlyOneChild ? onlyOneChild?.meta : meta) as AppRouteRecordRaw['meta']
+            const menuItemClass = shouldHideMenuItem(menuItemMeta, parentRoute?.meta) ? 'v-menu__item--hidden' : ''
             return (
               <ElMenuItem
                 index={onlyOneChild ? pathResolve(fullPath, onlyOneChild.path) : fullPath}
+                class={menuItemClass}
               >
                 {{
                   default: () => renderMenuTitle(onlyOneChild ? onlyOneChild?.meta : meta)
@@ -69,14 +141,18 @@ export const useRenderMenuItem = () =>
               <ElSubMenu index={fullPath}>
                 {{
                   title: () =>
-                    shouldNavigateDirectoryTitle(meta) ? (
-                      <span onClick={(event) => navigate(event as MouseEvent, fullPath, meta)}>
+                    v.children && v.children.length ? (
+                      <span
+                        onClick={(event) =>
+                          handleDirectoryTitleClick(event as MouseEvent, fullPath, meta, v)
+                        }
+                      >
                         {renderMenuTitle(meta)}
                       </span>
                     ) : (
                       renderMenuTitle(meta)
                     ),
-                  default: () => renderMenuItem(v.children!, fullPath)
+                  default: () => renderMenuItem(v.children!, fullPath, v)
                 }}
               </ElSubMenu>
             )

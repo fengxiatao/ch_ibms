@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>室内环境监测数据总览</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+        * { font-family: 'Inter', 'Noto Sans SC', sans-serif; }
+        body { background: #f0f4f8; color: #1e293b; padding: 20px; }
+        
+        .glass-panel { background: rgba(255,255,255,0.85); backdrop-filter: blur(8px); border: 1px solid rgba(0,0,0,0.05); }
+        .metric-card { background:#ffffff; border:1px solid #e9eef2; border-radius:1.5rem; }
+        .weather-card { background: linear-gradient(145deg,#ffffff 0%,#f9fcff 100%); border:1px solid #dde7f0; }
+        .badge-outdoor { background:#e6f0fa; color:#1e4b7a; font-size:0.7rem; }
+        .pulse-dot { width:8px; height:8px; border-radius:50%; background:#10b981; display:inline-block; animation:pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+        .digital-number { font-variant-numeric: tabular-nums; letter-spacing:-0.02em; }
+        .point-card { background:white; border-radius:1.2rem; border:1px solid #e2e8f0; transition:0.15s; }
+        .point-card:hover { border-color:#94a3b8; box-shadow:0 4px 12px rgba(0,50,100,0.05); }
+        .icon-circle { width:36px; height:36px; border-radius:12px; display:flex; align-items:center; justify-content:center; }
+        .chart-container { height:200px; width:100%; }
+        .building-tag { font-size:0.65rem; background:#e6f0fa; color:#0369a1; padding:0.15rem 0.6rem; border-radius:12px; }
+        .blink-light { animation: soft-blink 2s infinite; }
+        @keyframes soft-blink { 0%,100%{opacity:1;background:#e0f2fe;} 50%{opacity:0.6;background:#bae6fd;} }
+        .update-tag { font-size:0.6rem; background:#f1f5f9; padding:0.15rem 0.5rem; border-radius:20px; color:#64748b; display:inline-flex; align-items:center; gap:0.25rem; }
+        
+        /* 按钮组样式 */
+        .btn-group {
+            display: flex;
+            background: #f1f5f9;
+            border-radius: 8px;
+            padding: 2px;
+        }
+        .btn-group button {
+            padding: 4px 12px;
+            font-size: 0.7rem;
+            border-radius: 6px;
+            transition: all 0.2s;
+            color: #64748b;
+        }
+        .btn-group button.active {
+            background: white;
+            color: #2563eb;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        /* 趋势卡片头部控件 */
+        .trend-header-controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            font-size: 13px;
+            flex-wrap: wrap;
+        }
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .control-label {
+            color: #64748b;
+            font-size: 0.75rem;
+        }
+        select {
+            padding: 4px 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background-color: #f8fafc;
+            font-size: 0.75rem;
+            color: #1e293b;
+            cursor: pointer;
+            outline: none;
+        }
+        select:hover { border-color: #3b82f6; }
+
+        /* 当前数值卡片 */
+        .current-value-card {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+        .current-value-label {
+            font-size: 0.7rem;
+            color: #64748b;
+        }
+        .current-value-number {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        .current-value-unit {
+            font-size: 0.65rem;
+            color: #94a3b8;
+            margin-left: 2px;
+        }
+        .current-value-status {
+            font-size: 0.6rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <div class="max-w-7xl mx-auto space-y-5">
+
+        <!-- 顶部导航 -->
+        <header class="glass-panel sticky top-0 z-50 px-6 py-3 rounded-2xl flex flex-wrap items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center shadow"><i class="fas fa-water text-white text-sm"></i></div>
+                <h1 class="text-xl font-bold text-slate-800">室内环境监测数据总览</h1>
+               
+            </div>
+            <div class="flex items-center gap-4 text-sm">
+                <div class="flex items-center gap-2 text-slate-500"><i class="far fa-clock"></i> <span id="currentTime" class="digital-number text-blue-600"></span></div>
+                <div class="flex items-center gap-2 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-200"><span class="pulse-dot"></span><span class="text-emerald-700 text-xs">系统正常</span></div>
+            </div>
+        </header>
+
+        <!-- 第一行：联网设备统计 + 室外天气 + 空气质量 + CO₂（保持不变） -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-5">
+            <!-- 联网设备统计卡片 -->
+            <div class="metric-card p-5 lg:col-span-1 flex flex-col justify-between">
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-500 text-sm flex items-center gap-1"><i class="fas fa-wifi text-blue-400"></i> 联网设备统计</span>
+                    <span class="bg-slate-100 text-xs px-2 py-0.5 rounded-full">总数30台</span>
+                </div>
+                <div class="flex items-baseline justify-between mt-3">
+                    <div><span class="text-3xl font-bold text-slate-800 digital-number">26</span> <span class="text-sm text-slate-500 ml-1">在线</span></div>
+                    <div><span class="text-xl font-semibold text-red-400 digital-number">4</span> <span class="text-sm text-slate-500">离线</span></div>
+                </div>
+                <div class="grid grid-cols-1 gap-1 mt-3 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <div class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-blue-300"></span> 温湿度传感器 离线 <span class="font-mono">1</span></div>
+                    <div class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-teal-300"></span> 空气质量传感器 离线 <span class="font-mono">2</span></div>
+                    <div class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-purple-300"></span> CO₂传感器 离线 <span class="font-mono">1</span></div>
+                </div>
+                <div class="mt-2 flex items-center justify-end text-[10px]">
+                    <span class="update-tag"><i class="far fa-clock"></i> 更新于 10:32</span>
+                </div>
+            </div>
+
+            <div class="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-5">
+                <!-- 室外天气 - 广州 -->
+                <div class="weather-card rounded-2xl p-5 flex flex-col">
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-500 text-sm"><i class="fa-regular fa-sun me-1"></i>室外天气</span>
+                        <span class="badge-outdoor px-2 py-0.5 rounded-full">广东省广州市</span>
+                    </div>
+                    <div class="flex items-center mt-2 gap-2">
+                        <i class="fa-solid fa-cloud-sun text-3xl text-amber-400"></i>
+                        <span class="text-2xl font-semibold">28°C</span>
+                        <span class="text-slate-400 text-sm">湿度 72%</span>
+                    </div>
+                    <div class="text-xs text-slate-500 mt-1">多云转阴 · 体感闷热</div>
+                    <div class="mt-3 text-xs bg-blue-50 p-2 rounded-xl flex justify-between items-center">
+                        <span>建议携带雨具</span>
+                        <span class="update-tag"><i class="far fa-clock"></i> 更新于 10:25</span>
+                    </div>
+                </div>
+
+                <!-- 空气质量卡片 -->
+                <div class="weather-card rounded-2xl p-5 flex flex-col">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1 text-sm text-slate-500"><i class="fa-solid fa-wind text-teal-400"></i> 空气质量</div>
+                        <span class="update-tag"><i class="far fa-clock"></i> 更新于 10:28</span>
+                    </div>
+                    <div class="mt-1 flex items-center justify-between">
+                        <span class="text-2xl font-bold text-emerald-500">优</span>
+                        <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">AQI 32</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mt-3">
+                        <div class="bg-slate-50 p-2 rounded-xl text-center"><span class="text-xs text-slate-400">PM2.5</span><div class="font-semibold">25 <span class="text-xs">μg/m³</span></div></div>
+                        <div class="bg-slate-50 p-2 rounded-xl text-center"><span class="text-xs text-slate-400">PM10</span><div class="font-semibold">42 <span class="text-xs">μg/m³</span></div></div>
+                    </div>
+                    <div class="flex justify-between mt-3 text-xs border-t pt-2">
+                        <span>甲醛 0.025</span>
+                        <span>TVOC 0.821</span>
+                    </div>
+                </div>
+
+                <!-- CO₂浓度卡片 -->
+                <div class="weather-card rounded-2xl p-5 flex flex-col">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1 text-sm text-slate-500">
+                            <i class="fa-solid fa-wind text-purple-400"></i> CO₂浓度
+                        </div>
+                        <span class="update-tag"><i class="far fa-clock"></i> 更新于 10:29</span>
+                    </div>
+                    <div class="flex items-baseline gap-2 mt-1">
+                        <span class="text-3xl font-light digital-number">458</span>
+                        <span class="text-xs text-slate-400">ppm</span>
+                    </div>
+                    <div class="mt-2 flex items-center gap-1 text-xs flex-wrap">
+                        <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">正常</span>
+                        <span class="text-slate-400">良好 (≤450)</span>
+                        <span class="text-slate-400">正常 (450-1000)</span>
+                        <span class="text-slate-400">警戒 (1000-2000)</span>
+                    </div>
+                    <div class="w-full bg-slate-200 h-1.5 rounded-full mt-2 overflow-hidden flex">
+                        <div class="bg-emerald-400 h-full" style="width: 45%"></div>
+                    </div>
+                    <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+                        <span>400</span><span>800</span><span>1200</span><span>2000</span>
+                    </div>
+                    <div class="mt-3 text-xs bg-purple-50 p-2 rounded-xl text-slate-600 flex items-start gap-2">
+                        <i class="fa-regular fa-clock text-purple-400 mt-0.5"></i>
+                        <span>通风建议：当前CO₂正常，建议每小时开窗</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第二行：温湿度变化统计（按钮调整为近24h/近7天/近30天） -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div class="lg:col-span-2 glass-panel rounded-2xl p-5">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center gap-3">
+                        <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-chart-simple text-blue-500"></i><span id="chartTitle">温湿度变化统计</span></h3>
+                        <div class="btn-group">
+                            <button id="tempDayBtn" class="active">近24小时</button>
+                            <button id="tempWeekBtn">近7天</button>
+                            <button id="tempMonthBtn">近30天</button>
+                        </div>
+                    </div>
+                    <span class="update-tag"><i class="far fa-clock"></i> 图表实时更新</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="tempHumidChart"></canvas>
+                </div>
+            </div>
+            <div class="glass-panel rounded-2xl p-5 flex flex-col">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2"><i class="fa-solid fa-calendar-week text-indigo-400"></i><span class="text-sm font-semibold text-slate-700">历史数据对比</span></div>
+                    <span class="update-tag"><i class="far fa-clock"></i> 10:30对比</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-center text-xs">
+                    <div class="bg-blue-50 p-2 rounded-xl"><span class="text-slate-400">今日室内平均温度</span><div class="text-lg font-semibold text-blue-600 digital-number">24.8°C</div><span class="text-slate-400">较昨天 <span class="text-amber-500">+0.5°</span></span></div>
+                    <div class="bg-purple-50 p-2 rounded-xl"><span class="text-slate-400">今日室内平均湿度</span><div class="text-lg font-semibold text-purple-600 digital-number">56%</div><span class="text-slate-400">较昨天 <span class="text-emerald-500">-2%</span></span></div>
+                    <div class="bg-teal-50 p-2 rounded-xl"><span class="text-slate-400">PM2.5 今天</span><div class="text-lg font-semibold text-teal-600 digital-number">23</div><span class="text-slate-400">昨天 26 ↓3</span></div>
+                    <div class="bg-amber-50 p-2 rounded-xl"><span class="text-slate-400">甲醛 今天</span><div class="text-lg font-semibold text-amber-600 digital-number">0.022</div><span class="text-slate-400">昨天 0.028 ↓</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第三行：空气质量趋势图（时间筛选改为按钮） -->
+        <div class="glass-panel rounded-2xl p-5">
+            <!-- 头部：标题 + 数据来源 + 时间按钮 + 数据截止日期 -->
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line text-blue-500"></i>
+                    <h3 class="text-sm font-semibold text-slate-700">空气质量趋势图</h3>
+                </div>
+                
+                <div class="trend-header-controls">
+                    <div class="control-item">
+                        <span class="control-label">数据来源：</span>
+                        <select id="dataSourceSelect">
+                            <option value="A栋1层监测点">A栋1层监测点</option>
+                            <option value="A栋3层监测点">A栋3层监测点</option>
+                            <option value="B栋2层监测点">B栋2层监测点</option>
+                            <option value="B栋4层监测点" selected>B栋4层监测点</option>
+                            <option value="全楼10个监测点平均值">全楼10个监测点平均值</option>
+                        </select>
+                    </div>
+                    <div class="control-item">
+                        <span class="control-label sr-only">时间筛选：</span>
+                        <div class="btn-group">
+                            <button id="airDayBtn" class="active">近24小时</button>
+                            <button id="airWeekBtn">近7天</button>
+                            <button id="airMonthBtn">近30天</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-xs text-slate-400 flex items-center gap-2">
+                    <span>数据截止日期：</span>
+                    <span class="update-tag" id="dataCutoffTime">2026年3月3日 21:00</span>
+                </div>
+            </div>
+
+            <!-- 当前数值卡片（PM2.5、TVOC、甲醛） -->
+            <div class="grid grid-cols-3 gap-4 mb-4">
+                <div class="current-value-card">
+                    <div class="current-value-label">PM2.5</div>
+                    <div><span class="current-value-number" id="currentPm25">23</span><span class="current-value-unit">μg/m³</span></div>
+                    <div class="current-value-status bg-emerald-100 text-emerald-700">优</div>
+                </div>
+                <div class="current-value-card">
+                    <div class="current-value-label">TVOC</div>
+                    <div><span class="current-value-number" id="currentTvoc">0.47</span><span class="current-value-unit">mg/m³</span></div>
+                    <div class="current-value-status bg-emerald-100 text-emerald-700">优</div>
+                </div>
+                <div class="current-value-card">
+                    <div class="current-value-label">甲醛</div>
+                    <div><span class="current-value-number" id="currentHcho">0.019</span><span class="current-value-unit">mg/m³</span></div>
+                    <div class="current-value-status bg-emerald-100 text-emerald-700">优</div>
+                </div>
+            </div>
+
+            <!-- 图表容器 -->
+            <div class="chart-container" style="height: 220px;">
+                <canvas id="airQualityTrendChart"></canvas>
+            </div>
+
+            <!-- 图例说明 -->
+            <div class="flex justify-end gap-4 mt-2 text-xs">
+                <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-blue-500"></span> PM2.5 (μg/m³)</div>
+                <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-amber-500"></span> TVOC (mg/m³×100)</div>
+                <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> 甲醛 (mg/m³×1000)</div>
+            </div>
+        </div>
+
+        <!-- 第四行：楼层监测点位（保持不变） -->
+        <div class="glass-panel rounded-2xl p-5">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+                <div class="flex items-center gap-3">
+                    <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i class="fa-solid fa-layer-group text-indigo-400"></i> 楼层监测点位</h3>
+                    <div class="flex bg-slate-100 rounded-lg p-0.5 text-xs" id="filterGroup">
+                        <button id="filterAll" class="filter-btn px-3 py-1 rounded-md bg-white shadow-sm font-medium text-blue-600">全部 (10)</button>
+                        <button id="filterABuilding" class="filter-btn px-3 py-1 rounded-md text-slate-500 hover:bg-white/50">A栋</button>
+                        <button id="filterBBuilding" class="filter-btn px-3 py-1 rounded-md text-slate-500 hover:bg-white/50">B栋</button>
+                        <button id="filterAlarm" class="filter-btn px-3 py-1 rounded-md text-slate-500 hover:bg-white/50">仅告警/离线</button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+           
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="pollingToggle" class="sr-only peer" checked>
+                 
+                    </label>
+          
+                </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="floorPointContainer"></div>
+            <div class="text-xs text-slate-400 text-right mt-3 flex justify-between items-center">
+                <span id="filterHint">当前显示全部楼层</span>
+                <span class="update-tag"><i class="far fa-clock"></i> 点位数据采集 10:28-10:32</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 更新时间
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleString('zh-CN', {hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit'});
+        }
+        setInterval(updateTime,1000); updateTime();
+
+        // 温湿度图表 - 近24小时/近7天/近30天数据
+        const chartTitle = document.getElementById('chartTitle');
+        const tempDayBtn = document.getElementById('tempDayBtn');
+        const tempWeekBtn = document.getElementById('tempWeekBtn');
+        const tempMonthBtn = document.getElementById('tempMonthBtn');
+        const ctx = document.getElementById('tempHumidChart').getContext('2d');
+        
+        // 近24小时数据（每2小时）
+        const hourLabels = ['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'];
+        const hourTemp = [21, 20, 19, 21, 23, 26, 28, 27, 26, 24, 22, 21];
+        const hourHum = [65, 68, 70, 66, 58, 50, 45, 47, 51, 58, 62, 64];
+        
+        // 近7天数据（按天）
+        const weekLabels = ['第1天', '第2天', '第3天', '第4天', '第5天', '第6天', '第7天'];
+        const weekTemp = [23, 24, 26, 27, 25, 22, 21];
+        const weekHum = [58, 55, 50, 48, 52, 60, 62];
+        
+        // 近30天数据（每5天一个点）
+        const monthLabels = ['第5天', '第10天', '第15天', '第20天', '第25天', '第30天'];
+        const monthTemp = [22, 24, 26, 25, 23, 21];
+        const monthHum = [60, 55, 48, 52, 58, 62];
+
+        let tempChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: hourLabels,
+                datasets: [
+                    { label: '温度 (°C)', data: hourTemp, borderColor: '#2563eb', tension: 0.3, fill: false, yAxisID: 'y' },
+                    { label: '湿度 (%)', data: hourHum, borderColor: '#9333ea', tension: 0.3, fill: false, yAxisID: 'y1' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top', labels: { boxWidth: 12 } } },
+                scales: {
+                    y: { type: 'linear', display: true, position: 'left', beginAtZero: false },
+                    y1: { type: 'linear', display: true, position: 'right', beginAtZero: false, grid: { drawOnChartArea: false } }
+                }
+            }
+        });
+
+        function setTempDayView() {
+            chartTitle.innerText = '温湿度变化统计';
+            tempChart.data.labels = hourLabels;
+            tempChart.data.datasets[0].data = hourTemp;
+            tempChart.data.datasets[1].data = hourHum;
+            tempChart.update();
+            
+            tempDayBtn.classList.add('active');
+            tempWeekBtn.classList.remove('active');
+            tempMonthBtn.classList.remove('active');
+        }
+
+        function setTempWeekView() {
+            chartTitle.innerText = '温湿度变化统计';
+            tempChart.data.labels = weekLabels;
+            tempChart.data.datasets[0].data = weekTemp;
+            tempChart.data.datasets[1].data = weekHum;
+            tempChart.update();
+            
+            tempWeekBtn.classList.add('active');
+            tempDayBtn.classList.remove('active');
+            tempMonthBtn.classList.remove('active');
+        }
+
+        function setTempMonthView() {
+            chartTitle.innerText = '温湿度变化统计';
+            tempChart.data.labels = monthLabels;
+            tempChart.data.datasets[0].data = monthTemp;
+            tempChart.data.datasets[1].data = monthHum;
+            tempChart.update();
+            
+            tempMonthBtn.classList.add('active');
+            tempDayBtn.classList.remove('active');
+            tempWeekBtn.classList.remove('active');
+        }
+
+        tempDayBtn.addEventListener('click', setTempDayView);
+        tempWeekBtn.addEventListener('click', setTempWeekView);
+        tempMonthBtn.addEventListener('click', setTempMonthView);
+
+        // 楼层数据（保持不变）
+        const floorData = [
+            { id:101, name:'A栋1层', code:'A-1F', building:'A栋智能控制中心', floorNum:1, temp:23.5, hum:58, pm25:22,甲醛:0.021, tVOC:0.62, status:'在线', comfort:'舒适', airGrade:'优',采集时间:'10:28' },
+            { id:102, name:'A栋2层', code:'A-2F', building:'A栋智能控制中心', floorNum:2, temp:24.2, hum:55, pm25:18,甲醛:0.018, tVOC:0.55, status:'在线', comfort:'舒适', airGrade:'优',采集时间:'10:28' },
+            { id:103, name:'A栋3层', code:'A-3F', building:'A栋智能控制中心', floorNum:3, temp:25.0, hum:52, pm25:25,甲醛:0.025, tVOC:0.71, status:'在线', comfort:'舒适', airGrade:'优',采集时间:'10:29' },
+            { id:104, name:'A栋4层', code:'A-4F', building:'A栋智能控制中心', floorNum:4, temp:24.8, hum:53, pm25:30,甲醛:0.032, tVOC:0.89, status:'告警', comfort:'略闷', airGrade:'良', warn:'PM2.5',采集时间:'10:29' },
+            { id:105, name:'A栋5层', code:'A-5F', building:'A栋智能控制中心', floorNum:5, temp:24.0, hum:56, pm25:21,甲醛:0.022, tVOC:0.65, status:'在线', comfort:'舒适', airGrade:'优',采集时间:'10:30' },
+            { id:106, name:'A栋6层', code:'A-6F', building:'A栋智能控制中心', floorNum:6, temp:23.8, hum:59, pm25:19,甲醛:0.020, tVOC:0.58, status:'在线', comfort:'舒适', airGrade:'优',采集时间:'10:30' },
+            { id:201, name:'B栋1层', code:'B-1F', building:'B栋研发大楼', floorNum:1, temp:22.5, hum:62, pm25:15,甲醛:0.015, tVOC:0.45, status:'在线', comfort:'舒适', airGrade:'优',采集时间:'10:31' },
+            { id:202, name:'B栋2层', code:'B-2F', building:'B栋研发大楼', floorNum:2, temp:23.0, hum:60, pm25:17,甲醛:0.016, tVOC:0.48, status:'在线', comfort:'舒适', airGrade:'优',采集时间:'10:31' },
+            { id:203, name:'B栋3层', code:'B-3F', building:'B栋研发大楼', floorNum:3, temp:23.2, hum:61, pm25:20,甲醛:0.024, tVOC:0.70, status:'离线', comfort:'--', airGrade:'--', offline:true,采集时间:'10:32' },
+            { id:204, name:'B栋4层', code:'B-4F', building:'B栋研发大楼', floorNum:4, temp:23.9, hum:57, pm25:23,甲醛:0.028, tVOC:0.78, status:'在线', comfort:'舒适', airGrade:'优',采集时间:'10:32' }
+        ];
+
+        let currentFilter = 'all';
+        let pollingEnabled = true;
+        let pollingInterval;
+
+        function renderFloorCards() {
+            const container = document.getElementById('floorPointContainer');
+            container.innerHTML = '';
+            let filtered = floorData;
+            if (currentFilter === 'A') filtered = floorData.filter(f => f.building.includes('A栋'));
+            else if (currentFilter === 'B') filtered = floorData.filter(f => f.building.includes('B栋'));
+            else if (currentFilter === 'alarm') filtered = floorData.filter(f => f.status === '告警' || f.status === '离线' || f.offline);
+
+            filtered.forEach(f => {
+                const isOffline = f.status === '离线' || f.offline;
+                const statusColor = isOffline ? 'bg-slate-100 text-slate-500' : (f.status ==='告警' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700');
+                const badgeText = isOffline ? '离线' : (f.status==='告警' ? '告警' : '在线');
+                const card = document.createElement('div');
+                card.className = 'point-card p-4 hover:shadow-md transition';
+                card.innerHTML = `
+                    <div class="flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <div class="icon-circle bg-indigo-50"><i class="fa-solid fa-layer-group text-indigo-400 text-xs"></i></div>
+                        <div>
+                            <div class="font-medium text-sm">${f.name} <span class="text-slate-400 text-[10px] ml-1">${f.code}</span></div>
+                            <div class="text-[10px] text-slate-400 flex items-center gap-1"><span class="building-tag">${f.building}</span> 楼层 ${f.floorNum}</div>
+                        </div>
+                        <span class="ml-auto text-[10px] px-2 py-0.5 rounded-full ${statusColor}">${badgeText}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-3 gap-y-2 mt-3 text-xs">
+                        <div><span class="text-slate-400">甲醛</span><br><span class="font-medium">${f.甲醛.toFixed(3)} mg/m³</span> <span class="text-emerald-500 text-[9px]">${f.甲醛<0.03?'优':'良'}</span></div>
+                        <div><span class="text-slate-400">TVOC</span><br><span class="font-medium">${f.tVOC.toFixed(2)} mg/m³</span> <span class="${f.tVOC<0.6?'text-emerald-500':'text-amber-500'} text-[9px]">${f.tVOC<0.6?'优':'轻度'}</span></div>
+                        <div><span class="text-slate-400">PM2.5</span><br><span class="font-medium">${f.pm25} μg/m³</span> <span class="text-emerald-500 text-[9px]">${f.pm25<25?'优':'良'}</span></div>
+                        <div><span class="text-slate-400">室内温湿度</span><br><span class="font-medium">${f.temp}°C / ${f.hum}%</span></div>
+                    </div>
+                    <div class="flex justify-between items-center mt-2 text-[9px] text-slate-400 border-t pt-2">
+                        <div class="flex items-center gap-1">
+                            <i class="fa-regular fa-face-smile mr-1"></i>${f.comfort}
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span>空气质量 ${f.airGrade}</span>
+                            <span class="update-tag"><i class="far fa-clock"></i> ${f.采集时间}</span>
+                        </div>
+                        ${f.warn ? '<span class="text-amber-500"><i class="fa-solid fa-triangle-exclamation"></i> '+f.warn+'</span>' : ''}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            document.getElementById('filterHint').innerText = `当前显示 ${filtered.length} 个楼层 (${currentFilter==='all'?'全部':currentFilter==='A'?'A栋':currentFilter==='B'?'B栋':'告警/离线'})`;
+        }
+
+        function updateFilterButtons(activeId) {
+            document.querySelectorAll('#filterGroup .filter-btn').forEach(btn => btn.classList.remove('bg-white','shadow-sm','text-blue-600'));
+            const activeBtn = document.getElementById(activeId);
+            if(activeBtn) activeBtn.classList.add('bg-white','shadow-sm','text-blue-600');
+        }
+
+        document.getElementById('filterAll').addEventListener('click', ()=>{ currentFilter='all'; updateFilterButtons('filterAll'); renderFloorCards(); });
+        document.getElementById('filterABuilding').addEventListener('click', ()=>{ currentFilter='A'; updateFilterButtons('filterABuilding'); renderFloorCards(); });
+        document.getElementById('filterBBuilding').addEventListener('click', ()=>{ currentFilter='B'; updateFilterButtons('filterBBuilding'); renderFloorCards(); });
+        document.getElementById('filterAlarm').addEventListener('click', ()=>{ currentFilter='alarm'; updateFilterButtons('filterAlarm'); renderFloorCards(); });
+
+        function pollingUpdate() {
+            if (!pollingEnabled) return;
+            floorData.forEach(item => {
+                item.甲醛 = +(item.甲醛 * (1 + (Math.random()*0.04 - 0.02))).toFixed(3);
+                if(item.甲醛 < 0.01) item.甲醛=0.015;
+                item.tVOC = +(item.tVOC * (1 + (Math.random()*0.06 - 0.03))).toFixed(2);
+                if(item.tVOC < 0.3) item.tVOC=0.45;
+                item.pm25 = Math.max(10, Math.min(50, item.pm25 + Math.floor(Math.random()*3 -1) ));
+                const now = new Date();
+                item.采集时间 = `${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')}`;
+            });
+            renderFloorCards();
+        }
+
+        const toggleCheckbox = document.getElementById('pollingToggle');
+        const pollingStatus = document.getElementById('pollingStatus');
+        toggleCheckbox.addEventListener('change', function(e) {
+            pollingEnabled = e.target.checked;
+            if (pollingEnabled) {
+                pollingStatus.innerHTML = '● 轮询中';
+                pollingInterval = setInterval(pollingUpdate, 10000);
+            } else {
+                pollingStatus.innerHTML = '○ 已暂停';
+                clearInterval(pollingInterval);
+            }
+        });
+        pollingInterval = setInterval(pollingUpdate, 10000);
+        renderFloorCards();
+        updateFilterButtons('filterAll');
+
+        // 空气质量趋势图 - 数据来源 + 时间按钮联动
+        const dataSourceSelect = document.getElementById('dataSourceSelect');
+        const airDayBtn = document.getElementById('airDayBtn');
+        const airWeekBtn = document.getElementById('airWeekBtn');
+        const airMonthBtn = document.getElementById('airMonthBtn');
+        const dataCutoffTime = document.getElementById('dataCutoffTime');
+        const currentPm25 = document.getElementById('currentPm25');
+        const currentTvoc = document.getElementById('currentTvoc');
+        const currentHcho = document.getElementById('currentHcho');
+        
+        const trendCtx = document.getElementById('airQualityTrendChart').getContext('2d');
+        
+        // 不同数据来源和时间筛选对应的数据（基于楼层监测点位的实际数据）
+        const trendDataMap = {
+            'A栋1层监测点': {
+                '近24小时': {
+                    labels: ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00'],
+                    pm25: [22, 23, 25, 26, 28, 27, 24, 22],
+                    tvoc: [0.62, 0.64, 0.66, 0.68, 0.70, 0.69, 0.65, 0.62],
+                    hcho: [0.021, 0.022, 0.023, 0.024, 0.025, 0.024, 0.023, 0.021],
+                    cutoff: '2026年3月3日 21:00',
+                    current: { pm25: 22, tvoc: 0.62, hcho: 0.021 }
+                },
+                '近7天': {
+                    labels: ['3/1', '3/2', '3/3', '3/4', '3/5', '3/6', '3/7'],
+                    pm25: [24, 26, 22, 25, 28, 30, 26],
+                    tvoc: [0.64, 0.68, 0.62, 0.66, 0.72, 0.75, 0.68],
+                    hcho: [0.022, 0.024, 0.021, 0.023, 0.026, 0.028, 0.024],
+                    cutoff: '2026年3月7日 23:59',
+                    current: { pm25: 26, tvoc: 0.68, hcho: 0.024 }
+                },
+                '近30天': {
+                    labels: ['3/1', '3/5', '3/10', '3/15', '3/20', '3/25', '3/30'],
+                    pm25: [24, 26, 28, 30, 32, 35, 30],
+                    tvoc: [0.64, 0.68, 0.72, 0.75, 0.78, 0.82, 0.75],
+                    hcho: [0.022, 0.024, 0.026, 0.028, 0.030, 0.032, 0.028],
+                    cutoff: '2026年3月30日 23:59',
+                    current: { pm25: 30, tvoc: 0.75, hcho: 0.028 }
+                }
+            },
+            'A栋3层监测点': {
+                '近24小时': {
+                    labels: ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00'],
+                    pm25: [25, 26, 28, 30, 32, 31, 28, 25],
+                    tvoc: [0.71, 0.73, 0.75, 0.78, 0.80, 0.78, 0.74, 0.71],
+                    hcho: [0.025, 0.026, 0.027, 0.028, 0.029, 0.028, 0.027, 0.025],
+                    cutoff: '2026年3月3日 21:00',
+                    current: { pm25: 25, tvoc: 0.71, hcho: 0.025 }
+                },
+                '近7天': {
+                    labels: ['3/1', '3/2', '3/3', '3/4', '3/5', '3/6', '3/7'],
+                    pm25: [26, 28, 25, 29, 32, 34, 30],
+                    tvoc: [0.73, 0.76, 0.71, 0.75, 0.80, 0.84, 0.76],
+                    hcho: [0.026, 0.027, 0.025, 0.027, 0.029, 0.031, 0.027],
+                    cutoff: '2026年3月7日 23:59',
+                    current: { pm25: 30, tvoc: 0.76, hcho: 0.027 }
+                },
+                '近30天': {
+                    labels: ['3/1', '3/5', '3/10', '3/15', '3/20', '3/25', '3/30'],
+                    pm25: [26, 29, 32, 34, 36, 38, 34],
+                    tvoc: [0.73, 0.78, 0.82, 0.85, 0.88, 0.92, 0.85],
+                    hcho: [0.026, 0.028, 0.030, 0.032, 0.034, 0.036, 0.032],
+                    cutoff: '2026年3月30日 23:59',
+                    current: { pm25: 34, tvoc: 0.85, hcho: 0.032 }
+                }
+            },
+            'B栋2层监测点': {
+                '近24小时': {
+                    labels: ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00'],
+                    pm25: [17, 18, 19, 21, 23, 22, 20, 17],
+                    tvoc: [0.48, 0.50, 0.52, 0.54, 0.56, 0.55, 0.52, 0.48],
+                    hcho: [0.016, 0.017, 0.018, 0.019, 0.020, 0.019, 0.018, 0.016],
+                    cutoff: '2026年3月3日 21:00',
+                    current: { pm25: 17, tvoc: 0.48, hcho: 0.016 }
+                },
+                '近7天': {
+                    labels: ['3/1', '3/2', '3/3', '3/4', '3/5', '3/6', '3/7'],
+                    pm25: [18, 20, 17, 21, 24, 26, 22],
+                    tvoc: [0.50, 0.53, 0.48, 0.52, 0.58, 0.62, 0.54],
+                    hcho: [0.017, 0.018, 0.016, 0.018, 0.020, 0.022, 0.019],
+                    cutoff: '2026年3月7日 23:59',
+                    current: { pm25: 22, tvoc: 0.54, hcho: 0.019 }
+                },
+                '近30天': {
+                    labels: ['3/1', '3/5', '3/10', '3/15', '3/20', '3/25', '3/30'],
+                    pm25: [18, 22, 25, 27, 29, 31, 27],
+                    tvoc: [0.50, 0.56, 0.62, 0.66, 0.70, 0.74, 0.66],
+                    hcho: [0.017, 0.019, 0.022, 0.024, 0.026, 0.028, 0.024],
+                    cutoff: '2026年3月30日 23:59',
+                    current: { pm25: 27, tvoc: 0.66, hcho: 0.024 }
+                }
+            },
+            'B栋4层监测点': {
+                '近24小时': {
+                    labels: ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00'],
+                    pm25: [23, 24, 26, 28, 30, 29, 26, 23],
+                    tvoc: [0.78, 0.80, 0.82, 0.85, 0.88, 0.86, 0.82, 0.78],
+                    hcho: [0.028, 0.029, 0.030, 0.031, 0.032, 0.031, 0.030, 0.028],
+                    cutoff: '2026年3月3日 21:00',
+                    current: { pm25: 23, tvoc: 0.78, hcho: 0.028 }
+                },
+                '近7天': {
+                    labels: ['3/1', '3/2', '3/3', '3/4', '3/5', '3/6', '3/7'],
+                    pm25: [24, 26, 23, 27, 30, 32, 28],
+                    tvoc: [0.80, 0.84, 0.78, 0.82, 0.88, 0.92, 0.84],
+                    hcho: [0.029, 0.030, 0.028, 0.030, 0.032, 0.034, 0.030],
+                    cutoff: '2026年3月7日 23:59',
+                    current: { pm25: 28, tvoc: 0.84, hcho: 0.030 }
+                },
+                '近30天': {
+                    labels: ['3/1', '3/5', '3/10', '3/15', '3/20', '3/25', '3/30'],
+                    pm25: [24, 27, 30, 32, 34, 36, 32],
+                    tvoc: [0.80, 0.85, 0.90, 0.94, 0.98, 1.02, 0.94],
+                    hcho: [0.029, 0.031, 0.034, 0.036, 0.038, 0.040, 0.036],
+                    cutoff: '2026年3月30日 23:59',
+                    current: { pm25: 32, tvoc: 0.94, hcho: 0.036 }
+                }
+            },
+            '全楼10个监测点平均值': {
+                '近24小时': {
+                    labels: ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00'],
+                    pm25: [22, 23, 25, 27, 29, 28, 25, 22],
+                    tvoc: [0.62, 0.65, 0.68, 0.71, 0.74, 0.72, 0.68, 0.62],
+                    hcho: [0.022, 0.023, 0.024, 0.025, 0.026, 0.025, 0.024, 0.022],
+                    cutoff: '2026年3月3日 21:00',
+                    current: { pm25: 22, tvoc: 0.62, hcho: 0.022 }
+                },
+                '近7天': {
+                    labels: ['3/1', '3/2', '3/3', '3/4', '3/5', '3/6', '3/7'],
+                    pm25: [23, 25, 22, 26, 29, 31, 27],
+                    tvoc: [0.65, 0.69, 0.62, 0.68, 0.74, 0.78, 0.70],
+                    hcho: [0.023, 0.025, 0.022, 0.024, 0.027, 0.029, 0.025],
+                    cutoff: '2026年3月7日 23:59',
+                    current: { pm25: 27, tvoc: 0.70, hcho: 0.025 }
+                },
+                '近30天': {
+                    labels: ['3/1', '3/5', '3/10', '3/15', '3/20', '3/25', '3/30'],
+                    pm25: [23, 26, 29, 31, 33, 35, 31],
+                    tvoc: [0.65, 0.71, 0.77, 0.81, 0.85, 0.89, 0.81],
+                    hcho: [0.023, 0.026, 0.029, 0.031, 0.033, 0.035, 0.031],
+                    cutoff: '2026年3月30日 23:59',
+                    current: { pm25: 31, tvoc: 0.81, hcho: 0.031 }
+                }
+            }
+        };
+
+        let currentAirFilter = '近24小时';
+        
+        let trendChart = new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: trendDataMap['B栋4层监测点']['近24小时'].labels,
+                datasets: [
+                    { label: 'PM2.5 (μg/m³)', data: trendDataMap['B栋4层监测点']['近24小时'].pm25, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.3, fill: false, yAxisID: 'y' },
+                    { label: 'TVOC (mg/m³×100)', data: trendDataMap['B栋4层监测点']['近24小时'].tvoc.map(v => v * 100), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', tension: 0.3, fill: false, yAxisID: 'y' },
+                    { label: '甲醛 (mg/m³×1000)', data: trendDataMap['B栋4层监测点']['近24小时'].hcho.map(v => v * 1000), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.3, fill: false, yAxisID: 'y' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                let value = context.raw;
+                                if (label.includes('TVOC')) return `TVOC: ${(value/100).toFixed(2)} mg/m³`;
+                                if (label.includes('甲醛')) return `甲醛: ${(value/1000).toFixed(3)} mg/m³`;
+                                return `${label}: ${value} μg/m³`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: { display: true, text: '浓度' }
+                    }
+                }
+            }
+        });
+
+        function updateTrendChart() {
+            const source = dataSourceSelect.value;
+            const filter = currentAirFilter;
+            const data = trendDataMap[source][filter];
+            
+            // 更新图表数据
+            trendChart.data.labels = data.labels;
+            trendChart.data.datasets[0].data = data.pm25;
+            trendChart.data.datasets[1].data = data.tvoc.map(v => v * 100);
+            trendChart.data.datasets[2].data = data.hcho.map(v => v * 1000);
+            trendChart.update();
+            
+            // 更新截止日期
+            dataCutoffTime.textContent = data.cutoff;
+            
+            // 更新当前数值卡片
+            currentPm25.textContent = data.current.pm25;
+            currentTvoc.textContent = data.current.tvoc.toFixed(2);
+            currentHcho.textContent = data.current.hcho.toFixed(3);
+            
+            // 更新状态标签
+            const pm25Status = document.querySelector('#currentPm25').parentElement.nextElementSibling;
+            const tvocStatus = document.querySelector('#currentTvoc').parentElement.nextElementSibling;
+            const hchoStatus = document.querySelector('#currentHcho').parentElement.nextElementSibling;
+            
+            if (data.current.pm25 <= 25) {
+                pm25Status.className = 'current-value-status bg-emerald-100 text-emerald-700';
+                pm25Status.textContent = '优';
+            } else if (data.current.pm25 <= 50) {
+                pm25Status.className = 'current-value-status bg-amber-100 text-amber-700';
+                pm25Status.textContent = '良';
+            } else {
+                pm25Status.className = 'current-value-status bg-red-100 text-red-700';
+                pm25Status.textContent = '轻度';
+            }
+            
+            if (data.current.tvoc <= 0.6) {
+                tvocStatus.className = 'current-value-status bg-emerald-100 text-emerald-700';
+                tvocStatus.textContent = '优';
+            } else if (data.current.tvoc <= 1.0) {
+                tvocStatus.className = 'current-value-status bg-amber-100 text-amber-700';
+                tvocStatus.textContent = '轻度';
+            } else {
+                tvocStatus.className = 'current-value-status bg-red-100 text-red-700';
+                tvocStatus.textContent = '中度';
+            }
+            
+            if (data.current.hcho <= 0.03) {
+                hchoStatus.className = 'current-value-status bg-emerald-100 text-emerald-700';
+                hchoStatus.textContent = '优';
+            } else if (data.current.hcho <= 0.08) {
+                hchoStatus.className = 'current-value-status bg-amber-100 text-amber-700';
+                hchoStatus.textContent = '轻度';
+            } else {
+                hchoStatus.className = 'current-value-status bg-red-100 text-red-700';
+                hchoStatus.textContent = '超标';
+            }
+        }
+
+        function setAirDayView() {
+            currentAirFilter = '近24小时';
+            airDayBtn.classList.add('active');
+            airWeekBtn.classList.remove('active');
+            airMonthBtn.classList.remove('active');
+            updateTrendChart();
+        }
+
+        function setAirWeekView() {
+            currentAirFilter = '近7天';
+            airWeekBtn.classList.add('active');
+            airDayBtn.classList.remove('active');
+            airMonthBtn.classList.remove('active');
+            updateTrendChart();
+        }
+
+        function setAirMonthView() {
+            currentAirFilter = '近30天';
+            airMonthBtn.classList.add('active');
+            airDayBtn.classList.remove('active');
+            airWeekBtn.classList.remove('active');
+            updateTrendChart();
+        }
+
+        airDayBtn.addEventListener('click', setAirDayView);
+        airWeekBtn.addEventListener('click', setAirWeekView);
+        airMonthBtn.addEventListener('click', setAirMonthView);
+        dataSourceSelect.addEventListener('change', updateTrendChart);
+        
+        // 初始化
+        updateTrendChart();
+    </script>
+</body>
+</html>
