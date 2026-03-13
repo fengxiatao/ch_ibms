@@ -5,6 +5,10 @@ spring:
   profiles:
     active: dev
 
+  config:
+    import:
+      - classpath:application-video.yaml
+
   main:
     allow-circular-references: true # 允许循环依赖，因为项目是三层架构，无法避免这个情况。
     web-application-type: servlet # 明确指定为 Servlet 应用，避免调试时尝试启动 WebFlux

@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IBMS智慧物联管理平台 · 空间管理（编码规范V2.0）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .glass-card {
+            background: rgba(51, 65, 85, 0.4);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            background: rgba(51, 65, 85, 0.6);
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .sidebar-item {
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), transparent);
+            transition: width 0.3s;
+        }
+
+        .sidebar-item:hover::before, .sidebar-item.active::before {
+            width: 100%;
+        }
+
+        .sidebar-item:hover, .sidebar-item.active {
+            border-left-color: #3b82f6;
+            color: #60a5fa;
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            position: relative;
+        }
+
+        .status-online { background: #10b981; box-shadow: 0 0 8px #10b981; }
+        .status-offline { background: #ef4444; }
+        .status-warning { background: #f59e0b; }
+        .status-maintenance { background: #8b5cf6; }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.3);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.5);
+            border-radius: 3px;
+        }
+
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-enter {
+            animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes modalSlideIn {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .search-input {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px -5px rgba(59, 130, 246, 0.4);
+        }
+
+        .tree-node {
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 6px;
+        }
+
+        .tree-node:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .tree-node.active {
+            background: rgba(59, 130, 246, 0.2);
+            border-left: 3px solid #3b82f6;
+        }
+
+        .professional-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 16px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+        .badge-sa { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+        .badge-st { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
+        .badge-sb { background: rgba(6, 182, 212, 0.15); color: #67e8f9; }
+        .badge-se { background: rgba(245, 158, 11, 0.15); color: #fcd34d; }
+        .badge-sf { background: rgba(244, 63, 94, 0.15); color: #fb7185; }
+
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        .data-table th {
+            background: rgba(30, 41, 59, 0.8);
+            font-weight: 500;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: #94a3b8;
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+        .data-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.05);
+        }
+        .data-table tr:hover td {
+            background: rgba(59, 130, 246, 0.03);
+        }
+
+        .point-chip {
+            display: inline-block;
+            padding: 2px 6px;
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 4px;
+            font-size: 0.65rem;
+            color: #94a3b8;
+            margin-right: 4px;
+        }
+
+        .badge-online { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+        .badge-offline { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+        .badge-warning { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+
+        .sub-area-code {
+            font-family: monospace;
+            color: #60a5fa;
+            background: rgba(59, 130, 246, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+        }
+
+        /* 操作界面底图颜色样式 - 柔和渐变背景 */
+        .operation-panel {
+            background: linear-gradient(145deg, rgba(30, 58, 138, 0.25) 0%, rgba(15, 23, 42, 0.45) 100%);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(59, 130, 246, 0.15);
+            box-shadow: 0 8px 20px -6px rgba(0, 30, 60, 0.3);
+        }
+
+        .operation-header {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, rgba(30, 64, 175, 0.1) 100%);
+            border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .operation-item {
+            background: rgba(25, 35, 60, 0.5);
+            border-left: 3px solid #3b82f6;
+            transition: all 0.2s;
+        }
+        .operation-item:hover {
+            background: rgba(35, 50, 80, 0.6);
+            transform: translateX(2px);
+        }
+
+        .stat-card-colored {
+            background: linear-gradient(135deg, rgba(30, 58, 138, 0.3), rgba(20, 40, 70, 0.4));
+            border: 1px solid rgba(96, 165, 250, 0.2);
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex">
+
+    <!-- 左侧导航栏 (与IBMS整体风格一致) -->
+    <aside class="w-64 glass-panel flex flex-col border-r border-slate-700/30 z-20">
+        <div class="p-6 border-b border-slate-700/30">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <i class="fas fa-network-wired text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white tracking-tight">IBMS平台</h1>
+                    <p class="text-xs text-slate-400">编码规范V2.0</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto py-4">
+            <div class="px-4 mb-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">核心功能</div>
+            <a href="#" onclick="switchModule('dashboard')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-dashboard"><i class="fas fa-th-large w-5 text-center"></i><span>系统总览</span></a>
+            <a href="#" onclick="switchModule('device-mgmt')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-device-mgmt"><i class="fas fa-microchip w-5 text-center"></i><span>设备管理</span><span class="ml-auto bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded-full" id="device-count-badge">0</span></a>
+            <a href="#" onclick="switchModule('space-mgmt')" class="sidebar-item active flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-space-mgmt"><i class="fas fa-map-marked-alt w-5 text-center"></i><span>空间管理</span></a>
+            <a href="#" onclick="switchModule('product-catalog')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-product-catalog"><i class="fas fa-box-open w-5 text-center"></i><span>产品目录</span></a>
+            <a href="#" onclick="switchModule('type-mgmt')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-type-mgmt"><i class="fas fa-tags w-5 text-center"></i><span>类型管理</span></a>
+            <div class="px-4 mt-6 mb-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">业务配置</div>
+            <a href="#" onclick="switchModule('linkage-rules')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-linkage-rules"><i class="fas fa-project-diagram w-5 text-center"></i><span>联动规则</span></a>
+            <a href="#" onclick="switchModule('workflow')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-workflow"><i class="fas fa-tasks w-5 text-center"></i><span>接入流程</span></a>
+            <div class="px-4 mt-6 mb-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">运营中心</div>
+            <a href="#" onclick="switchModule('events')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-events"><i class="fas fa-bell w-5 text-center"></i><span>事件中心</span><span class="ml-auto bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded-full" id="event-badge">3</span></a>
+        </nav>
+
+        <div class="p-4 border-t border-slate-700/30">
+            <div class="glass-card rounded-xl p-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-sm font-bold text-white">A</div>
+                    <div class="flex-1 min-w-0"><p class="text-sm font-medium text-white truncate">系统管理员</p><p class="text-xs text-slate-400">admin@ibms.com</p></div>
+                    <button class="text-slate-400 hover:text-white transition-colors"><i class="fas fa-cog"></i></button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 flex flex-col overflow-hidden relative bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800">
+        <!-- 顶部栏 -->
+        <header class="h-16 glass-panel border-b border-slate-700/30 flex items-center justify-between px-6 z-10">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 text-sm text-slate-400"><span>IBMS平台</span><i class="fas fa-chevron-right text-xs"></i><span id="breadcrumb-module">空间管理</span></div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 px-4 py-2 glass-card rounded-lg"><span class="status-dot status-online"></span><span class="text-sm text-slate-300">系统运行正常</span><span class="text-xs text-slate-500 ml-2">| 在线率 98.5%</span></div>
+                <div class="relative"><button class="p-2 text-slate-400 hover:text-white transition-colors relative"><i class="fas fa-bell"></i><span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span></button></div>
+                <button class="p-2 text-slate-400 hover:text-white transition-colors"><i class="fas fa-expand"></i></button>
+            </div>
+        </header>
+
+        <!-- 内容滚动区 -->
+        <div class="flex-1 overflow-y-auto p-6 relative" id="main-content">
+            <!-- 模块2: 空间管理（重构版 - 操作界面添加底图颜色） -->
+            <div id="module-space-mgmt" class="tab-content active">
+
+                <!-- 统计卡片 (带彩色底图) -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="stat-card-colored rounded-xl p-4 backdrop-blur-sm">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-blue-500/30 flex items-center justify-center"><i class="fas fa-building text-blue-300 text-lg"></i></div>
+                            <div><p class="text-2xl font-bold text-white" id="stat-total-spaces">0</p><p class="text-xs text-blue-200/80">空间总数</p></div>
+                        </div>
+                    </div>
+                    <div class="stat-card-colored rounded-xl p-4 backdrop-blur-sm">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-indigo-500/30 flex items-center justify-center"><i class="fas fa-server text-indigo-300 text-lg"></i></div>
+                            <div><p class="text-2xl font-bold text-indigo-300" id="stat-total-devices">0</p><p class="text-xs text-indigo-200/80">已分配设备</p></div>
+                        </div>
+                    </div>
+                    <div class="stat-card-colored rounded-xl p-4 backdrop-blur-sm">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-amber-500/30 flex items-center justify-center"><i class="fas fa-microchip text-amber-300 text-lg"></i></div>
+                            <div><p class="text-2xl font-bold text-amber-300" id="stat-unassigned-devices">0</p><p class="text-xs text-amber-200/80">未分配设备</p></div>
+                        </div>
+                    </div>
+                    <div class="stat-card-colored rounded-xl p-4 backdrop-blur-sm">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-purple-500/30 flex items-center justify-center"><i class="fas fa-wave-square text-purple-300 text-lg"></i></div>
+                            <div><p class="text-2xl font-bold text-purple-300" id="stat-unassigned-points">0</p><p class="text-xs text-purple-200/80">未分配通道</p></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 主工作区：左侧空间树 + 右侧未分配设备/点位列表 (操作界面带彩色底图) -->
+                <div class="flex gap-6 h-[calc(100vh-280px)]">
+                    <!-- 左侧空间树 - 操作面板底图 -->
+                    <div class="w-80 operation-panel rounded-xl p-4 flex flex-col">
+                        <div class="operation-header flex justify-between items-center mb-4 px-2 py-2 rounded-lg">
+                            <h3 class="font-semibold text-white"><i class="fas fa-sitemap mr-2 text-blue-400"></i>空间结构 <span class="text-xs text-slate-400 ml-2">(区域码规范)</span></h3>
+                            <button onclick="openSpaceModal()" class="text-blue-400 hover:text-blue-300 text-sm bg-blue-500/10 px-3 py-1 rounded-full"><i class="fas fa-plus mr-1"></i>添加</button>
+                        </div>
+                        <div class="flex-1 overflow-y-auto" id="space-tree-container">
+                            <!-- 树形结构动态生成 -->
+                        </div>
+                        <div class="mt-3 pt-3 border-t border-blue-500/20 text-xs text-blue-200/70 flex items-center">
+                            <i class="fas fa-info-circle mr-1"></i> 选中空间可查看设备/通道
+                        </div>
+                    </div>
+
+                    <!-- 右侧：未分配设备及点位列表（操作面板带彩色底图） -->
+                    <div class="flex-1 operation-panel rounded-xl p-4 flex flex-col">
+                        <div class="operation-header flex flex-wrap items-center justify-between gap-3 mb-4 px-2 py-2 rounded-lg">
+                            <h3 class="font-semibold text-white"><i class="fas fa-puzzle-piece mr-2 text-purple-400"></i>未分配设备 & 通道 <span id="unassigned-summary" class="text-sm text-slate-400 ml-2"></span></h3>
+                            <div class="flex gap-2">
+                                <div class="relative">
+                                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-blue-300/70 text-xs"></i>
+                                    <input type="text" id="unassigned-search" placeholder="搜索编码/名称/系统..." class="search-input rounded-lg pl-8 pr-3 py-1.5 text-sm w-64 bg-slate-800/40 border-blue-500/30" oninput="filterUnassigned()">
+                                </div>
+                                <select id="unassigned-group-filter" class="bg-slate-800/40 border border-blue-500/30 rounded-lg px-3 py-1.5 text-sm text-slate-300" onchange="filterUnassigned()">
+                                    <option value="">全部分组</option>
+                                    <option value="SA">智慧安防</option>
+                                    <option value="ST">智慧通行</option>
+                                    <option value="SB">智慧建筑</option>
+                                    <option value="SE">智慧能源</option>
+                                    <option value="SF">消防安全</option>
+                                </select>
+                                <select id="unassigned-type-filter" class="bg-slate-800/40 border border-blue-500/30 rounded-lg px-3 py-1.5 text-sm text-slate-300" onchange="filterUnassigned()">
+                                    <option value="">全部类型</option>
+                                    <option value="device">仅设备</option>
+                                    <option value="point">仅通道</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 未分配列表容器 (操作项带底纹) -->
+                        <div class="flex-1 overflow-y-auto" id="unassigned-list-container">
+                            <!-- 动态生成 -->
+                        </div>
+
+                        <!-- 分页/统计 (带操作底图) -->
+                        <div class="flex justify-between items-center mt-3 pt-3 border-t border-blue-500/20 text-sm">
+                            <span class="text-blue-200/70" id="unassigned-page-info">0 项</span>
+                            <div class="flex gap-2">
+                                <button onclick="changeUnassignedPage(-1)" class="px-3 py-1 operation-item rounded text-blue-300 hover:text-white" id="unassigned-prev"><i class="fas fa-chevron-left"></i></button>
+                                <span class="px-2 py-1 text-white bg-blue-500/20 rounded" id="unassigned-page">1</span>
+                                <button onclick="changeUnassignedPage(1)" class="px-3 py-1 operation-item rounded text-blue-300 hover:text-white" id="unassigned-next"><i class="fas fa-chevron-right"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 模态框: 空间编辑/添加 (底图颜色) -->
+    <div id="modal-space" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50">
+        <div class="operation-panel rounded-xl w-full max-w-lg modal-enter border border-blue-500/30">
+            <div class="operation-header p-6 rounded-t-xl flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white" id="space-modal-title"><i class="fas fa-plus-circle mr-2 text-blue-400"></i>添加空间</h3>
+                <button onclick="closeModal('modal-space')" class="text-slate-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="form-label text-blue-200">空间名称</label>
+                    <input type="text" id="space-name" class="form-input bg-slate-800/40 border-blue-500/30" placeholder="如：地上1层大堂">
+                </div>
+                <div>
+                    <label class="form-label text-blue-200">区域码 <span class="text-xs text-blue-300">(遵循规范 F01/B01/PK...)</span></label>
+                    <input type="text" id="space-code" class="form-input bg-slate-800/40 border-blue-500/30" placeholder="F01">
+                </div>
+                <div>
+                    <label class="form-label text-blue-200">子区域码</label>
+                    <input type="text" id="space-subcode" class="form-input bg-slate-800/40 border-blue-500/30" placeholder="LBY/PK/FM (可选)">
+                </div>
+                <div>
+                    <label class="form-label text-blue-200">空间类型</label>
+                    <select id="space-type" class="form-input bg-slate-800/40 border-blue-500/30">
+                        <option value="floor">楼层</option>
+                        <option value="area">区域</option>
+                        <option value="room">房间</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label text-blue-200">上级空间</label>
+                    <select id="space-parent" class="form-input bg-slate-800/40 border-blue-500/30">
+                        <option value="">无（作为根节点）</option>
+                    </select>
+                </div>
+            </div>
+            <div class="p-6 border-t border-blue-500/20 flex justify-end gap-3">
+                <button onclick="closeModal('modal-space')" class="px-4 py-2 glass-card rounded-lg text-slate-300 hover:text-white bg-slate-800/40">取消</button>
+                <button onclick="saveSpace()" class="btn-primary px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 容器 -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <script>
+        'use strict';
+
+        // ==================== 1. 数据字典 (严格遵循IBMS编码规范V2.0) ====================
+        const DICT = {
+            profGroups: [
+                { code: "SA", name: "智慧安防", icon: "fa-shield-alt", color: "blue" },
+                { code: "ST", name: "智慧通行", icon: "fa-door-open", color: "purple" },
+                { code: "SB", name: "智慧建筑", icon: "fa-building", color: "cyan" },
+                { code: "SE", name: "智慧能源", icon: "fa-bolt", color: "amber" },
+                { code: "SF", name: "消防安全", icon: "fa-fire-extinguisher", color: "rose" }
+            ],
+            systems: [
+                { code: "VI", name: "视频监控", group: "SA" },
+                { code: "AC", name: "门禁系统", group: "ST" },
+                { code: "AL", name: "防盗报警", group: "SA" },
+                { code: "BA", name: "楼宇自控", group: "SB" },
+                { code: "FD", name: "火灾报警", group: "SF" },
+                { code: "LI", name: "智能照明", group: "SB" },
+                { code: "EP", name: "变配电", group: "SE" },
+                { code: "IC", name: "智能对讲", group: "ST" },
+                { code: "EL", name: "电梯控制", group: "SB" },
+                { code: "EN", name: "能源管理", group: "SE" },
+                { code: "PA", name: "公共广播", group: "SF" },
+                { code: "CA", name: "停车场", group: "ST" },
+                { code: "GR", name: "巡更系统", group: "SA" }
+            ],
+            models: [
+                { code: "DS", name: "枪机", system: "VI" },
+                { code: "DP", name: "球机", system: "VI" },
+                { code: "HP", name: "半球摄像机", system: "VI" },
+                { code: "NV", name: "NVR", system: "VI" },
+                { code: "CR", name: "IC卡读卡器", system: "AC" },
+                { code: "FR", name: "指纹读卡器", system: "AC" },
+                { code: "LR", name: "人脸识别终端", system: "AC" },
+                { code: "CC", name: "单门控制器", system: "AC" },
+                { code: "DC", name: "双门控制器", system: "AC" },
+                { code: "TS", name: "房间温控器", system: "BA" },
+                { code: "DD", name: "DDC控制器", system: "BA" }
+            ],
+            deviceTypes: [
+                { code: "CAM", name: "摄像机" },
+                { code: "READER", name: "读卡器" },
+                { code: "SENSOR", name: "传感器" },
+                { code: "CONTR", name: "控制器" },
+                { code: "DDC", name: "DDC控制器" },
+                { code: "NVR", name: "网络录像机" },
+                { code: "DETECTOR", name: "探测器" },
+                { code: "METER", name: "仪表" }
+            ],
+            pointTypes: [
+                { code: "VT", name: "视频通道", dataType: "视频流" },
+                { code: "AI", name: "报警输入", dataType: "DI" },
+                { code: "AO", name: "报警输出", dataType: "DO" },
+                { code: "DR", name: "门禁点", dataType: "逻辑点" },
+                { code: "DI", name: "数字输入", dataType: "DI" },
+                { code: "DO", name: "数字输出", dataType: "DO" },
+                { code: "AI_AN", name: "模拟输入", dataType: "AI" },
+                { code: "FP", name: "消防点位", dataType: "火警" },
+                { code: "LT", name: "照明回路", dataType: "DO/AO" },
+                { code: "PM", name: "电能监测", dataType: "AI" },
+                { code: "BC", name: "广播通道", dataType: "音频" }
+            ],
+            // 设备类型对应的点位类型（简化映射）
+            devPointMapping: {
+                "CAM": ["VT"],
+                "NVR": ["VT"],
+                "READER": ["DR"],
+                "CONTR": ["DI","DO"],
+                "DDC": ["DI","DO","AI_AN"],
+                "SENSOR": ["AI_AN"],
+                "DETECTOR": ["AI","FP"],
+                "METER": ["PM"]
+            },
+            spaces: [
+                { id: "F01", code: "F01", name: "地上1层", type: "floor", children: [
+                    { id: "F01-LBY", code: "LBY", name: "大堂", type: "area", parent: "F01" },
+                    { id: "F01-DT", code: "DT", name: "大厅", type: "area", parent: "F01" },
+                    { id: "F01-OFA", code: "OFA", name: "办公A区", type: "area", parent: "F01" },
+                    { id: "F01-FM", code: "FM", name: "弱电井", type: "area", parent: "F01" }
+                ]},
+                { id: "F02", code: "F02", name: "地上2层", type: "floor", children: [
+                    { id: "F02-OFA", code: "OFA", name: "办公A区", type: "area", parent: "F02" },
+                    { id: "F02-OFB", code: "OFB", name: "办公B区", type: "area", parent: "F02" },
+                    { id: "F02-FM", code: "FM", name: "弱电井", type: "area", parent: "F02" }
+                ]},
+                { id: "B01", code: "B01", name: "地下1层", type: "floor", children: [
+                    { id: "B01-PK", code: "PK", name: "停车场", type: "area", parent: "B01" },
+                    { id: "B01-FM", code: "FM", name: "配电房", type: "area", parent: "B01" }
+                ]},
+                { id: "ROOF", code: "ROOF", name: "屋面", type: "floor", children: [] }
+            ]
+        };
+
+        // ==================== 2. 状态管理 ====================
+        const State = {
+            devices: [],
+            points: [],        // 所有通道扁平化，便于搜索
+            unassignedList: [], // 当前显示的未分配项（设备+通道混合）
+            unassignedPage: 1,
+            pageSize: 15,
+            currentSpace: null,
+            filters: {
+                search: '',
+                group: '',
+                type: '' // device / point
+            }
+        };
+
+        // ==================== 3. 工具函数 ====================
+        function generateId(prefix='DEV') { return prefix + '-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2,4).toUpperCase(); }
+        function generateCode(area, sub, sys, model, devType, sn, pointCode=null) {
+            let base = [area, sub, sys, model, devType, sn].filter(p => p && p !== '').join('-');
+            return pointCode ? base + '-' + pointCode : base;
+        }
+        function showToast(msg, type='info') {
+            const container = document.getElementById('toast-container');
+            const icons = { success:'fa-check-circle text-green-400', error:'fa-times-circle text-red-400', warning:'fa-exclamation-triangle text-yellow-400', info:'fa-info-circle text-blue-400' };
+            const toast = document.createElement('div');
+            toast.className = `flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-600/50 glass-panel ${type}`;
+            toast.innerHTML = `<i class="fas ${icons[type]}"></i><span class="text-white">${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // ==================== 4. 初始化示例数据 (严格按编码规范生成) ====================
+        function initSampleData() {
+            // 已分配设备示例（带通道）
+            const assignedDevs = [
+                { name:"1楼大堂枪机1", group:"SA", sys:"VI", model:"DS", devType:"CAM", area:"F01", sub:"LBY", sn:"001", ip:"192.168.1.101", points:[{ptCode:"VT01",ptName:"视频通道1"}] },
+                { name:"1楼大堂枪机2", group:"SA", sys:"VI", model:"DS", devType:"CAM", area:"F01", sub:"LBY", sn:"002", ip:"192.168.1.102", points:[{ptCode:"VT01",ptName:"视频通道1"}] },
+                { name:"B1停车场球机1", group:"SA", sys:"VI", model:"DP", devType:"CAM", area:"B01", sub:"PK", sn:"003", ip:"192.168.1.103", points:[{ptCode:"VT01",ptName:"视频通道1"}] },
+                { name:"1楼大厅读卡器1", group:"ST", sys:"AC", model:"CR", devType:"READER", area:"F01", sub:"DT", sn:"001", points:[{ptCode:"DR01",ptName:"门禁点1"}] },
+                { name:"1楼大厅人脸终端1", group:"ST", sys:"AC", model:"LR", devType:"READER", area:"F01", sub:"DT", sn:"002", points:[{ptCode:"DR01",ptName:"门禁点1"}] },
+                { name:"2楼办公A区温控器1", group:"SB", sys:"BA", model:"TS", devType:"SENSOR", area:"F02", sub:"OFA", sn:"001", points:[{ptCode:"AI_AN01",ptName:"模拟输入1"}] },
+                { name:"B1机房DDC1", group:"SB", sys:"BA", model:"DD", devType:"DDC", area:"B01", sub:"FM", sn:"001", multi:true, channels:{DI:4,DO:2,AI_AN:2} },
+                { name:"1楼大堂烟感1", group:"SF", sys:"FD", model:"SM", devType:"DETECTOR", area:"F01", sub:"LBY", sn:"001", points:[{ptCode:"FP01",ptName:"消防点位1"}] }
+            ];
+
+            assignedDevs.forEach(cfg => {
+                let dev = {
+                    id: generateId('DEV'),
+                    name: cfg.name,
+                    group: cfg.group,
+                    system: cfg.sys,
+                    model: cfg.model,
+                    devType: cfg.devType,
+                    area: cfg.area,
+                    sub: cfg.sub || '',
+                    sn: cfg.sn,
+                    ip: cfg.ip || null,
+                    status: 'online',
+                    points: []
+                };
+                dev.code = generateCode(dev.area, dev.sub, dev.system, dev.model, dev.devType, dev.sn);
+                // 生成通道
+                if (cfg.multi) {
+                    let ptMap = cfg.channels || {DI:4,DO:2};
+                    for (let [ptCode, cnt] of Object.entries(ptMap)) {
+                        for (let i=1; i<=cnt; i++) {
+                            let ptSn = ptCode + i.toString().padStart(2,'0');
+                            dev.points.push({
+                                id: generateId('PT'),
+                                pointCode: dev.code + '-' + ptSn,
+                                name: (DICT.pointTypes.find(p=>p.code===ptCode)?.name||ptCode) + i,
+                                deviceId: dev.id,
+                                area: dev.area, sub: dev.sub,
+                                pointType: ptCode,
+                                status: 'online'
+                            });
+                        }
+                    }
+                } else {
+                    (cfg.points || [{ptCode:"VT01",ptName:"通道1"}]).forEach((p,i) => {
+                        dev.points.push({
+                            id: generateId('PT'),
+                            pointCode: dev.code + '-' + p.ptCode,
+                            name: p.ptName,
+                            deviceId: dev.id,
+                            area: dev.area, sub: dev.sub,
+                            pointType: p.ptCode.substring(0,2),
+                            status: 'online'
+                        });
+                    });
+                }
+                State.devices.push(dev);
+            });
+
+            // 未分配设备 (无空间)
+            const unassignedDevs = [
+                { name:"屋顶枪机3", group:"SA", sys:"VI", model:"DS", devType:"CAM", area:null, sub:null, sn:"003", points:[{ptCode:"VT01"}] },
+                { name:"B1出口门禁2", group:"ST", sys:"AC", model:"CR", devType:"READER", area:null, sub:null, sn:"003", points:[{ptCode:"DR01"}] },
+                { name:"3楼温控器2", group:"SB", sys:"BA", model:"TS", devType:"SENSOR", area:null, sub:null, sn:"002", points:[{ptCode:"AI_AN01"}] },
+                { name:"屋面电表1", group:"SE", sys:"EN", model:"PM", devType:"METER", area:null, sub:null, sn:"001", points:[{ptCode:"PM01"}] }
+            ];
+            unassignedDevs.forEach(cfg => {
+                let dev = {
+                    id: generateId('DEV'),
+                    name: cfg.name,
+                    group: cfg.group,
+                    system: cfg.sys,
+                    model: cfg.model,
+                    devType: cfg.devType,
+                    area: cfg.area, sub: cfg.sub, sn: cfg.sn,
+                    status: 'offline',
+                    points: []
+                };
+                dev.code = generateCode('XXX','XXX',dev.system,dev.model,dev.devType,dev.sn); // 无空间时占位
+                (cfg.points || []).forEach(p => {
+                    dev.points.push({
+                        id: generateId('PT'),
+                        pointCode: dev.code + '-' + p.ptCode,
+                        name: (DICT.pointTypes.find(pt=>pt.code===p.ptCode)?.name||p.ptCode) + '1',
+                        deviceId: dev.id,
+                        area: null, sub: null,
+                        pointType: p.ptCode,
+                        status: 'offline'
+                    });
+                });
+                State.devices.push(dev);
+            });
+
+            // 额外未分配通道 (单独)
+            State.devices.push({
+                id: generateId('DEV'),
+                name: "未关联设备通道(独立点位)",
+                group: "SB",
+                system: "BA",
+                model: "TH",
+                devType: "SENSOR",
+                area: null, sub: null, sn: "999",
+                status: 'warning',
+                code: 'TEMP-SENSOR-999',
+                points: [
+                    { id: generateId('PT'), pointCode: 'TEMP-SENSOR-999-AI01', name: '临时温湿度1', deviceId: null, area: null, sub: null, pointType: 'AI_AN', status: 'warning' },
+                    { id: generateId('PT'), pointCode: 'TEMP-SENSOR-999-AI02', name: '临时温湿度2', deviceId: null, area: null, sub: null, pointType: 'AI_AN', status: 'warning' }
+                ]
+            });
+
+            rebuildPointList();
+            updateStats();
+        }
+
+        // 重建扁平化点列表
+        function rebuildPointList() {
+            State.points = [];
+            State.devices.forEach(dev => {
+                (dev.points || []).forEach(p => State.points.push(p));
+            });
+        }
+
+        // 判断设备/通道是否已分配空间
+        function isAssigned(item) {
+            if (item.area) return true;
+            if (item.spaceId) return true;
+            return false;
+        }
+
+        // 构建未分配列表 (混合)
+        function buildUnassignedList() {
+            let list = [];
+
+            // 未分配设备（本身无空间 且 所有通道也无空间）
+            State.devices.forEach(dev => {
+                if (!dev.area && !dev.sub) {
+                    list.push({ type: 'device', ...dev, displayCode: dev.code, displayName: dev.name, group: dev.group });
+                } else {
+                    // 设备有空间，但可能有通道未分配？ 暂时不考虑，认为设备有空间则所有通道继承
+                }
+            });
+
+            // 未分配通道 (单独通道没有归属设备空间，或设备有空间但通道单独游离？ 这里简单处理：通道无area)
+            State.points.forEach(pt => {
+                if (!pt.area && !pt.sub) {
+                    list.push({ type: 'point', ...pt, displayCode: pt.pointCode, displayName: pt.name, group: pt.group || 'SA' });
+                }
+            });
+
+            return list;
+        }
+
+        // 应用过滤器
+        function applyFilters(list) {
+            const { search, group, type } = State.filters;
+            return list.filter(item => {
+                if (type === 'device' && item.type !== 'device') return false;
+                if (type === 'point' && item.type !== 'point') return false;
+                if (group && item.group !== group) return false;
+                if (search) {
+                    let haystack = (item.displayCode + ' ' + item.displayName + ' ' + (item.system||'')).toLowerCase();
+                    return haystack.includes(search.toLowerCase());
+                }
+                return true;
+            });
+        }
+
+        // 渲染未分配列表
+        function renderUnassigned() {
+            const raw = buildUnassignedList();
+            const filtered = applyFilters(raw);
+            State.unassignedList = filtered;
+
+            const total = filtered.length;
+            const pages = Math.ceil(total / State.pageSize) || 1;
+            if (State.unassignedPage > pages) State.unassignedPage = pages;
+            const start = (State.unassignedPage - 1) * State.pageSize;
+            const pageData = filtered.slice(start, start + State.pageSize);
+
+            document.getElementById('unassigned-summary').innerText = `共 ${total} 项 (设备 ${raw.filter(i=>i.type==='device').length} / 通道 ${raw.filter(i=>i.type==='point').length})`;
+            document.getElementById('unassigned-page-info').innerText = `${start+1}-${Math.min(start+State.pageSize,total)} / ${total}`;
+            document.getElementById('unassigned-page').innerText = State.unassignedPage;
+
+            const container = document.getElementById('unassigned-list-container');
+            if (pageData.length === 0) {
+                container.innerHTML = '<div class="text-center text-slate-500 py-8">暂无未分配项</div>';
+                return;
+            }
+
+            let html = '<div class="space-y-2">';
+            pageData.forEach(item => {
+                const group = DICT.profGroups.find(g => g.code === item.group) || { color:'slate', icon:'fa-cog' };
+                const badgeClass = item.type === 'device' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400';
+                const statusClass = item.status === 'online' ? 'badge-online' : (item.status === 'warning' ? 'badge-warning' : 'badge-offline');
+                const statusText = { online:'在线', offline:'离线', warning:'故障' }[item.status] || '未知';
+                const areaInfo = (item.area ? (item.sub ? item.area+'-'+item.sub : item.area) : '未指派');
+                const pointTypeInfo = item.pointType ? `<span class="point-chip">${item.pointType}</span>` : '';
+
+                html += `<div class="operation-item p-3 rounded-lg flex items-center justify-between hover:bg-blue-500/10">
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                        <span class="text-xs font-mono px-2 py-1 rounded ${badgeClass}">${item.type === 'device' ? 'DEV' : 'PT'}</span>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-medium text-white truncate">${item.displayName}</span>
+                                ${pointTypeInfo}
+                            </div>
+                            <div class="flex items-center gap-3 text-xs text-slate-400">
+                                <span class="font-mono">${item.displayCode}</span>
+                                <span><i class="fas ${group.icon} mr-1 text-${group.color}-400"></i>${group.name}</span>
+                                <span><i class="fas fa-map-pin mr-1"></i>${areaInfo}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 flex-shrink-0">
+                        <span class="device-badge ${statusClass} px-2 py-0.5 rounded-full text-xs">${statusText}</span>
+                        <button onclick="assignToSpace('${item.id}','${item.type}')" class="text-xs bg-blue-500/30 text-blue-300 px-3 py-1 rounded hover:bg-blue-500/40 border border-blue-500/30"><i class="fas fa-arrow-right mr-1"></i>分配</button>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // 更新统计
+        function updateStats() {
+            const totalSpaces = DICT.spaces.reduce((acc,f)=> acc + 1 + (f.children?.length||0), 0);
+            const assignedDevs = State.devices.filter(d => d.area).length;
+            const unassignedDevs = State.devices.filter(d => !d.area).length;
+            const unassignedPoints = State.points.filter(p => !p.area).length;
+
+            document.getElementById('stat-total-spaces').innerText = totalSpaces;
+            document.getElementById('stat-total-devices').innerText = assignedDevs;
+            document.getElementById('stat-unassigned-devices').innerText = unassignedDevs;
+            document.getElementById('stat-unassigned-points').innerText = unassignedPoints;
+            document.getElementById('device-count-badge').innerText = State.devices.length;
+        }
+
+        // 渲染空间树
+        function renderSpaceTree() {
+            const container = document.getElementById('space-tree-container');
+            let html = '<div class="space-y-1">';
+            DICT.spaces.forEach(floor => {
+                const activeClass = State.currentSpace === floor.id ? 'active' : '';
+                html += `<div class="tree-node py-2 px-3 ${activeClass}" data-id="${floor.id}" onclick="selectSpace('${floor.id}')">
+                    <div class="flex items-center gap-2"><i class="fas fa-building text-blue-400 w-4"></i><span class="text-sm">${floor.name} <span class="text-slate-500 text-xs ml-1">(${floor.code})</span></span></div>
+                </div>`;
+                (floor.children || []).forEach(area => {
+                    const act = State.currentSpace === area.id ? 'active' : '';
+                    html += `<div class="tree-node py-2 px-3 ml-4 ${act}" data-id="${area.id}" onclick="selectSpace('${area.id}')">
+                        <div class="flex items-center gap-2"><i class="fas fa-layer-group text-green-400 w-4"></i><span class="text-sm">${area.name} <span class="text-slate-500 text-xs ml-1">(${area.code})</span></span></div>
+                    </div>`;
+                });
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function selectSpace(id) {
+            State.currentSpace = id;
+            renderSpaceTree();
+            showToast('已选择空间: ' + id, 'info');
+            // 实际分配时可在此处记录
+        }
+
+        // 分配模拟 (仅前端演示)
+        function assignToSpace(itemId, type) {
+            if (!State.currentSpace) {
+                showToast('请先在左侧选择一个空间', 'warning');
+                return;
+            }
+            showToast(`已将 ${type} ${itemId} 分配到 ${State.currentSpace}`, 'success');
+            // 实际项目中应更新数据模型，此处简化
+        }
+
+        function filterUnassigned() {
+            State.filters.search = document.getElementById('unassigned-search').value;
+            State.filters.group = document.getElementById('unassigned-group-filter').value;
+            State.filters.type = document.getElementById('unassigned-type-filter').value;
+            State.unassignedPage = 1;
+            renderUnassigned();
+        }
+
+        function changeUnassignedPage(delta) {
+            const total = State.unassignedList.length;
+            const pages = Math.ceil(total / State.pageSize);
+            let newPage = State.unassignedPage + delta;
+            if (newPage >= 1 && newPage <= pages) {
+                State.unassignedPage = newPage;
+                renderUnassigned();
+            }
+        }
+
+        // 空间管理模态框 (简单)
+        function openSpaceModal() {
+            document.getElementById('space-modal-title').innerText = '添加空间';
+            document.getElementById('space-name').value = '';
+            document.getElementById('space-code').value = '';
+            document.getElementById('space-subcode').value = '';
+            document.getElementById('space-type').value = 'area';
+            // 填充上级
+            let parentOpts = '<option value="">无</option>';
+            DICT.spaces.forEach(f => parentOpts += `<option value="${f.id}">${f.name}</option>`);
+            document.getElementById('space-parent').innerHTML = parentOpts;
+            openModal('modal-space');
+        }
+
+        function saveSpace() {
+            const name = document.getElementById('space-name').value;
+            const code = document.getElementById('space-code').value;
+            const sub = document.getElementById('space-subcode').value;
+            const type = document.getElementById('space-type').value;
+            const parent = document.getElementById('space-parent').value;
+
+            if (!name || !code) { showToast('请填写必要信息','error'); return; }
+
+            // 简单添加到 DICT (演示用)
+            if (parent) {
+                const floor = DICT.spaces.find(f => f.id === parent);
+                if (floor) {
+                    let newId = parent + '-' + code;
+                    floor.children.push({ id: newId, code: code, name: name, type: 'area', parent: parent });
+                }
+            } else {
+                DICT.spaces.push({ id: code, code: code, name: name, type: 'floor', children: [] });
+            }
+            renderSpaceTree();
+            closeModal('modal-space');
+            showToast('空间添加成功','success');
+        }
+
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); document.getElementById(id).classList.add('flex'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); document.getElementById(id).classList.remove('flex'); }
+
+        function switchModule(mod) {
+            document.querySelectorAll('[id^="module-"]').forEach(el => el.classList.remove('active'));
+            document.getElementById('module-'+mod).classList.add('active');
+            document.querySelectorAll('[id^="nav-"]').forEach(el => el.classList.remove('active'));
+            document.getElementById('nav-'+mod).classList.add('active');
+            if (mod === 'space-mgmt') { renderSpaceTree(); renderUnassigned(); }
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initSampleData();
+            renderSpaceTree();
+            renderUnassigned();
+            updateStats();
+            // 弹出欢迎
+            showToast('空间管理已加载，遵循编码规范V2.0','info');
+        });
+
+        // 暴露全局
+        window.switchModule = switchModule;
+        window.selectSpace = selectSpace;
+        window.openSpaceModal = openSpaceModal;
+        window.saveSpace = saveSpace;
+        window.closeModal = closeModal;
+        window.filterUnassigned = filterUnassigned;
+        window.changeUnassignedPage = changeUnassignedPage;
+        window.assignToSpace = assignToSpace;
+    </script>
+</body>
+</html>

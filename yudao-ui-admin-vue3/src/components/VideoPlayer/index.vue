@@ -1,6 +1,5 @@
 <template>
   <div class="video-player" :id="containerId" ref="containerRef">
-    <video class="video-element" ref="videoRef" autoplay muted playsinline></video>
     <div v-if="loading" class="player-loading">
       <el-icon class="is-loading"><Loading /></el-icon>
       <span>加载中...</span>
@@ -16,7 +15,7 @@
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { Loading, CircleClose } from '@element-plus/icons-vue'
 import { getLivePlayUrl, stopStream } from '@/api/iot/video/zlm'
-import mpegts from 'mpegts.js'
+import useZlmPlayer, { type ZlmPlayerInstance } from '@/composables/useZlmPlayer'
 
 // Props
 interface Props {
@@ -41,10 +40,11 @@ const emit = defineEmits<{
 
 // 响应式数据
 const containerRef = ref<HTMLElement>()
-const videoRef = ref<HTMLVideoElement>()
 const loading = ref(false)
 const error = ref('')
-let player: mpegts.Player | null = null
+let instance: ZlmPlayerInstance | null = null
+
+const { playLive, stopInstance } = useZlmPlayer()
 
 // 智能路由
 const isIntranetAccess = (): boolean => {
@@ -66,10 +66,20 @@ const adaptPlayUrls = (urls: any): any => {
   
   const adapted = { ...urls }
   const publicHost = window.location.hostname
+  // 本地开发环境不做“外网替换”，否则会把 192.168.* 的流媒体地址替换成 localhost:3000 导致 404
+  if (publicHost === 'localhost' || publicHost === '127.0.0.1') {
+    return urls
+  }
   const publicPort = window.location.port ? parseInt(window.location.port) : 80
   const publicAddr = publicPort === 80 || publicPort === 443 ? publicHost : `${publicHost}:${publicPort}`
   const isHttps = window.location.protocol === 'https:'
+  const httpProtocol = isHttps ? 'https' : 'http'
   const wsProtocol = isHttps ? 'wss' : 'ws'
+
+  const envRtcHost = (import.meta as any).env?.VITE_ZLM_RTC_HOST as string | undefined
+  const envRtcPortRaw = (import.meta as any).env?.VITE_ZLM_RTC_PORT as string | undefined
+  const envRtcPort = envRtcPortRaw ? parseInt(envRtcPortRaw) : undefined
+  const envSecret = (import.meta as any).env?.VITE_ZLM_SECRET as string | undefined
   
   if (urls.wsFlvUrl) {
     let newUrl = urls.wsFlvUrl
@@ -77,6 +87,31 @@ const adaptPlayUrls = (urls: any): any => {
       .replace(/192\.168\.\d+\.\d+/g, publicHost)
     newUrl = newUrl.replace(/^ws:/, `${wsProtocol}:`)
     adapted.wsFlvUrl = newUrl
+  }
+
+  if (urls.webrtcUrl) {
+    let newUrl = urls.webrtcUrl
+      .replace(/192\.168\.\d+\.\d+:\d+/g, publicAddr)
+      .replace(/192\.168\.\d+\.\d+/g, publicHost)
+    newUrl = newUrl.replace(/^http:/, `${httpProtocol}:`)
+    try {
+      const u = new URL(newUrl)
+      if (envRtcHost) u.hostname = envRtcHost
+      if (envRtcPort && !Number.isNaN(envRtcPort)) u.port = String(envRtcPort)
+      if (envSecret && !u.searchParams.get('secret')) u.searchParams.set('secret', envSecret)
+      newUrl = u.toString()
+    } catch {
+      // ignore
+    }
+    if (envRtcHost) {
+      try {
+        const u = new URL(newUrl)
+        u.hostname = envRtcHost
+        if (envRtcPort && !Number.isNaN(envRtcPort)) u.port = String(envRtcPort)
+        newUrl = u.toString()
+      } catch {}
+    }
+    adapted.webrtcUrl = newUrl
   }
   
   return adapted
@@ -102,48 +137,30 @@ const play = async (channelData?: any) => {
     const rawPlayUrls = await getLivePlayUrl(channelId, 1) // 默认子码流
     const playUrls = adaptPlayUrls(rawPlayUrls)
     
-    if (!playUrls?.wsFlvUrl) {
+    if (!playUrls?.wsFlvUrl && !playUrls?.webrtcUrl) {
       throw new Error('未获取到播放地址')
     }
     
     await nextTick()
-    const videoEl = videoRef.value
-    if (!videoEl) {
+    const container = containerRef.value
+    if (!container) {
       throw new Error('视频元素未找到')
     }
-    
-    if (!mpegts.isSupported()) {
-      throw new Error('浏览器不支持 FLV 播放')
-    }
-    
-    player = mpegts.createPlayer({
-      type: 'flv',
-      url: playUrls.wsFlvUrl,
-      isLive: true,
-      hasAudio: false,
-      hasVideo: true
-    }, {
-      enableWorker: false,
-      enableStashBuffer: false,
-      stashInitialSize: 128,
-      lazyLoad: false,
-      autoCleanupSourceBuffer: false,
-      liveBufferLatencyChasing: true,
-      liveBufferLatencyMaxLatency: 1.5,
-      liveSync: true
+
+    instance = await playLive({
+      container,
+      urls: { wsFlvUrl: playUrls.wsFlvUrl, webrtcUrl: playUrls.webrtcUrl },
+      preferWebrtc:
+        (() => {
+          try {
+            return new URLSearchParams(window.location.search).get('forceWebrtc') === '1'
+              ? true
+              : !isIntranetAccess()
+          } catch {
+            return !isIntranetAccess()
+          }
+        })()
     })
-    
-    player.attachMediaElement(videoEl)
-    player.load()
-    
-    player.on(mpegts.Events.ERROR, (errorType: any, errorDetail: any) => {
-      if (String(errorDetail || '').includes('SourceBuffer')) return
-      error.value = `播放错误: ${errorDetail}`
-      loading.value = false
-      emit('error', { type: errorType, detail: errorDetail })
-    })
-    
-    await player.play()
     
     loading.value = false
     emit('playStart')
@@ -158,20 +175,10 @@ const play = async (channelData?: any) => {
 
 // 停止播放
 const stop = () => {
-  if (player) {
-    try {
-      player.pause()
-      player.unload()
-      player.detachMediaElement()
-      player.destroy()
-    } catch {}
-    player = null
+  if (instance) {
+    stopInstance(instance)
+    instance = null
     emit('playStop')
-  }
-  
-  if (videoRef.value) {
-    videoRef.value.srcObject = null
-    videoRef.value.src = ''
   }
   
   loading.value = false
@@ -213,12 +220,6 @@ defineExpose({
   height: 100%;
   background: #000;
   overflow: hidden;
-}
-
-.video-element {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
 }
 
 .player-loading,

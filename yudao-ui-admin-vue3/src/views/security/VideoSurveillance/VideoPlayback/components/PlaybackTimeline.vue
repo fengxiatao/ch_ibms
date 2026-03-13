@@ -114,6 +114,17 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
       if (segment.hasRecording) {
         const start = parseTimeString(segment.startTime)
         const end = parseTimeString(segment.endTime)
+        if (import.meta.env.DEV) {
+          if ((start === 0 || end === 0) && (segment.startTime || segment.endTime)) {
+            console.debug('[PlaybackTimeline] 片段时间解析失败', {
+              channelId: channelInfo.channelId,
+              rawStart: segment.startTime,
+              rawEnd: segment.endTime,
+              parsedStart: start,
+              parsedEnd: end
+            })
+          }
+        }
         if (start > 0 && end > 0 && end > start) {
           allIntervals.push({ start, end })
         }
@@ -121,7 +132,18 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
     })
   })
 
-  if (allIntervals.length === 0) return []
+  if (allIntervals.length === 0) {
+    if (import.meta.env.DEV) {
+      console.debug('[PlaybackTimeline] allIntervals 为空，无法标绿', {
+        channels: props.recordingInfoList.map((c) => ({
+          channelId: c.channelId,
+          segCount: c.segments?.length ?? 0,
+          hasRecCount: c.segments?.filter((s) => s.hasRecording)?.length ?? 0
+        }))
+      })
+    }
+    return []
+  }
 
   // 按开始时间排序
   allIntervals.sort((a, b) => a.start - b.start)
@@ -172,6 +194,14 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
       }
     }
   })
+
+  if (import.meta.env.DEV) {
+    console.debug('[PlaybackTimeline] segments 计算结果', {
+      count: segments.length,
+      first: segments[0] ?? null,
+      last: segments.length ? segments[segments.length - 1] : null
+    })
+  }
 
   return segments
 })

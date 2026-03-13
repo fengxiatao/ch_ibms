@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>入侵报警看板 · 完整计划策略 · 区域选择</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #141414; --bg-secondary: #1F1F1F; --bg-card: #262626; --bg-hover: #333333;
+            --text-primary: #ffffff; --text-secondary: rgba(255,255,255,0.65); --text-muted: rgba(255,255,255,0.45);
+            --border-color: #404040; --color-primary: #1890ff; --color-success: #52c41a;
+            --color-danger: #ff4d4f; --color-warning: #faad14; --color-info: #722ed1;
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary); overflow-x: hidden; }
+        
+        .sidebar { position: fixed; left: 0; top: 0; width: 240px; height: 100vh; background: var(--bg-secondary); border-right: 1px solid var(--border-color); z-index: 100; overflow-y: auto; }
+        .sidebar-header { padding: 20px 16px; border-bottom: 1px solid var(--border-color); }
+        .sidebar-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .sidebar-title .icon { width: 32px; height: 32px; background: linear-gradient(135deg,#667eea,#764ba2); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+        .nav-section { padding: 12px 0; }
+        .nav-item { padding: 12px 16px; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 10px; border-left: 3px solid transparent; transition: 0.2s; }
+        .nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .nav-item.active { background: rgba(24,144,255,0.15); color: var(--color-primary); border-left-color: var(--color-primary); }
+        .nav-item.main-menu { font-weight: 600; color: var(--text-primary); padding: 14px 16px; }
+        
+        .main-content { margin-left: 240px; padding: 24px; min-height: 100vh; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .header-title { font-size: 24px; font-weight: 700; }
+        .header-info { display: flex; gap: 20px; align-items: center; }
+        .system-time { color: var(--text-secondary); font-size: 14px; }
+        .user-info { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--bg-card); border-radius: 8px; }
+        .user-avatar { width: 32px; height: 32px; background: var(--color-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+
+        /* KPI卡片 */
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 24px; }
+        .kpi-card { background: var(--bg-card); border-radius: 12px; padding: 20px; border: 1px solid var(--border-color); transition: 0.3s; }
+        .kpi-card:hover { border-color: var(--color-primary); transform: translateY(-2px); }
+        .kpi-card.alarm { border-left: 4px solid var(--color-danger); }
+        .kpi-card.armed { border-left: 4px solid var(--color-success); }
+        .kpi-card.warning { border-left: 4px solid var(--color-warning); }
+        .kpi-card.info { border-left: 4px solid var(--color-primary); }
+        .kpi-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .kpi-label { color: var(--text-secondary); font-size: 14px; }
+        .kpi-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .kpi-icon.blue { background: rgba(24,144,255,0.15); }
+        .kpi-icon.green { background: rgba(82,196,26,0.15); }
+        .kpi-icon.red { background: rgba(255,77,79,0.15); }
+        .kpi-icon.yellow { background: rgba(250,173,20,0.15); }
+        .kpi-value { font-size: 32px; font-weight: 700; }
+        .kpi-trend { font-size: 12px; display: flex; align-items: center; gap: 4px; }
+
+        /* 卡片通用 */
+        .card { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden; }
+        .card-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .card-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .card-actions { display: flex; gap: 8px; }
+        .btn { padding: 6px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); transition: 0.2s; }
+        .btn-primary { background: var(--color-primary); color: white; border: none; }
+        .btn-primary:hover { background: #40a9ff; }
+        .btn-success { background: var(--color-success); color: white; border: none; }
+        .btn-success:hover { background: #6ccf4a; }
+        .btn-danger { background: var(--color-danger); color: white; border: none; }
+        .btn-danger:hover { background: #ff7875; }
+        .btn-warning { background: var(--color-warning); color: white; border: none; }
+        .btn-sm { padding: 4px 12px; font-size: 12px; }
+        .card-body { padding: 20px; }
+
+        /* 双列布局 */
+        .dashboard-two-col { display: grid; grid-template-columns: 1fr 320px; gap: 20px; margin-bottom: 20px; }
+
+        /* 右侧计划卡片 */
+        .plan-sidebar { display: flex; flex-direction: column; gap: 20px; }
+        .plan-category-card { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden; }
+        .plan-category-header { padding: 14px 16px; border-bottom: 1px solid var(--border-color); font-weight: 600; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); }
+        .plan-category-list { padding: 12px; display: flex; flex-direction: column; gap: 10px; max-height: 280px; overflow-y: auto; }
+        .plan-item-card { background: var(--bg-secondary); border-radius: 8px; padding: 12px; border: 1px solid var(--border-color); border-left: 4px solid transparent; }
+        .plan-item-card.executing { border-left-color: var(--color-success); }
+        .plan-item-card.pending { border-left-color: var(--color-warning); }
+        .plan-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .plan-item-name { font-weight: 600; font-size: 13px; }
+        .plan-item-time { font-size: 11px; color: var(--text-muted); }
+        .plan-item-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 6px; flex-wrap: wrap; }
+        .plan-item-areas { font-size: 11px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+        .plan-item-actions { display: flex; gap: 4px; }
+        .action-btn { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer; }
+        .badge-count { background: var(--bg-card); padding: 2px 8px; border-radius: 20px; font-size: 11px; }
+
+        /* 防区总览样式 */
+        .zone-compact { display: flex; flex-direction: column; gap: 12px; }
+        .compact-area-row { background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden; }
+        .compact-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border-color); cursor: pointer; flex-wrap: wrap; gap: 10px; }
+        .compact-header:hover { background: var(--bg-hover); }
+        .area-title-section { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+        .area-name-icon { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 16px; }
+        .armed-stat { display: flex; align-items: center; gap: 6px; background: rgba(82,196,26,0.15); color: var(--color-success); padding: 4px 12px; border-radius: 30px; border: 1px solid var(--color-success); font-size: 13px; }
+        .armed-stat span { font-size: 16px; font-weight: 700; margin-right: 2px; }
+        .alert-stat { display: flex; align-items: center; gap: 6px; background: rgba(255,77,79,0.15); color: var(--color-danger); padding: 4px 12px; border-radius: 30px; border: 1px solid var(--color-danger); font-size: 13px; }
+        
+        .area-actions { display: flex; gap: 6px; align-items: center; }
+        .icon-btn { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+        .zone-grid-compact { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; background: var(--bg-secondary); border-top: 1px solid var(--border-color); }
+        .zone-grid-compact.collapsed { display: none; }
+        
+        .zone-mini-card { background: var(--bg-card); border-radius: 10px; padding: 10px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px; cursor: pointer; position: relative; transition: 0.2s; }
+        .zone-mini-card:hover { border-color: var(--color-primary); }
+        .zone-mini-card .zone-actions { display: none; position: absolute; bottom: 4px; right: 4px; gap: 4px; }
+        .zone-mini-card:hover .zone-actions { display: flex; }
+        .zone-action-btn { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer; }
+        
+        /* 图表 */
+        .filter-card { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color); margin: 20px 0; }
+        .filter-body { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; padding: 12px 20px; }
+        .filter-buttons .btn.active { background: var(--color-primary); border-color: var(--color-primary); color: white; }
+        .double-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .chart-container { height: 250px; }
+        .page { display: none; }
+        .page.active { display: block; }
+
+        /* 计划管理页面 */
+        .plan-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+        .plan-stat-card { background: var(--bg-secondary); padding: 16px; border-radius: 10px; text-align: center; border: 1px solid var(--border-color); }
+        .plan-stat-value { font-size: 28px; font-weight: 700; }
+        .plan-table { width: 100%; border-collapse: collapse; }
+        .plan-table th { background: var(--bg-secondary); padding: 12px 16px; text-align: left; font-weight: 600; font-size: 13px; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); }
+        .plan-table td { padding: 14px 16px; border-bottom: 1px solid var(--border-color); font-size: 13px; }
+        .status-badge { display: inline-flex; padding: 4px 10px; border-radius: 20px; font-size: 12px; background: rgba(255,255,255,0.1); cursor: pointer; }
+        .status-badge.active { background: rgba(82,196,26,0.15); color: var(--color-success); }
+        .status-badge.inactive { background: rgba(255,255,255,0.08); color: var(--text-muted); }
+        .status-badge.warning { background: rgba(250,173,20,0.15); color: var(--color-warning); }
+        .action-link { color: var(--color-primary); cursor: pointer; margin-right: 12px; font-size: 12px; }
+        .action-link.danger { color: var(--color-danger); }
+        .action-link.disabled { color: var(--text-muted); cursor: not-allowed; pointer-events: none; }
+
+        /* 弹窗样式 */
+        .modal-overlay { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: var(--bg-card); border-radius: 12px; width: 700px; max-width: 96%; border: 1px solid var(--border-color); max-height: 90vh; overflow-y: auto; }
+        .modal-header { padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; position: sticky; top: 0; background: var(--bg-card); z-index: 10; }
+        .modal-title { font-size: 18px; font-weight: 600; }
+        .modal-close { background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; }
+        .modal-body { padding: 20px; }
+        .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px; background: var(--bg-card); }
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; margin-bottom: 8px; font-size: 14px; color: var(--text-secondary); font-weight: 500; }
+        .form-label .required { color: var(--color-danger); margin-left: 2px; }
+        .form-input, .form-select, .form-textarea { width: 100%; padding: 10px 14px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 14px; }
+        .form-input:focus, .form-select:focus { outline: none; border-color: var(--color-primary); }
+        .form-textarea { min-height: 80px; resize: vertical; }
+        .row-2 { display: flex; gap: 16px; }
+        .row-2 .form-group { flex: 1; }
+        
+        .strategy-selector { display: flex; gap: 16px; margin-bottom: 16px; }
+        .strategy-card { flex: 1; background: var(--bg-secondary); border: 2px solid var(--border-color); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s; text-align: center; }
+        .strategy-card:hover { border-color: var(--color-primary); background: var(--bg-hover); }
+        .strategy-card.selected { border-color: var(--color-primary); background: rgba(24,144,255,0.1); }
+        .strategy-icon { font-size: 32px; margin-bottom: 8px; }
+        .strategy-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .strategy-desc { font-size: 12px; color: var(--text-muted); }
+        
+        .zone-selector { max-height: 200px; overflow-y: auto; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; }
+        .zone-item { display: flex; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
+        .zone-item:last-child { border-bottom: none; }
+        .zone-item:hover { background: var(--bg-hover); }
+        .zone-item input[type="checkbox"] { margin-right: 12px; width: 16px; height: 16px; cursor: pointer; }
+        .zone-info { flex: 1; display: flex; justify-content: space-between; align-items: center; }
+        .zone-name { font-size: 14px; font-weight: 500; }
+        .zone-host { font-size: 12px; color: var(--text-muted); }
+        
+        .week-selector { display: flex; gap: 12px; flex-wrap: wrap; background: var(--bg-secondary); padding: 16px; border-radius: 8px; border: 1px solid var(--border-color); margin-top: 8px; }
+        .week-day { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 6px 12px; background: var(--bg-card); border-radius: 20px; border: 1px solid var(--border-color); transition: all 0.2s; }
+        .week-day:hover { border-color: var(--color-primary); background: var(--bg-hover); }
+        .week-day.selected { background: var(--color-primary); border-color: var(--color-primary); color: white; }
+        .week-day input { display: none; }
+        
+        .repeat-rule-options { display: flex; gap: 24px; margin-bottom: 16px; flex-wrap: wrap; }
+        .repeat-rule-options label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; }
+        
+        .error-message { color: var(--color-danger); font-size: 12px; margin-top: 4px; display: none; }
+        .helper-text { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+        /* 提示框 */
+        .toast-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-card);
+            border-left: 4px solid var(--color-warning);
+            color: var(--text-primary);
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            z-index: 2000;
+            animation: slideIn 0.3s ease;
+            max-width: 350px;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header"><div class="sidebar-title"><div class="icon">🛡️</div>安防管理系统</div></div>
+        <nav class="nav-section">
+            <div class="nav-item main-menu"><span class="icon">▶</span>入侵报警 <span class="nav-arrow">▲</span></div>
+            <div class="nav-item active" data-page="dashboard"><span class="icon">📊</span>可视化看板</div>
+            <div class="nav-item" data-page="hosts"><span class="icon">🖥️</span>报警主机</div>
+            <div class="nav-item" data-page="records"><span class="icon">📋</span>操作记录</div>
+            <div class="nav-item" data-page="alarms"><span class="icon">⚠️</span>报警记录</div>
+            <div class="nav-item" data-page="plan"><span class="icon">📅</span>布防计划</div>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="header">
+            <h1 class="header-title" id="pageTitle">入侵报警可视化看板</h1>
+            <div class="header-info">
+                <span class="system-time" id="currentTime"></span>
+                <div class="user-info"><div class="user-avatar">管</div><span>管理员</span></div>
+            </div>
+        </header>
+
+        <!-- 可视化看板页面 -->
+        <div id="dashboardPage" class="page active">
+            <div class="kpi-grid">
+                <div class="kpi-card info"><div class="kpi-header"><span class="kpi-label">主机总数</span><div class="kpi-icon blue">🖥️</div></div><div class="kpi-value">2</div><div class="kpi-trend">长辉-主机01/02</div></div>
+                <div class="kpi-card armed" id="kpiArmed"><div class="kpi-header"><span class="kpi-label">布防率</span><div class="kpi-icon green">🛡️</div></div><div class="kpi-value">40.0%</div><div class="kpi-trend" id="armedTrend">4/10 防区已布防</div></div>
+                <div class="kpi-card alarm"><div class="kpi-header"><span class="kpi-label">今日报警</span><div class="kpi-icon red">🔔</div></div><div class="kpi-value" id="alertCount">1</div><div class="kpi-trend">1个追踪中</div></div>
+                <div class="kpi-card warning"><div class="kpi-header"><span class="kpi-label">告警处理率</span><div class="kpi-icon yellow">📊</div></div><div class="kpi-value">0%</div><div class="kpi-trend">0/1 已处理</div></div>
+            </div>
+
+            <!-- 双列布局 -->
+            <div class="dashboard-two-col">
+                <!-- 左侧防区总览 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📍 防区总览 · 一键布防/撤防</h3>
+                        <div class="card-actions">
+                            <button class="btn btn-sm btn-success" onclick="armAllZones()">🔒 一键布防</button>
+                            <button class="btn btn-sm btn-danger" onclick="disarmAllZones()">🔓 一键撤防</button>
+                            <button class="btn btn-sm btn-primary" onclick="simulateNewAlert()">🚨 模拟报警</button>
+                            <button class="btn btn-sm btn-default" onclick="expandAllRows()">全部展开</button>
+                            <button class="btn btn-sm btn-default" onclick="collapseAllRows()">全部收起</button>
+                        </div>
+                    </div>
+                    <div class="card-body" style="padding:12px;">
+                        <div id="compactZoneView" class="zone-compact"></div>
+                    </div>
+                </div>
+
+                <!-- 右侧计划卡片 -->
+                <div class="plan-sidebar">
+                    <div class="plan-category-card">
+                        <div class="plan-category-header"><span>⏳ 执行中计划</span><span class="badge-count" id="executingCount">0</span></div>
+                        <div class="plan-category-list" id="executingPlansList"></div>
+                    </div>
+                    <div class="plan-category-card">
+                        <div class="plan-category-header"><span>📅 待执行计划</span><span class="badge-count" id="pendingCount">0</span></div>
+                        <div class="plan-category-list" id="pendingPlansList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 时间筛选 + 图表 -->
+            <div class="filter-card">
+                <div class="filter-body">
+                    <div class="filter-label">⏱️ 时间范围</div>
+                    <div class="filter-buttons" id="timeFilterButtons">
+                        <button class="btn btn-default active" data-range="today">今日</button>
+                        <button class="btn btn-default" data-range="week">本周</button>
+                        <button class="btn btn-default" data-range="month">本月</button>
+                        <button class="btn btn-default" data-range="custom">自定义</button>
+                    </div>
+                    <div class="date-picker-custom" id="customDatePicker" style="display:none;">
+                        <input type="date" class="date-input" id="startDate" value="2026-03-01"><span>—</span>
+                        <input type="date" class="date-input" id="endDate" value="2026-03-10">
+                        <button class="btn btn-primary" id="applyCustom">应用</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="double-col">
+                <div class="card"><div class="card-header"><h3 class="card-title" id="trendTitle">📈 24小时报警趋势（今日）</h3></div><div class="card-body"><div class="chart-container"><canvas id="alarmTrendChart"></canvas></div></div></div>
+                <div class="card"><div class="card-header"><h3 class="card-title">🥧 报警类型分布<span class="chart-subtitle" id="typeRangeLabel">(今日)</span></h3></div><div class="card-body"><div class="chart-container"><canvas id="alarmTypeChart"></canvas></div></div></div>
+            </div>
+        </div>
+
+        <!-- 其他占位页面 -->
+        <div id="hostsPage" class="page"><div class="card"><div class="card-body">报警主机内容</div></div></div>
+        <div id="recordsPage" class="page"><div class="card"><div class="card-body">操作记录内容</div></div></div>
+        <div id="alarmsPage" class="page"><div class="card"><div class="card-body">报警记录内容</div></div></div>
+
+        <!-- 布防计划页面（完整） -->
+        <div id="planPage" class="page">
+            <div class="plan-stats">
+                <div class="plan-stat-card"><div class="plan-stat-value" id="totalPlans">0</div><div class="plan-stat-label">总计划数</div></div>
+                <div class="plan-stat-card"><div class="plan-stat-value" id="activePlans">0</div><div class="plan-stat-label">执行中</div></div>
+                <div class="plan-stat-card"><div class="plan-stat-value" id="pendingPlans">0</div><div class="plan-stat-label">待执行</div></div>
+                <div class="plan-stat-card"><div class="plan-stat-value" id="completedPlans">0</div><div class="plan-stat-label">今日完成</div></div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📋 布防计划管理</h3>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" onclick="openPlanModal()">+ 新增计划</button>
+                        <button class="btn btn-default" onclick="refreshPlanTable()">🔄 刷新</button>
+                    </div>
+                </div>
+                <div class="card-body" style="padding:0; overflow-x:auto;">
+                    <table class="plan-table">
+                        <thead><tr><th>序号</th><th>计划名称</th><th>策略</th><th>计划时间</th><th>重复规则</th><th>布防区域</th><th>状态</th><th>启用状态</th><th>操作</th></tr></thead>
+                        <tbody id="planTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 计划弹窗（完整功能） -->
+    <div class="modal-overlay" id="planModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalPlanTitle">新增布防计划</h3>
+                <button class="modal-close" onclick="closePlanModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="planForm" onsubmit="return false;">
+                    <div class="form-group">
+                        <label class="form-label">计划名称 <span class="required">*</span></label>
+                        <input type="text" class="form-input" id="planName" placeholder="例如：夜间居家布防" required>
+                        <div class="error-message" id="nameError">请输入计划名称</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">布防策略 <span class="required">*</span></label>
+                        <div class="strategy-selector" id="strategySelector">
+                            <div class="strategy-card" data-strategy="home" onclick="selectStrategy('home')">
+                                <div class="strategy-icon">🏠</div><div class="strategy-name">居家布防</div>
+                                <div class="strategy-desc">仅布防周边区域</div>
+                            </div>
+                            <div class="strategy-card" data-strategy="away" onclick="selectStrategy('away')">
+                                <div class="strategy-icon">🚗</div><div class="strategy-name">外出布防</div>
+                                <div class="strategy-desc">所有防区全部布防</div>
+                            </div>
+                            <div class="strategy-card" data-strategy="custom" onclick="selectStrategy('custom')">
+                                <div class="strategy-icon">⚙️</div><div class="strategy-name">自定义</div>
+                                <div class="strategy-desc">手动选择布防区域</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="customAreaGroup" style="display: none;">
+                        <label class="form-label">选择布防区域 <span class="required">*</span></label>
+                        <div class="zone-selector" id="zoneSelector"></div>
+                        <div class="helper-text">勾选需要布防的区域，可多选</div>
+                        <div class="error-message" id="zonesError">请至少选择一个区域</div>
+                    </div>
+
+                    <div class="row-2">
+                        <div class="form-group"><label class="form-label">布防时间 <span class="required">*</span></label><input type="time" class="form-input" id="planStartTime" value="18:00" required></div>
+                        <div class="form-group"><label class="form-label">撤防时间 <span class="required">*</span></label><input type="time" class="form-input" id="planEndTime" value="08:00" required></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">重复规则</label>
+                        <div class="repeat-rule-options">
+                            <label><input type="radio" name="repeatRule" value="每天" checked> 每天</label>
+                            <label><input type="radio" name="repeatRule" value="每周"> 每周</label>
+                            <label><input type="radio" name="repeatRule" value="工作日"> 工作日</label>
+                            <label><input type="radio" name="repeatRule" value="周末"> 周末</label>
+                            <label><input type="radio" name="repeatRule" value="单次"> 单次</label>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="weekSelectorGroup" style="display: none;">
+                        <label class="form-label">选择星期 <span class="required">*</span></label>
+                        <div class="week-selector" id="weekDaysSelector">
+                            <label class="week-day"><input type="checkbox" value="1"> 周一</label>
+                            <label class="week-day"><input type="checkbox" value="2"> 周二</label>
+                            <label class="week-day"><input type="checkbox" value="3"> 周三</label>
+                            <label class="week-day"><input type="checkbox" value="4"> 周四</label>
+                            <label class="week-day"><input type="checkbox" value="5"> 周五</label>
+                            <label class="week-day"><input type="checkbox" value="6"> 周六</label>
+                            <label class="week-day"><input type="checkbox" value="0"> 周日</label>
+                        </div>
+                        <div class="error-message" id="weekDaysError">请至少选择一天</div>
+                    </div>
+
+                    <div class="form-group" id="singleDateGroup" style="display: none;">
+                        <label class="form-label">执行日期 <span class="required">*</span></label>
+                        <input type="date" class="form-input" id="planSingleDate" value="2026-03-15">
+                    </div>
+
+                    <div class="form-group"><label class="form-label">备注</label><textarea class="form-textarea" id="planRemark" placeholder="可选"></textarea></div>
+
+                    <input type="hidden" id="editingPlanId" value="">
+                    <input type="hidden" id="selectedStrategy" value="home">
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closePlanModal()">取消</button>
+                <button class="btn btn-primary" onclick="savePlan()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 追踪面板 -->
+    <div id="tracePanel" class="trace-panel"><div class="trace-header"><h3>🚨 报警追踪</h3><span class="trace-close" onclick="closeTracePanel()">×</span></div><div id="traceContent"></div></div>
+
+    <script>
+        (function() {
+            // ==================== 全局数据 ====================
+            // 防区数据
+            const zones = [
+                { id: 1, name: '大门', area: '出入口', host: '长辉-主机01', type: 'perimeter', deviceType: '门磁', deviceIcon: '🚪', status: 'disarmed', alert: false },
+                { id: 2, name: '后门', area: '出入口', host: '长辉-主机01', type: 'perimeter', deviceType: '门磁', deviceIcon: '🚪', status: 'armed', alert: false },
+                { id: 3, name: '窗户-东', area: '东侧外围', host: '长辉-主机01', type: 'perimeter', deviceType: '红外', deviceIcon: '📡', status: 'armed', alert: true, alertTime: '08:23' },
+                { id: 4, name: '窗户-西', area: '西侧外围', host: '长辉-主机01', type: 'perimeter', deviceType: '红外', deviceIcon: '📡', status: 'disarmed', alert: false },
+                { id: 5, name: '客厅', area: '室内核心', host: '长辉-主机01', type: 'interior', deviceType: '红外', deviceIcon: '📡', status: 'armed', alert: false },
+                { id: 6, name: '卧室', area: '室内休息区', host: '长辉-主机01', type: 'interior', deviceType: '红外', deviceIcon: '📡', status: 'disarmed', alert: false },
+                { id: 7, name: '书房', area: '室内工作区', host: '长辉-主机01', type: 'interior', deviceType: '红外', deviceIcon: '📡', status: 'disarmed', alert: false },
+                { id: 8, name: '厨房', area: '室内功能区', host: '长辉-主机01', type: 'interior', deviceType: '燃气', deviceIcon: '🔥', status: 'disarmed', alert: false },
+                { id: 9, name: '储藏室', area: '附属空间', host: '长辉-主机01', type: 'interior', deviceType: '红外', deviceIcon: '📡', status: 'disarmed', alert: false },
+                { id: 10, name: '车库', area: '附属空间', host: '长辉-主机02', type: 'perimeter', deviceType: '门磁', deviceIcon: '🚪', status: 'disarmed', alert: false }
+            ];
+            const areaList = [...new Set(zones.map(z => z.area))];
+            let expandedAreas = new Array(areaList.length).fill(false);
+
+            // 布防计划数据
+            let plans = [
+                { 
+                    id: 101, 
+                    name: '夜间居家布防', 
+                    strategy: 'home',
+                    startTime: '22:00', 
+                    endTime: '06:00', 
+                    repeatRule: '每天',
+                    weekDays: [], 
+                    singleDate: null,
+                    areas: ['大门', '后门', '窗户-东', '窗户-西'], 
+                    status: '待执行', 
+                    enabled: '启用',
+                    remark: '夜间仅布防周边区域',
+                    createTime: '2026-03-01'
+                },
+                { 
+                    id: 102, 
+                    name: '工作日外出布防', 
+                    strategy: 'away',
+                    startTime: '08:30', 
+                    endTime: '18:00', 
+                    repeatRule: '工作日',
+                    weekDays: [],
+                    singleDate: null,
+                    areas: ['大门', '后门', '窗户-东', '窗户-西', '客厅', '卧室', '书房', '厨房', '储藏室', '车库'], 
+                    status: '执行中', 
+                    enabled: '启用',
+                    remark: '工作日白天全布防',
+                    createTime: '2026-03-02'
+                },
+                { 
+                    id: 103, 
+                    name: '周末重点防护', 
+                    strategy: 'custom',
+                    startTime: '20:00', 
+                    endTime: '10:00', 
+                    repeatRule: '周末',
+                    weekDays: [],
+                    singleDate: null,
+                    areas: ['大门', '后门', '车库'], 
+                    status: '待执行', 
+                    enabled: '启用',
+                    remark: '周末重点监控出入口',
+                    createTime: '2026-03-05'
+                }
+            ];
+
+            // ==================== 提示工具 ====================
+            function showToast(message, type = 'warning') {
+                const toast = document.createElement('div');
+                toast.className = 'toast-message';
+                toast.style.borderLeftColor = type === 'warning' ? 'var(--color-warning)' : 'var(--color-info)';
+                toast.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>${type === 'warning' ? '⚠️' : 'ℹ️'}</span>
+                        <span>${message}</span>
+                    </div>
+                `;
+                document.body.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.remove();
+                }, 3000);
+            }
+
+            // ==================== 核心工具函数 ====================
+            // 更新计划状态（基于当前时间模拟）
+            function updatePlanStatuses() {
+                const now = new Date();
+                const currentTime = now.getHours() * 60 + now.getMinutes();
+                
+                plans.forEach(plan => {
+                    if (plan.enabled !== '启用') {
+                        plan.status = '已停用';
+                        return;
+                    }
+                    
+                    // 简单模拟：102为执行中，其他待执行
+                    if (plan.id === 102) {
+                        plan.status = '执行中';
+                    } else if (plan.id === 101 || plan.id === 103) {
+                        plan.status = '待执行';
+                    }
+                });
+            }
+
+            // 获取策略显示名称
+            function getStrategyName(strategy) {
+                const map = { home: '居家', away: '外出', custom: '自定义' };
+                return map[strategy] || strategy;
+            }
+
+            // 获取重复规则显示
+            function getRepeatDisplay(plan) {
+                if (plan.repeatRule === '每周' && plan.weekDays?.length) {
+                    const weekMap = {0:'周日',1:'周一',2:'周二',3:'周三',4:'周四',5:'周五',6:'周六'};
+                    return `每周 (${plan.weekDays.map(d => weekMap[d]).join('')})`;
+                }
+                if (plan.repeatRule === '单次' && plan.singleDate) {
+                    return `单次 (${plan.singleDate})`;
+                }
+                return plan.repeatRule;
+            }
+
+            // 根据策略获取区域列表
+            function getZonesByStrategy(strategy) {
+                if (strategy === 'home') {
+                    return zones.filter(z => z.type === 'perimeter').map(z => z.name);
+                } else if (strategy === 'away') {
+                    return zones.map(z => z.name);
+                } else {
+                    return []; // 自定义不预选
+                }
+            }
+
+            // ==================== 防区渲染 ====================
+            function renderCompactZones() {
+                const container = document.getElementById('compactZoneView');
+                if (!container) return;
+                
+                let html = '';
+                areaList.forEach((area, idx) => {
+                    const areaZones = zones.filter(z => z.area === area);
+                    const total = areaZones.length;
+                    const armed = areaZones.filter(z => z.status === 'armed').length;
+                    const alerting = areaZones.filter(z => z.alert).length;
+                    
+                    html += `<div class="compact-area-row">
+                        <div class="compact-header" onclick="toggleAreaRow(${idx})">
+                            <div class="area-title-section">
+                                <div class="area-name-icon"><span>📌 ${area}</span></div>
+                                <div class="armed-stat" title="布防数量 / 防区总数"><span>${armed}</span> / ${total} 布防</div>
+                                ${alerting ? `<div class="alert-stat">🔔报警 ${alerting}</div>` : ''}
+                            </div>
+                            <div class="area-actions" onclick="event.stopPropagation();">
+                                <button class="icon-btn" onclick="armArea('${area}')">🔒 布防</button>
+                                <button class="icon-btn" onclick="disarmArea('${area}')">🔓 撤防</button>
+                                <span style="margin-left:4px;">${expandedAreas[idx] ? '▼' : '▶'}</span>
+                            </div>
+                        </div>
+                        <div class="zone-grid-compact ${expandedAreas[idx] ? '' : 'collapsed'}">
+                            ${areaZones.map(zone => `
+                                <div class="zone-mini-card ${zone.alert ? 'alert-mini' : ''}">
+                                    ${zone.alert ? '<span style="position:absolute; top:2px; right:2px; background:var(--color-danger); color:white; font-size:9px; padding:1px 4px; border-radius:8px;">⚠️</span>' : ''}
+                                    <span class="zone-icon-mini">${zone.deviceIcon}</span>
+                                    <div class="zone-info-mini">
+                                        <span class="zone-name-mini">${zone.name}</span>
+                                        <div class="zone-meta-mini">
+                                            <span class="device-tag">${zone.deviceType}</span>
+                                            <span class="status-dot-mini" style="background:${zone.status==='armed'?'#52c41a':'#888'}"></span>
+                                        </div>
+                                    </div>
+                                    <div class="zone-actions">
+                                        <button class="zone-action-btn" onclick="event.stopPropagation();setZoneStatus(${zone.id}, 'armed')">🔒</button>
+                                        <button class="zone-action-btn" onclick="event.stopPropagation();setZoneStatus(${zone.id}, 'disarmed')">🔓</button>
+                                    </div>
+                                </div>`).join('')}
+                        </div>
+                    </div>`;
+                });
+                container.innerHTML = html;
+                updateKpiFromZones();
+            }
+
+            // 防区操作（带提示）
+            window.setZoneStatus = function(id, status) { 
+                const zone = zones.find(z => z.id === id); 
+                if (zone) {
+                    const executingPlans = plans.filter(p => p.status === '执行中' && p.enabled === '启用');
+                    if (executingPlans.length > 0) {
+                        showToast(`区域 "${zone.name}" 受执行中计划影响，手动操作可能不生效`, 'warning');
+                    }
+                    zone.status = status; 
+                    renderCompactZones(); 
+                } 
+            };
+            
+            window.armArea = function(area) { 
+                const executingPlans = plans.filter(p => p.status === '执行中' && p.enabled === '启用');
+                if (executingPlans.length > 0) {
+                    showToast(`区域 "${area}" 受执行中计划影响，手动操作可能不生效`, 'warning');
+                }
+                zones.forEach(z => { if (z.area === area) z.status = 'armed'; }); 
+                renderCompactZones(); 
+            };
+            
+            window.disarmArea = function(area) { 
+                const executingPlans = plans.filter(p => p.status === '执行中' && p.enabled === '启用');
+                if (executingPlans.length > 0) {
+                    showToast(`区域 "${area}" 受执行中计划影响，手动操作可能不生效`, 'warning');
+                }
+                zones.forEach(z => { if (z.area === area) z.status = 'disarmed'; }); 
+                renderCompactZones(); 
+            };
+            
+            window.armAllZones = function() { 
+                const executingPlans = plans.filter(p => p.status === '执行中' && p.enabled === '启用');
+                if (executingPlans.length > 0) {
+                    showToast(`当前有执行中计划，一键布防可能被计划覆盖`, 'warning');
+                }
+                zones.forEach(z => z.status = 'armed'); 
+                renderCompactZones(); 
+            };
+            
+            window.disarmAllZones = function() { 
+                const executingPlans = plans.filter(p => p.status === '执行中' && p.enabled === '启用');
+                if (executingPlans.length > 0) {
+                    showToast(`当前有执行中计划，一键撤防可能被计划覆盖`, 'warning');
+                }
+                zones.forEach(z => z.status = 'disarmed'); 
+                renderCompactZones(); 
+            };
+            
+            window.simulateNewAlert = function() { 
+                const nonAlert = zones.filter(z => !z.alert); 
+                if (nonAlert.length) { 
+                    nonAlert[Math.floor(Math.random() * nonAlert.length)].alert = true; 
+                    renderCompactZones(); 
+                }
+            };
+            
+            function updateKpiFromZones() {
+                const armedCount = zones.filter(z => z.status === 'armed').length;
+                document.querySelector('.kpi-card.armed .kpi-value').innerHTML = ((armedCount / zones.length) * 100).toFixed(1) + '%';
+                document.getElementById('armedTrend').innerHTML = `${armedCount}/${zones.length} 防区已布防`;
+                document.getElementById('alertCount').innerHTML = zones.filter(z => z.alert).length;
+            }
+
+            window.toggleAreaRow = function(idx) { expandedAreas[idx] = !expandedAreas[idx]; renderCompactZones(); };
+            window.expandAllRows = function() { expandedAreas = expandedAreas.map(() => true); renderCompactZones(); };
+            window.collapseAllRows = function() { expandedAreas = expandedAreas.map(() => false); renderCompactZones(); };
+
+            // ==================== 计划卡片渲染（右侧）====================
+            function renderPlanSidebar() {
+                updatePlanStatuses();
+                const executing = plans.filter(p => p.status === '执行中' && p.enabled === '启用');
+                const pending = plans.filter(p => p.status === '待执行' && p.enabled === '启用');
+                
+                document.getElementById('executingCount').innerText = executing.length;
+                document.getElementById('pendingCount').innerText = pending.length;
+
+                // 执行中
+                document.getElementById('executingPlansList').innerHTML = executing.length ? 
+                    executing.map(p => `
+                        <div class="plan-item-card executing">
+                            <div class="plan-item-header">
+                                <span class="plan-item-name">${p.name}</span>
+                                <span class="plan-item-time">${p.startTime}</span>
+                            </div>
+                            <div class="plan-item-footer">
+                                <span class="plan-item-areas">📍 ${p.areas.length}个区域</span>
+                                <div class="plan-item-actions">
+                                    <button class="action-btn" onclick="recoverPlan(${p.id})" style="color:var(--color-success)">🔄 恢复</button>
+                                    <button class="action-btn" onclick="disarmPlanZones(${p.id})" style="color:var(--color-danger)">🔓 撤防</button>
+                                </div>
+                            </div>
+                        </div>`).join('') : 
+                    '<div style="color:var(--text-muted); text-align:center; padding:8px;">暂无执行中计划</div>';
+
+                // 待执行
+                document.getElementById('pendingPlansList').innerHTML = pending.length ? 
+                    pending.map(p => `
+                        <div class="plan-item-card pending">
+                            <div class="plan-item-header">
+                                <span class="plan-item-name">${p.name}</span>
+                                <span class="plan-item-time">${p.startTime}</span>
+                            </div>
+                            <div class="plan-item-footer">
+                                <span class="plan-item-areas">📍 ${p.areas.length}个区域</span>
+                                <div class="plan-item-actions">
+                                    <button class="action-btn" onclick="executePlan(${p.id})" style="color:var(--color-warning)">▶ 执行</button>
+                                    <button class="action-btn" onclick="cancelPlan(${p.id})" style="color:var(--color-danger)">✖ 取消</button>
+                                </div>
+                            </div>
+                        </div>`).join('') : 
+                    '<div style="color:var(--text-muted); text-align:center; padding:8px;">暂无待执行计划</div>';
+            }
+
+            // 计划卡片操作（带提示）
+            window.recoverPlan = function(planId) {
+                const plan = plans.find(p => p.id === planId);
+                if (plan) { 
+                    plan.status = '待执行'; 
+                    plan.enabled = '启用'; 
+                    showToast(`计划 "${plan.name}" 已恢复为待执行`, 'info');
+                    refreshAll(); 
+                }
+            };
+            
+            window.executePlan = function(planId) {
+                const plan = plans.find(p => p.id === planId);
+                if (plan) { 
+                    showToast(`计划 "${plan.name}" 已立即执行，将持续到 ${plan.endTime}`, 'info');
+                    plan.status = '执行中'; 
+                    plan.enabled = '启用'; 
+                    refreshAll(); 
+                }
+            };
+            
+            window.cancelPlan = function(planId) {
+                const plan = plans.find(p => p.id === planId);
+                if (plan) { 
+                    plan.status = '已停用'; 
+                    plan.enabled = '停用'; 
+                    showToast(`计划 "${plan.name}" 已取消`, 'info');
+                    refreshAll(); 
+                }
+            };
+            
+            window.disarmPlanZones = function(planId) {
+                const plan = plans.find(p => p.id === planId);
+                showToast(`计划 "${plan.name}" 关联防区已撤防（模拟操作）`, 'info');
+            };
+
+            // ==================== 计划表格渲染（计划页面）====================
+            function renderPlanTable() {
+                updatePlanStatuses();
+                const tbody = document.getElementById('planTableBody');
+                if (!tbody) return;
+
+                tbody.innerHTML = plans.map((p, idx) => {
+                    const statusClass = p.status === '执行中' ? 'active' : (p.status === '待执行' ? 'warning' : 'inactive');
+                    const enabledClass = p.enabled === '启用' ? 'active' : 'inactive';
+                    
+                    // 执行中的计划，删除按钮置灰
+                    const deleteBtnClass = p.status === '执行中' ? 'action-link danger disabled' : 'action-link danger';
+                    const deleteHandler = p.status === '执行中' 
+                        ? 'return false;' 
+                        : `deletePlan(${p.id})`;
+                    
+                    return `<tr>
+                        <td>${idx + 1}</td>
+                        <td>${p.name}</td>
+                        <td>${getStrategyName(p.strategy)}</td>
+                        <td>${p.startTime} - ${p.endTime}</td>
+                        <td>${getRepeatDisplay(p)}</td>
+                        <td>${p.areas.length}个区域</td>
+                        <td><span class="status-badge ${statusClass}">${p.status}</span></td>
+                        <td><span class="status-badge ${enabledClass}" onclick="togglePlanEnabled(${p.id})">${p.enabled === '启用' ? '✅启用' : '⏸️停用'}</span></td>
+                        <td>
+                            <span class="action-link" onclick="viewPlan(${p.id})">详情</span>
+                            <span class="action-link" onclick="editPlan(${p.id})">编辑</span>
+                            <span class="${deleteBtnClass}" onclick="${deleteHandler}">删除</span>
+                        </td>
+                    </tr>`;
+                }).join('');
+
+                // 更新统计卡片
+                document.getElementById('totalPlans').innerText = plans.length;
+                document.getElementById('activePlans').innerText = plans.filter(p => p.status === '执行中').length;
+                document.getElementById('pendingPlans').innerText = plans.filter(p => p.status === '待执行').length;
+                document.getElementById('completedPlans').innerText = plans.filter(p => p.status === '已完成').length;
+            }
+
+            // 计划操作（带规则检查）
+            window.togglePlanEnabled = function(id) {
+                const plan = plans.find(p => p.id === id);
+                if (plan) { 
+                    if (plan.status === '执行中' && plan.enabled === '启用') {
+                        showToast(`执行中的计划不能停用，请先恢复为待执行`, 'warning');
+                        return;
+                    }
+                    plan.enabled = plan.enabled === '启用' ? '停用' : '启用'; 
+                    refreshAll(); 
+                }
+            };
+
+            window.deletePlan = function(id) {
+                const plan = plans.find(p => p.id === id);
+                if (plan && plan.status === '执行中') {
+                    showToast(`执行中的计划不能删除`, 'warning');
+                    return;
+                }
+                if (confirm('确认删除该计划？')) {
+                    plans = plans.filter(p => p.id !== id);
+                    showToast(`计划已删除`, 'info');
+                    refreshAll();
+                }
+            };
+
+            window.viewPlan = function(id) {
+                const plan = plans.find(p => p.id === id);
+                if (!plan) return;
+                alert(`计划详情\n名称：${plan.name}\n策略：${getStrategyName(plan.strategy)}\n时间：${plan.startTime}-${plan.endTime}\n重复：${getRepeatDisplay(plan)}\n区域：${plan.areas.length}个\n备注：${plan.remark || '无'}`);
+            };
+
+            window.editPlan = function(id) {
+                const plan = plans.find(p => p.id === id);
+                if (!plan) return;
+                
+                if (plan.status === '执行中') {
+                    showToast(`执行中的计划不能编辑`, 'warning');
+                    return;
+                }
+                
+                // 填充表单
+                document.getElementById('modalPlanTitle').innerText = '编辑布防计划';
+                document.getElementById('planName').value = plan.name;
+                document.getElementById('planStartTime').value = plan.startTime;
+                document.getElementById('planEndTime').value = plan.endTime;
+                document.getElementById('planRemark').value = plan.remark || '';
+                document.getElementById('editingPlanId').value = plan.id;
+                
+                // 策略
+                selectStrategy(plan.strategy);
+                
+                // 重复规则
+                document.querySelectorAll('input[name="repeatRule"]').forEach(r => {
+                    r.checked = r.value === plan.repeatRule;
+                });
+                
+                // 显示对应控件
+                toggleRepeatRuleControls(plan.repeatRule);
+                
+                // 如果是每周，选中星期
+                if (plan.repeatRule === '每周' && plan.weekDays) {
+                    document.querySelectorAll('#weekDaysSelector input[type="checkbox"]').forEach(cb => {
+                        cb.checked = plan.weekDays.includes(parseInt(cb.value));
+                        cb.closest('.week-day').classList.toggle('selected', cb.checked);
+                    });
+                }
+                
+                // 如果是单次，设置日期
+                if (plan.repeatRule === '单次' && plan.singleDate) {
+                    document.getElementById('planSingleDate').value = plan.singleDate;
+                }
+                
+                // 如果是自定义，需要勾选对应的区域
+                if (plan.strategy === 'custom' && plan.areas) {
+                    setTimeout(() => {
+                        const checkboxes = document.querySelectorAll('#zoneSelector input[type="checkbox"]');
+                        checkboxes.forEach(cb => {
+                            const zoneId = parseInt(cb.value);
+                            const zone = zones.find(z => z.id === zoneId);
+                            if (zone && plan.areas.includes(zone.name)) {
+                                cb.checked = true;
+                            }
+                        });
+                    }, 100);
+                }
+                
+                openPlanModal(true);
+            };
+
+            // ==================== 弹窗相关 ====================
+            // 初始化区域选择器
+            function initZoneSelector() {
+                const selector = document.getElementById('zoneSelector');
+                let html = '';
+                
+                zones.forEach(zone => {
+                    html += `
+                        <label class="zone-item">
+                            <input type="checkbox" value="${zone.id}">
+                            <div class="zone-info">
+                                <span class="zone-name">${zone.name}</span>
+                                <span class="zone-host">${zone.host} · ${zone.type === 'perimeter' ? '周边' : '内部'}</span>
+                            </div>
+                        </label>
+                    `;
+                });
+                
+                selector.innerHTML = html;
+            }
+
+            // 获取选中的区域名称列表
+            function getSelectedZones() {
+                const checkboxes = document.querySelectorAll('#zoneSelector input[type="checkbox"]:checked');
+                const selectedZones = [];
+                
+                checkboxes.forEach(cb => {
+                    const zoneId = parseInt(cb.value);
+                    const zone = zones.find(z => z.id === zoneId);
+                    if (zone) {
+                        selectedZones.push(zone.name);
+                    }
+                });
+                
+                return selectedZones;
+            }
+
+            // 根据策略更新区域选择
+            function updateZonesByStrategy(strategy) {
+                if (strategy !== 'custom') return;
+                
+                const checkboxes = document.querySelectorAll('#zoneSelector input[type="checkbox"]');
+                checkboxes.forEach(cb => {
+                    cb.checked = false; // 默认全不选
+                });
+            }
+
+            // 新增计划
+            window.openPlanModal = function(isEdit = false) {
+                if (!isEdit) {
+                    document.getElementById('planForm').reset();
+                    document.getElementById('editingPlanId').value = '';
+                    document.getElementById('modalPlanTitle').innerText = '新增布防计划';
+                    selectStrategy('home');
+                    document.querySelector('input[name="repeatRule"][value="每天"]').checked = true;
+                    toggleRepeatRuleControls('每天');
+                    
+                    // 重置区域选择器
+                    initZoneSelector();
+                }
+                document.getElementById('planModal').classList.add('active');
+            };
+
+            window.closePlanModal = function() {
+                document.getElementById('planModal').classList.remove('active');
+            };
+
+            // 策略选择
+            window.selectStrategy = function(strategy) {
+                document.getElementById('selectedStrategy').value = strategy;
+                document.querySelectorAll('.strategy-card').forEach(c => c.classList.remove('selected'));
+                document.querySelector(`.strategy-card[data-strategy="${strategy}"]`).classList.add('selected');
+                
+                // 自定义区域显示控制
+                const customAreaGroup = document.getElementById('customAreaGroup');
+                if (customAreaGroup) {
+                    customAreaGroup.style.display = strategy === 'custom' ? 'block' : 'none';
+                }
+                
+                // 根据策略预选区域（仅在新增时有用，编辑时由外部设置）
+                if (!document.getElementById('editingPlanId').value) {
+                    if (strategy === 'home') {
+                        const homeZones = zones.filter(z => z.type === 'perimeter').map(z => z.id);
+                        document.querySelectorAll('#zoneSelector input[type="checkbox"]').forEach(cb => {
+                            cb.checked = homeZones.includes(parseInt(cb.value));
+                        });
+                    } else if (strategy === 'away') {
+                        document.querySelectorAll('#zoneSelector input[type="checkbox"]').forEach(cb => {
+                            cb.checked = true;
+                        });
+                    }
+                }
+            };
+
+            // 重复规则联动
+            function toggleRepeatRuleControls(rule) {
+                const weekGroup = document.getElementById('weekSelectorGroup');
+                const singleGroup = document.getElementById('singleDateGroup');
+                
+                if (weekGroup && singleGroup) {
+                    weekGroup.style.display = rule === '每周' ? 'block' : 'none';
+                    singleGroup.style.display = rule === '单次' ? 'block' : 'none';
+                }
+            }
+
+            // 监听重复规则变化
+            document.querySelectorAll('input[name="repeatRule"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    toggleRepeatRuleControls(this.value);
+                });
+            });
+
+            // 星期选择器交互
+            document.querySelectorAll('.week-day').forEach(day => {
+                day.addEventListener('click', function() {
+                    const cb = this.querySelector('input[type="checkbox"]');
+                    cb.checked = !cb.checked;
+                    this.classList.toggle('selected', cb.checked);
+                });
+            });
+
+            // 保存计划
+            window.savePlan = function() {
+                // 表单验证
+                const name = document.getElementById('planName').value.trim();
+                if (!name) {
+                    document.getElementById('nameError').style.display = 'block';
+                    return;
+                }
+
+                const editId = document.getElementById('editingPlanId').value;
+                const strategy = document.getElementById('selectedStrategy').value;
+                const startTime = document.getElementById('planStartTime').value;
+                const endTime = document.getElementById('planEndTime').value;
+                const repeatRule = document.querySelector('input[name="repeatRule"]:checked').value;
+                const remark = document.getElementById('planRemark').value;
+
+                // 验证时间
+                if (startTime >= endTime && repeatRule !== '单次') {
+                    showToast('布防时间必须早于撤防时间', 'warning');
+                    return;
+                }
+
+                // 收集星期数据
+                let weekDays = [];
+                if (repeatRule === '每周') {
+                    weekDays = Array.from(document.querySelectorAll('#weekDaysSelector input[type="checkbox"]:checked'))
+                        .map(cb => parseInt(cb.value));
+                    if (weekDays.length === 0) {
+                        document.getElementById('weekDaysError').style.display = 'block';
+                        return;
+                    }
+                }
+
+                // 收集单次日期
+                let singleDate = null;
+                if (repeatRule === '单次') {
+                    singleDate = document.getElementById('planSingleDate').value;
+                }
+
+                // 获取区域列表
+                let areas = [];
+                if (strategy === 'custom') {
+                    areas = getSelectedZones();
+                    if (areas.length === 0) {
+                        document.getElementById('zonesError').style.display = 'block';
+                        return;
+                    }
+                } else {
+                    areas = getZonesByStrategy(strategy);
+                }
+
+                const planData = {
+                    id: editId ? parseInt(editId) : Date.now(),
+                    name,
+                    strategy,
+                    startTime,
+                    endTime,
+                    repeatRule,
+                    weekDays,
+                    singleDate,
+                    areas,
+                    status: '待执行',
+                    enabled: '启用',
+                    remark,
+                    createTime: new Date().toISOString().split('T')[0]
+                };
+
+                if (editId) {
+                    const index = plans.findIndex(p => p.id === parseInt(editId));
+                    if (index !== -1) plans[index] = planData;
+                    showToast(`计划已更新`, 'info');
+                } else {
+                    plans.push(planData);
+                    showToast(`计划已新增`, 'info');
+                }
+
+                refreshAll();
+                closePlanModal();
+            };
+
+            window.refreshPlanTable = function() {
+                refreshAll();
+            };
+
+            // 全局刷新
+            function refreshAll() {
+                renderCompactZones();
+                renderPlanSidebar();
+                renderPlanTable();
+            }
+
+            // ==================== 图表 ====================
+            let alarmTrendChart, alarmTypeChart;
+            
+            function initCharts() {
+                const trendCtx = document.getElementById('alarmTrendChart')?.getContext('2d');
+                if (trendCtx) {
+                    alarmTrendChart = new Chart(trendCtx, {
+                        type: 'line',
+                        data: { labels: [], datasets: [{ label: '报警数量', data: [], borderColor: '#1890ff', backgroundColor: 'rgba(24,144,255,0.1)', fill: true }] },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                }
+                
+                const typeCtx = document.getElementById('alarmTypeChart')?.getContext('2d');
+                if (typeCtx) {
+                    alarmTypeChart = new Chart(typeCtx, {
+                        type: 'doughnut',
+                        data: { 
+                            labels: ['入侵报警', '防拆报警', '设备故障', '紧急按钮', '其他'],
+                            datasets: [{ data: [42, 18, 22, 10, 8], backgroundColor: ['#ff4d4f', '#faad14', '#1890ff', '#722ed1', '#52c41a'] }]
+                        },
+                        options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: 'rgba(255,255,255,0.65)' } } } }
+                    });
+                }
+                
+                updateChartsByRange('today');
+            }
+
+            function updateChartsByRange(range) {
+                if (!alarmTrendChart) return;
+                
+                let labels, values, title;
+                if (range === 'today') {
+                    labels = ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'];
+                    values = [3, 5, 8, 12, 10, 4];
+                    title = '24小时报警趋势（今日）';
+                } else if (range === 'week') {
+                    labels = ['03-04', '03-05', '03-06', '03-07', '03-08', '03-09', '03-10'];
+                    values = [18, 22, 15, 25, 30, 28, 35];
+                    title = '近7天报警趋势';
+                } else if (range === 'month') {
+                    labels = ['第1周', '第2周', '第3周', '第4周'];
+                    values = [98, 112, 85, 130];
+                    title = '近1个月报警趋势';
+                } else {
+                    labels = ['03-01', '03-02', '03-03', '03-04', '03-05', '03-06', '03-07', '03-08', '03-09', '03-10'];
+                    values = [5, 7, 9, 12, 15, 18, 22, 19, 24, 20];
+                    title = '自定义报警趋势';
+                }
+                
+                alarmTrendChart.data.labels = labels;
+                alarmTrendChart.data.datasets[0].data = values;
+                alarmTrendChart.update();
+                
+                document.getElementById('trendTitle').innerHTML = `📈 ${title}`;
+                document.getElementById('typeRangeLabel').innerText = `(${range === 'today' ? '今日' : range === 'week' ? '本周' : range === 'month' ? '本月' : '自定义'})`;
+            }
+
+            function setupFilterButtons() {
+                const btns = document.querySelectorAll('#timeFilterButtons .btn');
+                const customPicker = document.getElementById('customDatePicker');
+                
+                btns.forEach(b => {
+                    b.addEventListener('click', function() {
+                        btns.forEach(b2 => b2.classList.remove('active'));
+                        this.classList.add('active');
+                        const range = this.dataset.range;
+                        customPicker.style.display = range === 'custom' ? 'flex' : 'none';
+                        if (range !== 'custom') updateChartsByRange(range);
+                    });
+                });
+                
+                document.getElementById('applyCustom').addEventListener('click', () => updateChartsByRange('custom'));
+            }
+
+            // ==================== 追踪面板 ====================
+            window.openTracePanel = function(zoneId) {
+                const zone = zones.find(z => z.id === zoneId);
+                if (!zone) return;
+                document.getElementById('traceContent').innerHTML = `
+                    <div style="background:var(--bg-secondary); padding:16px; border-radius:12px;">
+                        <h4>${zone.name} (${zone.deviceType})</h4>
+                        <p>区域: ${zone.area}<br>主机: ${zone.host}<br>报警时间: ${zone.alertTime || '刚刚'}</p>
+                        <button class="btn btn-primary" onclick="acknowledgeAlert(${zone.id})">确认报警</button>
+                    </div>`;
+                document.getElementById('tracePanel').classList.add('open');
+            };
+            
+            window.closeTracePanel = function() {
+                document.getElementById('tracePanel').classList.remove('open');
+            };
+            
+            window.acknowledgeAlert = function(zoneId) {
+                const zone = zones.find(z => z.id === zoneId);
+                if (zone) { zone.alert = false; renderCompactZones(); closeTracePanel(); }
+            };
+
+            // ==================== 页面切换 ====================
+            window.switchPage = function(pageId, el) {
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById(pageId + 'Page').classList.add('active');
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                if (el) el.classList.add('active');
+                
+                document.getElementById('pageTitle').innerText = 
+                    pageId === 'dashboard' ? '入侵报警可视化看板' : 
+                    pageId === 'plan' ? '布防计划管理' : '';
+                
+                if (pageId === 'plan') renderPlanTable();
+            };
+
+            document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+                item.addEventListener('click', function(e) { switchPage(this.dataset.page, this); });
+            });
+
+            // ==================== 初始化 ====================
+            function updateTime() { 
+                document.getElementById('currentTime').innerText = new Date().toLocaleString('zh-CN'); 
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                initZoneSelector(); // 初始化区域选择器
+                renderCompactZones();
+                renderPlanSidebar();
+                renderPlanTable();
+                initCharts();
+                setupFilterButtons();
+                updateTime();
+                setInterval(updateTime, 1000);
+                setInterval(refreshAll, 60000); // 每分钟刷新一次
+            });
+        })();
+    </script>
+</body>
+</html>

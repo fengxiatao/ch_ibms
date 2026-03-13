@@ -1,0 +1,1803 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧照明控制系统 - 设备管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #3b82f6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --bg: #f8fafc;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        /* 侧边栏样式 */
+        .sidebar {
+            width: 240px;
+            background: #1e293b;
+            position: fixed;
+            height: 100vh;
+            color: white;
+        }
+
+        .logo {
+            height: 64px;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .logo i {
+            color: var(--primary);
+            margin-right: 12px;
+            font-size: 20px;
+        }
+
+        .menu-item {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .menu-item:hover, .menu-item.active {
+            background: #334155;
+            color: white;
+        }
+
+        .menu-item i {
+            width: 20px;
+            margin-right: 12px;
+            font-size: 14px;
+        }
+
+        .submenu {
+            margin-left: 32px;
+            padding-left: 12px;
+            border-left: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .submenu-item {
+            padding: 8px 16px;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .submenu-item:hover, .submenu-item.active {
+            color: white;
+        }
+
+        .main-content {
+            margin-left: 240px;
+            padding: 20px;
+        }
+
+        /* 表格容器 - 支持横向滚动 */
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            overflow-x: auto;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        /* 表格样式 */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1600px;
+        }
+
+        .data-table th {
+            background: #f8fafc;
+            padding: 14px 16px;
+            text-align: left;
+            font-weight: 500;
+            font-size: 13px;
+            color: #64748b;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .data-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        .data-table tr:hover td {
+            background: #f8fafc;
+        }
+
+        /* 状态标签 */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.online {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-badge.offline {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* 设备类型标签 */
+        .type-tag {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            background: #f1f5f9;
+            color: #334155;
+        }
+
+        /* ========== 规格参数样式（精简版，只保留核心规格） ========== */
+        .spec-container {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 180px;
+        }
+
+        /* 灯具规格样式 - 普通照明 */
+        .light-spec {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #f8fafc;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border-left: 3px solid #3b82f6;
+        }
+
+        .light-count {
+            font-weight: 600;
+            color: #3b82f6;
+        }
+
+        .light-power {
+            color: #64748b;
+        }
+
+        /* 调光设备规格样式 */
+        .dimmer-spec {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f8fafc;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border-left: 3px solid #8b5cf6;
+        }
+
+        .dimmer-spec i {
+            color: #8b5cf6;
+            font-size: 14px;
+        }
+
+        /* 执行控制器规格样式 */
+        .controller-spec {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: #eff6ff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #bfdbfe;
+        }
+
+        .controller-model {
+            font-weight: 600;
+            color: #1e40af;
+        }
+
+        .controller-params {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            color: #475569;
+        }
+
+        /* 网关规格样式 */
+        .gateway-spec {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #f0fdf4;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #86efac;
+        }
+
+        .gateway-model {
+            font-weight: 600;
+            color: #166534;
+        }
+
+        /* 传感器规格样式 */
+        .sensor-spec {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #f8fafc;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border-left: 3px solid #10b981;
+        }
+
+        .sensor-model {
+            font-weight: 500;
+            color: #065f46;
+        }
+
+        .sensor-range {
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        /* 操作按钮 */
+        .action-btn {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--primary);
+            cursor: pointer;
+            margin: 0 2px;
+        }
+
+        .action-btn:hover {
+            background: #eef2ff;
+        }
+
+        /* 筛选栏 */
+        .filter-bar {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-select, .filter-input {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            min-width: 140px;
+            background: white;
+        }
+
+        .filter-input {
+            min-width: 200px;
+        }
+
+        .filter-btn {
+            padding: 8px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .reset-btn {
+            padding: 8px 20px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .export-btn {
+            padding: 8px 20px;
+            background: var(--success);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        /* 统计信息 */
+        .stats-bar {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .stat-card {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid var(--primary);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .stat-unit {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-left: 2px;
+        }
+
+        .stat-desc {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+
+        /* 分页 */
+        .pagination {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .pagination-info {
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .pagination-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .pagination-btn:hover {
+            background: #f8fafc;
+        }
+
+        .pagination-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* 模态框 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            width: 700px;
+            max-width: 90%;
+            padding: 24px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: #f1f5f9;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .detail-item {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .detail-label {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+
+        .detail-value {
+            font-size: 16px;
+            font-weight: 600;
+            word-break: break-word;
+        }
+
+        /* 历史查询面板 */
+        .history-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .history-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .history-title i {
+            color: var(--primary);
+        }
+
+        .query-section {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr auto;
+            gap: 16px;
+            align-items: end;
+        }
+
+        .date-range {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .date-input-group {
+            flex: 1;
+        }
+
+        .date-input-group label {
+            display: block;
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+
+        .date-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .dimension-select {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            min-width: 140px;
+            background: white;
+        }
+
+        .query-btn {
+            padding: 10px 24px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            height: 42px;
+        }
+
+        .query-btn:hover {
+            background: #2563eb;
+        }
+
+        /* 分析面板 */
+        .analysis-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .analysis-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text);
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .analysis-item {
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .analysis-label {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+
+        .analysis-value {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* 导出模态框中的选项 */
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin: 16px 0;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: #f8fafc;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo">
+            <i class="fas fa-lightbulb"></i>
+            <span>智慧照明系统</span>
+        </div>
+        
+        <div class="menu-item" onclick="window.location.href='智能照明数据总览.html'">
+        
+            
+        </div>
+        
+        <div class="menu-item active">
+            <i class="fas fa-microchip"></i>
+            <span>设备管理</span>
+        </div>
+        
+        <div class="submenu">
+            
+        </div>
+        
+        <div class="menu-item" onclick="window.location.href='场景控制.html'">
+           
+        </div>
+        
+        <div class="menu-item" onclick="window.location.href='操作日志.html'">
+        
+           
+        </div>
+        
+        <div class="menu-item" onclick="window.location.href='告警信息.html'">
+            
+            
+        </div>
+    </div>
+
+    <div class="main-content">
+        <!-- 顶部标题 -->
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h1 class="text-xl font-bold">设备管理</h1>
+                <p class="text-sm text-slate-500 mt-1">照明设备列表与规格参数</p>
+            </div>
+            <div class="text-sm text-slate-500" id="currentTime"></div>
+        </div>
+
+        <!-- 统计分析卡片 -->
+        <div class="stats-bar">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">设备总数</div>
+                    <div class="stat-value" id="totalCount">0</div>
+                    <div class="stat-desc">在线 <span id="onlineCount">0</span> · 离线 <span id="offlineCount">0</span></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">执行控制器</div>
+                    <div class="stat-value" id="controllerCount">0</div>
+                    <div class="stat-desc">管理 <span id="controlledCircuits">0</span> 个回路</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">今日总能耗</div>
+                    <div class="stat-value" id="totalEnergy">0<span class="stat-unit">kWh</span></div>
+                    <div class="stat-desc">预估电费 ¥<span id="totalCost">0</span></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">控制器平均使用率</div>
+                    <div class="stat-value" id="avgLoadRate">0<span class="stat-unit">%</span></div>
+                    <div class="stat-desc">基于控制器容量</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 控制器使用率分析面板 -->
+        <div class="analysis-panel">
+            <div class="analysis-title">📊 执行控制器使用率分析</div>
+            <div class="analysis-grid">
+                <div class="analysis-item">
+                    <div class="analysis-label">控制器总容量</div>
+                    <div class="analysis-value" id="totalControllerCapacity">0 W</div>
+                    <div class="text-xs text-slate-500 mt-1">可带载 <span id="maxCircuits">0</span> 个回路</div>
+                </div>
+                <div class="analysis-item">
+                    <div class="analysis-label">当前总负载</div>
+                    <div class="analysis-value" id="totalControllerLoad">0 W</div>
+                    <div class="text-xs text-slate-500 mt-1">已用容量 <span id="usedCapacityPercent">0</span>%</div>
+                </div>
+                <div class="analysis-item">
+                    <div class="analysis-label">剩余容量</div>
+                    <div class="analysis-value" id="remainingCapacity">0 W</div>
+                    <div class="text-xs text-slate-500 mt-1">可新增 <span id="remainingCircuits">0</span> 个回路</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 历史数据查询面板 -->
+        <div class="history-panel">
+            <div class="history-title">
+                <i class="fas fa-history"></i>
+                历史数据查询
+            </div>
+            <div class="query-section">
+                <div class="date-range">
+                    <div class="date-input-group">
+                        <label>起始时间</label>
+                        <input type="datetime-local" class="date-input" id="historyStartTime" value="2026-03-01T00:00">
+                    </div>
+                    <div class="date-input-group">
+                        <label>结束时间</label>
+                        <input type="datetime-local" class="date-input" id="historyEndTime" value="2026-03-04T23:59">
+                    </div>
+                </div>
+                
+                <select class="dimension-select" id="timeDimension">
+                    <option value="custom">自定义</option>
+                    <option value="today">今日</option>
+                    <option value="yesterday">昨日</option>
+                    <option value="thisWeek">本周</option>
+                    <option value="lastWeek">上周</option>
+                    <option value="thisMonth">本月</option>
+                    <option value="lastMonth">上月</option>
+                </select>
+                
+                <select class="dimension-select" id="historyType">
+                    <option value="all">全部设备</option>
+                    <option value="light">普通照明</option>
+                    <option value="dimmer">调光设备</option>
+                    <option value="controller">执行控制器</option>
+                </select>
+                
+                <button class="query-btn" onclick="queryHistoryData()">
+                    <i class="fas fa-search"></i>
+                    查询历史
+                </button>
+            </div>
+            
+            <!-- 历史数据统计结果 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4" id="historyStats" style="display: none;">
+                <div class="bg-blue-50 p-3 rounded-lg">
+                    <div class="text-xs text-blue-600">查询时间段</div>
+                    <div class="text-sm font-medium" id="queryPeriod">2026-03-01 至 2026-03-04</div>
+                </div>
+                <div class="bg-green-50 p-3 rounded-lg">
+                    <div class="text-xs text-green-600">累计开启时间</div>
+                    <div class="text-lg font-bold text-green-700" id="totalRuntime">0</div>
+                    <div class="text-xs text-green-600">小时</div>
+                </div>
+                <div class="bg-purple-50 p-3 rounded-lg">
+                    <div class="text-xs text-purple-600">累计功耗</div>
+                    <div class="text-lg font-bold text-purple-700" id="totalPower">0</div>
+                    <div class="text-xs text-purple-600">kWh</div>
+                </div>
+                <div class="bg-orange-50 p-3 rounded-lg">
+                    <div class="text-xs text-orange-600">平均每日开启</div>
+                    <div class="text-lg font-bold text-orange-700" id="avgDailyRuntime">0</div>
+                    <div class="text-xs text-orange-600">小时/天</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 筛选栏 -->
+        <div class="filter-bar">
+            <select class="filter-select" id="typeFilter" onchange="filterDevices()">
+                <option value="all">全部设备类型</option>
+                <option value="light">普通照明</option>
+                <option value="dimmer">调光设备</option>
+                <option value="gateway">智能网关</option>
+                <option value="controller">执行控制器</option>
+                <option value="sensor">传感器</option>
+            </select>
+            
+            <select class="filter-select" id="statusFilter" onchange="filterDevices()">
+                <option value="all">全部状态</option>
+                <option value="online">在线</option>
+                <option value="offline">离线</option>
+            </select>
+            
+            <select class="filter-select" id="areaFilter" onchange="filterDevices()">
+                <option value="all">全部区域</option>
+                <option value="A座1层">A座1层</option>
+                <option value="A座2层">A座2层</option>
+                <option value="B座1层">B座1层</option>
+                <option value="B座2层">B座2层</option>
+                <option value="C座1层">C座1层</option>
+            </select>
+            
+            <input type="text" class="filter-input" placeholder="搜索设备名称/编号/型号" id="searchInput" oninput="filterDevices()">
+            
+            <button class="filter-btn" onclick="filterDevices()">
+                <i class="fas fa-search mr-2"></i>查询
+            </button>
+            
+            <button class="reset-btn" onclick="resetFilter()">
+                <i class="fas fa-undo mr-2"></i>重置
+            </button>
+            
+            <button class="export-btn" onclick="openExportModal()">
+                <i class="fas fa-file-export mr-2"></i>报表导出
+            </button>
+        </div>
+
+        <!-- 设备列表表格（带横向滚动） -->
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>设备编号</th>
+                        <th>设备名称</th>
+                        <th>设备类型</th>
+                        <th>规格参数</th>
+                        <th>所属区域</th>
+                        <th>状态</th>
+                        <th>所属控制器</th>
+                        <th>功率(W)</th>
+                        <th>今日能耗(kWh)</th>
+                        <th>今日运行(h)</th>
+                        <th>累计运行(h)</th>
+                        <th>控制器使用率</th>
+                        <th>最后通信</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="deviceTableBody">
+                    <!-- 动态生成设备数据 -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 分页 -->
+        <div class="pagination">
+            <div class="pagination-info">
+                显示 <span id="startItem">1</span> - <span id="endItem">10</span> 条，共 <span id="totalItems">0</span> 条
+            </div>
+            <div class="flex gap-2">
+                <button class="pagination-btn" onclick="changePage('first')">
+                    <i class="fas fa-angle-double-left"></i>
+                </button>
+                <button class="pagination-btn" onclick="changePage('prev')">
+                    <i class="fas fa-angle-left"></i>
+                </button>
+                <span class="pagination-btn active" id="currentPage">1</span>
+                <button class="pagination-btn" onclick="changePage('next')">
+                    <i class="fas fa-angle-right"></i>
+                </button>
+                <button class="pagination-btn" onclick="changePage('last')">
+                    <i class="fas fa-angle-double-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设备详情模态框 -->
+    <div class="modal" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">设备详情</div>
+                <div class="modal-close" onclick="closeModal('detailModal')">
+                    <i class="fas fa-times"></i>
+                </div>
+            </div>
+            <div id="deviceDetail"></div>
+        </div>
+    </div>
+
+    <!-- 导出报表模态框 -->
+    <div class="modal" id="exportModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">导出报表</div>
+                <div class="modal-close" onclick="closeModal('exportModal')">
+                    <i class="fas fa-times"></i>
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium mb-3">选择导出内容</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" class="rounded border-slate-300" id="exportBasic" checked>
+                        <span class="text-sm">基础信息</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" class="rounded border-slate-300" id="exportSpec" checked>
+                        <span class="text-sm">规格参数</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" class="rounded border-slate-300" id="exportPower" checked>
+                        <span class="text-sm">功率数据</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" class="rounded border-slate-300" id="exportEnergy" checked>
+                        <span class="text-sm">能耗数据</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" class="rounded border-slate-300" id="exportRuntime" checked>
+                        <span class="text-sm">运行数据</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" class="rounded border-slate-300" id="exportLoad" checked>
+                        <span class="text-sm">负载数据</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" class="rounded border-slate-300" id="exportStatus" checked>
+                        <span class="text-sm">状态信息</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <label class="block text-sm font-medium mb-2">导出格式</label>
+                <select class="filter-select w-full" id="exportFormat">
+                    <option value="csv">CSV文件（Excel可打开）</option>
+                </select>
+            </div>
+            
+            <div class="flex justify-end gap-3 mt-6">
+                <button class="px-4 py-2 border border-slate-200 rounded-lg" onclick="closeModal('exportModal')">取消</button>
+                <button class="px-4 py-2 bg-green-600 text-white rounded-lg" onclick="exportReport()">
+                    <i class="fas fa-download mr-2"></i>生成报表
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 数据源 ====================
+        // 执行控制器列表
+        const controllers = [
+            { id: 'CT001', name: 'A座执行控制器', capacity: 2000, area: 'A座1层', model: 'LC-8CH-20A' },
+            { id: 'CT002', name: 'B座执行控制器', capacity: 1500, area: 'B座1层', model: 'LC-8CH-20A' }
+        ];
+
+        // 照明回路数据（只保留核心规格参数）
+        const circuitList = [
+            // 普通照明 - A座控制器
+            { id: 'C001', code: 'LT-001', name: 'A1层走廊灯组', type: 'light', typeName: '普通照明', area: 'A座1层', status: 'online', 
+              power: 76, energy: 12.4, runtimeToday: 8.5, totalRuntime: 128, controllerId: 'CT001',
+              specType: 'light', lightCount: 6, lightPower: 72, manufacturer: 'Philips',
+              lastComm: '2026-03-04 14:25:30' },
+            
+            { id: 'C002', code: 'LT-002', name: 'A1层会议室灯', type: 'light', typeName: '普通照明', area: 'A座1层', status: 'online', 
+              power: 68, energy: 8.8, runtimeToday: 6.2, totalRuntime: 96, controllerId: 'CT001',
+              specType: 'light', lightCount: 8, lightPower: 96, manufacturer: 'Philips',
+              lastComm: '2026-03-04 14:20:15' },
+            
+            { id: 'D001', code: 'DM-001', name: 'A1层会议室调光', type: 'dimmer', typeName: '调光设备', area: 'A座1层', status: 'online', 
+              power: 80, energy: 7.2, runtimeToday: 5.5, totalRuntime: 92, controllerId: 'CT001',
+              specType: 'dimmer', lightType: '可调光LED射灯', lightPower: 90, manufacturer: 'Lutron',
+              lastComm: '2026-03-04 14:25:55' },
+            
+            { id: 'G001', code: 'GW-001', name: 'A座主网关', type: 'gateway', typeName: '智能网关', area: 'A座1层', status: 'online', 
+              power: 5, energy: 0.5, runtimeToday: 24.0, totalRuntime: 8760, controllerId: null,
+              specType: 'gateway', model: 'IoT-GW-2024', manufacturer: 'Cisco',
+              lastComm: '2026-03-04 14:30:01' },
+            
+            { id: 'CT001', code: 'CT-001', name: 'A座执行控制器', type: 'controller', typeName: '执行控制器', area: 'A座1层', status: 'online', 
+              power: 10, energy: 1.2, runtimeToday: 24.0, totalRuntime: 8760, controllerId: null,
+              specType: 'controller', model: 'LC-8CH-20A', channels: 8, current: 20,
+              lastComm: '2026-03-04 14:30:02' },
+            
+            { id: 'C003', code: 'LT-003', name: 'A1层办公室灯', type: 'light', typeName: '普通照明', area: 'A座1层', status: 'offline', 
+              power: 0, energy: 0, runtimeToday: 0, totalRuntime: 0, controllerId: 'CT001',
+              specType: 'light', lightCount: 12, lightPower: 144, manufacturer: 'Philips',
+              lastComm: '2026-03-03 18:30:22' },
+            
+            { id: 'C004', code: 'EM-001', name: 'A1层应急照明', type: 'light', typeName: '应急照明', area: 'A座1层', status: 'online', 
+              power: 88, energy: 2.4, runtimeToday: 1.5, totalRuntime: 24, controllerId: 'CT001',
+              specType: 'light', lightCount: 4, lightPower: 96, manufacturer: 'Schneider',
+              lastComm: '2026-03-04 14:28:45' },
+            
+            { id: 'C006', code: 'LT-004', name: 'A2层走廊灯组', type: 'light', typeName: '普通照明', area: 'A座2层', status: 'online', 
+              power: 90, energy: 10.5, runtimeToday: 7.2, totalRuntime: 110, controllerId: 'CT001',
+              specType: 'light', lightCount: 6, lightPower: 96, manufacturer: 'Philips',
+              lastComm: '2026-03-04 14:26:33' },
+            
+            { id: 'C007', code: 'LT-005', name: 'A2层办公室灯', type: 'light', typeName: '普通照明', area: 'A座2层', status: 'online', 
+              power: 88, energy: 7.9, runtimeToday: 5.8, totalRuntime: 88, controllerId: 'CT001',
+              specType: 'light', lightCount: 8, lightPower: 88, manufacturer: 'Philips',
+              lastComm: '2026-03-04 14:24:18' },
+            
+            { id: 'C009', code: 'LT-006', name: 'B1层车间照明', type: 'light', typeName: '普通照明', area: 'B座1层', status: 'online', 
+              power: 165, energy: 22.3, runtimeToday: 9.5, totalRuntime: 156, controllerId: 'CT002',
+              specType: 'light', lightCount: 10, lightPower: 180, manufacturer: 'Osram',
+              lastComm: '2026-03-04 14:27:51' },
+            
+            { id: 'C010', code: 'EM-002', name: 'B1层应急照明', type: 'light', typeName: '应急照明', area: 'B座1层', status: 'online', 
+              power: 58, energy: 1.5, runtimeToday: 1.2, totalRuntime: 24, controllerId: 'CT002',
+              specType: 'light', lightCount: 3, lightPower: 64, manufacturer: 'Schneider',
+              lastComm: '2026-03-04 14:23:42' },
+            
+            { id: 'C011', code: 'LT-007', name: 'B2层办公区灯', type: 'light', typeName: '普通照明', area: 'B座2层', status: 'offline', 
+              power: 0, energy: 0, runtimeToday: 0, totalRuntime: 0, controllerId: 'CT002',
+              specType: 'light', lightCount: 8, lightPower: 96, manufacturer: 'Philips',
+              lastComm: '2026-03-03 15:30:18' },
+            
+            { id: 'C012', code: 'LT-008', name: 'C座食堂照明', type: 'light', typeName: '普通照明', area: 'C座1层', status: 'online', 
+              power: 185, energy: 26.5, runtimeToday: 11.2, totalRuntime: 168, controllerId: 'CT002',
+              specType: 'light', lightCount: 12, lightPower: 200, manufacturer: 'Philips',
+              lastComm: '2026-03-04 14:29:03' },
+            
+            { id: 'D002', code: 'DM-002', name: 'A2层办公室调光', type: 'dimmer', typeName: '调光设备', area: 'A座2层', status: 'online', 
+              power: 60, energy: 2.8, runtimeToday: 3.2, totalRuntime: 45, controllerId: 'CT001',
+              specType: 'dimmer', lightType: '可调光LED射灯', lightPower: 80, manufacturer: 'Lutron',
+              lastComm: '2026-03-04 14:21:37' },
+            
+            { id: 'D003', code: 'DM-003', name: 'B1层车间调光', type: 'dimmer', typeName: '调光设备', area: 'B座1层', status: 'offline', 
+              power: 0, energy: 0, runtimeToday: 0, totalRuntime: 0, controllerId: 'CT002',
+              specType: 'dimmer', lightType: '可调光LED射灯', lightPower: 120, manufacturer: 'Lutron',
+              lastComm: '2026-03-02 11:20:44' },
+            
+            { id: 'D004', code: 'DM-004', name: 'C座食堂调光', type: 'dimmer', typeName: '调光设备', area: 'C座1层', status: 'online', 
+              power: 140, energy: 15.5, runtimeToday: 8.8, totalRuntime: 120, controllerId: 'CT002',
+              specType: 'dimmer', lightType: '可调光LED射灯', lightPower: 150, manufacturer: 'Lutron',
+              lastComm: '2026-03-04 14:28:12' },
+            
+            { id: 'G002', code: 'GW-002', name: 'B座主网关', type: 'gateway', typeName: '智能网关', area: 'B座1层', status: 'online', 
+              power: 5, energy: 0.5, runtimeToday: 24.0, totalRuntime: 8760, controllerId: null,
+              specType: 'gateway', model: 'IoT-GW-2024', manufacturer: 'Cisco',
+              lastComm: '2026-03-04 14:29:58' },
+            
+            { id: 'S001', code: 'SEN-001', name: 'A1层光照传感器', type: 'sensor', typeName: '传感器', area: 'A座1层', status: 'online', 
+              power: 1, energy: 0.1, runtimeToday: 24.0, totalRuntime: 8760, controllerId: null,
+              specType: 'sensor', model: 'LS-2000', range: '0-2000Lux', manufacturer: 'Siemens',
+              lastComm: '2026-03-04 14:28:33' },
+            
+            { id: 'S002', code: 'SEN-002', name: 'A1层人体传感器', type: 'sensor', typeName: '传感器', area: 'A座1层', status: 'online', 
+              power: 1, energy: 0.1, runtimeToday: 24.0, totalRuntime: 8760, controllerId: null,
+              specType: 'sensor', model: 'MS-10M', range: '10米', manufacturer: 'Honeywell',
+              lastComm: '2026-03-04 14:27:44' },
+            
+            { id: 'S003', code: 'SEN-003', name: 'A2层光照传感器', type: 'sensor', typeName: '传感器', area: 'A座2层', status: 'online', 
+              power: 1, energy: 0.1, runtimeToday: 24.0, totalRuntime: 8760, controllerId: null,
+              specType: 'sensor', model: 'LS-2000B', range: '0-2000Lux', manufacturer: 'Siemens',
+              lastComm: '2026-03-04 14:26:22' },
+            
+            { id: 'S004', code: 'SEN-004', name: 'B1层光照传感器', type: 'sensor', typeName: '传感器', area: 'B座1层', status: 'offline', 
+              power: 0, energy: 0, runtimeToday: 0, totalRuntime: 0, controllerId: null,
+              specType: 'sensor', model: 'LS-2000', range: '0-2000Lux', manufacturer: 'Siemens',
+              lastComm: '2026-03-03 08:15:30' }
+        ];
+
+        // 构建控制器到回路的映射
+        const controllerCircuits = {};
+        circuitList.forEach(circuit => {
+            if (circuit.controllerId) {
+                if (!controllerCircuits[circuit.controllerId]) {
+                    controllerCircuits[circuit.controllerId] = [];
+                }
+                controllerCircuits[circuit.controllerId].push(circuit);
+            }
+        });
+
+        // 缓存每个控制器的使用率数据
+        const controllerUsageCache = {};
+
+        // 更新控制器使用率缓存
+        function updateControllerUsageCache() {
+            controllers.forEach(controller => {
+                const circuits = controllerCircuits[controller.id] || [];
+                const totalLoad = circuits
+                    .filter(c => c.status === 'online')
+                    .reduce((sum, c) => sum + c.power, 0);
+                controllerUsageCache[controller.id] = {
+                    totalLoad: totalLoad,
+                    usageRate: (totalLoad / controller.capacity) * 100,
+                    circuitCount: circuits.length,
+                    onlineCount: circuits.filter(c => c.status === 'online').length
+                };
+            });
+        }
+
+        // 初始化使用率缓存
+        updateControllerUsageCache();
+
+        // ==================== 全局变量 ====================
+        let currentPage = 1;
+        const pageSize = 10;
+        let filteredDevices = [...circuitList];
+
+        // ==================== 初始化 ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            updateTime();
+            setInterval(updateTime, 1000);
+            updateStats();
+            updateControllerAnalysis();
+            renderTable();
+            
+            // 设置默认时间维度
+            setupTimeDimensionListener();
+        });
+
+        // 设置时间维度监听
+        function setupTimeDimensionListener() {
+            document.getElementById('timeDimension').addEventListener('change', function(e) {
+                const dimension = e.target.value;
+                if (dimension === 'custom') return;
+                
+                const now = new Date();
+                let start, end;
+                
+                switch(dimension) {
+                    case 'today':
+                        start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+                        end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+                        break;
+                    case 'yesterday':
+                        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
+                        end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
+                        break;
+                    case 'thisWeek':
+                        const firstDay = now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1);
+                        start = new Date(now.getFullYear(), now.getMonth(), firstDay, 0, 0, 0);
+                        end = new Date(now.getFullYear(), now.getMonth(), firstDay + 6, 23, 59, 59);
+                        break;
+                    case 'lastWeek':
+                        const lastWeekFirst = now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1) - 7;
+                        start = new Date(now.getFullYear(), now.getMonth(), lastWeekFirst, 0, 0, 0);
+                        end = new Date(now.getFullYear(), now.getMonth(), lastWeekFirst + 6, 23, 59, 59);
+                        break;
+                    case 'thisMonth':
+                        start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+                        end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+                        break;
+                    case 'lastMonth':
+                        start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
+                        end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+                        break;
+                }
+                
+                document.getElementById('historyStartTime').value = formatDateTime(start);
+                document.getElementById('historyEndTime').value = formatDateTime(end);
+            });
+        }
+
+        // 格式化日期时间
+        function formatDateTime(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+
+        // 更新时间
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').innerHTML = now.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        // 查询历史数据
+        function queryHistoryData() {
+            const startTime = new Date(document.getElementById('historyStartTime').value);
+            const endTime = new Date(document.getElementById('historyEndTime').value);
+            const historyType = document.getElementById('historyType').value;
+            
+            // 计算天数差
+            const daysDiff = Math.ceil((endTime - startTime) / (1000 * 60 * 60 * 24)) + 1;
+            
+            // 根据类型筛选设备
+            let devices = circuitList;
+            if (historyType !== 'all') {
+                devices = circuitList.filter(d => d.type === historyType);
+            }
+            
+            // 计算累计数据
+            let totalRuntime = 0;
+            let totalEnergy = 0;
+            
+            devices.forEach(device => {
+                // 估算：基于今日数据按天数比例计算
+                const dailyRuntime = device.runtimeToday;
+                const dailyEnergy = device.energy;
+                totalRuntime += dailyRuntime * daysDiff;
+                totalEnergy += dailyEnergy * daysDiff;
+            });
+            
+            // 计算平均每日开启时间
+            const avgDailyRuntime = totalRuntime / daysDiff;
+            
+            // 显示统计结果
+            document.getElementById('historyStats').style.display = 'grid';
+            document.getElementById('queryPeriod').innerText = `${startTime.toLocaleDateString()} 至 ${endTime.toLocaleDateString()}`;
+            document.getElementById('totalRuntime').innerText = totalRuntime.toFixed(1);
+            document.getElementById('totalPower').innerText = totalEnergy.toFixed(1);
+            document.getElementById('avgDailyRuntime').innerText = avgDailyRuntime.toFixed(1);
+            
+            showMessage(`查询到 ${devices.length} 台设备的历史数据`);
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            const total = circuitList.length;
+            const online = circuitList.filter(d => d.status === 'online').length;
+            const offline = circuitList.filter(d => d.status === 'offline').length;
+            
+            const controllerCount = controllers.length;
+            const totalCircuits = circuitList.filter(d => d.controllerId).length;
+            
+            const totalEnergy = circuitList.reduce((sum, d) => sum + d.energy, 0);
+            const totalCost = (totalEnergy * 0.8).toFixed(2);
+
+            document.getElementById('totalCount').innerText = total;
+            document.getElementById('onlineCount').innerText = online;
+            document.getElementById('offlineCount').innerText = offline;
+            
+            document.getElementById('controllerCount').innerText = controllerCount;
+            document.getElementById('controlledCircuits').innerText = totalCircuits;
+            
+            document.getElementById('totalEnergy').innerText = totalEnergy.toFixed(1);
+            document.getElementById('totalCost').innerText = totalCost;
+        }
+
+        // 更新控制器使用率分析
+        function updateControllerAnalysis() {
+            let totalCapacity = 0;
+            let totalLoad = 0;
+            
+            controllers.forEach(controller => {
+                totalCapacity += controller.capacity;
+                totalLoad += controllerUsageCache[controller.id]?.totalLoad || 0;
+            });
+            
+            const remaining = totalCapacity - totalLoad;
+            const usedPercent = totalCapacity > 0 ? ((totalLoad / totalCapacity) * 100).toFixed(1) : 0;
+            
+            // 估算可新增回路数（按平均每个回路100W计算）
+            const avgCircuitPower = 100;
+            const remainingCircuits = Math.floor(remaining / avgCircuitPower);
+            
+            document.getElementById('totalControllerCapacity').innerText = totalCapacity + ' W';
+            document.getElementById('totalControllerLoad').innerText = totalLoad + ' W';
+            document.getElementById('usedCapacityPercent').innerText = usedPercent;
+            document.getElementById('remainingCapacity').innerText = remaining + ' W';
+            document.getElementById('remainingCircuits').innerText = remainingCircuits;
+            document.getElementById('avgLoadRate').innerText = usedPercent;
+            
+            // 计算最大可带载回路数
+            const maxCircuits = controllers.reduce((sum, c) => sum + Math.floor(c.capacity / avgCircuitPower), 0);
+            document.getElementById('maxCircuits').innerText = maxCircuits;
+        }
+
+        // 获取设备所属控制器名称
+        function getControllerName(device) {
+            if (!device.controllerId) return '-';
+            const controller = controllers.find(c => c.id === device.controllerId);
+            return controller ? controller.name : '-';
+        }
+
+        // 获取控制器使用率（基于控制器容量）
+        function getControllerUsageRate(device) {
+            if (!device.controllerId || device.status !== 'online') return 0;
+            const usageData = controllerUsageCache[device.controllerId];
+            return usageData ? usageData.usageRate : 0;
+        }
+
+        // 根据设备类型渲染规格参数（精简版，只保留核心规格）
+        function renderSpec(device) {
+            switch(device.specType) {
+                case 'light':
+                    // 普通照明：LED灯具 x 数量 · 功率
+                    return `
+                        <div class="light-spec">
+                            <span class="light-count">LED灯具 x ${device.lightCount}</span>
+                            <span class="light-power">· ${device.lightPower}W</span>
+                        </div>
+                    `;
+                
+                case 'dimmer':
+                    // 调光设备：可调光LED射灯 · 功率
+                    return `
+                        <div class="dimmer-spec">
+                            <i class="fas fa-sliders-h"></i>
+                            <span>${device.lightType} · ${device.lightPower}W</span>
+                        </div>
+                    `;
+                
+                case 'controller':
+                    // 执行控制器：型号 · 通道/电流
+                    return `
+                        <div class="controller-spec">
+                            <span class="controller-model">${device.model}</span>
+                            <span class="controller-params">${device.channels}通道/${device.current}A</span>
+                        </div>
+                    `;
+                
+                case 'gateway':
+                    // 智能网关：型号
+                    return `
+                        <div class="gateway-spec">
+                            <span class="gateway-model">${device.model}</span>
+                        </div>
+                    `;
+                
+                case 'sensor':
+                    // 传感器：型号 · 量程
+                    return `
+                        <div class="sensor-spec">
+                            <span class="sensor-model">${device.model}</span>
+                            <span class="sensor-range">${device.range}</span>
+                        </div>
+                    `;
+                
+                default:
+                    return `<span class="text-slate-400">-</span>`;
+            }
+        }
+
+        // 渲染表格
+        function renderTable() {
+            const tbody = document.getElementById('deviceTableBody');
+            const start = (currentPage - 1) * pageSize;
+            const end = start + pageSize;
+            const pageData = filteredDevices.slice(start, end);
+
+            if (pageData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="14" class="text-center py-8 text-slate-500">暂无数据</td></tr>';
+            } else {
+                tbody.innerHTML = pageData.map(device => createTableRow(device)).join('');
+            }
+
+            // 更新分页信息
+            document.getElementById('startItem').innerText = filteredDevices.length > 0 ? start + 1 : 0;
+            document.getElementById('endItem').innerText = Math.min(end, filteredDevices.length);
+            document.getElementById('totalItems').innerText = filteredDevices.length;
+            document.getElementById('currentPage').innerText = currentPage;
+        }
+
+        // 创建表格行
+        function createTableRow(device) {
+            // 状态标签样式
+            let statusClass, statusText;
+            switch(device.status) {
+                case 'online':
+                    statusClass = 'online';
+                    statusText = '在线';
+                    break;
+                case 'offline':
+                    statusClass = 'offline';
+                    statusText = '离线';
+                    break;
+                default:
+                    statusClass = 'offline';
+                    statusText = '离线';
+            }
+            
+            const controllerName = getControllerName(device);
+            const usageRate = getControllerUsageRate(device);
+            
+            // 使用率颜色标识（基于控制器使用率）
+            const usageRateColor = usageRate > 80 ? 'text-red-600 font-bold' : 
+                                 (usageRate > 60 ? 'text-yellow-600 font-bold' : 
+                                 (usageRate > 0 ? 'text-green-600' : 'text-slate-400'));
+
+            return `
+                <tr>
+                    <td class="font-mono text-sm">${device.code}</td>
+                    <td>${device.name}</td>
+                    <td><span class="type-tag">${device.typeName}</span></td>
+                    <td><div class="spec-container">${renderSpec(device)}</div></td>
+                    <td>${device.area}</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <td>${controllerName}</td>
+                    <td class="font-medium">${device.power}</td>
+                    <td class="font-medium">${device.energy.toFixed(1)}</td>
+                    <td class="font-medium">${device.runtimeToday.toFixed(1)}</td>
+                    <td class="font-medium">${device.totalRuntime}</td>
+                    <td class="font-medium ${usageRateColor}">${usageRate > 0 ? usageRate.toFixed(1) + '%' : '-'}</td>
+                    <td class="text-sm text-slate-500">${device.lastComm}</td>
+                    <td>
+                        <span class="action-btn" onclick="viewDetail('${device.id}')" title="查看详情">
+                            <i class="fas fa-eye"></i>
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }
+
+        // ==================== 筛选功能 ====================
+        function filterDevices() {
+            const type = document.getElementById('typeFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            const area = document.getElementById('areaFilter').value;
+            const search = document.getElementById('searchInput').value.toLowerCase();
+
+            filteredDevices = circuitList.filter(device => {
+                if (type !== 'all' && device.type !== type) return false;
+                if (status !== 'all' && device.status !== status) return false;
+                if (area !== 'all' && device.area !== area) return false;
+                
+                if (search) {
+                    return device.name.toLowerCase().includes(search) || 
+                           device.code.toLowerCase().includes(search) ||
+                           device.id.toLowerCase().includes(search) ||
+                           (device.model && device.model.toLowerCase().includes(search));
+                }
+                
+                return true;
+            });
+
+            currentPage = 1;
+            renderTable();
+        }
+
+        function resetFilter() {
+            document.getElementById('typeFilter').value = 'all';
+            document.getElementById('statusFilter').value = 'all';
+            document.getElementById('areaFilter').value = 'all';
+            document.getElementById('searchInput').value = '';
+            
+            filteredDevices = [...circuitList];
+            currentPage = 1;
+            renderTable();
+        }
+
+        // ==================== 分页 ====================
+        function changePage(action) {
+            const totalPages = Math.ceil(filteredDevices.length / pageSize);
+            
+            switch(action) {
+                case 'first':
+                    currentPage = 1;
+                    break;
+                case 'prev':
+                    if (currentPage > 1) currentPage--;
+                    break;
+                case 'next':
+                    if (currentPage < totalPages) currentPage++;
+                    break;
+                case 'last':
+                    currentPage = totalPages;
+                    break;
+            }
+            
+            renderTable();
+        }
+
+        // ==================== 设备详情 ====================
+        function viewDetail(deviceId) {
+            const device = circuitList.find(d => d.id === deviceId);
+            if (!device) return;
+
+            const controllerName = getControllerName(device);
+            const usageRate = getControllerUsageRate(device);
+            
+            // 获取控制器详细信息
+            let controllerInfo = '';
+            if (device.controllerId) {
+                const controller = controllers.find(c => c.id === device.controllerId);
+                const usageData = controllerUsageCache[device.controllerId];
+                if (controller && usageData) {
+                    controllerInfo = `
+                        <div class="detail-item">
+                            <div class="detail-label">控制器容量</div>
+                            <div class="detail-value">${controller.capacity} W</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">控制器当前负载</div>
+                            <div class="detail-value">${usageData.totalLoad} W</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">控制器剩余容量</div>
+                            <div class="detail-value">${controller.capacity - usageData.totalLoad} W</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">控制器使用率</div>
+                            <div class="detail-value ${usageRate > 80 ? 'text-red-600' : (usageRate > 60 ? 'text-yellow-600' : 'text-green-600')}">${usageRate.toFixed(1)}%</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">回路总数</div>
+                            <div class="detail-value">${usageData.circuitCount} 个</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">在线回路</div>
+                            <div class="detail-value">${usageData.onlineCount} 个</div>
+                        </div>
+                    `;
+                }
+            }
+
+            // 根据设备类型显示不同的规格信息
+            let specDetail = '';
+            switch(device.specType) {
+                case 'light':
+                    specDetail = `
+                        <div class="detail-item">
+                            <div class="detail-label">灯具数量</div>
+                            <div class="detail-value">${device.lightCount} 个</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">单灯功率</div>
+                            <div class="detail-value">${device.lightPower} W</div>
+                        </div>
+                    `;
+                    break;
+                case 'dimmer':
+                    specDetail = `
+                        <div class="detail-item">
+                            <div class="detail-label">灯具类型</div>
+                            <div class="detail-value">${device.lightType}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">额定功率</div>
+                            <div class="detail-value">${device.lightPower} W</div>
+                        </div>
+                    `;
+                    break;
+                case 'gateway':
+                    specDetail = `
+                        <div class="detail-item">
+                            <div class="detail-label">型号</div>
+                            <div class="detail-value">${device.model}</div>
+                        </div>
+                    `;
+                    break;
+                case 'controller':
+                    specDetail = `
+                        <div class="detail-item">
+                            <div class="detail-label">型号</div>
+                            <div class="detail-value">${device.model}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">通道数</div>
+                            <div class="detail-value">${device.channels} 通道</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">额定电流</div>
+                            <div class="detail-value">${device.current} A</div>
+                        </div>
+                    `;
+                    break;
+                case 'sensor':
+                    specDetail = `
+                        <div class="detail-item">
+                            <div class="detail-label">型号</div>
+                            <div class="detail-value">${device.model}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">量程</div>
+                            <div class="detail-value">${device.range}</div>
+                        </div>
+                    `;
+                    break;
+            }
+
+            const detailHtml = `
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">设备编号</div>
+                        <div class="detail-value">${device.code}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">设备名称</div>
+                        <div class="detail-value">${device.name}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">设备类型</div>
+                        <div class="detail-value">${device.typeName}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">制造商</div>
+                        <div class="detail-value">${device.manufacturer || '-'}</div>
+                    </div>
+                    ${specDetail}
+                    <div class="detail-item">
+                        <div class="detail-label">所属区域</div>
+                        <div class="detail-value">${device.area}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">当前状态</div>
+                        <div class="detail-value capitalize">${device.status === 'online' ? '在线' : '离线'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">所属控制器</div>
+                        <div class="detail-value">${controllerName}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">当前功率</div>
+                        <div class="detail-value">${device.power} W</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">今日能耗</div>
+                        <div class="detail-value">${device.energy} kWh</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">今日运行</div>
+                        <div class="detail-value">${device.runtimeToday} 小时</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">累计运行</div>
+                        <div class="detail-value">${device.totalRuntime} 小时</div>
+                    </div>
+                    ${controllerInfo}
+                    <div class="detail-item">
+                        <div class="detail-label">最后通信</div>
+                        <div class="detail-value">${device.lastComm}</div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('deviceDetail').innerHTML = detailHtml;
+            openModal('detailModal');
+        }
+
+        // ==================== 导出功能 ====================
+        function openExportModal() {
+            openModal('exportModal');
+        }
+
+        function exportReport() {
+            const format = document.getElementById('exportFormat').value;
+            
+            // 构建表头
+            const headers = [];
+            if (document.getElementById('exportBasic').checked) {
+                headers.push('设备编号', '设备名称', '设备类型');
+            }
+            if (document.getElementById('exportSpec').checked) {
+                headers.push('规格参数', '制造商');
+            }
+            if (document.getElementById('exportPower').checked) {
+                headers.push('功率(W)');
+            }
+            if (document.getElementById('exportEnergy').checked) {
+                headers.push('今日能耗(kWh)');
+            }
+            if (document.getElementById('exportRuntime').checked) {
+                headers.push('今日运行(h)', '累计运行(h)');
+            }
+            if (document.getElementById('exportLoad').checked) {
+                headers.push('所属控制器', '控制器使用率(%)', '控制器总负载(W)', '控制器容量(W)');
+            }
+            if (document.getElementById('exportStatus').checked) {
+                headers.push('当前状态', '所属区域', '最后通信时间');
+            }
+            
+            // 构建数据行（基于当前筛选结果）
+            const csvData = filteredDevices.map(device => {
+                const row = [];
+                const statusText = device.status === 'online' ? '在线' : '离线';
+                const controllerName = getControllerName(device);
+                const usageRate = getControllerUsageRate(device);
+                
+                // 构建规格参数字符串
+                let specStr = '';
+                
+                if (device.specType === 'light') {
+                    specStr = `LED灯具 x ${device.lightCount} · ${device.lightPower}W`;
+                } else if (device.specType === 'dimmer') {
+                    specStr = `${device.lightType} · ${device.lightPower}W`;
+                } else if (device.specType === 'gateway') {
+                    specStr = `网关 ${device.model}`;
+                } else if (device.specType === 'controller') {
+                    specStr = `${device.model} · ${device.channels}通道/${device.current}A`;
+                } else if (device.specType === 'sensor') {
+                    specStr = `${device.model} · ${device.range}`;
+                }
+                
+                if (document.getElementById('exportBasic').checked) {
+                    row.push(device.code, device.name, device.typeName);
+                }
+                if (document.getElementById('exportSpec').checked) {
+                    row.push(specStr, device.manufacturer || '-');
+                }
+                if (document.getElementById('exportPower').checked) {
+                    row.push(device.power);
+                }
+                if (document.getElementById('exportEnergy').checked) {
+                    row.push(device.energy.toFixed(1));
+                }
+                if (document.getElementById('exportRuntime').checked) {
+                    row.push(device.runtimeToday.toFixed(1), device.totalRuntime);
+                }
+                if (document.getElementById('exportLoad').checked) {
+                    if (device.controllerId) {
+                        const controller = controllers.find(c => c.id === device.controllerId);
+                        const usageData = controllerUsageCache[device.controllerId];
+                        row.push(
+                            controllerName,
+                            usageRate.toFixed(1),
+                            usageData?.totalLoad || 0,
+                            controller?.capacity || 0
+                        );
+                    } else {
+                        row.push('-', '-', '-', '-');
+                    }
+                }
+                if (document.getElementById('exportStatus').checked) {
+                    row.push(statusText, device.area, device.lastComm);
+                }
+                return row;
+            });
+            
+            // 添加报表头信息
+            const now = new Date();
+            const reportHeader = [
+                [`照明设备报表`],
+                [`生成时间: ${now.toLocaleString()}`],
+                [`设备总数: ${filteredDevices.length} 台`],
+                [`在线设备: ${filteredDevices.filter(d => d.status === 'online').length} 台`],
+                [`离线设备: ${filteredDevices.filter(d => d.status === 'offline').length} 台`],
+                []
+            ];
+            
+            // 创建CSV内容
+            const csvContent = [
+                ...reportHeader.map(row => row.map(cell => `"${cell}"`).join(',')),
+                headers.map(h => `"${h}"`).join(','),
+                ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+            ].join('\n');
+            
+            // 下载文件
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.href = url;
+            link.setAttribute('download', `照明设备报表_${now.toLocaleDateString()}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            closeModal('exportModal');
+            showMessage('报表导出成功');
+        }
+
+        // ==================== 模态框控制 ====================
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // 点击模态框外部关闭
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('active');
+            }
+        }
+
+        // 显示提示消息
+        function showMessage(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+            toast.innerText = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // 刷新数据
+        function refreshData() {
+            updateControllerUsageCache();
+            filterDevices();
+            updateStats();
+            updateControllerAnalysis();
+            showMessage('数据已刷新');
+        }
+    </script>
+</body>
+</html>

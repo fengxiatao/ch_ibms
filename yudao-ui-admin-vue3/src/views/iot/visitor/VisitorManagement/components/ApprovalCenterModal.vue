@@ -17,7 +17,7 @@
             <h3 class="dialog-header__title">访客预约审批中心</h3>
             <p class="dialog-header__desc">
               待审批 <strong class="text-warning">{{ pendingCount }}</strong> 条 | 
-              今日已处理 <strong class="text-success">{{ processedCount }}</strong> 条
+              今日已处理 <strong class="text-success">{{ processedCountValue }}</strong> 条
             </p>
           </div>
         </div>
@@ -227,16 +227,16 @@ const dialogVisible = computed({
 })
 
 // 今日已处理：优先用父组件传入的 processedCount，否则请求 stats
-const processedCount = ref(0)
+const processedCountValue = ref(0)
 const resolveProcessedCount = () => {
   if (props.processedCount !== undefined && props.processedCount !== null) {
-    processedCount.value = props.processedCount
+    processedCountValue.value = props.processedCount
     return
   }
   NewVisitorManagementApi.getStats()
     .then((res: any) => {
       const d = res?.data
-      processedCount.value = d?.todayProcessedCount ?? d?.today_processed_count ?? 0
+      processedCountValue.value = d?.todayProcessedCount ?? d?.today_processed_count ?? 0
     })
     .catch(() => {})
 }

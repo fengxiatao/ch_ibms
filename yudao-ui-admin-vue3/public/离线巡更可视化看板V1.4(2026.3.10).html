@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>离线巡更可视化看板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .metric-card {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%);
+            border-left: 4px solid #3b82f6;
+            transition: all 0.3s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.2);
+        }
+        .status-indicator {
+            width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        .status-normal { background: #10b981; box-shadow: 0 0 8px #10b981; }
+        .status-warning { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+        .status-danger { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        .chart-container { position: relative; height: 300px; width: 100%; }
+        .grid-layout { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; padding: 20px; }
+        .col-span-3 { grid-column: span 3; } .col-span-4 { grid-column: span 4; }
+        .col-span-5 { grid-column: span 5; } .col-span-6 { grid-column: span 6; }
+        .col-span-7 { grid-column: span 7; } .col-span-8 { grid-column: span 8; }
+        .col-span-12 { grid-column: span 12; }
+        .header-glow {
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .badge-offline {
+            background: rgba(100, 116, 139, 0.3); color: #cbd5e1; padding: 2px 8px; border-radius: 20px; font-size: 11px;
+        }
+        .time-range-selector {
+            display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+        }
+        .time-range-selector button {
+            background: rgba(15, 23, 42, 0.7); color: #94a3b8; border: 1px solid #334155;
+            border-radius: 30px; padding: 6px 16px; font-size: 13px; cursor: pointer; transition: all 0.2s;
+        }
+        .time-range-selector button.active {
+            background: #3b82f6; color: white; border-color: #3b82f6;
+        }
+        .custom-date-range {
+            display: none;
+            gap: 8px;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.7);
+            padding: 4px 12px 4px 16px;
+            border-radius: 40px;
+            border: 1px solid #334155;
+            margin-left: 8px;
+        }
+        .custom-date-range.visible {
+            display: flex;
+        }
+        .custom-date-range input[type="date"] {
+            background: rgba(15, 23, 42, 0.8); color: #e2e8f0; border: 1px solid #334155;
+            border-radius: 30px; padding: 5px 12px; font-size: 13px;
+        }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .stat-item {
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        .insight-badge {
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 12px;
+            color: #3b82f6;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .rank-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .rank-number {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .staff-rank-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 14px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            transition: 0.2s;
+        }
+        .staff-rank-item:hover {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: #3b82f6;
+        }
+        .staff-avatar {
+            width: 40px; height: 40px;
+            border-radius: 40%;
+            background: linear-gradient(145deg, #2563eb, #7c3aed);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 16px; color: white;
+        }
+        .staff-info { flex: 1; }
+        .staff-name { font-weight: 600; font-size: 16px; }
+        .staff-stats { display: flex; gap: 16px; margin-top: 4px; font-size: 12px; color: #94a3b8; }
+        .staff-badge { background: #2d3a4e; padding: 2px 8px; border-radius: 20px; font-size: 11px; }
+        .function-hint {
+            background: rgba(0, 212, 255, 0.07);
+            border-left: 4px solid #38bdf8;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            margin-top: 16px;
+        }
+        .time-label-badge {
+            font-size: 12px;
+            background: rgba(59, 130, 246, 0.2);
+            padding: 2px 8px;
+            border-radius: 20px;
+            margin-left: 8px;
+            color: #3b82f6;
+            font-weight: 400;
+        }
+        .score-card {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            padding: 12px;
+            border: 1px solid #334155;
+            margin-top: 12px;
+        }
+        .score-title {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 4px;
+        }
+        .score-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+        }
+        .score-rule {
+            font-size: 11px;
+            color: #3b82f6;
+            margin-top: 4px;
+        }
+        .score-percent {
+            font-size: 14px;
+            color: #94a3b8;
+            margin-left: 2px;
+        }
+        .legend-desc {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <header class="glass-panel mx-4 mt-4 p-4 flex flex-wrap justify-between items-center sticky top-0 z-50 gap-4">
+        <div class="flex items-center gap-4">
+            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold header-glow">离线巡更可视化看板</h1>
+              
+            </div>
+        </div>
+        <div class="flex items-center gap-6 flex-wrap">
+            <div class="time-range-selector">
+                <button id="rangeToday" class="active">今日</button>
+                <button id="rangeWeek">近一周</button>
+                <button id="rangeMonth">近一月</button>
+                <button id="rangeCustom">自定义</button>
+                <div id="customDateRange" class="custom-date-range">
+                    <span class="text-xs text-slate-400">从</span>
+                    <input type="date" id="startDate" value="2026-01-30">
+                    <span class="text-slate-400">—</span>
+                    <input type="date" id="endDate" value="2026-01-30">
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-2xl font-bold" id="currentTime">12:00:00</div>
+                <div class="text-sm text-slate-400" id="currentDate">2024年1月1日</div>
+            </div>
+          
+        </div>
+    </header>
+
+    <div class="grid-layout">
+        <!-- 核心指标卡片（4个） -->
+        <div class="col-span-3">
+            <div class="glass-panel p-6 metric-card h-full">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-slate-400 text-sm" id="taskLabel">巡更任务 <span id="taskLabelSuffix" class="time-label-badge"></span></p>
+                        <h3 class="text-3xl font-bold text-white mt-1" id="totalTasks">10</h3>
+                    </div>
+                    <span class="status-indicator status-normal" id="taskStatus"></span>
+                </div>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div class="stat-value text-green-400" id="completedTasks">3</div>
+                        <div class="stat-label">已巡任务</div>  <!-- 修改 -->
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value text-yellow-400" id="pendingTasks">7</div>
+                        <div class="stat-label">未巡任务</div>  <!-- 修改 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-span-3">
+            <div class="glass-panel p-6 metric-card h-full" style="border-left-color: #8b5cf6;">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-slate-400 text-sm" id="pointLabel">涉及巡更点位次数 <span id="pointLabelSuffix" class="time-label-badge"></span></p>
+                        <h3 class="text-3xl font-bold text-white mt-1" id="totalPoints">56</h3>
+                    </div>
+                </div>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div class="stat-value text-green-400" id="checkedPoints">32</div>
+                        <div class="stat-label">已巡点位次数</div>  <!-- 修改 -->
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value text-red-400" id="missedPoints">24</div>
+                        <div class="stat-label">漏巡点位次数</div>  <!-- 修改 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-span-3">
+            <div class="glass-panel p-6 metric-card h-full" style="border-left-color: #ec4899;">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-slate-400 text-sm">巡更路线 <span id="routeLabelSuffix" class="time-label-badge"></span></p>
+                        <h3 class="text-3xl font-bold text-white mt-1" id="totalRoutes">5</h3>
+                    </div>
+                </div>
+                <div class="mt-4 space-y-3">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">平均点位/路线</span>
+                        <span class="text-white font-semibold" id="avgPointsPerRoute">11.2</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">点位巡更完成率</span>  <!-- 修改 -->
+                        <span class="text-green-400 font-semibold" id="completionRate">57.1%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-span-3">
+            <div class="glass-panel p-6 metric-card h-full" style="border-left-color: #f59e0b;">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-slate-400 text-sm">巡更人员 <span id="staffLabelSuffix" class="time-label-badge"></span></p>
+                        <h3 class="text-3xl font-bold text-white mt-1" id="totalStaff">4</h3>
+                    </div>
+                </div>
+                <div class="flex -space-x-2 mt-4" id="staffAvatars">
+                    <div class="w-8 h-8 rounded-full bg-blue-500 border-2 border-slate-800 flex items-center justify-center text-xs font-bold">王</div>
+                    <div class="w-8 h-8 rounded-full bg-purple-500 border-2 border-slate-800 flex items-center justify-center text-xs font-bold">李</div>
+                    <div class="w-8 h-8 rounded-full bg-green-500 border-2 border-slate-800 flex items-center justify-center text-xs font-bold">张</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第一行：任务完成率分布（左）+ 人员绩效排行榜（右） -->
+        <div class="col-span-5">
+            <div class="glass-panel p-6 h-full">
+                <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
+                    </svg>
+                    任务完成率分布 <span id="completionLabelSuffix" class="time-label-badge"></span>
+                </h3>
+                <div id="completionChart" class="chart-container" style="height: 280px;"></div>
+                <div class="flex justify-center gap-4 mt-2">
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-green-500"></span><span class="text-xs" id="legendFull">100%完成 (3个)</span></div>
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-yellow-500"></span><span class="text-xs" id="legendPartial">1-99%完成 (1个)</span></div>  <!-- 修改 -->
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-red-500"></span><span class="text-xs" id="legendZero">0%完成 (3个)</span></div>
+                </div>
+                <!-- 新增说明 -->
+                <div class="legend-desc mt-3">
+                    <p class="text-xs text-slate-300">📋 完成率说明：</p>
+                    <p class="text-xs text-slate-400 mt-1">• <span class="text-green-400">100%完成</span>：该任务所有点位均已巡更，无漏巡</p>
+                    <p class="text-xs text-slate-400">• <span class="text-yellow-400">1-99%完成</span>：该任务部分点位漏巡，完成率介于1%-99%之间</p>
+                    <p class="text-xs text-slate-400">• <span class="text-red-400">0%完成</span>：该任务所有点位均未巡更，全部漏巡</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 人员绩效排行榜 (右侧) -->
+        <div class="col-span-7">
+            <div class="glass-panel p-6 h-full">
+                <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                    </svg>
+                    人员绩效排行榜 <span id="staffRankLabelSuffix" class="time-label-badge"></span>
+                </h3>
+                <!-- 人员绩效容器 -->
+                <div id="staffRankContainer" class="space-y-2 mt-2 max-h-[360px] overflow-y-auto pr-1">
+                    <!-- js动态填充 -->
+                </div>
+                <!-- 综合评分卡片 -->
+                <div class="mt-4 score-card">
+                    <div class="flex justify-between items-center">
+                        <span class="score-title">综合评分 (100分制)</span>
+                        <span class="score-rule">(1 - 漏巡/巡检总数) × 100</span>
+                    </div>
+                    <div class="flex justify-end items-baseline gap-4">
+                        <div class="text-right">
+                            <span class="score-value" id="totalScore">--</span>
+                            <span class="score-percent">分</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第二行：点位漏巡排行榜（左）+ 巡更打卡时段热力（右） -->
+        <div class="col-span-5">
+            <div class="glass-panel p-6 h-full">
+                <h3 class="text-lg font-semibold mb-6 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    点位漏巡排行榜 <span id="missedRankLabelSuffix" class="time-label-badge"></span>
+                </h3>
+                <div id="missedRankContainer" class="space-y-3 mt-2">
+                    <!-- 动态JS渲染 -->
+                </div>
+                <div class="mt-6 p-3 bg-slate-800/40 rounded-lg">
+                    <p class="text-xs text-slate-400" id="missedSummary">基于7个巡更任务，总计56个点位次数，其中24次漏巡</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 巡更打卡时段热力 (右侧) - 无时间标签，名称修改 -->
+        <div class="col-span-7">
+            <div class="glass-panel p-6 h-full">
+                <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    巡更打卡时段热力
+                </h3>
+                <div id="heatmapChart" class="chart-container" style="height: 260px;"></div>
+                <div class="flex justify-between text-xs text-slate-400 mt-3 px-4">
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-[#1e293b]"></span> 低频 (0~1次)</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-[#3b82f6]"></span> 中频 (2次)</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-[#8b5cf6]"></span> 高频 (3次+)</span>
+                </div>
+                <!-- 功能说明 - 名称修改 -->
+                <div class="function-hint mt-4">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <div>
+                            <p class="text-sm font-medium text-cyan-300">📌 辅助巡更计划优化</p>  <!-- 修改 -->
+                            <p class="text-xs text-slate-300 leading-relaxed mt-1">
+                                展示不同时段/周几的打卡密集程度。颜色越深(紫)表示打卡次数越多，帮助识别高峰与低峰时段。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 时间更新
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString('zh-CN');
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('zh-CN', { 
+                year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' 
+            });
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // 当前选中的范围标识
+        let currentRangeLabel = '今日';
+
+        // 显示/隐藏自定义日期范围
+        const customDateDiv = document.getElementById('customDateRange');
+        document.getElementById('rangeCustom').addEventListener('click', function() {
+            document.querySelectorAll('.time-range-selector button').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            customDateDiv.classList.add('visible');
+            currentRangeLabel = '自定义';
+            updateAllSuffixes();
+            const start = new Date(document.getElementById('startDate').value + 'T00:00:00');
+            const end = new Date(document.getElementById('endDate').value + 'T00:00:00');
+            if (start <= end) {
+                currentStart = start;
+                currentEnd = end;
+                refreshDashboard();
+            }
+        });
+
+        document.getElementById('rangeToday').addEventListener('click', function() {
+            document.querySelectorAll('.time-range-selector button').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            customDateDiv.classList.remove('visible');
+            currentRangeLabel = '今日';
+            updateAllSuffixes();
+            setRange(1);
+        });
+        document.getElementById('rangeWeek').addEventListener('click', function() {
+            document.querySelectorAll('.time-range-selector button').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            customDateDiv.classList.remove('visible');
+            currentRangeLabel = '近一周';  // 修改
+            updateAllSuffixes();
+            setRange(7);
+        });
+        document.getElementById('rangeMonth').addEventListener('click', function() {
+            document.querySelectorAll('.time-range-selector button').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            customDateDiv.classList.remove('visible');
+            currentRangeLabel = '近一月';  // 修改
+            updateAllSuffixes();
+            setRange(30);
+        });
+
+        // 更新标注后缀
+        function updateAllSuffixes() {
+            const suffixElements = [
+                'taskLabelSuffix', 'pointLabelSuffix', 'routeLabelSuffix', 
+                'staffLabelSuffix', 'completionLabelSuffix', 'staffRankLabelSuffix',
+                'missedRankLabelSuffix'
+            ];
+            suffixElements.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = currentRangeLabel;
+            });
+        }
+
+        function setRange(days) {
+            const end = new Date(2026, 0, 30);
+            const start = new Date(2026, 0, 30 - days + 1);
+            currentStart = start;
+            currentEnd = end;
+            refreshDashboard();
+        }
+
+        document.getElementById('startDate').addEventListener('change', function() {
+            if (!customDateDiv.classList.contains('visible')) return;
+            const start = new Date(document.getElementById('startDate').value + 'T00:00:00');
+            const end = new Date(document.getElementById('endDate').value + 'T00:00:00');
+            if (start <= end) {
+                currentStart = start;
+                currentEnd = end;
+                refreshDashboard();
+            }
+        });
+        document.getElementById('endDate').addEventListener('change', function() {
+            if (!customDateDiv.classList.contains('visible')) return;
+            const start = new Date(document.getElementById('startDate').value + 'T00:00:00');
+            const end = new Date(document.getElementById('endDate').value + 'T00:00:00');
+            if (start <= end) {
+                currentStart = start;
+                currentEnd = end;
+                refreshDashboard();
+            }
+        });
+
+        let currentStart = new Date(2026, 0, 30);
+        let currentEnd = new Date(2026, 0, 30);
+
+        function generateDataByRange(start, end) {
+            const days = Math.ceil((end - start) / (1000*3600*24)) + 1;
+            let factor = days / 3.5;
+            if (factor < 0.6) factor = 0.6;
+            if (factor > 3.2) factor = 3.2;
+
+            const baseTasks = 10, baseCompleted = 3, baseTotalPoints = 56, baseChecked = 32, baseRoutes = 5;
+            const totalTasks = Math.round(baseTasks * factor * 0.7);
+            const completedTasks = Math.round(baseCompleted * Math.sqrt(factor) * 0.9);
+            const pendingTasks = totalTasks - completedTasks;
+            const totalPoints = Math.round(baseTotalPoints * factor * 0.8);
+            const checkedPoints = Math.round(baseChecked * Math.pow(factor,0.7) * 0.9);
+            const missedPoints = totalPoints - checkedPoints;
+            const totalRoutes = Math.round(baseRoutes * (factor>1? Math.min(1.6, factor): factor));
+            const avgPointsPerRoute = totalPoints / totalRoutes;
+            const completionRate = (checkedPoints / totalPoints * 100).toFixed(1);
+
+            const staff = [
+                { name:'王小军', done:Math.round(9*factor*0.5), miss:Math.round(1*factor), avatar:'王', color:'bg-blue-500' },
+                { name:'李芳', done:Math.round(7*factor*0.5), miss:Math.round(2*factor), avatar:'李', color:'bg-purple-500' },
+                { name:'张强', done:Math.round(6*factor*0.5), miss:Math.round(3*factor), avatar:'张', color:'bg-green-500' },
+                { name:'赵丽', done:Math.round(4*factor*0.5), miss:Math.round(4*factor), avatar:'赵', color:'bg-orange-500' }
+            ];
+
+            // 综合评分公式: (1 - 漏巡/总次数) * 100
+            const staffWithScore = staff.map(s => {
+                const total = s.done + s.miss;
+                const score = total > 0 ? Math.round((1 - s.miss / total) * 100) : 0;
+                return { ...s, score };
+            });
+
+            const rankPoints = [
+                { name:'C栋主入口', missCount:Math.round(4*factor) },
+                { name:'A栋3楼', missCount:Math.round(3*factor) },
+                { name:'园区后门', missCount:Math.round(3*factor) },
+                { name:'A栋4楼', missCount:Math.round(2*factor) },
+                { name:'B栋天面', missCount:Math.round(2*factor) }
+            ];
+
+            const full = Math.max(0, Math.round(2*factor*0.6));
+            const partial = Math.max(0, Math.round(1.5*factor*0.6));
+            const zero = totalTasks - full - partial;
+
+            const totalDoneSum = staffWithScore.reduce((sum, s) => sum + s.done, 0);
+            const totalMissSum = staffWithScore.reduce((sum, s) => sum + s.miss, 0);
+            const totalAll = totalDoneSum + totalMissSum;
+            const totalScore = totalAll > 0 ? Math.round((1 - totalMissSum / totalAll) * 100) : 0;
+
+            return {
+                totalTasks, completedTasks, pendingTasks,
+                totalPoints, checkedPoints, missedPoints,
+                totalRoutes, avgPointsPerRoute: avgPointsPerRoute.toFixed(1), completionRate,
+                totalStaff: staff.length, staff: staffWithScore,
+                rankPoints,
+                pieData: { full, partial, zero: zero>0? zero:0 },
+                totalScore
+            };
+        }
+
+        function refreshDashboard() {
+            const data = generateDataByRange(currentStart, currentEnd);
+
+            document.getElementById('totalTasks').innerText = data.totalTasks;
+            document.getElementById('completedTasks').innerText = data.completedTasks;
+            document.getElementById('pendingTasks').innerText = data.pendingTasks;
+            document.getElementById('totalPoints').innerText = data.totalPoints;
+            document.getElementById('checkedPoints').innerText = data.checkedPoints;
+            document.getElementById('missedPoints').innerText = data.missedPoints;
+            document.getElementById('totalRoutes').innerText = data.totalRoutes;
+            document.getElementById('avgPointsPerRoute').innerText = data.avgPointsPerRoute;
+            document.getElementById('completionRate').innerText = data.completionRate + '%';
+            document.getElementById('totalStaff').innerText = data.totalStaff;
+
+            const avatars = document.getElementById('staffAvatars');
+            avatars.innerHTML = data.staff.map(s => 
+                `<div class="w-8 h-8 rounded-full ${s.color} border-2 border-slate-800 flex items-center justify-center text-xs font-bold">${s.avatar}</div>`
+            ).join('');
+
+            // 人员绩效容器 - 名称修改为"已巡点位数" "漏巡点位数"
+            const staffContainer = document.getElementById('staffRankContainer');
+            staffContainer.innerHTML = data.staff.map(s => {
+                return `
+                <div class="staff-rank-item">
+                    <div class="staff-avatar">${s.avatar}</div>
+                    <div class="staff-info">
+                        <div class="flex justify-between items-center">
+                            <span class="staff-name">${s.name}</span>
+                        </div>
+                        <div class="staff-stats">
+                            <span>✅ 已巡点位数: ${s.done}</span>  <!-- 修改 -->
+                            <span>❌ 漏巡点位数: ${s.miss}</span>  <!-- 修改 -->
+                            <span>📊 漏巡率 ${Math.round(s.miss/(s.done+s.miss)*100)}%</span>
+                        </div>
+                    </div>
+                    <div class="text-lg font-bold text-white">${s.score}</div>
+                </div>`;
+            }).join('');
+
+            document.getElementById('totalScore').innerText = data.totalScore;
+
+            const rankContainer = document.getElementById('missedRankContainer');
+            rankContainer.innerHTML = data.rankPoints.map((item, idx) => {
+                let rankNumber = idx+1;
+                let widthPercent = Math.min(100, (item.missCount / (data.rankPoints[0].missCount) * 100));
+                return `
+                <div class="rank-item">
+                    <span class="rank-number">${rankNumber}</span>
+                    <span class="text-sm font-medium flex-1">${item.name}</span>
+                    <div class="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
+                        <div class="h-full bg-red-500" style="width: ${widthPercent}%"></div>
+                    </div>
+                    <span class="text-sm text-red-400 font-semibold">${item.missCount}次</span>
+                </div>`;
+            }).join('');
+
+            document.getElementById('missedSummary').innerText = `基于${data.totalTasks}个巡更任务，总计${data.totalPoints}个点位次数，其中${data.missedPoints}次漏巡`;
+
+            completionChart.setOption({
+                series: [{
+                    data: [
+                        { value: data.pieData.full, name: '100%完成', itemStyle: { color: '#10b981' } },
+                        { value: data.pieData.partial, name: '1-99%完成', itemStyle: { color: '#f59e0b' } },  // 修改
+                        { value: data.pieData.zero, name: '0%完成', itemStyle: { color: '#ef4444' } }
+                    ]
+                }]
+            });
+            document.getElementById('legendFull').innerText = `100%完成 (${data.pieData.full}个)`;
+            document.getElementById('legendPartial').innerText = `1-99%完成 (${data.pieData.partial}个)`;  // 修改
+            document.getElementById('legendZero').innerText = `0%完成 (${data.pieData.zero}个)`;
+
+            // 热力图数据 - 独立
+            const heatData = [];
+            for (let i = 0; i < 7; i++) {
+                for (let j = 0; j < 12; j++) {
+                    let baseVal = 0;
+                    if (i === 4 && j === 1) baseVal = 1;
+                    else if (i === 0 && j === 4) baseVal = 2;
+                    else if (i === 4 && j === 6) baseVal = 2;
+                    else if (Math.random() < 0.15) baseVal = 1;
+                    if (baseVal > 4) baseVal = 4;
+                    heatData.push([j, i, baseVal]);
+                }
+            }
+            heatmapChart.setOption({ series: [{ data: heatData }] });
+        }
+
+        const completionChart = echarts.init(document.getElementById('completionChart'));
+        completionChart.setOption({
+            tooltip: { trigger: 'item', formatter: '{b}: {c}个 ({d}%)' },
+            legend: { show: false },
+            series: [{ type: 'pie', radius: ['55%', '75%'], label: { show: true, position: 'outside', color: '#e2e8f0', fontSize: 11 } }]
+        });
+
+        const heatmapChart = echarts.init(document.getElementById('heatmapChart'));
+        const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        const hours = ['00-02', '02-04', '04-06', '06-08', '08-10', '10-12', '12-14', '14-16', '16-18', '18-20', '20-22', '22-24'];
+        heatmapChart.setOption({
+            tooltip: { position: 'top', formatter: (params) => `${days[params.value[1]]} ${hours[params.value[0]]}<br/>打卡次数: ${params.value[2]}` },
+            grid: { left: '8%', right: '5%', top: '8%', bottom: '10%' },
+            xAxis: { type: 'category', data: hours, splitArea: { show: true }, axisLabel: { rotate: 30, fontSize: 10 } },
+            yAxis: { type: 'category', data: days, splitArea: { show: true } },
+            visualMap: { min: 0, max: 4, calculable: true, orient: 'horizontal', left: 'center', bottom: '0%', inRange: { color: ['#1e293b', '#3b82f6', '#8b5cf6'] } },
+            series: [{ type: 'heatmap', data: [] }]
+        });
+
+        updateAllSuffixes();
+        refreshDashboard();
+
+        window.addEventListener('resize', () => {
+            completionChart.resize();
+            heatmapChart.resize();
+        });
+    </script>
+</body>
+</html>

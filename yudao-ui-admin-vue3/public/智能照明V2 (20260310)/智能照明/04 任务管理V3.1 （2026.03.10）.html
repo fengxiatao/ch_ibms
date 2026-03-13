@@ -1,0 +1,3344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧照明控制系统 · 任务管理（完整版 + 执行状态监控 + 结束后回路保持）</title>
+    <style>
+        /* ==================== 全局基础样式 (完全保留原样) ==================== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --primary-light: #d1fae5;
+            --secondary: #6366f1;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --border: #e5e7eb;
+            --bg-primary: #f3f4f6;
+            --bg-secondary: #ffffff;
+            --sidebar-bg: #1f2937;
+            --sidebar-width: 260px;
+            --executing-bg: #ecfdf5;
+            --executing-border: #a7f3d0;
+            --scheduled-bg: #eff6ff;
+            --scheduled-border: #bfdbfe;
+            --keep-alive-bg: #fff3cd;
+            --keep-alive-border: #ffeeba;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .app-container { display: flex; min-height: 100vh; }
+        
+        /* ==================== 侧边栏样式 ==================== */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--sidebar-bg);
+            color: #fff;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 100;
+        }
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .sidebar-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        .sidebar-title { font-size: 18px; font-weight: 600; }
+        .sidebar-subtitle { font-size: 11px; color: rgba(255,255,255,0.5); }
+        .nav-menu { padding: 15px 0; }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+            transition: all 0.2s;
+            gap: 12px;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+        .nav-item.active { background: rgba(16, 185, 129, 0.15); color: var(--primary); }
+        .nav-item-icon { width: 20px; text-align: center; font-size: 16px; }
+        .nav-item-text { flex: 1; }
+        
+        /* ==================== 主内容区 ==================== */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            padding: 20px 30px;
+            min-height: 100vh;
+        }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding: 20px 25px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        .breadcrumb-item.active { color: var(--text-primary); font-weight: 500; }
+        .datetime-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+        
+        /* ==================== 按钮样式 ==================== */
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-secondary {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { background: var(--border); }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-warning { background: var(--warning); color: #fff; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-info { background: var(--info); color: #fff; }
+        .btn-info:hover { background: #2563eb; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        
+        /* ==================== 卡片样式 ==================== */
+        .settings-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+        }
+        .settings-card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        /* ==================== 页面标题 ==================== */
+        .page-title { font-size: 24px; font-weight: 700; margin-bottom: 10px; }
+        .page-desc {
+            color: var(--text-secondary);
+            margin-bottom: 25px;
+            font-size: 14px;
+        }
+        
+        /* ==================== 表单样式 ==================== */
+        .form-group { margin-bottom: 20px; }
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+        .form-label .required { color: var(--danger); margin-left: 4px; }
+        .form-control {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--bg-secondary);
+            outline: none;
+        }
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+        .form-control.error {
+            border-color: var(--danger);
+        }
+        .form-hint {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 6px;
+        }
+        .form-error {
+            font-size: 12px;
+            color: var(--danger);
+            margin-top: 4px;
+            display: none;
+        }
+        .input-group { display: flex; gap: 10px; align-items: center; }
+        .input-group .form-control { flex: 1; }
+        
+        /* ==================== 分区导航树样式 ==================== */
+        .partition-nav-container { display: flex; gap: 20px; margin-bottom: 20px; }
+        .partition-nav-tree {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .partition-nav-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .partition-tree { list-style: none; padding: 0; margin: 0; }
+        .partition-tree-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+        .partition-tree-item:hover { background: var(--bg-primary); }
+        .partition-tree-item.active {
+            background: var(--primary-light);
+            color: var(--primary-dark);
+            font-weight: 500;
+        }
+        .partition-tree-children {
+            list-style: none;
+            padding-left: 20px;
+            margin: 0;
+            border-left: 2px solid var(--border);
+            margin-left: 10px;
+        }
+        .partition-tree-icon { font-size: 16px; }
+        .partition-tree-toggle {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .partition-content-area { flex: 1; }
+        
+        /* ==================== 执行状态面板 ==================== */
+        .execution-panel {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border-left: 4px solid var(--primary);
+        }
+        .execution-panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .execution-panel-title span { 
+            color: var(--primary); 
+            background: var(--primary-light); 
+            padding: 4px 12px; 
+            border-radius: 30px; 
+            font-size: 13px; 
+            margin-left: 10px; 
+        }
+        .execution-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .execution-item {
+            flex: 1 1 300px;
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 16px;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .execution-item.executing {
+            background: var(--executing-bg);
+            border-color: var(--executing-border);
+        }
+        .execution-item.scheduled {
+            background: var(--scheduled-bg);
+            border-color: var(--scheduled-border);
+        }
+        .execution-item.keep-alive {
+            background: var(--keep-alive-bg);
+            border-color: var(--keep-alive-border);
+        }
+        .execution-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .execution-name {
+            font-weight: 600;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .execution-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 30px;
+            font-weight: 600;
+        }
+        .executing .execution-badge { background: var(--primary); color: white; }
+        .scheduled .execution-badge { background: var(--info); color: white; }
+        .keep-alive .execution-badge { background: var(--warning); color: white; }
+        .execution-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .execution-progress {
+            margin-top: 12px;
+            height: 6px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 3px;
+            width: 0%;
+        }
+        .execution-footer {
+            margin-top: 12px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        .execution-footer .btn-sm { padding: 4px 8px; font-size: 11px; }
+        
+        /* ==================== 任务类型标签 ==================== */
+        .task-type-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .type-manual {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .type-auto {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        /* ==================== 任务卡片网格 ==================== */
+        .task-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .task-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border: 2px solid transparent;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .task-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+        }
+        .task-card.manual-highlight {
+            border-left: 4px solid var(--info);
+        }
+        .task-card.auto-highlight {
+            border-left: 4px solid var(--primary);
+        }
+        .task-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .task-title {
+            font-size: 16px;
+            font-weight: 600;
+            flex: 1;
+        }
+        .task-status-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 10px;
+            border-radius: 30px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        .task-status-chip.enabled {
+            background: #dcfce7;
+            color: #166534;
+            border-color: #86efac;
+        }
+        .task-status-chip.disabled {
+            background: #fee2e2;
+            color: #991b1b;
+            border-color: #fecaca;
+        }
+        .task-status-chip.executing {
+            background: #dcfce7;
+            color: #166534;
+            border-color: #86efac;
+        }
+        .task-status-chip.stopped {
+            background: #fee2e2;
+            color: #991b1b;
+            border-color: #fecaca;
+        }
+        .task-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+        .task-region {
+            font-size: 14px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+        .task-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 15px 0;
+            padding: 12px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+        }
+        .stat-item {
+            flex: 1;
+            text-align: center;
+        }
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+        }
+        .stat-value {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .stat-value.success { color: var(--primary); }
+        .stat-value.failed { color: var(--danger); }
+        .task-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+        .task-tag {
+            background: var(--bg-primary);
+            padding: 4px 10px;
+            border-radius: 20px;
+            color: var(--text-secondary);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .task-device-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+        }
+        .task-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border);
+        }
+        .task-status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status-enabled { background: #dcfce7; color: #166534; }
+        .status-disabled { background: #fee2e2; color: #991b1b; }
+        
+        /* ==================== 筛选栏 ==================== */
+        .filter-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .search-group {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+        
+        /* ==================== 表格样式 ==================== */
+        .table-container { overflow-x: auto; }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .data-table th {
+            background: var(--bg-primary);
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border);
+        }
+        .data-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .data-table tr:hover { background: var(--bg-primary); }
+        
+        /* ==================== 状态标签 ==================== */
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status-online { background: #dcfce7; color: #166534; }
+        .status-offline { background: #fee2e2; color: #991b1b; }
+        .status-maintain { background: #fef3c7; color: #92400e; }
+        
+        /* ==================== 回路类型标签 ==================== */
+        .type-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .type-light { background: #dbeafe; color: #1e40af; }
+        .type-emergency { background: #fee2e2; color: #991b1b; }
+        .type-socket { background: #dcfce7; color: #166534; }
+        .type-ac { background: #fef3c7; color: #92400e; }
+        
+        /* ==================== 步骤条 ==================== */
+        .step-wizard {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        .step-wizard::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 50px;
+            right: 50px;
+            height: 2px;
+            background: var(--border);
+            z-index: 0;
+        }
+        .step-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+            z-index: 1;
+            flex: 1;
+        }
+        .step-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        .step-item.active .step-circle {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        .step-item.completed .step-circle {
+            background: var(--secondary);
+            border-color: var(--secondary);
+            color: white;
+        }
+        .step-label { font-size: 12px; color: var(--text-secondary); }
+        .step-item.active .step-label { color: var(--primary); font-weight: 600; }
+        
+        .step-content { display: none; }
+        .step-content.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* ==================== 模态框样式 ==================== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-container {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 1000px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: var(--bg-secondary);
+            z-index: 10;
+        }
+        .modal-title { font-size: 18px; font-weight: 600; }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+        .modal-close:hover { background: var(--bg-primary); }
+        .modal-body { padding: 25px; }
+        .modal-footer {
+            padding: 20px 25px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            background: var(--bg-primary);
+            border-radius: 0 0 16px 16px;
+            position: sticky;
+            bottom: 0;
+        }
+        
+        /* ==================== 回路选择器 ==================== */
+        .circuit-selector {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .circuit-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .circuit-item:hover { background: var(--bg-primary); }
+        .circuit-item.selected { background: var(--primary-light); }
+        .circuit-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: var(--bg-primary);
+        }
+        .circuit-checkbox { margin-right: 15px; }
+        .circuit-info { flex: 1; }
+        .circuit-name { font-weight: 600; font-size: 13px; }
+        .circuit-detail {
+            display: flex;
+            gap: 15px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            flex-wrap: wrap;
+        }
+        .circuit-status { width: 80px; }
+        
+        /* ==================== 执行周期选择 ==================== */
+        .schedule-type {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .schedule-option {
+            padding: 10px 20px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            flex: 1;
+            text-align: center;
+            transition: all 0.2s;
+            min-width: 80px;
+        }
+        .schedule-option:hover { border-color: var(--primary); }
+        .schedule-option.selected {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+        .weekday-selector {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .weekday-tag {
+            padding: 6px 12px;
+            background: var(--bg-primary);
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .weekday-tag:hover { background: var(--primary-light); }
+        .weekday-tag.selected {
+            background: var(--primary);
+            color: white;
+        }
+        
+        /* ==================== 执行回路列表 ==================== */
+        .execution-circuit-list {
+            margin-top: 20px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .execution-circuit-header {
+            display: grid;
+            grid-template-columns: 50px 2fr 1fr 1fr 80px 80px 60px;
+            padding: 10px 12px;
+            background: var(--bg-primary);
+            font-weight: 600;
+            font-size: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .execution-circuit-row {
+            display: grid;
+            grid-template-columns: 50px 2fr 1fr 1fr 80px 80px 60px;
+            padding: 10px 12px;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .execution-circuit-row:last-child { border-bottom: none; }
+        .enable-toggle { display: flex; align-items: center; gap: 8px; }
+        .enable-toggle input { width: 18px; height: 18px; cursor: pointer; }
+        
+        /* ==================== 新增：结束后保持回路控制 ==================== */
+        .keep-alive-section {
+            margin-top: 25px;
+            padding: 20px;
+            background: var(--bg-primary);
+            border-radius: 12px;
+            border: 1px solid var(--keep-alive-border);
+        }
+        .keep-alive-title {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #856404;
+        }
+        .keep-alive-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 5px;
+        }
+        .keep-alive-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .keep-alive-item:hover {
+            background: var(--primary-light);
+        }
+        .keep-alive-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+        .keep-alive-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .keep-alive-name {
+            font-weight: 500;
+        }
+        .keep-alive-code {
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+        .keep-alive-type {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: var(--bg-primary);
+        }
+        
+        /* ==================== 添加回路按钮 ==================== */
+        .add-circuit-btn {
+            margin-top: 15px;
+            padding: 10px;
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .add-circuit-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        /* ==================== 执行时长显示 ==================== */
+        .duration-display {
+            margin-top: 10px;
+            padding: 10px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .duration-icon {
+            font-size: 18px;
+        }
+        .duration-text {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        .duration-value {
+            color: var(--primary);
+            font-weight: 600;
+            margin-left: 5px;
+        }
+        
+        /* ==================== 任务详情卡片 ==================== */
+        .task-detail-card {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .task-detail-row {
+            display: flex;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .task-detail-row:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .task-detail-label {
+            width: 120px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .task-detail-value {
+            flex: 1;
+            font-weight: 500;
+        }
+        .task-detail-value.success { color: var(--primary); }
+        .task-detail-value.failed { color: var(--danger); }
+        
+        /* ==================== 分页 ==================== */
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border);
+        }
+        
+        /* ==================== 加载动画 ==================== */
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* ==================== 提示消息 ==================== */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 2000;
+            animation: slideIn 0.3s;
+            max-width: 400px;
+        }
+        .toast.success { border-left: 4px solid var(--primary); }
+        .toast.warning { border-left: 4px solid var(--warning); }
+        .toast.error { border-left: 4px solid var(--danger); }
+        .toast.info { border-left: 4px solid var(--info); }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0%); opacity: 1; }
+        }
+        
+        /* ==================== 响应式 ==================== */
+        @media (max-width: 992px) {
+            .sidebar { transform: translateX(-100%); position: fixed; }
+            .main-content { margin-left: 0; }
+            .partition-nav-container { flex-direction: column; }
+            .partition-nav-tree { width: 100%; max-height: 300px; }
+            .execution-circuit-header {
+                grid-template-columns: 50px 2fr 1fr 1fr 80px 80px 60px;
+                font-size: 11px;
+            }
+            .execution-circuit-row {
+                grid-template-columns: 50px 2fr 1fr 1fr 80px 80px 60px;
+                font-size: 11px;
+            }
+        }
+
+        .priority-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 6px;
+        }
+        .priority-high {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .priority-normal {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .stat-note {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+            text-align: center;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- ==================== 侧边栏 ==================== -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">💡</div>
+                <div>
+                    <div class="sidebar-title">智慧照明控制</div>
+                    <div class="sidebar-subtitle">Lighting Control System</div>
+                </div>
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-item active" data-page="task">
+                    <span class="nav-item-icon">📋</span>
+                    <span class="nav-item-text">任务管理</span>
+                </div>
+                <div class="nav-item" data-page="device">
+                    <span class="nav-item-icon">🔌</span>
+                    <span class="nav-item-text">设备管理</span>
+                </div>
+                <div class="nav-item" data-page="history">
+                    <span class="nav-item-icon">📜</span>
+                    <span class="nav-item-text">执行历史</span>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- ==================== 主内容区 ==================== -->
+        <main class="main-content">
+            <div class="page-header">
+                <div class="breadcrumb">
+                    <span class="breadcrumb-item">首页</span>
+                    <span>/</span>
+                    <span class="breadcrumb-item">照明控制</span>
+                    <span>/</span>
+                    <span class="breadcrumb-item active">任务管理</span>
+                </div>
+                <div class="header-actions">
+                    <div class="datetime-display">
+                        <span>📅</span>
+                        <span id="currentDateTime">2026-03-10 14:30:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-title">📋 任务管理</div>
+            <div class="page-desc">
+                配置照明任务，支持手动任务（即时触发）和自动任务（定时执行），实现智能化照明控制。
+            </div>
+
+            <!-- 执行状态面板（带批量停止按钮） -->
+            <div class="execution-panel" id="executionStatusPanel">
+                <div class="execution-panel-title">
+                    ⏳ 正在执行 / 待执行任务 
+                    <span id="executingCount">0</span>
+                    <button class="btn btn-sm btn-warning" onclick="stopAllExecutingTasks()" style="margin-left: auto;">
+                        ⏸️ 停止全部执行中
+                    </button>
+                </div>
+                <div class="execution-grid" id="executionGrid">
+                    <!-- 动态生成执行中/计划任务卡片 -->
+                </div>
+            </div>
+
+            <!-- 分区导航 + 任务列表布局 -->
+            <div class="partition-nav-container">
+                <!-- 左侧空间导航树 -->
+                <div class="partition-nav-tree">
+                    <div class="partition-nav-title">🗂️ 空间导航</div>
+                    <ul class="partition-tree" id="spaceTree">
+                        <li>
+                            <div class="partition-tree-item active" onclick="selectSpace(this, 'root')">
+                                <span class="partition-tree-toggle" onclick="toggleTreeNode(event, this)">▼</span>
+                                <span class="partition-tree-icon">🏢</span>
+                                <span>智慧园区一期</span>
+                            </div>
+                            <ul class="partition-tree-children">
+                                <li>
+                                    <div class="partition-tree-item" onclick="selectSpace(this, 'A')">
+                                        <span class="partition-tree-toggle" onclick="toggleTreeNode(event, this)">▼</span>
+                                        <span class="partition-tree-icon">🏢</span>
+                                        <span>A座办公楼</span>
+                                    </div>
+                                    <ul class="partition-tree-children">
+                                        <li><div class="partition-tree-item" onclick="selectSpace(this, 'A1')"><span class="partition-tree-icon">🏠</span><span>1层</span></div></li>
+                                        <li><div class="partition-tree-item" onclick="selectSpace(this, 'A2')"><span class="partition-tree-icon">🏠</span><span>2层</span></div></li>
+                                        <li><div class="partition-tree-item" onclick="selectSpace(this, 'A3')"><span class="partition-tree-icon">🏠</span><span>3层</span></div></li>
+                                    </ul>
+                                </li>
+                                <li>
+                                    <div class="partition-tree-item" onclick="selectSpace(this, 'B')">
+                                        <span class="partition-tree-toggle" onclick="toggleTreeNode(event, this)">▶</span>
+                                        <span class="partition-tree-icon">🏭</span>
+                                        <span>B座生产车间</span>
+                                    </div>
+                                    <ul class="partition-tree-children" style="display: none;">
+                                        <li><div class="partition-tree-item" onclick="selectSpace(this, 'B1')"><span class="partition-tree-icon">🏠</span><span>一层车间</span></div></li>
+                                        <li><div class="partition-tree-item" onclick="selectSpace(this, 'B2')"><span class="partition-tree-icon">🏠</span><span>二层办公区</span></div></li>
+                                    </ul>
+                                </li>
+                                <li><div class="partition-tree-item" onclick="selectSpace(this, 'C')"><span class="partition-tree-icon">🍽️</span><span>C座食堂</span></div></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 右侧任务列表区 -->
+                <div class="partition-content-area">
+                    <div class="settings-card">
+                        <div class="settings-card-title">
+                            <span>📋 任务列表</span>
+                            <div>
+                                <button class="btn btn-primary" onclick="openAddTaskModal()">➕ 新建任务</button>
+                            </div>
+                        </div>
+                        
+                        <!-- 任务类型说明卡片 -->
+                        <div style="display: flex; gap: 20px; margin-bottom: 20px; padding: 15px; background: var(--bg-primary); border-radius: 8px; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="task-type-badge type-manual">🔘 手动任务</span>
+                                <span style="color: var(--text-secondary); font-size: 12px;">需手动点击启动，优先级高，执行时暂停同区域自动任务</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="task-type-badge type-auto">🤖 自动任务</span>
+                                <span style="color: var(--text-secondary); font-size: 12px;">按设定时间自动执行</span>
+                            </div>
+                        </div>
+                        
+                        <!-- 筛选栏 -->
+                        <div class="filter-bar">
+                            <div>
+                                <select class="form-control" id="typeFilter" style="width: 120px;" onchange="filterTasks()">
+                                    <option value="all">全部类型</option>
+                                    <option value="manual">手动任务</option>
+                                    <option value="auto">自动任务</option>
+                                </select>
+                            </div>
+                            <div>
+                                <select class="form-control" id="statusFilter" style="width: 120px;" onchange="filterTasks()">
+                                    <option value="all">全部状态</option>
+                                    <option value="enabled">已启用</option>
+                                    <option value="disabled">已停用</option>
+                                </select>
+                            </div>
+                            <div class="search-group">
+                                <input type="text" class="form-control" id="searchInput" placeholder="搜索任务名称..." style="width: 200px;" oninput="filterTasks()">
+                                <button class="btn btn-secondary" onclick="resetFilters()">🔄 重置</button>
+                            </div>
+                        </div>
+
+                        <!-- 任务卡片网格 -->
+                        <div class="task-grid" id="taskGrid">
+                            <!-- 动态生成 -->
+                        </div>
+                        
+                        <!-- 分页 -->
+                        <div class="pagination">
+                            <div style="color: var(--text-secondary); font-size: 13px;">共 <span id="totalTasks">0</span> 个任务</div>
+                            <div style="display: flex; gap: 5px;" id="paginationControls">
+                                <button class="btn btn-sm btn-secondary" onclick="changePage('prev')" id="prevPageBtn" disabled>上一页</button>
+                                <span id="pageInfo" style="padding: 0 10px;">第 <span id="currentPage">1</span> 页 / 共 <span id="totalPages">1</span> 页</span>
+                                <button class="btn btn-sm btn-secondary" onclick="changePage('next')" id="nextPageBtn">下一页</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ==================== 任务编辑模态框（包含结束后保持回路控制） ==================== -->
+    <div class="modal-overlay" id="taskModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <div class="modal-title" id="taskModalTitle">➕ 新建任务</div>
+                <button class="modal-close" onclick="closeTaskModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <!-- 步骤条 -->
+                <div class="step-wizard">
+                    <div class="step-item active" data-step="1">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">基础设置</div>
+                    </div>
+                    <div class="step-item" data-step="2">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">回路配置</div>
+                    </div>
+                    <div class="step-item" data-step="3" id="step3Auto">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">定时设置</div>
+                    </div>
+                </div>
+
+                <!-- 第一步：基础设置 -->
+                <div class="step-content active" id="step1">
+                    <div class="form-group">
+                        <label class="form-label">任务名称 <span class="required">*</span></label>
+                        <input type="text" class="form-control" id="taskName" placeholder="请输入任务名称，如：XX区域+办公模式/会议模式" maxlength="50">
+                        <div class="form-error" id="taskNameError">任务名称不能为空</div>
+                        <div class="form-hint">最多50个字符</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">空间位置 <span class="required">*</span></label>
+                        <select class="form-control" id="taskLocation" onchange="onLocationChange()">
+                            <option value="">请选择空间位置...</option>
+                            <option value="A1">A座办公楼 - 1层</option>
+                            <option value="A2">A座办公楼 - 2层</option>
+                            <option value="A3">A座办公楼 - 3层</option>
+                            <option value="B1">B座生产车间 - 一层车间</option>
+                            <option value="B2">B座生产车间 - 二层办公区</option>
+                            <option value="C">C座食堂</option>
+                        </select>
+                        <div class="form-error" id="locationError">请选择空间位置</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">任务类型 <span class="required">*</span></label>
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                            <label style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-primary); border-radius: 8px; cursor: pointer; border: 2px solid transparent;" onclick="selectTaskType('manual')" id="typeManualOption">
+                                <input type="radio" name="taskType" value="manual" checked style="display: none;">
+                                <span class="task-type-badge type-manual">🔘 手动任务</span>
+                                <span style="color: var(--text-secondary); font-size: 12px;">即时触发</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-primary); border-radius: 8px; cursor: pointer; border: 2px solid transparent;" onclick="selectTaskType('auto')" id="typeAutoOption">
+                                <input type="radio" name="taskType" value="auto" style="display: none;">
+                                <span class="task-type-badge type-auto">🤖 自动任务</span>
+                                <span style="color: var(--text-secondary); font-size: 12px;">定时执行</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">启用状态</label>
+                        <div style="display: flex; gap: 20px;">
+                            <label style="display: flex; align-items: center; gap: 5px;">
+                                <input type="radio" name="taskStatus" value="enabled" checked> 启用
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px;">
+                                <input type="radio" name="taskStatus" value="disabled"> 停用
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">备注说明</label>
+                        <textarea class="form-control" id="taskRemark" rows="2" placeholder="请输入任务描述..." maxlength="200"></textarea>
+                        <div class="form-hint">最多200个字符</div>
+                    </div>
+
+                    <!-- 版本信息（编辑时显示） -->
+                    <div id="versionInfo" style="display: none; margin-top: 20px; padding: 10px; background: var(--bg-primary); border-radius: 8px; font-size: 12px;">
+                        <div>最后修改：<span id="lastModified"></span></div>
+                        <div>版本：<span id="version"></span></div>
+                    </div>
+                </div>
+
+                <!-- 第二步：回路配置（包含回路启用/关闭功能） -->
+                <div class="step-content" id="step2">
+                    <div class="form-group">
+                        <label class="form-label">
+                            选择回路 <span class="required">*</span>
+                            <span style="margin-left: 10px; font-weight: normal; color: var(--text-secondary);">
+                                (已选 <span id="selectedCircuitCount">0</span> 个，启用 <span id="enabledCircuitCount">0</span> 个)
+                            </span>
+                        </label>
+                        
+                        <div style="margin-bottom: 15px; padding: 15px; background: var(--bg-primary); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="font-size: 20px; margin-right: 10px;">🔌</span>
+                                <span>请点击下方按钮选择回路</span>
+                            </div>
+                            <button class="btn btn-primary" onclick="openCircuitSelector()">选择回路</button>
+                        </div>
+                    </div>
+
+                    <!-- 已选回路详情（包含启用/关闭复选框） -->
+                    <div class="form-group">
+                        <label class="form-label">已选回路详情</label>
+                        <div class="execution-circuit-list" id="executionCircuitList">
+                            <!-- 动态生成，包含启用复选框 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 第三步：定时设置（仅自动任务显示，新增结束后保持回路控制） -->
+                <div class="step-content" id="step3">
+                    <div id="scheduleConfigSection">
+                        <div class="form-group">
+                            <label class="form-label">执行周期 <span class="required">*</span></label>
+                            <div class="schedule-type">
+                                <div class="schedule-option selected" onclick="selectScheduleType('once')" id="scheduleOnce">单次</div>
+                                <div class="schedule-option" onclick="selectScheduleType('daily')" id="scheduleDaily">每天</div>
+                                <div class="schedule-option" onclick="selectScheduleType('weekly')" id="scheduleWeekly">每周</div>
+                                <div class="schedule-option" onclick="selectScheduleType('workday')" id="scheduleWorkday">工作日</div>
+                                <div class="schedule-option" onclick="selectScheduleType('weekend')" id="scheduleWeekend">周末</div>
+                            </div>
+                        </div>
+
+                        <!-- 每周选择 -->
+                        <div id="weeklySchedule" style="display: none;">
+                            <label class="form-label">选择星期 <span class="required">*</span></label>
+                            <div class="weekday-selector">
+                                <span class="weekday-tag" onclick="toggleWeekday(this)">周一</span>
+                                <span class="weekday-tag" onclick="toggleWeekday(this)">周二</span>
+                                <span class="weekday-tag" onclick="toggleWeekday(this)">周三</span>
+                                <span class="weekday-tag" onclick="toggleWeekday(this)">周四</span>
+                                <span class="weekday-tag" onclick="toggleWeekday(this)">周五</span>
+                                <span class="weekday-tag" onclick="toggleWeekday(this)">周六</span>
+                                <span class="weekday-tag" onclick="toggleWeekday(this)">周日</span>
+                            </div>
+                            <div class="form-error" id="weekdayError">请至少选择一天</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">执行时间 <span class="required">*</span></label>
+                            <input type="time" class="form-control" id="executeTime" value="08:00" onchange="calculateDuration(); checkScheduleConflict()">
+                            <div class="form-error" id="timeError">请填写有效的执行时间</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">结束时间 <span class="required">*</span></label>
+                            <input type="time" class="form-control" id="endTime" value="18:00" onchange="calculateDuration(); checkScheduleConflict()">
+                            <div class="form-error" id="endTimeError">请填写有效的结束时间</div>
+                        </div>
+
+                        <!-- 执行时长显示 -->
+                        <div class="duration-display">
+                            <span class="duration-icon">⏱️</span>
+                            <span class="duration-text">执行时长：</span>
+                            <span class="duration-value" id="durationValue">10小时0分钟</span>
+                        </div>
+
+                        <!-- ==================== 新增：结束后保持回路控制 ==================== -->
+                        <div class="keep-alive-section" id="keepAliveSection">
+                            <div class="keep-alive-title">
+                                <span>🔌 任务结束后回路保持</span>
+                                <span style="font-size: 12px; font-weight: normal; color: var(--text-secondary);">
+                                    (勾选的回路在任务结束后保持开启，直到下一个任务执行)
+                                </span>
+                            </div>
+                            <div class="keep-alive-grid" id="keepAliveGrid">
+                                <!-- 动态生成回路保持选项 -->
+                                <div style="padding: 20px; text-align: center; color: var(--text-secondary);">
+                                    请先在第二步选择回路
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">生效日期范围</label>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="date" class="form-control" id="scheduleStartDate" value="">
+                                <span>至</span>
+                                <input type="date" class="form-control" id="scheduleEndDate" value="">
+                            </div>
+                            <div class="form-hint">不填表示长期有效</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">高级选项</label>
+                            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                                <label style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="checkbox" id="enableRetry"> 失败重试（最多3次）
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="checkbox" id="enableNotification"> 执行后通知
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="checkbox" id="enableLog" checked> 记录详细日志
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 冲突检测结果 -->
+                        <div id="conflictWarning" style="display: none; margin-top: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 8px; color: #856404;">
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                <span style="font-size: 20px;">⚠️</span>
+                                <span style="font-weight: 600;">检测到定时任务冲突</span>
+                            </div>
+                            <div id="conflictDetails" style="font-size: 13px;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 手动任务提示（仅手动任务显示） -->
+                    <div id="manualTaskHint" style="display: none; padding: 20px; background: var(--bg-primary); border-radius: 8px; text-align: center;">
+                        <div style="font-size: 40px; margin-bottom: 10px;">🔘</div>
+                        <div style="font-weight: 600; margin-bottom: 5px;">手动任务无需定时设置</div>
+                        <div style="color: var(--text-secondary); font-size: 12px;">保存后可通过点击"执行"按钮手动触发</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="prevStep()" id="prevBtn" style="display: none;">上一步</button>
+                <button class="btn btn-secondary" onclick="closeTaskModal()">取消</button>
+                <button class="btn btn-primary" onclick="nextStep()" id="nextBtn">下一步</button>
+                <button class="btn btn-primary" onclick="saveTask()" id="submitBtn" style="display: none;">✅ 保存任务</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 回路选择模态框 ==================== -->
+    <div class="modal-overlay" id="circuitModal">
+        <div class="modal-container" style="max-width: 1000px;">
+            <div class="modal-header">
+                <div class="modal-title">选择回路 <span id="currentLocationHint" style="font-size: 12px; color: var(--text-secondary); margin-left: 10px;"></span></div>
+                <button class="modal-close" onclick="closeCircuitModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="filter-bar" style="margin-bottom: 15px;">
+                    <div>
+                        <select class="form-control" id="circuitTypeFilter" style="width: 120px;" onchange="filterCircuits()">
+                            <option value="all">全部类型</option>
+                            <option value="light">普通照明</option>
+                            <option value="emergency">应急照明</option>
+                            <option value="socket">插座回路</option>
+                            <option value="ac">空调回路</option>
+                        </select>
+                    </div>
+                    <div>
+                        <select class="form-control" id="circuitStatusFilter" style="width: 120px;" onchange="filterCircuits()">
+                            <option value="all">全部状态</option>
+                            <option value="online">在线</option>
+                            <option value="offline">离线</option>
+                            <option value="maintain">维护中</option>
+                        </select>
+                    </div>
+                    <div>
+                        <select class="form-control" id="circuitAreaFilter" style="width: 120px;" onchange="filterCircuits()">
+                            <option value="all">全部区域</option>
+                        </select>
+                    </div>
+                    <div class="search-group">
+                        <input type="text" class="form-control" id="circuitSearch" placeholder="搜索回路名称或编码..." style="width: 200px;" oninput="filterCircuits()">
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <button class="btn btn-sm btn-secondary" onclick="selectAllCircuits(true)">全选</button>
+                        <button class="btn btn-sm btn-secondary" onclick="selectAllCircuits(false)">取消全选</button>
+                        <button class="btn btn-sm btn-secondary" onclick="selectOnlineCircuits()">仅选在线</button>
+                    </div>
+                    <div style="color: var(--text-secondary);">
+                        已选择 <span id="circuitModalSelectedCount">0</span> 个回路
+                    </div>
+                </div>
+                
+                <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                    <table class="data-table">
+                        <thead style="position: sticky; top: 0; background: var(--bg-primary);">
+                            <tr>
+                                <th style="width: 50px;"><input type="checkbox" onchange="selectAllDisplayedCircuits(this.checked)"></th>
+                                <th>序号</th>
+                                <th>设备编码</th>
+                                <th>回路名称</th>
+                                <th>回路类型</th>
+                                <th>所属区域</th>
+                                <th>设备状态</th>
+                                <th>最后在线</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="circuitTableBody">
+                            <!-- 动态生成回路数据 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeCircuitModal()">取消</button>
+                <button class="btn btn-primary" onclick="confirmAddCircuits()">确认添加 (已选 <span id="confirmSelectedCount">0</span>)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 任务详情模态框（增强回路显示） ==================== -->
+    <div class="modal-overlay" id="taskDetailModal">
+        <div class="modal-container" style="max-width: 700px;">
+            <div class="modal-header">
+                <div class="modal-title">📋 任务详情</div>
+                <button class="modal-close" onclick="closeTaskDetailModal()">×</button>
+            </div>
+            <div class="modal-body" id="taskDetailModalBody"></div>
+        </div>
+    </div>
+
+    <!-- ==================== 执行历史模态框 ==================== -->
+    <div class="modal-overlay" id="historyModal">
+        <div class="modal-container" style="max-width: 800px;">
+            <div class="modal-header">
+                <div class="modal-title">📜 执行历史</div>
+                <button class="modal-close" onclick="closeHistoryModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>执行时间</th><th>任务名称</th><th>执行结果</th><th>回路数</th><th>详情</th></tr>
+                        </thead>
+                        <tbody id="historyTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 全局变量 ====================
+        let currentStep = 1;
+        let editingTaskId = null;
+        let selectedCircuits = []; // 数组，每个元素包含 circuit 对象和 enabled 属性
+        let keepAliveCircuits = []; // 存储任务结束后要保持开启的回路ID
+        let taskType = 'manual';
+        let scheduleType = 'once';
+        let selectedWeekdays = [];
+        let currentPage = 1;
+        let pageSize = 6;
+        let currentTypeFilter = 'all';
+        let currentStatusFilter = 'all';
+        let currentSearchText = '';
+        let currentSpaceFilter = 'root';
+        let operationLogs = [];
+        let executionHistory = [];
+        let taskList = [];
+        let currentLocation = ''; // 当前选中的区域
+
+        // 模拟回路数据 (完整)
+        let circuitList = [
+            { id: 'C001', code: 'LT-001', name: 'A1层走廊灯组', type: 'light', typeName: '普通照明', area: 'A座1层', status: 'online', statusName: '在线', lastOnline: '2026-03-04 10:25:00' },
+            { id: 'C002', code: 'LT-002', name: 'A1层会议室灯', type: 'light', typeName: '普通照明', area: 'A座1层', status: 'online', statusName: '在线', lastOnline: '2026-03-04 10:28:00' },
+            { id: 'C003', code: 'LT-003', name: 'A1层办公室灯', type: 'light', typeName: '普通照明', area: 'A座1层', status: 'offline', statusName: '离线', lastOnline: '2026-03-03 18:30:00' },
+            { id: 'C004', code: 'EM-001', name: 'A1层应急照明', type: 'emergency', typeName: '应急照明', area: 'A座1层', status: 'online', statusName: '在线', lastOnline: '2026-03-04 10:29:00' },
+            { id: 'C005', code: 'SK-001', name: 'A1层插座回路', type: 'socket', typeName: '插座回路', area: 'A座1层', status: 'maintain', statusName: '维护中', lastOnline: '2026-03-02 09:15:00' },
+            { id: 'C006', code: 'LT-004', name: 'A2层走廊灯组', type: 'light', typeName: '普通照明', area: 'A座2层', status: 'online', statusName: '在线', lastOnline: '2026-03-04 10:27:00' },
+            { id: 'C007', code: 'LT-005', name: 'A2层办公室灯', type: 'light', typeName: '普通照明', area: 'A座2层', status: 'online', statusName: '在线', lastOnline: '2026-03-04 10:26:00' },
+            { id: 'C008', code: 'AC-001', name: 'A2层空调回路', type: 'ac', typeName: '空调回路', area: 'A座2层', status: 'online', statusName: '在线', lastOnline: '2026-03-04 10:24:00' },
+            { id: 'C009', code: 'LT-006', name: 'B1层车间照明', type: 'light', typeName: '普通照明', area: 'B座1层', status: 'online', statusName: '在线', lastOnline: '2026-03-04 10:23:00' },
+            { id: 'C010', code: 'EM-002', name: 'B1层应急照明', type: 'emergency', typeName: '应急照明', area: 'B座1层', status: 'online', statusName: '在线', lastOnline: '2026-03-04 10:22:00' },
+            { id: 'C011', code: 'LT-007', name: 'B2层办公区灯', type: 'light', typeName: '普通照明', area: 'B座2层', status: 'offline', statusName: '离线', lastOnline: '2026-03-03 16:45:00' },
+            { id: 'C012', code: 'LT-008', name: 'C座食堂照明', type: 'light', typeName: '普通照明', area: 'C座1层', status: 'online', statusName: '在线', lastOnline: '2026-03-04 10:20:00' }
+        ];
+
+        // 任务原始数据 (带执行历史关联)
+        let taskListData = [
+            { 
+                id: 'T001', name: '办公模式', location: 'A1', locationName: 'A座办公楼 - 1层', 
+                type: 'auto', typeName: '自动任务', status: 'enabled',
+                remark: '工作日办公照明', circuits: ['C001', 'C002', 'C003'], 
+                circuitDetails: [ { id: 'C001', enabled: true }, { id: 'C002', enabled: true }, { id: 'C003', enabled: false } ],
+                keepAliveCircuits: ['C001'], // 结束后保持开启的回路
+                schedule: { type: 'workday', startTime: '09:00', endTime: '18:00', duration: 9, retry: true, notify: false, detailedLog: true }, 
+                icon: '💼', version: 1, lastModified: '2026-03-03 14:30:00', createdBy: 'admin',
+                stats: { total: 4, success: 3, fail: 1, lastExecute: '2026-03-04 09:00:00', nextExecute: '2026-03-05 09:00' }
+            },
+            { 
+                id: 'T002', name: '会议模式', location: 'A1', locationName: 'A座办公楼 - 1层', 
+                type: 'manual', typeName: '手动任务', status: 'enabled',
+                remark: '会议室高亮照明', circuits: ['C002'], 
+                circuitDetails: [ { id: 'C002', enabled: true } ],
+                keepAliveCircuits: [],
+                schedule: null, icon: '📋', version: 1, lastModified: '2026-03-03 15:20:00', createdBy: 'admin',
+                stats: { total: 1, success: 1, fail: 0, lastExecute: '2026-03-04 14:30:00' }
+            },
+            { 
+                id: 'T003', name: '节能模式', location: 'A2', locationName: 'A座办公楼 - 2层', 
+                type: 'auto', typeName: '自动任务', status: 'enabled',
+                remark: '非工作时段节能照明', circuits: ['C006', 'C007'], 
+                circuitDetails: [ { id: 'C006', enabled: true }, { id: 'C007', enabled: true } ],
+                keepAliveCircuits: ['C006'],
+                schedule: { type: 'daily', startTime: '22:00', endTime: '06:00', duration: 8, retry: true, notify: true, detailedLog: true }, 
+                icon: '💡', version: 2, lastModified: '2026-03-04 09:15:00', createdBy: 'admin',
+                stats: { total: 2, success: 2, fail: 0, lastExecute: '2026-03-03 22:00:00', nextExecute: '2026-03-04 22:00' }
+            },
+            { 
+                id: 'T004', name: '清洁模式', location: 'A1', locationName: 'A座办公楼 - 1层', 
+                type: 'manual', typeName: '手动任务', status: 'disabled',
+                remark: '全区域高亮照明', circuits: ['C001', 'C002', 'C003', 'C004'], 
+                circuitDetails: [ { id: 'C001', enabled: true }, { id: 'C002', enabled: true }, { id: 'C003', enabled: true }, { id: 'C004', enabled: true } ],
+                keepAliveCircuits: [],
+                schedule: null, icon: '🧹', version: 1, lastModified: '2026-03-02 11:30:00', createdBy: 'admin',
+                stats: { total: 0, success: 0, fail: 0, lastExecute: null }
+            },
+            { 
+                id: 'T005', name: '应急模式', location: 'B1', locationName: 'B座生产车间 - 一层车间', 
+                type: 'auto', typeName: '自动任务', status: 'enabled',
+                remark: '紧急情况应急照明', circuits: ['C009', 'C010'], 
+                circuitDetails: [ { id: 'C009', enabled: true }, { id: 'C010', enabled: true } ],
+                keepAliveCircuits: ['C010'],
+                schedule: { type: 'daily', startTime: '00:00', endTime: '23:59', duration: 24, retry: false, notify: true, detailedLog: true }, 
+                icon: '🚨', version: 1, lastModified: '2026-03-01 10:00:00', createdBy: 'admin',
+                stats: { total: 2, success: 2, fail: 0, lastExecute: '2026-03-04 00:00:00', nextExecute: '2026-03-05 00:00' }
+            },
+            { 
+                id: 'T006', name: '周末模式', location: 'A', locationName: 'A座办公楼', 
+                type: 'auto', typeName: '自动任务', status: 'enabled',
+                remark: '周末低功耗照明', circuits: ['C001', 'C006'], 
+                circuitDetails: [ { id: 'C001', enabled: true }, { id: 'C006', enabled: true } ],
+                keepAliveCircuits: ['C001', 'C006'],
+                schedule: { type: 'weekend', startTime: '08:00', endTime: '20:00', duration: 12, retry: true, notify: false, detailedLog: true }, 
+                icon: '🌴', version: 1, lastModified: '2026-03-03 16:45:00', createdBy: 'admin',
+                stats: { total: 2, success: 1, fail: 1, lastExecute: '2026-03-02 08:00:00', nextExecute: '2026-03-08 08:00' }
+            },
+            { 
+                id: 'T007', name: '加班模式', location: 'A2', locationName: 'A座办公楼 - 2层', 
+                type: 'auto', typeName: '自动任务', status: 'enabled',
+                remark: '加班时段照明', circuits: ['C006', 'C007', 'C008'], 
+                circuitDetails: [ { id: 'C006', enabled: true }, { id: 'C007', enabled: true }, { id: 'C008', enabled: false } ],
+                keepAliveCircuits: ['C006'],
+                schedule: { type: 'weekly', weekdays: [1,2,3,4,5], startTime: '19:00', endTime: '22:00', duration: 3, retry: true, notify: false, detailedLog: true }, 
+                icon: '🌙', version: 1, lastModified: '2026-03-04 10:30:00', createdBy: 'admin',
+                stats: { total: 2, success: 1, fail: 1, lastExecute: '2026-03-03 19:00:00', nextExecute: '2026-03-04 19:00' }
+            }
+        ];
+
+        // ==================== 正在执行的任务状态列表 ====================
+        let executingTasks = [
+            { id: 'T002', name: '会议模式', type: 'manual', location: 'A座办公楼 - 1层', progress: 65, startTime: '14:30', endTime: '15:30', status: 'executing', icon: '📋' },
+            { id: 'T001', name: '办公模式', type: 'auto', location: 'A座办公楼 - 1层', progress: 30, startTime: '09:00', endTime: '18:00', status: 'executing', icon: '💼' },
+            { id: 'T007', name: '加班模式', type: 'auto', location: 'A座办公楼 - 2层', progress: 0, scheduledTime: '19:00', status: 'scheduled', icon: '🌙' },
+            { id: 'T003', name: '节能模式', type: 'auto', location: 'A座办公楼 - 2层', progress: 0, scheduledTime: '22:00', status: 'scheduled', icon: '💡' }
+        ];
+
+        // ==================== 初始化执行历史 ====================
+        function initExecutionHistory() {
+            executionHistory = [
+                { id: 'H001', taskId: 'T001', taskName: '办公模式', executeTime: '2026-03-04 09:00:00', status: 'success', result: '成功', circuits: 3, details: '所有回路正常执行' },
+                { id: 'H002', taskId: 'T001', taskName: '办公模式', executeTime: '2026-03-03 09:00:00', status: 'success', result: '成功', circuits: 3, details: '所有回路正常执行' },
+                { id: 'H003', taskId: 'T001', taskName: '办公模式', executeTime: '2026-03-02 09:00:00', status: 'success', result: '成功', circuits: 3, details: '所有回路正常执行' },
+                { id: 'H004', taskId: 'T001', taskName: '办公模式', executeTime: '2026-03-01 09:00:00', status: 'partial', result: '部分成功 (2/3)', circuits: 3, details: 'C003离线' },
+                { id: 'H005', taskId: 'T002', taskName: '会议模式', executeTime: '2026-03-04 14:30:00', status: 'success', result: '成功', circuits: 1, details: '执行成功' },
+                { id: 'H006', taskId: 'T003', taskName: '节能模式', executeTime: '2026-03-03 22:00:00', status: 'success', result: '成功', circuits: 2, details: 'C006,C007执行成功' },
+                { id: 'H007', taskId: 'T003', taskName: '节能模式', executeTime: '2026-03-02 22:00:00', status: 'success', result: '成功', circuits: 2, details: 'C006,C007执行成功' },
+                { id: 'H008', taskId: 'T005', taskName: '应急模式', executeTime: '2026-03-04 00:00:00', status: 'success', result: '成功', circuits: 2, details: '所有回路正常执行' },
+                { id: 'H009', taskId: 'T005', taskName: '应急模式', executeTime: '2026-03-03 00:00:00', status: 'success', result: '成功', circuits: 2, details: '所有回路正常执行' },
+                { id: 'H010', taskId: 'T006', taskName: '周末模式', executeTime: '2026-03-02 08:00:00', status: 'success', result: '成功', circuits: 2, details: '所有回路正常执行' },
+                { id: 'H011', taskId: 'T006', taskName: '周末模式', executeTime: '2026-03-01 08:00:00', status: 'failed', result: '失败', circuits: 2, details: 'C001离线，C006离线' },
+                { id: 'H012', taskId: 'T007', taskName: '加班模式', executeTime: '2026-03-03 19:00:00', status: 'partial', result: '部分成功 (2/3)', circuits: 3, details: 'C006,C007成功，C008离线' },
+                { id: 'H013', taskId: 'T007', taskName: '加班模式', executeTime: '2026-03-02 19:00:00', status: 'success', result: '成功', circuits: 3, details: '所有回路正常执行' }
+            ];
+        }
+
+        // ==================== 初始化任务列表 ====================
+        function initTaskList() {
+            taskList = taskListData.map(task => {
+                const taskHistories = executionHistory.filter(h => h.taskId === task.id);
+                const total = taskHistories.length;
+                const success = taskHistories.filter(h => h.status === 'success').length;
+                const partial = taskHistories.filter(h => h.status === 'partial').length;
+                const fail = taskHistories.filter(h => h.status === 'failed').length;
+                const totalFail = partial + fail;
+                const lastExecute = taskHistories.length > 0 
+                    ? taskHistories.sort((a,b) => new Date(b.executeTime) - new Date(a.executeTime))[0].executeTime 
+                    : null;
+                return {
+                    ...task,
+                    stats: {
+                        total: total,
+                        success: success,
+                        fail: totalFail,
+                        lastExecute: lastExecute,
+                        nextExecute: task.stats.nextExecute || null
+                    }
+                };
+            });
+        }
+
+        // ==================== 工具函数 ====================
+        function updateDateTime() {
+            const now = new Date();
+            const formatted = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2,'0') + "-" + String(now.getDate()).padStart(2,'0') + " " + String(now.getHours()).padStart(2,'0') + ":" + String(now.getMinutes()).padStart(2,'0') + ":" + String(now.getSeconds()).padStart(2,'0');
+            document.getElementById('currentDateTime').textContent = formatted;
+        }
+
+        function initNavigation() {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                    this.classList.add('active');
+                    const page = this.dataset.page;
+                    if (page === 'history') showExecutionHistory();
+                    else if (page === 'device') showToast('设备管理开发中', 'info');
+                });
+            });
+        }
+
+        function toggleTreeNode(event, element) {
+            event.stopPropagation();
+            const children = element.parentElement.nextElementSibling;
+            if (children && children.classList.contains('partition-tree-children')) {
+                const isExpanded = children.style.display !== 'none';
+                children.style.display = isExpanded ? 'none' : 'block';
+                element.textContent = isExpanded ? '▶' : '▼';
+            }
+        }
+
+        function selectSpace(element, spaceId) {
+            document.querySelectorAll('.partition-tree-item').forEach(i => i.classList.remove('active'));
+            element.classList.add('active');
+            currentSpaceFilter = spaceId;
+            filterTasks();
+        }
+
+        function filterTasks() {
+            currentTypeFilter = document.getElementById('typeFilter').value;
+            currentStatusFilter = document.getElementById('statusFilter').value;
+            currentSearchText = document.getElementById('searchInput').value;
+            currentPage = 1;
+            renderTaskGrid();
+        }
+
+        function resetFilters() {
+            document.getElementById('typeFilter').value = 'all';
+            document.getElementById('statusFilter').value = 'all';
+            document.getElementById('searchInput').value = '';
+            currentTypeFilter = 'all';
+            currentStatusFilter = 'all';
+            currentSearchText = '';
+            currentPage = 1;
+            renderTaskGrid();
+        }
+
+        function changePage(direction) {
+            const totalPages = Math.ceil(taskList.filter(t => {
+                if (currentSpaceFilter !== 'root' && !t.location.startsWith(currentSpaceFilter)) return false;
+                if (currentTypeFilter !== 'all' && t.type !== currentTypeFilter) return false;
+                if (currentStatusFilter !== 'all' && t.status !== currentStatusFilter) return false;
+                if (currentSearchText && !t.name.toLowerCase().includes(currentSearchText.toLowerCase())) return false;
+                return true;
+            }).length / pageSize);
+            if (direction === 'prev' && currentPage > 1) currentPage--;
+            else if (direction === 'next' && currentPage < totalPages) currentPage++;
+            renderTaskGrid();
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<span>${type==='success'?'✅':type==='warning'?'⚠️':type==='error'?'❌':'ℹ️'}</span><span>${message}</span>`;
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.style.animation = 'slideIn 0.3s reverse'; setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        // ==================== 渲染执行状态面板 ====================
+        function renderExecutionStatus() {
+            const grid = document.getElementById('executionGrid');
+            if (!grid) return;
+            const countSpan = document.getElementById('executingCount');
+            countSpan.textContent = executingTasks.length;
+
+            grid.innerHTML = '';
+            if (executingTasks.length === 0) {
+                grid.innerHTML = '<div style="padding: 20px; color: var(--text-secondary);">暂无正在执行或计划的任务</div>';
+                return;
+            }
+
+            executingTasks.forEach(task => {
+                const item = document.createElement('div');
+                item.className = `execution-item ${task.status}`;
+                let timeInfo = '';
+                if (task.status === 'executing') {
+                    timeInfo = `<span>⏱️ 开始: ${task.startTime} · 结束: ${task.endTime}</span>`;
+                } else {
+                    timeInfo = `<span>⏰ 计划: ${task.scheduledTime}</span>`;
+                }
+                
+                // 构建操作按钮
+                let actionButtons = `
+                    <button class="btn btn-sm btn-secondary" onclick="viewTaskDetail('${task.id}')">详情</button>
+                `;
+                
+                if (task.status === 'executing') {
+                    actionButtons += `
+                        <button class="btn btn-sm btn-warning" onclick="stopExecutingTask('${task.id}')">⏸️ 停止</button>
+                    `;
+                }
+                
+                item.innerHTML = `
+                    <div class="execution-header">
+                        <div class="execution-name">
+                            <span>${task.icon}</span> ${task.name}
+                            <span class="execution-badge">${task.status === 'executing' ? '执行中' : '待执行'}</span>
+                        </div>
+                        <span class="task-type-badge ${task.type === 'manual' ? 'type-manual' : 'type-auto'}">${task.type === 'manual' ? '手动' : '自动'}</span>
+                    </div>
+                    <div class="execution-info">
+                        <span>📍 ${task.location}</span>
+                        ${timeInfo}
+                    </div>
+                    ${task.status === 'executing' ? `
+                        <div class="execution-progress">
+                            <div class="progress-bar" style="width: ${task.progress}%;"></div>
+                        </div>
+                    ` : ''}
+                    <div class="execution-footer">
+                        ${actionButtons}
+                    </div>
+                `;
+                grid.appendChild(item);
+            });
+        }
+
+        // ==================== 停止单个执行中的任务 ====================
+        function stopExecutingTask(taskId) {
+            const executingTask = executingTasks.find(t => t.id === taskId && t.status === 'executing');
+            if (!executingTask) {
+                showToast('任务未在执行中', 'warning');
+                return;
+            }
+            
+            const task = taskList.find(t => t.id === taskId);
+            if (!task) return;
+            
+            if (!confirm(`确定要停止正在执行的任务「${task.name}」吗？`)) return;
+            
+            const index = executingTasks.findIndex(t => t.id === taskId);
+            if (index !== -1) {
+                executingTasks.splice(index, 1);
+            }
+            
+            if (task.type === 'manual') {
+                task.status = 'disabled';
+            } else if (task.type === 'auto') {
+                task.status = 'disabled';
+                addOperationLog('stop', task.name, '手动停止自动任务执行');
+            }
+            
+            executionHistory.push({
+                id: 'H' + Date.now(),
+                taskId: task.id,
+                taskName: task.name,
+                executeTime: new Date().toLocaleString(),
+                status: 'stopped',
+                result: '手动停止',
+                circuits: task.circuits?.length || 0,
+                details: '任务被手动停止'
+            });
+            
+            renderExecutionStatus();
+            renderTaskGrid();
+            showToast(`任务「${task.name}」已停止`, 'success');
+        }
+
+        // ==================== 停止所有执行中的任务 ====================
+        function stopAllExecutingTasks() {
+            const executingCount = executingTasks.filter(t => t.status === 'executing').length;
+            if (executingCount === 0) {
+                showToast('没有正在执行的任务', 'info');
+                return;
+            }
+            
+            if (!confirm(`确定要停止全部 ${executingCount} 个正在执行的任务吗？`)) return;
+            
+            executingTasks
+                .filter(t => t.status === 'executing')
+                .forEach(task => {
+                    const originalTask = taskList.find(t => t.id === task.id);
+                    if (originalTask) {
+                        originalTask.status = 'disabled';
+                    }
+                    
+                    executionHistory.push({
+                        id: 'H' + Date.now() + Math.random(),
+                        taskId: task.id,
+                        taskName: task.name,
+                        executeTime: new Date().toLocaleString(),
+                        status: 'stopped',
+                        result: '批量停止',
+                        circuits: originalTask?.circuits?.length || 0,
+                        details: '批量停止任务'
+                    });
+                });
+            
+            executingTasks = executingTasks.filter(t => t.status !== 'executing');
+            
+            renderExecutionStatus();
+            renderTaskGrid();
+            showToast(`已停止 ${executingCount} 个任务`, 'success');
+        }
+
+        // ==================== 核心渲染函数 ====================
+        function renderTaskGrid() {
+            const grid = document.getElementById('taskGrid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            let filteredTasks = taskList.filter(task => {
+                if (currentSpaceFilter !== 'root' && !task.location.startsWith(currentSpaceFilter)) return false;
+                if (currentTypeFilter !== 'all' && task.type !== currentTypeFilter) return false;
+                if (currentStatusFilter !== 'all' && task.status !== currentStatusFilter) return false;
+                if (currentSearchText && !task.name.toLowerCase().includes(currentSearchText.toLowerCase())) return false;
+                return true;
+            });
+
+            const total = filteredTasks.length;
+            const start = (currentPage - 1) * pageSize;
+            const end = Math.min(start + pageSize, total);
+            const pageTasks = filteredTasks.slice(start, end);
+
+            document.getElementById('totalTasks').textContent = total;
+            document.getElementById('currentPage').textContent = currentPage;
+            document.getElementById('totalPages').textContent = Math.ceil(total / pageSize) || 1;
+            document.getElementById('prevPageBtn').disabled = currentPage === 1;
+            document.getElementById('nextPageBtn').disabled = currentPage >= Math.ceil(total / pageSize);
+
+            if (pageTasks.length === 0) {
+                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">暂无符合条件的任务</div>';
+                return;
+            }
+
+            pageTasks.forEach(task => {
+                const offlineCount = task.circuits.map(id => circuitList.find(c => c.id === id)?.status).filter(s => s === 'offline').length;
+                const taskTitle = `${task.locationName} · ${task.name}`;
+                
+                let scheduleText = '';
+                if (task.type === 'auto' && task.schedule) {
+                    const weekdays = ['周一','周二','周三','周四','周五','周六','周日'];
+                    let periodText = '';
+                    if (task.schedule.type === 'daily') periodText = '每天';
+                    else if (task.schedule.type === 'workday') periodText = '工作日';
+                    else if (task.schedule.type === 'weekend') periodText = '周末';
+                    else if (task.schedule.type === 'weekly' && task.schedule.weekdays) {
+                        const days = task.schedule.weekdays.map(d => weekdays[d-1]).join('、');
+                        periodText = days;
+                    }
+                    scheduleText = `${periodText} ${task.schedule.startTime}-${task.schedule.endTime}`;
+                }
+
+                // 构建保持回路显示
+                const keepAliveText = task.keepAliveCircuits && task.keepAliveCircuits.length > 0 
+                    ? `🔌 结束后保持: ${task.keepAliveCircuits.length}个回路` 
+                    : '';
+
+                const successRate = task.stats.total > 0 ? Math.round(task.stats.success / task.stats.total * 100) : 100;
+
+                const card = document.createElement('div');
+                card.className = `task-card ${task.type === 'manual' ? 'manual-highlight' : 'auto-highlight'}`;
+                card.dataset.id = task.id;
+                card.dataset.location = task.location;
+                card.dataset.type = task.type;
+                card.dataset.status = task.status;
+
+                let statusChip = '';
+                if (task.type === 'manual') {
+                    statusChip = `<span class="task-status-chip ${task.status === 'enabled' ? 'executing' : 'stopped'}">${task.status === 'enabled' ? '▶️ 执行中' : '⏸️ 停止'}</span>`;
+                } else {
+                    statusChip = `<span class="task-status-chip ${task.status === 'enabled' ? 'enabled' : 'disabled'}">${task.status === 'enabled' ? '✅ 已启用' : '⛔ 已停用'}</span>`;
+                }
+
+                let actionButtons = `
+                    <button class="btn btn-sm btn-secondary" onclick="editTask('${task.id}')">✏️ 编辑</button>
+                    <button class="btn btn-sm btn-info" onclick="viewTaskDetail('${task.id}')">📋 详情</button>
+                `;
+                
+                if (task.type === 'manual') {
+                    actionButtons += `
+                        <button class="btn btn-sm btn-${task.status === 'enabled' ? 'warning' : 'success'}" onclick="toggleManualTaskStatus('${task.id}')">
+                            ${task.status === 'enabled' ? '⏸️ 停止' : '▶️ 执行'}
+                        </button>
+                    `;
+                } else {
+                    actionButtons += `
+                        <button class="btn btn-sm btn-${task.status === 'enabled' ? 'warning' : 'success'}" onclick="toggleTaskStatus('${task.id}')">
+                            ${task.status === 'enabled' ? '⏸️ 停用' : '▶️ 启用'}
+                        </button>
+                    `;
+                }
+                
+                actionButtons += `<button class="btn btn-sm btn-danger" onclick="deleteTask('${task.id}')">🗑️ 删除</button>`;
+
+                card.innerHTML = `
+                    <div class="task-icon">${task.icon}</div>
+                    <div class="task-header">
+                        <div class="task-title" title="${taskTitle}">${taskTitle}</div>
+                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                            ${statusChip}
+                            <span class="task-type-badge ${task.type === 'manual' ? 'type-manual' : 'type-auto'}">${task.type === 'manual' ? '🔘 手动' : '🤖 自动'}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="task-stats">
+                        <div class="stat-item"><div class="stat-label">总执行</div><div class="stat-value">${task.stats.total}</div></div>
+                        <div class="stat-item"><div class="stat-label">成功</div><div class="stat-value success">${task.stats.success}</div></div>
+                        <div class="stat-item"><div class="stat-label">失败</div><div class="stat-value failed">${task.stats.fail}</div></div>
+                        <div class="stat-item"><div class="stat-label">成功率</div><div class="stat-value">${successRate}%</div></div>
+                    </div>
+                    <div class="stat-note">* 从创建至今的累计执行次数</div>
+                    
+                    <div class="task-meta">
+                        <span class="task-tag">🕒 最后: ${task.stats.lastExecute || '未执行'}</span>
+                        ${task.type === 'auto' && task.stats.nextExecute ? `<span class="task-tag">⏰ 下次: ${task.stats.nextExecute}</span>` : ''}
+                        ${scheduleText ? `<span class="task-tag">📅 ${scheduleText}</span>` : ''}
+                        ${offlineCount > 0 ? `<span class="task-tag" style="background:#fee2e2;color:#991b1b;">⚠️ ${offlineCount}个回路离线</span>` : ''}
+                        ${keepAliveText ? `<span class="task-tag" style="background:var(--keep-alive-bg);">${keepAliveText}</span>` : ''}
+                    </div>
+                    
+                    <div class="task-device-count">关联回路：${task.circuits.length}个 (启用：${task.circuitDetails.filter(c => c.enabled).length})</div>
+                    
+                    <div class="task-actions">
+                        ${actionButtons}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // ==================== 新增：渲染结束后保持回路选项 ====================
+        function renderKeepAliveOptions() {
+            const container = document.getElementById('keepAliveGrid');
+            if (!container) return;
+            
+            if (selectedCircuits.length === 0) {
+                container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">请先在第二步选择回路</div>';
+                return;
+            }
+            
+            let html = '';
+            selectedCircuits.forEach(circuit => {
+                const isChecked = keepAliveCircuits.includes(circuit.id);
+                html += `
+                    <div class="keep-alive-item">
+                        <div class="keep-alive-info">
+                            <input type="checkbox" class="keep-alive-checkbox" 
+                                   value="${circuit.id}" 
+                                   ${isChecked ? 'checked' : ''}
+                                   onchange="toggleKeepAliveCircuit('${circuit.id}', this.checked)">
+                            <span class="keep-alive-name">${circuit.name}</span>
+                            <span class="keep-alive-code">${circuit.code}</span>
+                        </div>
+                        <span class="keep-alive-type type-${circuit.type}">${circuit.typeName}</span>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // ==================== 切换回路保持状态 ====================
+        function toggleKeepAliveCircuit(circuitId, checked) {
+            if (checked) {
+                if (!keepAliveCircuits.includes(circuitId)) {
+                    keepAliveCircuits.push(circuitId);
+                }
+            } else {
+                keepAliveCircuits = keepAliveCircuits.filter(id => id !== circuitId);
+            }
+            showToast(checked ? '回路将在任务结束后保持开启' : '回路将在任务结束后关闭', 'info');
+        }
+
+        // ==================== 扩展原有的任务操作函数 ====================
+        function toggleManualTaskStatus(id) {
+            const task = taskList.find(t => t.id === id);
+            if (task && task.type === 'manual') {
+                task.status = task.status === 'enabled' ? 'disabled' : 'enabled';
+                if (task.status === 'enabled') {
+                    if (!executingTasks.some(t => t.id === id)) {
+                        executingTasks.push({
+                            id: task.id,
+                            name: task.name,
+                            type: 'manual',
+                            location: task.locationName || task.location,
+                            progress: 0,
+                            startTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            endTime: '--',
+                            status: 'executing',
+                            icon: task.icon || '🔘'
+                        });
+                    }
+                } else {
+                    executingTasks = executingTasks.filter(t => !(t.id === id && t.type === 'manual'));
+                }
+                renderExecutionStatus();
+                renderTaskGrid();
+                showToast(`手动任务已${task.status === 'enabled' ? '执行' : '停止'}`);
+            }
+        }
+
+        function toggleTaskStatus(id) {
+            const task = taskList.find(t => t.id === id);
+            if (task && task.type === 'auto') {
+                task.status = task.status === 'enabled' ? 'disabled' : 'enabled';
+                if (task.status === 'disabled') {
+                    executingTasks = executingTasks.filter(t => t.id !== id);
+                } else {
+                    if (!executingTasks.some(t => t.id === id)) {
+                        executingTasks.push({
+                            id: task.id,
+                            name: task.name,
+                            type: 'auto',
+                            location: task.locationName || task.location,
+                            progress: 0,
+                            scheduledTime: task.schedule?.startTime || '--',
+                            status: 'scheduled',
+                            icon: task.icon || '🤖'
+                        });
+                    }
+                }
+                renderExecutionStatus();
+                renderTaskGrid();
+                showToast(`自动任务已${task.status === 'enabled' ? '启用' : '停用'}`);
+            }
+        }
+
+        function deleteTask(taskId) {
+            const task = taskList.find(t => t.id === taskId);
+            if (!task) return;
+            
+            if (confirm(`确定要删除任务「${task.name}」吗？`)) {
+                const index = taskList.findIndex(t => t.id === taskId);
+                if (index !== -1) {
+                    taskList.splice(index, 1);
+                    executingTasks = executingTasks.filter(t => t.id !== taskId);
+                    addOperationLog('delete', task.name, '删除任务');
+                    showToast('✅ 任务已删除');
+                    renderTaskGrid();
+                    renderExecutionStatus();
+                }
+            }
+        }
+
+        // ==================== 保存任务（包含结束后保持回路） ====================
+        function saveTask() {
+            if (!validateCurrentStep()) return;
+            
+            const startTime = document.getElementById('executeTime').value;
+            const endTime = document.getElementById('endTime').value;
+            
+            const start = new Date(`2000-01-01T${startTime}:00`);
+            const end = new Date(`2000-01-01T${endTime}:00`);
+            let diffMs = end - start;
+            if (diffMs < 0) {
+                diffMs += 24 * 60 * 60 * 1000;
+            }
+            const duration = Math.round(diffMs / (1000 * 60 * 60) * 10) / 10;
+            
+            const taskData = {
+                id: editingTaskId || 'T' + String(taskList.length + 1).padStart(3, '0'),
+                name: document.getElementById('taskName').value.trim(),
+                location: document.getElementById('taskLocation').value,
+                type: taskType,
+                status: document.querySelector('input[name="taskStatus"]:checked').value,
+                remark: document.getElementById('taskRemark').value,
+                circuits: selectedCircuits.map(c => c.id),
+                circuitDetails: selectedCircuits.map(c => ({
+                    id: c.id,
+                    enabled: c.enabled !== false
+                })),
+                keepAliveCircuits: keepAliveCircuits, // 保存结束后保持的回路
+                icon: getRandomIcon(),
+                version: 1,
+                lastModified: new Date().toLocaleString(),
+                createdBy: 'admin',
+                stats: {
+                    total: 0,
+                    success: 0,
+                    fail: 0,
+                    lastExecute: null
+                }
+            };
+            
+            if (taskType === 'auto') {
+                taskData.schedule = {
+                    type: scheduleType,
+                    startTime: startTime,
+                    endTime: endTime,
+                    duration: duration
+                };
+                
+                if (scheduleType === 'weekly') {
+                    taskData.schedule.weekdays = selectedWeekdays.length > 0 ? selectedWeekdays : [1,2,3,4,5];
+                }
+                
+                const startDate = document.getElementById('scheduleStartDate').value;
+                const endDate = document.getElementById('scheduleEndDate').value;
+                if (startDate) taskData.schedule.startDate = startDate;
+                if (endDate) taskData.schedule.endDate = endDate;
+                
+                taskData.schedule.retry = document.getElementById('enableRetry').checked;
+                taskData.schedule.notify = document.getElementById('enableNotification').checked;
+                taskData.schedule.detailedLog = document.getElementById('enableLog').checked;
+            }
+            
+            const locationMap = {
+                'A1': 'A座办公楼 - 1层',
+                'A2': 'A座办公楼 - 2层',
+                'A3': 'A座办公楼 - 3层',
+                'B1': 'B座生产车间 - 一层车间',
+                'B2': 'B座生产车间 - 二层办公区',
+                'C': 'C座食堂'
+            };
+            taskData.locationName = locationMap[taskData.location] || '未知位置';
+            
+            taskData.typeName = taskType === 'manual' ? '手动任务' : '自动任务';
+            
+            if (editingTaskId) {
+                const index = taskList.findIndex(t => t.id === editingTaskId);
+                if (index !== -1) {
+                    taskData.stats = taskList[index].stats;
+                    taskData.version = (taskList[index].version || 0) + 1;
+                    taskList[index] = { ...taskList[index], ...taskData };
+                }
+                showToast('✅ 任务更新成功！');
+                addOperationLog('update', taskData.name, '更新任务配置');
+            } else {
+                taskList.push(taskData);
+                showToast('✅ 任务创建成功！');
+                addOperationLog('create', taskData.name, '新建任务');
+            }
+            
+            if (taskData.status === 'enabled') {
+                if (taskData.type === 'manual') {
+                    if (!executingTasks.some(t => t.id === taskData.id)) {
+                        executingTasks.push({
+                            id: taskData.id,
+                            name: taskData.name,
+                            type: 'manual',
+                            location: taskData.locationName,
+                            progress: 0,
+                            startTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            endTime: '--',
+                            status: 'executing',
+                            icon: taskData.icon
+                        });
+                    }
+                } else if (taskData.type === 'auto' && taskData.schedule) {
+                    if (!executingTasks.some(t => t.id === taskData.id)) {
+                        executingTasks.push({
+                            id: taskData.id,
+                            name: taskData.name,
+                            type: 'auto',
+                            location: taskData.locationName,
+                            progress: 0,
+                            scheduledTime: taskData.schedule.startTime,
+                            status: 'scheduled',
+                            icon: taskData.icon
+                        });
+                    }
+                }
+            }
+            
+            renderTaskGrid();
+            renderExecutionStatus();
+            closeTaskModal();
+        }
+
+        function getRandomIcon() {
+            const icons = ['💼', '📋', '💡', '🧹', '🚨', '🌴', '🏢', '🛋️', '🍽️', '🎯', '⭐', '🔆', '🌙', '☀️', '🌈'];
+            return icons[Math.floor(Math.random() * icons.length)];
+        }
+
+        function addOperationLog(action, target, details) {
+            const log = {
+                id: 'LOG' + Date.now(),
+                time: new Date().toLocaleString(),
+                user: 'admin',
+                action: action,
+                target: target,
+                details: details
+            };
+            operationLogs.push(log);
+        }
+
+        function showExecutionHistory() {
+            const modalBody = document.getElementById('historyTableBody');
+            if (!modalBody) return;
+            
+            modalBody.innerHTML = '';
+            executionHistory.forEach(h => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${h.executeTime}</td>
+                    <td>${h.taskName}</td>
+                    <td><span class="${h.status === 'success' ? 'status-online' : h.status === 'partial' ? 'status-maintain' : 'status-offline'}">${h.result}</span></td>
+                    <td>${h.circuits}个</td>
+                    <td>${h.details || '-'}</td>
+                `;
+                modalBody.appendChild(tr);
+            });
+            
+            document.getElementById('historyModal').classList.add('active');
+        }
+
+        function closeHistoryModal() {
+            document.getElementById('historyModal').classList.remove('active');
+        }
+
+        // 以下为模态框相关函数
+        function openAddTaskModal() {
+            editingTaskId = null;
+            document.getElementById('taskModalTitle').textContent = '➕ 新建任务';
+            resetTaskForm();
+            document.getElementById('taskModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            document.getElementById('versionInfo').style.display = 'none';
+        }
+
+        function editTask(taskId) {
+            editingTaskId = taskId;
+            document.getElementById('taskModalTitle').textContent = '✏️ 编辑任务';
+            
+            const task = taskList.find(t => t.id === taskId);
+            if (task) {
+                document.getElementById('taskName').value = task.name;
+                document.getElementById('taskLocation').value = task.location;
+                currentLocation = task.location;
+                
+                taskType = task.type;
+                updateTaskTypeUI();
+                
+                const typeRadios = document.getElementsByName('taskType');
+                for (let radio of typeRadios) {
+                    if (radio.value === task.type) {
+                        radio.checked = true;
+                        break;
+                    }
+                }
+                
+                const statusRadios = document.getElementsByName('taskStatus');
+                for (let radio of statusRadios) {
+                    if (radio.value === task.status) {
+                        radio.checked = true;
+                        break;
+                    }
+                }
+                
+                document.getElementById('taskRemark').value = task.remark || '';
+                
+                selectedCircuits = task.circuits.map(id => {
+                    const circuit = circuitList.find(c => c.id === id);
+                    const detail = task.circuitDetails.find(d => d.id === id);
+                    return circuit ? { 
+                        ...circuit, 
+                        enabled: detail ? detail.enabled : true 
+                    } : null;
+                }).filter(c => c !== null);
+                
+                // 加载结束后保持的回路
+                keepAliveCircuits = task.keepAliveCircuits ? [...task.keepAliveCircuits] : [];
+                
+                if (task.type === 'auto' && task.schedule) {
+                    scheduleType = task.schedule.type || 'daily';
+                    if (task.schedule.startTime) {
+                        document.getElementById('executeTime').value = task.schedule.startTime;
+                    }
+                    if (task.schedule.endTime) {
+                        document.getElementById('endTime').value = task.schedule.endTime;
+                    }
+                    
+                    if (scheduleType === 'weekly' && task.schedule.weekdays) {
+                        selectedWeekdays = task.schedule.weekdays;
+                    }
+                    
+                    if (task.schedule.startDate) {
+                        document.getElementById('scheduleStartDate').value = task.schedule.startDate;
+                    }
+                    if (task.schedule.endDate) {
+                        document.getElementById('scheduleEndDate').value = task.schedule.endDate;
+                    }
+                    
+                    document.getElementById('enableRetry').checked = task.schedule.retry || false;
+                    document.getElementById('enableNotification').checked = task.schedule.notify || false;
+                    document.getElementById('enableLog').checked = task.schedule.detailedLog !== false;
+                    
+                    calculateDuration();
+                    checkScheduleConflict();
+                }
+                
+                document.getElementById('versionInfo').style.display = 'block';
+                document.getElementById('lastModified').textContent = task.lastModified;
+                document.getElementById('version').textContent = 'v' + task.version;
+                
+                updateScheduleUI();
+            }
+            
+            currentStep = 1;
+            updateStepWizard();
+            renderExecutionCircuits();
+            renderKeepAliveOptions(); // 渲染保持回路选项
+            updateCircuitCounts();
+            
+            document.getElementById('taskModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        // ==================== 增强的任务详情函数（显示回路保持状态） ====================
+        function viewTaskDetail(taskId) {
+            const task = taskList.find(t => t.id === taskId);
+            if (!task) return;
+            
+            const taskHistories = executionHistory.filter(h => h.taskId === taskId).slice(0, 10);
+            
+            let typeText = '';
+            if (task.type === 'auto') {
+                if (task.schedule.type === 'daily') typeText = '每天';
+                else if (task.schedule.type === 'workday') typeText = '工作日';
+                else if (task.schedule.type === 'weekend') typeText = '周末';
+                else if (task.schedule.type === 'weekly') {
+                    const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+                    const days = task.schedule.weekdays ? task.schedule.weekdays.map(d => weekdays[d-1]).join('、') : '';
+                    typeText = `每周 (${days})`;
+                }
+            }
+            
+            const successRate = task.stats.total > 0 
+                ? Math.round(task.stats.success / task.stats.total * 100) 
+                : 100;
+            
+            // 生成回路详情HTML
+            const circuitDetailsHtml = task.circuits.map(circuitId => {
+                const circuit = circuitList.find(c => c.id === circuitId);
+                const detail = task.circuitDetails.find(d => d.id === circuitId);
+                const isKeepAlive = task.keepAliveCircuits?.includes(circuitId);
+                if (!circuit) return '';
+                return `
+                    <div style="display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid var(--border);">
+                        <span>
+                            <span style="font-weight: 500;">${circuit.name}</span>
+                            <span style="color: var(--text-secondary); font-size: 11px; margin-left: 8px;">${circuit.code}</span>
+                        </span>
+                        <div style="display: flex; gap: 8px;">
+                            ${isKeepAlive ? '<span class="status-badge status-maintain" style="font-size: 11px;">🔌 结束后保持</span>' : ''}
+                            <span class="status-badge ${detail?.enabled ? 'status-online' : 'status-offline'}" style="font-size: 11px;">
+                                ${detail?.enabled ? '✅ 启用' : '⛔ 停用'}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            let historyHtml = '';
+            taskHistories.forEach(h => {
+                historyHtml += `
+                    <tr>
+                        <td>${h.executeTime}</td>
+                        <td><span class="${h.status === 'success' ? 'status-online' : h.status === 'partial' ? 'status-maintain' : 'status-offline'}">${h.result}</span></td>
+                        <td>${h.circuits}个</td>
+                        <td>${h.details || '-'}</td>
+                    </tr>
+                `;
+            });
+            
+            const modalBody = document.getElementById('taskDetailModalBody');
+            modalBody.innerHTML = `
+                <div class="task-detail-card">
+                    <h4 style="margin-bottom: 15px;">📋 任务基本信息</h4>
+                    <div class="task-detail-row">
+                        <div class="task-detail-label">任务ID：</div>
+                        <div class="task-detail-value">${task.id}</div>
+                    </div>
+                    <div class="task-detail-row">
+                        <div class="task-detail-label">任务名称：</div>
+                        <div class="task-detail-value">${task.name}</div>
+                    </div>
+                    <div class="task-detail-row">
+                        <div class="task-detail-label">区域位置：</div>
+                        <div class="task-detail-value">${task.locationName}</div>
+                    </div>
+                    <div class="task-detail-row">
+                        <div class="task-detail-label">任务类型：</div>
+                        <div class="task-detail-value"><span class="task-type-badge ${task.type === 'manual' ? 'type-manual' : 'type-auto'}">${task.type === 'manual' ? '手动任务' : '自动任务'}</span></div>
+                    </div>
+                    ${task.type === 'auto' ? `
+                    <div class="task-detail-row">
+                        <div class="task-detail-label">执行周期：</div>
+                        <div class="task-detail-value">${typeText}</div>
+                    </div>
+                    <div class="task-detail-row">
+                        <div class="task-detail-label">执行时间：</div>
+                        <div class="task-detail-value">${task.schedule.startTime} - ${task.schedule.endTime} (时长: ${task.schedule.duration}小时)</div>
+                    </div>
+                    ` : ''}
+                    <div class="task-detail-row">
+                        <div class="task-detail-label">当前状态：</div>
+                        <div class="task-detail-value"><span class="status-badge ${task.status === 'enabled' ? 'status-online' : 'status-offline'}">${task.status === 'enabled' ? '已启用' : '已停用'}</span></div>
+                    </div>
+                    <div class="task-detail-row">
+                        <div class="task-detail-label">备注：</div>
+                        <div class="task-detail-value">${task.remark || '无'}</div>
+                    </div>
+                </div>
+
+                <div class="task-detail-card">
+                    <h4 style="margin-bottom: 15px;">📊 执行统计</h4>
+                    <div class="task-detail-row">
+                        <div class="task-detail-label">总执行次数：</div>
+                        <div class="task-detail-value">${task.stats.total}</div>
+                    </div>
+                    <div class="task-detail-row">
+                        <div class="task-detail-label">成功次数：</div>
+                        <div class="task-detail-value success">${task.stats.success}</div>
+                    </div>
+                    <div class="task-detail-row">
+                        <div class="task-detail-label">失败次数：</div>
+                        <div class="task-detail-value failed">${task.stats.fail}</div>
+                    </div>
+                    <div class="task-detail-row">
+                        <div class="task-detail-label">成功率：</div>
+                        <div class="task-detail-value">${successRate}%</div>
+                    </div>
+                    <div class="task-detail-row">
+                        <div class="task-detail-label">最后执行：</div>
+                        <div class="task-detail-value">${task.stats.lastExecute || '从未执行'}</div>
+                    </div>
+                    ${task.type === 'auto' && task.stats.nextExecute ? `
+                    <div class="task-detail-row">
+                        <div class="task-detail-label">下次执行：</div>
+                        <div class="task-detail-value">${task.stats.nextExecute}</div>
+                    </div>
+                    ` : ''}
+                </div>
+
+                <div class="task-detail-card">
+                    <h4 style="margin-bottom: 15px;">🔌 回路配置 (启用/停用状态 及 结束后保持)</h4>
+                    ${circuitDetailsHtml || '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">暂无回路配置</div>'}
+                </div>
+
+                <div class="task-detail-card">
+                    <h4 style="margin-bottom: 15px;">🔄 最近执行记录</h4>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>执行时间</th>
+                                    <th>执行结果</th>
+                                    <th>执行回路</th>
+                                    <th>详情</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${historyHtml || '<tr><td colspan="4" style="text-align: center; padding: 20px;">暂无执行记录</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('taskDetailModal').classList.add('active');
+        }
+
+        function closeTaskDetailModal() {
+            document.getElementById('taskDetailModal').classList.remove('active');
+        }
+
+        function resetTaskForm() {
+            document.getElementById('taskName').value = '';
+            document.getElementById('taskLocation').value = '';
+            currentLocation = '';
+            
+            taskType = 'manual';
+            updateTaskTypeUI();
+            
+            const typeRadios = document.getElementsByName('taskType');
+            typeRadios[0].checked = true;
+            
+            const statusRadios = document.getElementsByName('taskStatus');
+            statusRadios[0].checked = true;
+            
+            document.getElementById('taskRemark').value = '';
+            document.getElementById('executeTime').value = '08:00';
+            document.getElementById('endTime').value = '18:00';
+            document.getElementById('scheduleStartDate').value = '';
+            document.getElementById('scheduleEndDate').value = '';
+            document.getElementById('enableRetry').checked = false;
+            document.getElementById('enableNotification').checked = false;
+            document.getElementById('enableLog').checked = true;
+            
+            selectedCircuits = [];
+            keepAliveCircuits = []; // 清空保持回路
+            scheduleType = 'once';
+            selectedWeekdays = [];
+            
+            document.querySelectorAll('.form-error').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.form-control').forEach(el => el.classList.remove('error'));
+            
+            calculateDuration();
+            updateScheduleUI();
+            renderExecutionCircuits();
+            renderKeepAliveOptions(); // 渲染保持回路选项
+            updateCircuitCounts();
+            
+            currentStep = 1;
+            updateStepWizard();
+        }
+
+        function selectTaskType(type) {
+            taskType = type;
+            updateTaskTypeUI();
+            
+            if (currentStep === 3) {
+                updateStepWizard();
+            }
+        }
+
+        function updateTaskTypeUI() {
+            if (taskType === 'manual') {
+                document.getElementById('typeManualOption').style.borderColor = 'var(--primary)';
+                document.getElementById('typeAutoOption').style.borderColor = 'transparent';
+            } else {
+                document.getElementById('typeManualOption').style.borderColor = 'transparent';
+                document.getElementById('typeAutoOption').style.borderColor = 'var(--primary)';
+            }
+        }
+
+        function onLocationChange() {
+            const location = document.getElementById('taskLocation').value;
+            currentLocation = location;
+            
+            if (selectedCircuits.length > 0) {
+                if (confirm('切换区域将清空已选回路，是否继续？')) {
+                    selectedCircuits = [];
+                    keepAliveCircuits = []; // 清空保持回路
+                    renderExecutionCircuits();
+                    renderKeepAliveOptions();
+                    updateCircuitCounts();
+                } else {
+                    document.getElementById('taskLocation').value = currentLocation;
+                    return;
+                }
+            }
+            
+            updateAreaFilterOptions();
+            
+            if (document.getElementById('circuitModal').classList.contains('active')) {
+                renderCircuitTable();
+            }
+            
+            updateLocationHint();
+        }
+
+        function updateAreaFilterOptions() {
+            const areaFilter = document.getElementById('circuitAreaFilter');
+            if (!areaFilter) return;
+            
+            areaFilter.innerHTML = '<option value="all">全部区域</option>';
+            
+            if (currentLocation) {
+                const locationMap = {
+                    'A1': 'A座1层',
+                    'A2': 'A座2层',
+                    'A3': 'A座3层',
+                    'B1': 'B座1层',
+                    'B2': 'B座2层',
+                    'C': 'C座1层'
+                };
+                
+                const area = locationMap[currentLocation];
+                if (area) {
+                    const option = document.createElement('option');
+                    option.value = area;
+                    option.textContent = area;
+                    areaFilter.appendChild(option);
+                }
+            }
+        }
+
+        function updateLocationHint() {
+            const hint = document.getElementById('currentLocationHint');
+            if (hint) {
+                const locationMap = {
+                    'A1': 'A座办公楼 - 1层',
+                    'A2': 'A座办公楼 - 2层',
+                    'A3': 'A座办公楼 - 3层',
+                    'B1': 'B座生产车间 - 一层车间',
+                    'B2': 'B座生产车间 - 二层办公区',
+                    'C': 'C座食堂'
+                };
+                hint.textContent = currentLocation ? `(当前区域：${locationMap[currentLocation]})` : '';
+            }
+        }
+
+        function nextStep() {
+            if (validateCurrentStep()) {
+                if (currentStep < 3) {
+                    currentStep++;
+                    updateStepWizard();
+                    if (currentStep === 3 && taskType === 'auto') {
+                        renderKeepAliveOptions(); // 进入第三步时渲染保持回路选项
+                    }
+                }
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                currentStep--;
+                updateStepWizard();
+            }
+        }
+
+        function validateCurrentStep() {
+            if (currentStep === 1) {
+                const name = document.getElementById('taskName').value.trim();
+                const location = document.getElementById('taskLocation').value;
+                
+                if (!name) { showToast('请输入任务名称', 'warning'); return false; }
+                if (!location) { showToast('请选择空间位置', 'warning'); return false; }
+                return true;
+            }
+            if (currentStep === 2) {
+                if (selectedCircuits.length === 0) {
+                    showToast('请至少选择一个回路', 'warning');
+                    return false;
+                }
+                return true;
+            }
+            if (currentStep === 3 && taskType === 'auto') {
+                const startTime = document.getElementById('executeTime').value;
+                const endTime = document.getElementById('endTime').value;
+                
+                if (!startTime) {
+                    showToast('请填写执行开始时间', 'warning');
+                    return false;
+                }
+                if (!endTime) {
+                    showToast('请填写执行结束时间', 'warning');
+                    return false;
+                }
+                
+                if (scheduleType === 'weekly' && selectedWeekdays.length === 0) {
+                    showToast('请至少选择一天', 'warning');
+                    return false;
+                }
+                
+                return true;
+            }
+            return true;
+        }
+
+        function updateStepWizard() {
+            document.querySelectorAll('.step-item').forEach((item, index) => {
+                item.classList.remove('active', 'completed');
+                const stepNum = index + 1;
+                if (stepNum < currentStep) {
+                    item.classList.add('completed');
+                    item.querySelector('.step-circle').textContent = '✓';
+                } else if (stepNum === currentStep) {
+                    item.classList.add('active');
+                    item.querySelector('.step-circle').textContent = stepNum;
+                } else {
+                    item.querySelector('.step-circle').textContent = stepNum;
+                }
+            });
+
+            document.querySelectorAll('.step-content').forEach((content, index) => {
+                content.classList.remove('active');
+                if (index + 1 === currentStep) {
+                    content.classList.add('active');
+                }
+            });
+
+            document.getElementById('prevBtn').style.display = currentStep > 1 ? 'inline-flex' : 'none';
+            
+            if (currentStep === 3) {
+                if (taskType === 'auto') {
+                    document.getElementById('nextBtn').style.display = 'none';
+                    document.getElementById('submitBtn').style.display = 'inline-flex';
+                    document.getElementById('manualTaskHint').style.display = 'none';
+                    document.getElementById('scheduleConfigSection').style.display = 'block';
+                } else {
+                    document.getElementById('nextBtn').style.display = 'none';
+                    document.getElementById('submitBtn').style.display = 'inline-flex';
+                    document.getElementById('manualTaskHint').style.display = 'block';
+                    document.getElementById('scheduleConfigSection').style.display = 'none';
+                }
+            } else {
+                document.getElementById('nextBtn').style.display = 'inline-flex';
+                document.getElementById('submitBtn').style.display = 'none';
+            }
+            
+            if (currentStep === 2) {
+                renderExecutionCircuits();
+            }
+        }
+
+        function closeTaskModal() {
+            document.getElementById('taskModal').classList.remove('active');
+            document.body.style.overflow = '';
+            resetTaskForm();
+        }
+
+        function openCircuitSelector() {
+            if (!currentLocation) {
+                showToast('请先选择空间位置', 'warning');
+                return;
+            }
+            updateAreaFilterOptions();
+            updateLocationHint();
+            renderCircuitTable();
+            document.getElementById('circuitModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeCircuitModal() {
+            document.getElementById('circuitModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function renderCircuitTable() {
+            const tbody = document.getElementById('circuitTableBody');
+            const typeFilter = document.getElementById('circuitTypeFilter').value;
+            const statusFilter = document.getElementById('circuitStatusFilter').value;
+            const areaFilter = document.getElementById('circuitAreaFilter').value;
+            const searchText = document.getElementById('circuitSearch').value.toLowerCase();
+            
+            let filteredCircuits = circuitList.filter(circuit => {
+                if (currentLocation) {
+                    const locationMap = {
+                        'A1': 'A座1层',
+                        'A2': 'A座2层',
+                        'A3': 'A座3层',
+                        'B1': 'B座1层',
+                        'B2': 'B座2层',
+                        'C': 'C座1层'
+                    };
+                    const expectedArea = locationMap[currentLocation];
+                    if (circuit.area !== expectedArea) return false;
+                }
+                
+                if (typeFilter !== 'all' && circuit.type !== typeFilter) return false;
+                if (statusFilter !== 'all' && circuit.status !== statusFilter) return false;
+                if (areaFilter !== 'all' && circuit.area !== areaFilter) return false;
+                if (searchText && !circuit.name.toLowerCase().includes(searchText) && !circuit.code.toLowerCase().includes(searchText)) return false;
+                return true;
+            });
+            
+            tbody.innerHTML = '';
+            
+            filteredCircuits.forEach((circuit, index) => {
+                const isSelected = selectedCircuits.some(c => c.id === circuit.id);
+                const isOffline = circuit.status === 'offline';
+                const isMaintain = circuit.status === 'maintain';
+                
+                const tr = document.createElement('tr');
+                tr.dataset.id = circuit.id;
+                tr.dataset.status = circuit.status;
+                
+                tr.innerHTML = `
+                    <td>
+                        <input type="checkbox" 
+                               class="circuit-select-checkbox" 
+                               value="${circuit.id}" 
+                               ${isSelected ? 'checked' : ''} 
+                               ${isOffline || isMaintain ? 'disabled' : ''}
+                               onchange="handleCircuitSelect('${circuit.id}', this.checked)">
+                    </td>
+                    <td>${index + 1}</td>
+                    <td>${circuit.code}</td>
+                    <td>${circuit.name}</td>
+                    <td><span class="type-badge type-${circuit.type}">${circuit.typeName}</span></td>
+                    <td>${circuit.area}</td>
+                    <td><span class="status-badge status-${circuit.status}">${circuit.statusName}</span></td>
+                    <td>${circuit.lastOnline}</td>
+                    <td>
+                        ${isOffline || isMaintain ? 
+                          `<span style="color: var(--danger);">不可用</span>` : 
+                          `<button class="btn btn-sm btn-primary" onclick="quickAddCircuit('${circuit.id}')">快速添加</button>`}
+                    </td>
+                `;
+                
+                if (isOffline || isMaintain) {
+                    tr.style.opacity = '0.6';
+                    tr.style.backgroundColor = '#f9f9f9';
+                }
+                
+                tbody.appendChild(tr);
+            });
+            
+            if (filteredCircuits.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">当前区域下暂无符合条件的回路</td></tr>';
+            }
+            
+            updateCircuitModalCounts();
+        }
+
+        function quickAddCircuit(circuitId) {
+            const circuit = circuitList.find(c => c.id === circuitId);
+            if (!circuit) return;
+            
+            if (circuit.status !== 'online') {
+                showToast('该回路当前不可用', 'warning');
+                return;
+            }
+            
+            if (!selectedCircuits.some(c => c.id === circuitId)) {
+                selectedCircuits.push({ 
+                    ...circuit, 
+                    enabled: true,
+                    selectedTime: new Date().toLocaleString()
+                });
+                showToast(`已添加回路：${circuit.name}`, 'success');
+                
+                const checkbox = document.querySelector(`.circuit-select-checkbox[value="${circuitId}"]`);
+                if (checkbox) checkbox.checked = true;
+                
+                updateCircuitModalCounts();
+                renderExecutionCircuits();
+                renderKeepAliveOptions(); // 更新保持回路选项
+                updateCircuitCounts();
+            }
+        }
+
+        function handleCircuitSelect(circuitId, checked) {
+            const circuit = circuitList.find(c => c.id === circuitId);
+            if (!circuit) return;
+            
+            if (checked && (circuit.status === 'offline' || circuit.status === 'maintain')) {
+                showToast('该回路当前不可用', 'warning');
+                return;
+            }
+            
+            if (checked) {
+                if (!selectedCircuits.some(c => c.id === circuitId)) {
+                    selectedCircuits.push({ 
+                        ...circuit, 
+                        enabled: true,
+                        selectedTime: new Date().toLocaleString()
+                    });
+                }
+            } else {
+                selectedCircuits = selectedCircuits.filter(c => c.id !== circuitId);
+                // 如果移除了回路，也从保持列表中移除
+                keepAliveCircuits = keepAliveCircuits.filter(id => id !== circuitId);
+            }
+            
+            updateCircuitModalCounts();
+            renderExecutionCircuits();
+            renderKeepAliveOptions(); // 更新保持回路选项
+            updateCircuitCounts();
+        }
+
+        function selectAllDisplayedCircuits(checked) {
+            const checkboxes = document.querySelectorAll('#circuitTableBody .circuit-select-checkbox:not(:disabled)');
+            checkboxes.forEach(cb => {
+                cb.checked = checked;
+                const circuitId = cb.value;
+                const circuit = circuitList.find(c => c.id === circuitId);
+                
+                if (checked) {
+                    if (!selectedCircuits.some(c => c.id === circuitId)) {
+                        selectedCircuits.push({ ...circuit, enabled: true });
+                    }
+                } else {
+                    selectedCircuits = selectedCircuits.filter(c => c.id !== circuitId);
+                    keepAliveCircuits = keepAliveCircuits.filter(id => id !== circuitId);
+                }
+            });
+            
+            updateCircuitModalCounts();
+            renderExecutionCircuits();
+            renderKeepAliveOptions();
+            updateCircuitCounts();
+        }
+
+        function selectAllCircuits(checked) {
+            const checkboxes = document.querySelectorAll('#circuitTableBody .circuit-select-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = checked;
+                const circuitId = cb.value;
+                const circuit = circuitList.find(c => c.id === circuitId);
+                
+                if (!cb.disabled) {
+                    if (checked) {
+                        if (!selectedCircuits.some(c => c.id === circuitId)) {
+                            selectedCircuits.push({ ...circuit, enabled: true });
+                        }
+                    } else {
+                        selectedCircuits = selectedCircuits.filter(c => c.id !== circuitId);
+                        keepAliveCircuits = keepAliveCircuits.filter(id => id !== circuitId);
+                    }
+                }
+            });
+            
+            updateCircuitModalCounts();
+            renderExecutionCircuits();
+            renderKeepAliveOptions();
+            updateCircuitCounts();
+        }
+
+        function selectOnlineCircuits() {
+            const onlineCheckboxes = document.querySelectorAll('#circuitTableBody .circuit-select-checkbox:not(:disabled)');
+            onlineCheckboxes.forEach(cb => {
+                const tr = cb.closest('tr');
+                if (tr && tr.dataset.status === 'online') {
+                    cb.checked = true;
+                    const circuitId = cb.value;
+                    const circuit = circuitList.find(c => c.id === circuitId);
+                    if (!selectedCircuits.some(c => c.id === circuitId)) {
+                        selectedCircuits.push({ ...circuit, enabled: true });
+                    }
+                } else {
+                    cb.checked = false;
+                    const circuitId = cb.value;
+                    selectedCircuits = selectedCircuits.filter(c => c.id !== circuitId);
+                    keepAliveCircuits = keepAliveCircuits.filter(id => id !== circuitId);
+                }
+            });
+            
+            updateCircuitModalCounts();
+            renderExecutionCircuits();
+            renderKeepAliveOptions();
+            updateCircuitCounts();
+        }
+
+        function updateCircuitModalCounts() {
+            const count = selectedCircuits.length;
+            document.getElementById('circuitModalSelectedCount').textContent = count;
+            document.getElementById('confirmSelectedCount').textContent = count;
+        }
+
+        function confirmAddCircuits() {
+            closeCircuitModal();
+            showToast(`已选择 ${selectedCircuits.length} 个回路`, 'success');
+        }
+
+        function filterCircuits() {
+            renderCircuitTable();
+        }
+
+        function updateCircuitCounts() {
+            document.getElementById('selectedCircuitCount').textContent = selectedCircuits.length;
+            const enabledCount = selectedCircuits.filter(c => c.enabled !== false).length;
+            document.getElementById('enabledCircuitCount').textContent = enabledCount;
+        }
+
+        function renderExecutionCircuits() {
+            const container = document.getElementById('executionCircuitList');
+            
+            if (selectedCircuits.length === 0) {
+                container.innerHTML = `
+                    <div style="padding: 30px; text-align: center; color: var(--text-secondary); border: 1px dashed var(--border); border-radius: 8px;">
+                        <div style="font-size: 40px; margin-bottom: 10px;">🔌</div>
+                        <div>暂无选择回路</div>
+                        <div style="margin-top: 15px;">
+                            <button class="btn btn-primary" onclick="openCircuitSelector()">
+                                点击选择回路
+                            </button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <div class="execution-circuit-header">
+                    <div>序号</div>
+                    <div>回路名称</div>
+                    <div>回路类型</div>
+                    <div>所属区域</div>
+                    <div>状态</div>
+                    <div>是否启用</div>
+                    <div>操作</div>
+                </div>
+            `;
+            
+            selectedCircuits.forEach((circuit, index) => {
+                const latestCircuit = circuitList.find(c => c.id === circuit.id) || circuit;
+                const statusClass = latestCircuit.status === 'online' ? 'status-online' : 
+                                   latestCircuit.status === 'offline' ? 'status-offline' : 'status-maintain';
+                
+                html += `
+                    <div class="execution-circuit-row" data-id="${circuit.id}">
+                        <div>${index + 1}</div>
+                        <div>
+                            ${circuit.name}
+                            <div style="font-size: 11px; color: var(--text-secondary);">${circuit.code}</div>
+                        </div>
+                        <div><span class="type-badge type-${circuit.type}">${circuit.typeName}</span></div>
+                        <div>${circuit.area}</div>
+                        <div><span class="status-badge ${statusClass}">${latestCircuit.statusName}</span></div>
+                        <div class="enable-toggle">
+                            <input type="checkbox" 
+                                   ${circuit.enabled !== false ? 'checked' : ''} 
+                                   onchange="toggleCircuitEnabled('${circuit.id}', this.checked)">
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-danger" onclick="removeCircuit('${circuit.id}')">移除</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function toggleCircuitEnabled(circuitId, enabled) {
+            const circuit = selectedCircuits.find(c => c.id === circuitId);
+            if (circuit) {
+                circuit.enabled = enabled;
+                updateCircuitCounts();
+                showToast(`${enabled ? '启用' : '停用'}回路：${circuit.name}`, 'info');
+            }
+        }
+
+        function removeCircuit(circuitId) {
+            const circuit = selectedCircuits.find(c => c.id === circuitId);
+            if (circuit && confirm(`确定要从任务中移除回路「${circuit.name}」吗？`)) {
+                selectedCircuits = selectedCircuits.filter(c => c.id !== circuitId);
+                keepAliveCircuits = keepAliveCircuits.filter(id => id !== circuitId); // 从保持列表中移除
+                renderExecutionCircuits();
+                renderKeepAliveOptions(); // 更新保持回路选项
+                updateCircuitCounts();
+                showToast(`已移除回路：${circuit.name}`, 'info');
+                
+                if (document.getElementById('circuitModal').classList.contains('active')) {
+                    const checkbox = document.querySelector(`.circuit-select-checkbox[value="${circuitId}"]`);
+                    if (checkbox) checkbox.checked = false;
+                    updateCircuitModalCounts();
+                }
+            }
+        }
+
+        function selectScheduleType(type) {
+            scheduleType = type;
+            
+            document.querySelectorAll('.schedule-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            document.getElementById(`schedule${type.charAt(0).toUpperCase() + type.slice(1)}`).classList.add('selected');
+            
+            if (type === 'weekly') {
+                document.getElementById('weeklySchedule').style.display = 'block';
+                document.getElementById('weekdayError').style.display = 'none';
+            } else {
+                document.getElementById('weeklySchedule').style.display = 'none';
+            }
+            
+            if (type === 'workday') {
+                selectedWeekdays = [1, 2, 3, 4, 5];
+                updateWeekdayUI();
+            } else if (type === 'weekend') {
+                selectedWeekdays = [6, 7];
+                updateWeekdayUI();
+            }
+            
+            checkScheduleConflict();
+        }
+
+        function toggleWeekday(element) {
+            element.classList.toggle('selected');
+            
+            const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+            const index = weekdays.indexOf(element.textContent) + 1;
+            
+            if (element.classList.contains('selected')) {
+                if (!selectedWeekdays.includes(index)) {
+                    selectedWeekdays.push(index);
+                }
+            } else {
+                selectedWeekdays = selectedWeekdays.filter(d => d !== index);
+            }
+            
+            if (selectedWeekdays.length === 0) {
+                document.getElementById('weekdayError').style.display = 'block';
+            } else {
+                document.getElementById('weekdayError').style.display = 'none';
+            }
+            
+            checkScheduleConflict();
+        }
+
+        function updateWeekdayUI() {
+            const weekdays = document.querySelectorAll('.weekday-tag');
+            weekdays.forEach((tag, index) => {
+                if (selectedWeekdays.includes(index + 1)) {
+                    tag.classList.add('selected');
+                } else {
+                    tag.classList.remove('selected');
+                }
+            });
+        }
+
+        function updateScheduleUI() {
+            selectScheduleType(scheduleType);
+            
+            if (scheduleType === 'weekly') {
+                updateWeekdayUI();
+            }
+        }
+
+        function calculateDuration() {
+            const startTime = document.getElementById('executeTime').value;
+            const endTime = document.getElementById('endTime').value;
+            
+            if (startTime && endTime) {
+                const start = new Date(`2000-01-01T${startTime}:00`);
+                const end = new Date(`2000-01-01T${endTime}:00`);
+                
+                let diffMs = end - start;
+                if (diffMs < 0) {
+                    diffMs += 24 * 60 * 60 * 1000;
+                }
+                
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                
+                document.getElementById('durationValue').textContent = `${diffHours}小时${diffMinutes}分钟`;
+            }
+        }
+
+        function checkScheduleConflict() {
+            if (taskType !== 'auto' || !currentLocation) return true;
+            
+            const startTime = document.getElementById('executeTime').value;
+            const endTime = document.getElementById('endTime').value;
+            
+            if (!startTime || !endTime) return true;
+            
+            const conflictingTasks = taskList.filter(task => {
+                if (task.id === editingTaskId) return false;
+                if (task.type !== 'auto') return false;
+                if (task.location !== currentLocation) return false;
+                if (task.status !== 'enabled') return false;
+                if (!task.schedule) return false;
+                
+                return isTimeOverlap(startTime, endTime, task.schedule.startTime, task.schedule.endTime);
+            });
+            
+            const warningDiv = document.getElementById('conflictWarning');
+            const detailsDiv = document.getElementById('conflictDetails');
+            
+            if (conflictingTasks.length > 0) {
+                let conflictHtml = '<ul style="margin-left: 20px;">';
+                conflictingTasks.forEach(task => {
+                    conflictHtml += `<li>${task.name} (${task.schedule.startTime}-${task.schedule.endTime})</li>`;
+                });
+                conflictHtml += '</ul>';
+                detailsDiv.innerHTML = `同区域存在冲突的自动任务：${conflictHtml}`;
+                warningDiv.style.display = 'block';
+                return false;
+            } else {
+                warningDiv.style.display = 'none';
+                return true;
+            }
+        }
+
+        function isTimeOverlap(start1, end1, start2, end2) {
+            const toMinutes = (time) => {
+                const [h, m] = time.split(':').map(Number);
+                return h * 60 + m;
+            };
+            
+            const s1 = toMinutes(start1);
+            const e1 = toMinutes(end1);
+            const s2 = toMinutes(start2);
+            const e2 = toMinutes(end2);
+            
+            const duration1 = e1 < s1 ? e1 + 24*60 : e1;
+            const duration2 = e2 < s2 ? e2 + 24*60 : e2;
+            
+            return !(duration1 <= s2 || duration2 <= s1);
+        }
+
+        // ==================== 初始化 ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+            initNavigation();
+            initExecutionHistory();
+            initTaskList();
+            renderTaskGrid();
+            renderExecutionStatus();
+            updateAreaFilterOptions();
+        });
+
+        // 模态框点击关闭
+        document.getElementById('taskModal').addEventListener('click', function(e) {
+            if (e.target === this) closeTaskModal();
+        });
+
+        document.getElementById('circuitModal').addEventListener('click', function(e) {
+            if (e.target === this) closeCircuitModal();
+        });
+
+        document.getElementById('taskDetailModal').addEventListener('click', function(e) {
+            if (e.target === this) closeTaskDetailModal();
+        });
+
+        document.getElementById('historyModal').addEventListener('click', function(e) {
+            if (e.target === this) closeHistoryModal();
+        });
+    </script>
+</body>
+</html>

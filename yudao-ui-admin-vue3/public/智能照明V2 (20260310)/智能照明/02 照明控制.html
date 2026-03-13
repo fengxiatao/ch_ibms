@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧照明控制系统 - 照明控制</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #409eff;
+            --success: #67c23a;
+            --warning: #e6a23c;
+            --danger: #f56c6c;
+            --text: #303133;
+            --text-regular: #606266;
+            --border: #ebeef5;
+            --bg: #f0f2f5;
+            --sidebar-bg: #304156;
+            --sidebar-text: #bfcbd9;
+            --light-bg: #f5f7fa;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        .container { display: flex; min-height: 100vh; }
+        
+        /* 侧边栏 */
+        .sidebar {
+            width: 220px;
+            background-color: var(--sidebar-bg);
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+        .logo {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .menu { padding: 10px 0; }
+        .menu-item {
+            padding: 0 20px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            color: var(--sidebar-text);
+            cursor: pointer;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+            justify-content: space-between;
+        }
+        .menu-item:hover, .menu-item.active {
+            background-color: rgba(64, 158, 255, 0.1);
+            color: var(--primary);
+            border-left-color: var(--primary);
+        }
+        .menu-icon-text { display: flex; align-items: center; }
+        .menu-icon { width: 20px; margin-right: 10px; text-align: center; }
+        .arrow { transition: transform 0.3s; font-size: 12px; }
+        .arrow.expanded { transform: rotate(90deg); }
+        .submenu {
+            background-color: rgba(0,0,0,0.15);
+            overflow: hidden;
+            max-height: 0;
+            transition: max-height 0.3s;
+        }
+        .submenu.expanded { max-height: 400px; }
+        .submenu-item {
+            padding: 12px 20px 12px 50px;
+            color: var(--sidebar-text);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .submenu-item:hover, .submenu-item.active {
+            color: var(--primary);
+            background: rgba(64, 158, 255, 0.05);
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: 220px;
+            padding: 20px;
+        }
+
+        .top-header {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .breadcrumb { color: #606266; font-size: 14px; }
+
+        .view-section { display: none; }
+        .view-section.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 设备管理样式 */
+        .device-management {
+            background: white;
+            border-radius: 4px;
+            padding: 20px;
+            min-height: calc(100vh - 140px);
+        }
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-select, .filter-input {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            outline: none;
+        }
+        .filter-input { width: 200px; }
+        .filter-btn {
+            padding: 8px 16px;
+            border: none;
+            background: var(--primary);
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .reset-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .group-tabs {
+            display: flex;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 20px;
+        }
+        .group-tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            color: var(--text-regular);
+            position: relative;
+        }
+        .group-tab.active {
+            color: var(--primary);
+            font-weight: 600;
+        }
+        .group-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--primary);
+        }
+
+        /* 设备网格 - 可展开卡片 */
+        .device-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        @media (max-width: 1400px) { .device-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 900px) { .device-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        .device-card {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            background: white;
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        .device-card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            border-color: var(--primary);
+        }
+        .device-card.on {
+            border-color: #fadb14;
+            background: #fffbe6;
+        }
+        .device-card.active-control {
+            grid-column: span 2;
+            background: #f5f7fa;
+            border: 2px solid var(--primary);
+            z-index: 10;
+        }
+        @media (max-width: 900px) {
+            .device-card.active-control {
+                grid-column: span 2;
+            }
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .device-name {
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .status-tag {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .status-on { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
+        .status-off { background: #f5f5f5; color: #8c8c8c; border: 1px solid #d9d9d9; }
+        .status-fault { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
+        
+        .card-body {
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+        .info-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            color: #606266;
+            font-size: 13px;
+        }
+        .info-icon {
+            width: 24px;
+            text-align: center;
+            margin-right: 5px;
+        }
+        
+        /* 展开的控制区域 */
+        .card-control-panel {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 2px solid var(--primary);
+            animation: slideDown 0.3s ease;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .control-title {
+            font-size: 12px;
+            color: #909399;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        
+        .control-btn {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .control-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        .control-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        
+        .slider-container {
+            margin-top: 12px;
+        }
+        
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #606266;
+        }
+        
+        .range-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #dcdfe6;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        .range-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .close-control {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            color: #909399;
+            font-size: 18px;
+            line-height: 24px;
+            text-align: center;
+        }
+        .close-control:hover {
+            color: var(--danger);
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            z-index: 9999;
+            font-size: 14px;
+            animation: fadeIn 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="logo">💡 智慧照明系统</div>
+            <div class="menu">
+                <div class="menu-item" onclick="switchView('dashboard')">
+                    <div class="menu-icon-text">
+                        <span class="menu-icon">🏢</span>
+                        <span>智慧楼宇</span>
+                    </div>
+                </div>
+                
+                <div class="menu-item active" onclick="toggleSubmenu(this)">
+                    <div class="menu-icon-text">
+                        <span class="menu-icon">💡</span>
+                        <span>智慧照明</span>
+                    </div>
+                    <span class="arrow expanded">▶</span>
+                </div>
+                
+                <div class="submenu expanded" id="lightSubmenu">
+                    <div class="submenu-item active" onclick="switchToDevice()">照明控制</div>
+                    <div class="submenu-item" onclick="switchToScene()">场景控制</div>
+                    <div class="submenu-item" onclick="switchToDeviceManagement()">设备管理</div>
+                    <div class="submenu-item" onclick="switchToOperationLog()">操作日志</div>
+                    <div class="submenu-item" onclick="switchToAlarmInfo()">告警信息</div>
+                </div>
+
+                <div class="menu-item" onclick="switchToSettings()">
+                    <div class="menu-icon-text">
+                        <span class="menu-icon">⚙️</span>
+                        <span>系统设置</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主内容 -->
+        <main class="main-content">
+            <!-- 照明控制视图（核心模块） -->
+            <div id="deviceView" class="view-section active">
+                <div class="top-header">
+                    <div class="breadcrumb">首页 / 智慧照明 / 照明控制</div>
+                    <div style="color: #606266;">👤 管理员</div>
+                </div>
+
+                <div class="device-management">
+                    <div class="filter-bar">
+                        <select class="filter-select" id="areaFilter" onchange="filterDevices()">
+                            <option value="all">全部区域</option>
+                            <option value="A1">A区一层</option>
+                            <option value="A2">A区二层</option>
+                            <option value="B1">B区展厅</option>
+                            <option value="public">公共区域</option>
+                        </select>
+                        <select class="filter-select" id="statusFilter" onchange="filterDevices()">
+                            <option value="all">全部状态</option>
+                            <option value="on">开启</option>
+                            <option value="off">关闭</option>
+                            <option value="fault">故障</option>
+                        </select>
+                        <input type="text" class="filter-input" placeholder="请输入回路名称或编号" id="searchInput">
+                        <button class="filter-btn" onclick="filterDevices()">筛选</button>
+                        <button class="reset-btn" onclick="resetFilter()">重置</button>
+                    </div>
+
+                    <div class="group-tabs">
+                        <div class="group-tab active" onclick="switchDeviceTab('normal')">普通照明回路控制</div>
+                        <div class="group-tab" onclick="switchDeviceTab('dimming')">调光设备控制</div>
+                    </div>
+
+                    <div class="device-grid" id="deviceGrid"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // 模拟设备数据
+        const deviceData = {
+            normal: [
+                { id: 1, name: 'A1-01 走廊照明', area: 'A1', status: 'on', power: '120W', voltage: '220V', current: '0.54A' },
+                { id: 2, name: 'A1-02 办公室照明', area: 'A1', status: 'off', power: '180W', voltage: '220V', current: '0.82A' },
+                { id: 3, name: 'A2-01 会议室照明', area: 'A2', status: 'on', power: '240W', voltage: '220V', current: '1.09A' },
+                { id: 4, name: 'B1-01 展厅主照明', area: 'B1', status: 'fault', power: '300W', voltage: '218V', current: '1.38A' },
+                { id: 5, name: 'public-01 楼梯间照明', area: 'public', status: 'on', power: '60W', voltage: '220V', current: '0.27A' },
+                { id: 6, name: 'A1-03 卫生间照明', area: 'A1', status: 'off', power: '80W', voltage: '220V', current: '0.36A' },
+                { id: 7, name: 'A2-02 茶水间照明', area: 'A2', status: 'on', power: '100W', voltage: '220V', current: '0.45A' },
+                { id: 8, name: 'B1-02 展厅辅助照明', area: 'B1', status: 'on', power: '200W', voltage: '220V', current: '0.91A' }
+            ],
+            dimming: [
+                { id: 101, name: 'B1-03 展厅氛围灯', area: 'B1', status: 'on', brightness: 75, power: '150W', voltage: '220V' },
+                { id: 102, name: 'A2-03 会议室调光灯', area: 'A2', status: 'on', brightness: 60, power: '200W', voltage: '220V' },
+                { id: 103, name: 'public-02 大厅主灯', area: 'public', status: 'off', brightness: 0, power: '300W', voltage: '220V' },
+                { id: 104, name: 'A1-04 接待区调光灯', area: 'A1', status: 'on', brightness: 85, power: '180W', voltage: '220V' }
+            ]
+        };
+
+        // 当前激活的设备标签（普通/调光）
+        let activeDeviceTab = 'normal';
+        // 当前筛选条件
+        let currentFilters = {
+            area: 'all',
+            status: 'all',
+            keyword: ''
+        };
+
+        // 页面初始化
+        window.onload = function() {
+            renderDeviceGrid();
+        };
+
+        // 切换子菜单展开/收起
+        function toggleSubmenu(el) {
+            const arrow = el.querySelector('.arrow');
+            const submenu = document.getElementById('lightSubmenu');
+            arrow.classList.toggle('expanded');
+            submenu.classList.toggle('expanded');
+        }
+
+        // 切换到照明控制视图（保留原有方法，保证菜单点击有效）
+        function switchToDevice() {
+            document.querySelectorAll('.submenu-item').forEach(item => item.classList.remove('active'));
+            event.target.classList.add('active');
+            document.querySelectorAll('.view-section').forEach(section => section.classList.remove('active'));
+            document.getElementById('deviceView').classList.add('active');
+        }
+
+        // 空方法（保留原有菜单点击逻辑，避免报错）
+        function switchView() {}
+        function switchToScene() {}
+        function switchToDeviceManagement() {}
+        function switchToOperationLog() {}
+        function switchToAlarmInfo() {}
+        function switchToSettings() {}
+
+        // 切换设备标签（普通/调光）
+        function switchDeviceTab(tabType) {
+            activeDeviceTab = tabType;
+            // 更新标签样式
+            document.querySelectorAll('.group-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            // 重新渲染设备网格
+            renderDeviceGrid();
+        }
+
+        // 渲染设备网格
+        function renderDeviceGrid() {
+            const gridContainer = document.getElementById('deviceGrid');
+            gridContainer.innerHTML = '';
+
+            // 获取筛选后的设备列表
+            let filteredDevices = getFilteredDevices();
+
+            if (filteredDevices.length === 0) {
+                gridContainer.innerHTML = `
+                    <div style="grid-column: span 4; text-align: center; padding: 60px 20px; color: #909399;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">💡</div>
+                        <div style="font-size: 16px; margin-bottom: 8px;">暂无符合条件的设备</div>
+                        <div style="font-size: 13px;">请调整筛选条件后重试</div>
+                    </div>
+                `;
+                return;
+            }
+
+            // 生成设备卡片
+            filteredDevices.forEach(device => {
+                const card = document.createElement('div');
+                card.className = `device-card ${device.status === 'on' ? 'on' : ''}`;
+                card.dataset.id = device.id;
+
+                // 状态标签
+                let statusTag = '';
+                if (device.status === 'on') statusTag = '<span class="status-tag status-on">开启</span>';
+                else if (device.status === 'off') statusTag = '<span class="status-tag status-off">关闭</span>';
+                else if (device.status === 'fault') statusTag = '<span class="status-tag status-fault">故障</span>';
+
+                // 基础卡片内容
+                let cardContent = `
+                    <div class="card-header">
+                        <div class="device-name">${device.name}</div>
+                        ${statusTag}
+                    </div>
+                    <div class="card-body">
+                        <div class="info-row">
+                            <span class="info-icon">📍</span>
+                            <span>所属区域：${getAreaName(device.area)}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-icon">⚡</span>
+                            <span>功率：${device.power}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-icon">🔌</span>
+                            <span>电压：${device.voltage}</span>
+                        </div>
+                `;
+
+                // 普通设备/调光设备差异化内容
+                if (activeDeviceTab === 'normal') {
+                    cardContent += `
+                            <div class="info-row">
+                                <span class="info-icon">📊</span>
+                                <span>电流：${device.current}</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    cardContent += `
+                            <div class="info-row">
+                                <span class="info-icon">💡</span>
+                                <span>亮度：${device.brightness}%</span>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = cardContent;
+                gridContainer.appendChild(card);
+
+                // 点击卡片展开控制面板
+                card.addEventListener('click', function() {
+                    // 关闭其他卡片的控制面板
+                    document.querySelectorAll('.device-card').forEach(c => {
+                        c.classList.remove('active-control');
+                        c.querySelector('.card-control-panel')?.remove();
+                        c.querySelector('.close-control')?.remove();
+                    });
+
+                    // 激活当前卡片
+                    this.classList.add('active-control');
+                    // 添加关闭按钮
+                    const closeBtn = document.createElement('button');
+                    closeBtn.className = 'close-control';
+                    closeBtn.innerHTML = '×';
+                    closeBtn.onclick = function(e) {
+                        e.stopPropagation();
+                        card.classList.remove('active-control');
+                        card.querySelector('.card-control-panel')?.remove();
+                        this.remove();
+                    };
+                    this.appendChild(closeBtn);
+
+                    // 添加控制面板
+                    const controlPanel = createControlPanel(device);
+                    this.appendChild(controlPanel);
+                });
+            });
+        }
+
+        // 创建设备控制面板
+        function createControlPanel(device) {
+            const panel = document.createElement('div');
+            panel.className = 'card-control-panel';
+
+            // 普通设备控制面板
+            if (activeDeviceTab === 'normal') {
+                panel.innerHTML = `
+                    <div class="control-title">设备控制</div>
+                    <div class="control-buttons">
+                        <button class="control-btn ${device.status === 'on' ? 'active' : ''}" onclick="controlDevice(${device.id}, 'on')">
+                            <span>🔛 开启</span>
+                        </button>
+                        <button class="control-btn ${device.status === 'off' ? 'active' : ''}" onclick="controlDevice(${device.id}, 'off')">
+                            <span>🔌 关闭</span>
+                        </button>
+                        ${device.status === 'fault' ? 
+                            '<button class="control-btn" onclick="clearFault(' + device.id + ')">\n<span>🔧 故障复位</span>\n</button>' : ''}
+                    </div>
+                `;
+            } 
+            // 调光设备控制面板
+            else {
+                panel.innerHTML = `
+                    <div class="control-title">调光控制</div>
+                    <div class="control-buttons">
+                        <button class="control-btn ${device.status === 'on' ? 'active' : ''}" onclick="controlDevice(${device.id}, 'on')">
+                            <span>🔛 开启</span>
+                        </button>
+                        <button class="control-btn ${device.status === 'off' ? 'active' : ''}" onclick="controlDevice(${device.id}, 'off')">
+                            <span>🔌 关闭</span>
+                        </button>
+                    </div>
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>亮度调节</span>
+                            <span id="brightness-${device.id}">${device.brightness}%</span>
+                        </div>
+                        <input type="range" min="0" max="100" value="${device.brightness}" 
+                               class="range-slider" id="slider-${device.id}"
+                               oninput="updateBrightness(${device.id}, this.value)"
+                               ${device.status === 'off' ? 'disabled' : ''}>
+                    </div>
+                `;
+            }
+
+            return panel;
+        }
+
+        // 获取筛选后的设备列表
+        function getFilteredDevices() {
+            let devices = deviceData[activeDeviceTab];
+            
+            // 区域筛选
+            if (currentFilters.area !== 'all') {
+                devices = devices.filter(d => d.area === currentFilters.area);
+            }
+
+            // 状态筛选
+            if (currentFilters.status !== 'all') {
+                devices = devices.filter(d => d.status === currentFilters.status);
+            }
+
+            // 关键词筛选
+            if (currentFilters.keyword) {
+                const keyword = currentFilters.keyword.toLowerCase();
+                devices = devices.filter(d => 
+                    d.name.toLowerCase().includes(keyword) || 
+                    d.id.toString().includes(keyword)
+                );
+            }
+
+            return devices;
+        }
+
+        // 筛选设备
+        function filterDevices() {
+            currentFilters.area = document.getElementById('areaFilter').value;
+            currentFilters.status = document.getElementById('statusFilter').value;
+            currentFilters.keyword = document.getElementById('searchInput').value.trim();
+            renderDeviceGrid();
+        }
+
+        // 重置筛选条件
+        function resetFilter() {
+            document.getElementById('areaFilter').value = 'all';
+            document.getElementById('statusFilter').value = 'all';
+            document.getElementById('searchInput').value = '';
+            currentFilters = { area: 'all', status: 'all', keyword: '' };
+            renderDeviceGrid();
+        }
+
+        // 控制设备（开/关/故障复位）
+        function controlDevice(deviceId, action) {
+            const devices = deviceData[activeDeviceTab];
+            const device = devices.find(d => d.id === deviceId);
+            if (!device) return;
+
+            if (action === 'on') {
+                device.status = 'on';
+                if (activeDeviceTab === 'dimming' && device.brightness === 0) {
+                    device.brightness = 100;
+                }
+            } else if (action === 'off') {
+                device.status = 'off';
+                if (activeDeviceTab === 'dimming') {
+                    device.brightness = 0;
+                }
+            } else if (action === 'fault') {
+                device.status = 'off';
+            }
+
+            showToast(`已${action === 'on' ? '开启' : action === 'off' ? '关闭' : '复位'}设备：${device.name}`);
+            renderDeviceGrid();
+        }
+
+        // 清除故障
+        function clearFault(deviceId) {
+            const device = deviceData.normal.find(d => d.id === deviceId);
+            if (device) {
+                device.status = 'off';
+                showToast(`已清除设备【${device.name}】故障状态`);
+                renderDeviceGrid();
+            }
+        }
+
+        // 更新调光亮度
+        function updateBrightness(deviceId, value) {
+            const device = deviceData.dimming.find(d => d.id === deviceId);
+            if (device) {
+                device.brightness = parseInt(value);
+                if (value > 0 && device.status === 'off') {
+                    device.status = 'on';
+                } else if (value == 0 && device.status === 'on') {
+                    device.status = 'off';
+                }
+                document.getElementById(`brightness-${deviceId}`).textContent = `${value}%`;
+                showToast(`已调整【${device.name}】亮度至${value}%`);
+            }
+        }
+
+        // 获取区域名称
+        function getAreaName(areaCode) {
+            const areaMap = {
+                'A1': 'A区一层',
+                'A2': 'A区二层',
+                'B1': 'B区展厅',
+                'public': '公共区域',
+                'machine': '机房/弱电间'
+            };
+            return areaMap[areaCode] || areaCode;
+        }
+
+        // 显示提示框
+        function showToast(message) {
+            // 移除已存在的toast
+            document.querySelector('.toast')?.remove();
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            // 3秒后自动消失
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

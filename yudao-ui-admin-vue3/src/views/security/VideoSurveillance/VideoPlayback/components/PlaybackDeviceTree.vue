@@ -86,7 +86,14 @@
           />
         </div>
         
-        <el-button type="primary" size="small" @click="handleSearch" style="width: 100%" :loading="searching">
+        <el-button
+          type="primary"
+          size="small"
+          @click="handleSearch"
+          style="width: 100%"
+          :loading="searching"
+          :disabled="searching"
+        >
           搜索录像
         </el-button>
       </div>
@@ -95,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Icon } from '@/components/Icon'
 import { getBuildingList } from '@/api/iot/spatial/building'
@@ -110,10 +117,15 @@ const emit = defineEmits<{
   (e: 'channels-change', channels: IbmsChannel[]): void
 }>()
 
+// Props（由父组件控制 searching，避免 500ms 误解锁导致重复请求叠加）
+const props = defineProps<{
+  searching?: boolean
+}>()
+
 // 状态
 const searchKeyword = ref('')
 const treeRef = ref()
-const searching = ref(false)
+const searching = computed(() => props.searching === true)
 
 // 选中的通道
 const selectedChannels = ref<IbmsChannel[]>([])
@@ -171,18 +183,28 @@ const loadTreeNode = async (node: any, resolve: Function) => {
         buildingId: data.buildingId
       }))
     } else if (data.type === 'floor') {
-      // 直接加载该楼层的视频通道
-      const params = { pageNo: 1, pageSize: 100, channelType: 'video', floorId: data.floorId }
-      const channelsRes = await getChannelPage(params)
+      // 按空间查询通道（iot_device_channel 有 floorId，录像回放后端用 channel.id 查询）
+      const channelsRes = await getChannelPage({
+        pageNo: 1,
+        pageSize: 100,
+        channelType: 'video',
+        floorId: data.floorId
+      })
       const channels = channelsRes.list || []
 
       children = channels.map((ch: any) => {
+        const ibmsChannel: IbmsChannel = {
+          id: ch.id,
+          channelName: ch.channelName || `通道${ch.channelNo ?? 1}`,
+          channelNo: ch.channelNo ?? 1,
+          onlineStatus: ch.status
+        }
         return {
           id: `channel-${ch.id}`,
-          name: ch.channelName || `通道${ch.channelNo}`,
+          name: ibmsChannel.channelName,
           type: 'channel' as const,
           channelId: ch.id,
-          ibmsChannel: ch as IbmsChannel
+          ibmsChannel
         }
       })
     }
@@ -206,14 +228,7 @@ const handleSearch = () => {
     ElMessage.warning('请先选择要查询的通道')
     return
   }
-
-  searching.value = true
   emit('search', selectedChannels.value, filterForm.timeRange[0], filterForm.timeRange[1])
-  
-  // 搜索完成后重置状态
-  setTimeout(() => {
-    searching.value = false
-  }, 500)
 }
 
 const handleSearchClear = () => {

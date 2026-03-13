@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频监控系统 - 告警管理 (详情按钮+常显图标)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0f172a;
+        }
+        
+        .sidebar-item {
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar-item:hover {
+            background: rgba(59, 130, 246, 0.15);
+        }
+        
+        .sidebar-item.active {
+            background: #3b82f6;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+        
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        /* 告警级别标记 */
+        .badge-critical { @apply bg-red-500/20 text-red-400; }
+        .badge-warning { @apply bg-orange-500/20 text-orange-400; }
+        .badge-info { @apply bg-blue-500/20 text-blue-400; }
+        .badge-resolved { @apply bg-green-500/20 text-green-400; }
+
+        /* 表格行样式 */
+        .alert-table-row {
+            transition: all 0.2s ease;
+            border-left: 4px solid transparent;
+        }
+        .alert-table-row:hover {
+            background: rgba(51, 65, 85, 0.8);
+        }
+        .row-critical { border-left-color: #ef4444; }
+        .row-warning { border-left-color: #f59e0b; }
+        .row-info { border-left-color: #3b82f6; }
+        .row-resolved { border-left-color: #10b981; opacity: 0.8; }
+        
+        .pulse-dot {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* 已处理状态文字颜色 */
+        .status-resolved { color: #94a3b8; }
+        
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        /* 复选框样式 */
+        .checkbox-custom {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #1e293b;
+            border: 2px solid #475569;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .checkbox-custom:checked {
+            background: #3b82f6;
+            border-color: #3b82f6;
+        }
+        .checkbox-custom:checked::after {
+            content: "\f00c";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            font-size: 12px;
+            color: white;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .checkbox-custom:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* 操作按钮组 — 始终显示，不再隐藏 */
+        .row-actions {
+            opacity: 1 !important;  /* 强制显示 */
+        }
+        
+        /* 已处理行操作按钮仍然禁用但可见，但已处理行本来就用文字替代了按钮，所以无妨 */
+        tr.row-resolved .row-actions button {
+            display: none;  /* 已处理行不显示按钮，保持原有逻辑 */
+        }
+        tr.row-resolved .row-actions span {
+            display: inline-block; /* 已处理文字显示 */
+        }
+
+        /* 处理弹窗 */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-content {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 1rem;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            transform: scale(0.9);
+            transition: transform 0.3s;
+        }
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-content select,
+        .modal-content input,
+        .modal-content textarea,
+        .modal-content button {
+            pointer-events: auto;
+            position: relative;
+            z-index: 1001;
+        }
+
+        select, input[type="datetime-local"], textarea {
+            color-scheme: dark;
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            color: #fff;
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            width: 100%;
+            outline: none;
+        }
+        select:focus, input:focus, textarea:focus {
+            border-color: #3b82f6;
+        }
+
+        /* 提示Toast */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: #1e293b;
+            border-left: 4px solid #3b82f6;
+            border-radius: 0.5rem;
+            padding: 1rem 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
+            z-index: 1100;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        /* 详情弹窗 (新增) */
+        #detailModal .modal-content {
+            max-width: 600px;
+        }
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: 0.75rem 1rem;
+        }
+    </style>
+</head>
+<body class="text-gray-100 h-screen overflow-hidden flex">
+
+    <!-- 处理告警弹窗 -->
+    <div id="handleModal" class="modal-overlay">
+        <div class="modal-content p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold flex items-center">
+                    <i class="fas fa-check-circle text-blue-500 mr-2"></i>
+                    处理告警
+                </h3>
+                <button id="closeModalBtn" class="text-slate-400 hover:text-white" type="button">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="modalAlertInfo" class="mb-4 p-3 bg-slate-800 rounded-lg text-sm">
+                <!-- 动态填充告警信息 -->
+            </div>
+            <form id="handleForm" onsubmit="return false;">
+                <div class="mb-4">
+                    <label class="block text-sm text-slate-400 mb-2">处理方式 <span class="text-red-400">*</span></label>
+                    <select id="handleMethod" name="handleMethod" class="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-4 py-2.5 focus:outline-none focus:border-blue-500" required>
+                        <option value="">请选择处理方式</option>
+                        <option value="现场检查">现场检查</option>
+                        <option value="设备重启">设备重启</option>
+                        <option value="安排维修">安排维修</option>
+                        <option value="临时忽略">临时忽略</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm text-slate-400 mb-2">处理备注</label>
+                    <textarea id="handleRemark" name="handleRemark" rows="3" class="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 placeholder-slate-500" placeholder="填写处理说明或结果..."></textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="resolveConfirm" class="checkbox-custom mr-2">
+                        <span class="text-sm text-slate-300">确认已解决，标记为“已处理”</span>
+                    </label>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancelModalBtn" class="px-4 py-2 bg-slate-700 text-slate-300 text-sm rounded-lg hover:bg-slate-600 transition-colors">取消</button>
+                    <button type="submit" id="submitHandleBtn" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">确认处理</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 详情弹窗 (新增) -->
+    <div id="detailModal" class="modal-overlay">
+        <div class="modal-content p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold flex items-center">
+                    <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                    告警详情
+                </h3>
+                <button id="closeDetailBtn" class="text-slate-400 hover:text-white" type="button">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="detailContent" class="py-2">
+                <!-- 动态渲染详情 -->
+            </div>
+            <div class="flex justify-end mt-6">
+                <button type="button" id="closeDetailFooterBtn" class="px-4 py-2 bg-slate-700 text-slate-300 text-sm rounded-lg hover:bg-slate-600 transition-colors">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提示Toast -->
+    <div id="toast" class="toast flex items-center">
+        <i class="fas fa-info-circle text-blue-500 mr-3 text-lg"></i>
+        <span id="toastMessage">告警已处理</span>
+    </div>
+
+    <!-- 侧边栏 -->
+    <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
+        <div class="h-16 flex items-center px-6 border-b border-slate-800 bg-slate-950">
+            <i class="fas fa-video text-blue-500 text-xl mr-3"></i>
+            <span class="text-lg font-bold tracking-wide">视频监控系统</span>
+        </div>
+        <nav class="flex-1 py-4 overflow-y-auto">
+            <div class="mb-2">
+                <div class="px-6 py-3 flex items-center justify-between cursor-pointer hover:bg-slate-800 transition-colors group">
+                    <div class="flex items-center text-blue-400 font-medium">
+                        <i class="fas fa-video w-5 mr-3"></i>
+                        <span>视频监控</span>
+                    </div>
+                    <i class="fas fa-chevron-up text-xs text-slate-500 group-hover:text-blue-400 transition-colors"></i>
+                </div>
+                <div class="mt-1 space-y-1 px-3">
+                    <a href="#" class="sidebar-item flex items-center px-6 py-3 rounded-lg text-sm text-slate-300 hover:text-white">
+                        <i class="fas fa-desktop w-5 mr-3 text-slate-400"></i>
+                        <span>实时预览</span>
+                    </a>
+                    <a href="#" class="sidebar-item flex items-center px-6 py-3 rounded-lg text-sm text-slate-300 hover:text-white">
+                        <i class="fas fa-play-circle w-5 mr-3 text-slate-400"></i>
+                        <span>录像回放</span>
+                    </a>
+                    <a href="#" class="sidebar-item flex items-center px-6 py-3 rounded-lg text-sm text-slate-300 hover:text-white">
+                        <i class="fas fa-camera w-5 mr-3 text-slate-400"></i>
+                        <span>抓图记录</span>
+                    </a>
+                    <a href="#" class="sidebar-item active flex items-center px-6 py-3 rounded-lg text-sm font-medium">
+                        <i class="fas fa-bell w-5 mr-3"></i>
+                        <span>告警管理</span>
+                        <span class="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full pulse-dot" id="alertCount">0</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
+        <div class="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
+            V2.5.0 Build 20240309
+        </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 flex flex-col bg-slate-950 overflow-hidden">
+        <!-- 顶部栏 -->
+        <header class="h-16 glass-panel flex items-center justify-between px-6 z-10">
+            <div class="flex items-center text-sm text-slate-400">
+                <span class="hover:text-blue-400 cursor-pointer transition-colors">视频监控</span>
+                <i class="fas fa-chevron-right mx-2 text-xs"></i>
+                <span class="text-white font-medium">告警管理</span>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <button class="relative p-2 text-slate-400 hover:text-white transition-colors">
+                    <i class="fas fa-bell text-lg"></i>
+                    <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full pulse-dot"></span>
+                </button>
+                <div class="flex items-center space-x-3 pl-4 border-l border-slate-700">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm font-bold">
+                        AD
+                    </div>
+                    <span class="text-sm font-medium">管理员</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 告警管理内容区 -->
+        <div class="flex-1 overflow-auto p-6">
+            <!-- 统计卡片 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div class="glass-panel rounded-xl p-5 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150"></div>
+                    <div class="relative">
+                        <p class="text-slate-400 text-sm mb-1">今日告警总数</p>
+                        <h3 class="text-3xl font-bold text-white" id="todayTotal">6</h3>
+                        <p class="text-red-400 text-xs mt-2 flex items-center">
+                            <i class="fas fa-calendar-day mr-1"></i>今日内产生
+                        </p>
+                    </div>
+                    <i class="fas fa-exclamation-triangle absolute bottom-4 right-4 text-red-500/20 text-4xl"></i>
+                </div>
+                <div class="glass-panel rounded-xl p-5 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-orange-500/10 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150"></div>
+                    <div class="relative">
+                        <p class="text-slate-400 text-sm mb-1">历史告警总数</p>
+                        <h3 class="text-3xl font-bold text-white" id="historyTotal">21</h3>
+                        <p class="text-orange-400 text-xs mt-2">累计全部</p>
+                    </div>
+                    <i class="fas fa-database absolute bottom-4 right-4 text-orange-500/20 text-4xl"></i>
+                </div>
+                <div class="glass-panel rounded-xl p-5 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-green-500/10 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150"></div>
+                    <div class="relative">
+                        <p class="text-slate-400 text-sm mb-1">已处理告警数</p>
+                        <h3 class="text-3xl font-bold text-white" id="resolvedTotal">8</h3>
+                        <p class="text-green-400 text-xs mt-2">已解决/已忽略</p>
+                    </div>
+                    <i class="fas fa-check-circle absolute bottom-4 right-4 text-green-500/20 text-4xl"></i>
+                </div>
+                <div class="glass-panel rounded-xl p-5 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150"></div>
+                    <div class="relative">
+                        <p class="text-slate-400 text-sm mb-1">未处理告警数</p>
+                        <h3 class="text-3xl font-bold text-white" id="pendingTotal">13</h3>
+                        <p class="text-blue-400 text-xs mt-2">待处理</p>
+                    </div>
+                    <i class="fas fa-clock absolute bottom-4 right-4 text-blue-500/20 text-4xl"></i>
+                </div>
+            </div>
+
+            <!-- 筛选工具栏 -->
+            <div class="glass-panel rounded-xl p-4 mb-6">
+                <div class="flex flex-wrap items-center gap-4">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm text-slate-400">时间范围:</span>
+                        <button class="filter-time px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors" data-range="today">今日</button>
+                        <button class="filter-time px-3 py-1.5 bg-slate-700 text-slate-300 text-sm rounded-lg hover:bg-slate-600 transition-colors" data-range="7days">近7天</button>
+                        <button class="filter-time px-3 py-1.5 bg-slate-700 text-slate-300 text-sm rounded-lg hover:bg-slate-600 transition-colors" data-range="30days">近30天</button>
+                        <input type="datetime-local" id="startTime" class="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm text-slate-400">告警级别:</span>
+                        <select id="levelFilter" class="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500">
+                            <option value="">全部级别</option>
+                            <option value="critical">严重</option>
+                            <option value="warning">警告</option>
+                            <option value="info">提示</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm text-slate-400">告警类型:</span>
+                        <select id="typeFilter" class="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500">
+                            <option value="">全部类型</option>
+                            <option value="offline">设备离线</option>
+                            <option value="motion">移动侦测</option>
+                            <option value="storage">存储异常</option>
+                        </select>
+                    </div>
+                    <!-- 处理状态筛选 -->
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm text-slate-400">处理状态:</span>
+                        <select id="statusFilter" class="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500">
+                            <option value="">全部状态</option>
+                            <option value="resolved">已处理</option>
+                            <option value="pending">未处理</option>
+                        </select>
+                    </div>
+                    <div class="flex-1 min-w-[200px]">
+                        <div class="relative">
+                            <input type="text" id="searchInput" placeholder="搜索设备名称/通道号/位置..." 
+                                class="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg pl-10 pr-4 py-1.5 focus:outline-none focus:border-blue-500 placeholder-slate-500">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button id="queryBtn" class="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors flex items-center">
+                            <i class="fas fa-filter mr-2"></i>查询
+                        </button>
+                        <button id="exportBtn" class="px-4 py-1.5 bg-slate-700 text-slate-300 text-sm rounded-lg hover:bg-slate-600 transition-colors flex items-center">
+                            <i class="fas fa-download mr-2"></i>导出
+                        </button>
+                        <button id="batchProcessBtn" class="px-4 py-1.5 bg-slate-700 text-slate-300 text-sm rounded-lg hover:bg-slate-600 transition-colors flex items-center">
+                            <i class="fas fa-check-double mr-2"></i>批量处理
+                            <span id="selectedCount" class="ml-2 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full hidden">0</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 告警列表 - 表格形式 (操作列图标常显) -->
+            <div class="glass-panel rounded-xl overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                    <h3 class="font-semibold text-lg flex items-center">
+                        <i class="fas fa-list-ul mr-2 text-blue-500"></i>
+                        告警记录列表
+                    </h3>
+                    <div class="flex items-center space-x-2 text-sm">
+                        <span class="text-slate-400">排序:</span>
+                        <select id="sortOrder" class="bg-slate-800 border border-slate-700 text-white text-sm rounded px-2 py-1">
+                            <option value="time-desc">时间降序</option>
+                            <option value="time-asc">时间升序</option>
+                            <option value="level">级别优先</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-wider">
+                            <tr>
+                                <th class="px-6 py-3 text-left w-8">
+                                    <input type="checkbox" id="selectAll" class="checkbox-custom">
+                                </th>
+                                <th class="px-6 py-3 text-left">级别</th>
+                                <th class="px-6 py-3 text-left">告警类型</th>
+                                <th class="px-6 py-3 text-left">设备名称/位置</th>
+                                <th class="px-6 py-3 text-left">告警详情</th>
+                                <th class="px-6 py-3 text-left">发生时间</th>
+                                <th class="px-6 py-3 text-left">处理状态</th>
+                                <th class="px-6 py-3 text-left">处理时间</th>
+                                <th class="px-6 py-3 text-left">处理结果</th>
+                                <th class="px-6 py-3 text-left">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alertTableBody" class="divide-y divide-slate-800">
+                            <!-- 1. 设备离线 - 严重 (未处理) 增加了详情按钮 -->
+                            <tr class="alert-table-row row-critical" data-level="critical" data-type="offline" data-device="主楼-1F-南通道摄像机-01" data-location="主楼一层南侧走廊" data-time="2024-03-09 14:53" data-id="1" data-processed="false" data-handle-time="" data-handle-result="">
+                                <td class="px-6 py-4"><input type="checkbox" class="checkbox-custom row-checkbox" value="1"></td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 badge-critical text-xs rounded font-medium">严重</span></td>
+                                <td class="px-6 py-4 text-slate-300">设备离线</td>
+                                <td class="px-6 py-4">
+                                    <div class="font-medium text-white">主楼-1F-南通道摄像机-01</div>
+                                    <div class="text-xs text-slate-400">主楼一层南侧走廊</div>
+                                </td>
+                                <td class="px-6 py-4 text-slate-300">设备离线超过30分钟，IP:192.168.1.105</td>
+                                <td class="px-6 py-4 text-slate-300">2024-03-09 14:53:22</td>
+                                <td class="px-6 py-4"><span class="status-offline text-red-400"><i class="fas fa-circle text-[8px] mr-1"></i>未处理</span></td>
+                                <td class="px-6 py-4 text-slate-400">-</td>
+                                <td class="px-6 py-4 text-slate-400">-</td>
+                                <td class="px-6 py-4 row-actions">
+                                    <button class="handle-btn text-blue-500 hover:text-blue-400 mr-2" title="处理" data-id="1"><i class="fas fa-check-circle"></i></button>
+                                    <button class="ignore-btn text-slate-500 hover:text-slate-400 mr-2" title="忽略" data-id="1"><i class="fas fa-eye-slash"></i></button>
+                                    <button class="detail-btn text-slate-400 hover:text-white mr-2" title="详情" data-id="1"><i class="fas fa-info-circle"></i></button>
+                                    <button class="text-slate-500 hover:text-white"><i class="fas fa-ellipsis-v"></i></button>
+                                </td>
+                            </tr>
+                            <!-- 2. 移动侦测告警 - 严重 (未处理) -->
+                            <tr class="alert-table-row row-critical" data-level="critical" data-type="motion" data-device="仓库-A区-红外枪机-02" data-location="A区仓库东侧" data-time="2024-03-09 14:15" data-id="2" data-processed="false">
+                                <td class="px-6 py-4"><input type="checkbox" class="checkbox-custom row-checkbox" value="2"></td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 badge-critical text-xs rounded font-medium">严重</span></td>
+                                <td class="px-6 py-4 text-slate-300">移动侦测告警</td>
+                                <td class="px-6 py-4">
+                                    <div class="font-medium text-white">仓库-A区-红外枪机-02</div>
+                                    <div class="text-xs text-slate-400">A区仓库东侧</div>
+                                </td>
+                                <td class="px-6 py-4 text-slate-300">检测到移动物体，置信度92%，已抓拍</td>
+                                <td class="px-6 py-4 text-slate-300">2024-03-09 14:15:33</td>
+                                <td class="px-6 py-4"><span class="status-offline text-red-400"><i class="fas fa-circle text-[8px] mr-1"></i>未处理</span></td>
+                                <td class="px-6 py-4 text-slate-400">-</td>
+                                <td class="px-6 py-4 text-slate-400">-</td>
+                                <td class="px-6 py-4 row-actions">
+                                    <button class="handle-btn text-blue-500 hover:text-blue-400 mr-2" data-id="2"><i class="fas fa-check-circle"></i></button>
+                                    <button class="ignore-btn text-slate-500 hover:text-slate-400 mr-2" data-id="2"><i class="fas fa-eye-slash"></i></button>
+                                    <button class="detail-btn text-slate-400 hover:text-white mr-2" data-id="2"><i class="fas fa-info-circle"></i></button>
+                                    <button class="text-slate-500 hover:text-white"><i class="fas fa-ellipsis-v"></i></button>
+                                </td>
+                            </tr>
+                            <!-- 3. 存储硬盘故障 - 警告 (未处理) -->
+                            <tr class="alert-table-row row-warning" data-level="warning" data-type="storage" data-device="NVR-主楼-磁盘阵列" data-location="主楼机房" data-time="2024-03-09 13:42" data-id="3" data-processed="false">
+                                <td class="px-6 py-4"><input type="checkbox" class="checkbox-custom row-checkbox" value="3"></td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 badge-warning text-xs rounded font-medium">警告</span></td>
+                                <td class="px-6 py-4 text-slate-300">存储异常</td>
+                                <td class="px-6 py-4">
+                                    <div class="font-medium text-white">NVR-主楼-磁盘阵列</div>
+                                    <div class="text-xs text-slate-400">主楼机房 机柜A-03</div>
+                                </td>
+                                <td class="px-6 py-4 text-slate-300">硬盘2读取出错，预计剩余寿命不足7天</td>
+                                <td class="px-6 py-4 text-slate-300">2024-03-09 13:42:18</td>
+                                <td class="px-6 py-4"><span class="status-offline text-red-400"><i class="fas fa-circle text-[8px] mr-1"></i>未处理</span></td>
+                                <td class="px-6 py-4 text-slate-400">-</td>
+                                <td class="px-6 py-4 text-slate-400">-</td>
+                                <td class="px-6 py-4 row-actions">
+                                    <button class="handle-btn text-blue-500 hover:text-blue-400 mr-2" data-id="3"><i class="fas fa-check-circle"></i></button>
+                                    <button class="ignore-btn text-slate-500 hover:text-slate-400 mr-2" data-id="3"><i class="fas fa-eye-slash"></i></button>
+                                    <button class="detail-btn text-slate-400 hover:text-white mr-2" data-id="3"><i class="fas fa-info-circle"></i></button>
+                                    <button class="text-slate-500 hover:text-white"><i class="fas fa-ellipsis-v"></i></button>
+                                </td>
+                            </tr>
+                            <!-- 6. 设备离线 - 严重 (未处理) -->
+                            <tr class="alert-table-row row-critical" data-level="critical" data-type="offline" data-device="食堂-后厨-摄像机-01" data-location="食堂后厨" data-time="2024-03-09 10:12" data-id="6" data-processed="false">
+                                <td class="px-6 py-4"><input type="checkbox" class="checkbox-custom row-checkbox" value="6"></td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 badge-critical text-xs rounded font-medium">严重</span></td>
+                                <td class="px-6 py-4 text-slate-300">设备离线</td>
+                                <td class="px-6 py-4">
+                                    <div class="font-medium text-white">食堂-后厨-摄像机-01</div>
+                                    <div class="text-xs text-slate-400">食堂后厨操作区</div>
+                                </td>
+                                <td class="px-6 py-4 text-slate-300">设备离线，最后在线 10:05，可能断电</td>
+                                <td class="px-6 py-4 text-slate-300">2024-03-09 10:12:33</td>
+                                <td class="px-6 py-4"><span class="status-offline text-red-400"><i class="fas fa-circle text-[8px] mr-1"></i>未处理</span></td>
+                                <td class="px-6 py-4 text-slate-400">-</td>
+                                <td class="px-6 py-4 text-slate-400">-</td>
+                                <td class="px-6 py-4 row-actions">
+                                    <button class="handle-btn text-blue-500 hover:text-blue-400 mr-2" data-id="6"><i class="fas fa-check-circle"></i></button>
+                                    <button class="ignore-btn text-slate-500 hover:text-slate-400 mr-2" data-id="6"><i class="fas fa-eye-slash"></i></button>
+                                    <button class="detail-btn text-slate-400 hover:text-white mr-2" data-id="6"><i class="fas fa-info-circle"></i></button>
+                                    <button class="text-slate-500 hover:text-white"><i class="fas fa-ellipsis-v"></i></button>
+                                </td>
+                            </tr>
+                            <!-- 8. 移动侦测告警 - 严重 (未处理) -->
+                            <tr class="alert-table-row row-critical" data-level="critical" data-type="motion" data-device="财务室-红外半球-01" data-location="2F财务室" data-time="2024-03-09 08:22" data-id="8" data-processed="false">
+                                <td class="px-6 py-4"><input type="checkbox" class="checkbox-custom row-checkbox" value="8"></td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 badge-critical text-xs rounded font-medium">严重</span></td>
+                                <td class="px-6 py-4 text-slate-300">移动侦测告警</td>
+                                <td class="px-6 py-4">
+                                    <div class="font-medium text-white">财务室-红外半球-01</div>
+                                    <div class="text-xs text-slate-400">2F财务室门口</div>
+                                </td>
+                                <td class="px-6 py-4 text-slate-300">非工作时间检测到移动，已录像</td>
+                                <td class="px-6 py-4 text-slate-300">2024-03-09 08:22:45</td>
+                                <td class="px-6 py-4"><span class="status-offline text-red-400"><i class="fas fa-circle text-[8px] mr-1"></i>未处理</span></td>
+                                <td class="px-6 py-4 text-slate-400">-</td>
+                                <td class="px-6 py-4 text-slate-400">-</td>
+                                <td class="px-6 py-4 row-actions">
+                                    <button class="handle-btn text-blue-500 hover:text-blue-400 mr-2" data-id="8"><i class="fas fa-check-circle"></i></button>
+                                    <button class="ignore-btn text-slate-500 hover:text-slate-400 mr-2" data-id="8"><i class="fas fa-eye-slash"></i></button>
+                                    <button class="detail-btn text-slate-400 hover:text-white mr-2" data-id="8"><i class="fas fa-info-circle"></i></button>
+                                    <button class="text-slate-500 hover:text-white"><i class="fas fa-ellipsis-v"></i></button>
+                                </td>
+                            </tr>
+                            <!-- 9. 存储容量不足 - 提示 (已处理) 操作列显示已处理文字 -->
+                            <tr class="alert-table-row row-resolved" data-level="info" data-type="storage" data-device="NVR-宿舍楼-01" data-location="宿舍楼弱电井" data-time="2024-03-09 07:58" data-id="9" data-processed="true" data-handle-time="2024-03-09 09:30" data-handle-result="已扩容,清理旧录像">
+                                <td class="px-6 py-4"><input type="checkbox" class="checkbox-custom row-checkbox" value="9" disabled></td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 badge-resolved text-xs rounded font-medium">提示</span></td>
+                                <td class="px-6 py-4 text-slate-300">存储容量不足</td>
+                                <td class="px-6 py-4">
+                                    <div class="font-medium text-white">NVR-宿舍楼-01</div>
+                                    <div class="text-xs text-slate-400">宿舍楼弱电井</div>
+                                </td>
+                                <td class="px-6 py-4 text-slate-300">硬盘剩余容量仅8%，建议清理或扩容</td>
+                                <td class="px-6 py-4 text-slate-300">2024-03-09 07:58:30</td>
+                                <td class="px-6 py-4"><span class="status-resolved text-green-400"><i class="fas fa-circle text-[8px] mr-1"></i>已处理</span></td>
+                                <td class="px-6 py-4 text-slate-300">2024-03-09 09:30</td>
+                                <td class="px-6 py-4 text-slate-300">已扩容,清理旧录像</td>
+                                <td class="px-6 py-4 row-actions"><span class="text-slate-500 text-xs">已处理</span></td>
+                            </tr>
+                            <!-- 12. 设备离线 - 严重 (未处理) -->
+                            <tr class="alert-table-row row-critical" data-level="critical" data-type="offline" data-device="周界-围墙枪机-05" data-location="东侧围墙" data-time="2024-03-09 04:10" data-id="12" data-processed="false">
+                                <td class="px-6 py-4"><input type="checkbox" class="checkbox-custom row-checkbox" value="12"></td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 badge-critical text-xs rounded font-medium">严重</span></td>
+                                <td class="px-6 py-4 text-slate-300">设备离线</td>
+                                <td class="px-6 py-4">
+                                    <div class="font-medium text-white">周界-围墙枪机-05</div>
+                                    <div class="text-xs text-slate-400">东侧围墙中段</div>
+                                </td>
+                                <td class="px-6 py-4 text-slate-300">设备无响应，可能被人为破坏</td>
+                                <td class="px-6 py-4 text-slate-300">2024-03-09 04:10:12</td>
+                                <td class="px-6 py-4"><span class="status-offline text-red-400"><i class="fas fa-circle text-[8px] mr-1"></i>未处理</span></td>
+                                <td class="px-6 py-4 text-slate-400">-</td>
+                                <td class="px-6 py-4 text-slate-400">-</td>
+                                <td class="px-6 py-4 row-actions">
+                                    <button class="handle-btn text-blue-500 hover:text-blue-400 mr-2" data-id="12"><i class="fas fa-check-circle"></i></button>
+                                    <button class="ignore-btn text-slate-500 hover:text-slate-400 mr-2" data-id="12"><i class="fas fa-eye-slash"></i></button>
+                                    <button class="detail-btn text-slate-400 hover:text-white mr-2" data-id="12"><i class="fas fa-info-circle"></i></button>
+                                    <button class="text-slate-500 hover:text-white"><i class="fas fa-ellipsis-v"></i></button>
+                                </td>
+                            </tr>
+                            <!-- 14. 移动侦测告警 - 严重 (已处理) -->
+                            <tr class="alert-table-row row-resolved" data-level="critical" data-type="motion" data-device="展厅-吸顶球机-02" data-location="1F展厅" data-time="2024-03-09 02:50" data-id="14" data-processed="true" data-handle-time="2024-03-09 10:15" data-handle-result="现场确认,误报">
+                                <td class="px-6 py-4"><input type="checkbox" class="checkbox-custom row-checkbox" value="14" disabled></td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 badge-resolved text-xs rounded font-medium">严重</span></td>
+                                <td class="px-6 py-4 text-slate-300">移动侦测告警</td>
+                                <td class="px-6 py-4">
+                                    <div class="font-medium text-white">展厅-吸顶球机-02</div>
+                                    <div class="text-xs text-slate-400">1F展厅中央</div>
+                                </td>
+                                <td class="px-6 py-4 text-slate-300">夜间布防时段检测到移动</td>
+                                <td class="px-6 py-4 text-slate-300">2024-03-09 02:50:33</td>
+                                <td class="px-6 py-4"><span class="status-resolved text-green-400"><i class="fas fa-circle text-[8px] mr-1"></i>已处理</span></td>
+                                <td class="px-6 py-4 text-slate-300">2024-03-09 10:15</td>
+                                <td class="px-6 py-4 text-slate-300">现场确认,误报</td>
+                                <td class="px-6 py-4 row-actions"><span class="text-slate-500 text-xs">已处理</span></td>
+                            </tr>
+                            <!-- 15. 存储写入慢 - 提示 (未处理) -->
+                            <tr class="alert-table-row row-info" data-level="info" data-type="storage" data-device="NVR-食堂-01" data-location="食堂办公室" data-time="2024-03-09 01:05" data-id="15" data-processed="false">
+                                <td class="px-6 py-4"><input type="checkbox" class="checkbox-custom row-checkbox" value="15"></td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 badge-info text-xs rounded font-medium">提示</span></td>
+                                <td class="px-6 py-4 text-slate-300">存储写入慢</td>
+                                <td class="px-6 py-4">
+                                    <div class="font-medium text-white">NVR-食堂-01</div>
+                                    <div class="text-xs text-slate-400">食堂办公室</div>
+                                </td>
+                                <td class="px-6 py-4 text-slate-300">录像写入延迟超过500ms，检查硬盘</td>
+                                <td class="px-6 py-4 text-slate-300">2024-03-09 01:05:27</td>
+                                <td class="px-6 py-4"><span class="status-offline text-red-400"><i class="fas fa-circle text-[8px] mr-1"></i>未处理</span></td>
+                                <td class="px-6 py-4 text-slate-400">-</td>
+                                <td class="px-6 py-4 text-slate-400">-</td>
+                                <td class="px-6 py-4 row-actions">
+                                    <button class="handle-btn text-blue-500 hover:text-blue-400 mr-2" data-id="15"><i class="fas fa-check-circle"></i></button>
+                                    <button class="ignore-btn text-slate-500 hover:text-slate-400 mr-2" data-id="15"><i class="fas fa-eye-slash"></i></button>
+                                    <button class="detail-btn text-slate-400 hover:text-white mr-2" data-id="15"><i class="fas fa-info-circle"></i></button>
+                                    <button class="text-slate-500 hover:text-white"><i class="fas fa-ellipsis-v"></i></button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 分页 -->
+                <div class="px-6 py-4 border-t border-slate-800 flex items-center justify-between">
+                    <span class="text-sm text-slate-400">共 <span id="totalCount">8</span> 条记录，每页显示 10 条</span>
+                    <div class="flex items-center space-x-2">
+                        <button class="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded hover:bg-slate-700 disabled:opacity-50" disabled>
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded">1</button>
+                        <button class="px-3 py-1.5 bg-slate-800 text-slate-300 text-sm rounded hover:bg-slate-700">2</button>
+                        <span class="text-slate-500">...</span>
+                        <button class="px-3 py-1.5 bg-slate-800 text-slate-300 text-sm rounded hover:bg-slate-700">3</button>
+                        <button class="px-3 py-1.5 bg-slate-800 text-slate-300 text-sm rounded hover:bg-slate-700">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        (function() {
+            // 获取元素
+            const tableBody = document.getElementById('alertTableBody');
+            const rows = Array.from(document.querySelectorAll('#alertTableBody tr'));
+            const selectAllCheckbox = document.getElementById('selectAll');
+            const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+            const selectedCountSpan = document.getElementById('selectedCount');
+
+            // 统计卡片
+            const todayTotalSpan = document.getElementById('todayTotal');
+            const historyTotalSpan = document.getElementById('historyTotal');
+            const resolvedTotalSpan = document.getElementById('resolvedTotal');
+            const pendingTotalSpan = document.getElementById('pendingTotal');
+            const totalCountSpan = document.getElementById('totalCount');
+            const alertCountBadge = document.getElementById('alertCount');
+
+            // 弹窗
+            const modal = document.getElementById('handleModal');
+            const modalAlertInfo = document.getElementById('modalAlertInfo');
+            const closeModalBtn = document.getElementById('closeModalBtn');
+            const cancelModalBtn = document.getElementById('cancelModalBtn');
+            const handleForm = document.getElementById('handleForm');
+            const handleMethod = document.getElementById('handleMethod');
+            const handleRemark = document.getElementById('handleRemark');
+            const resolveConfirm = document.getElementById('resolveConfirm');
+            
+            // 详情弹窗
+            const detailModal = document.getElementById('detailModal');
+            const detailContent = document.getElementById('detailContent');
+            const closeDetailBtn = document.getElementById('closeDetailBtn');
+            const closeDetailFooterBtn = document.getElementById('closeDetailFooterBtn');
+            
+            // Toast
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+
+            let currentHandleRow = null;
+
+            function showToast(msg, type = 'success') {
+                toastMessage.textContent = msg;
+                toast.classList.add('show');
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 3000);
+            }
+
+            function getCurrentTimeStr() {
+                const d = new Date();
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2,'0');
+                const day = String(d.getDate()).padStart(2,'0');
+                const hour = String(d.getHours()).padStart(2,'0');
+                const minute = String(d.getMinutes()).padStart(2,'0');
+                return `${year}-${month}-${day} ${hour}:${minute}`;
+            }
+
+            function updateStats() {
+                let totalVisible = rows.filter(r => r.style.display !== 'none').length;
+                totalCountSpan.textContent = totalVisible;
+                alertCountBadge.textContent = totalVisible;
+
+                const todayStr = '2024-03-09';
+                const todayTotal = rows.filter(r => {
+                    const time = r.dataset.time || '';
+                    return time.startsWith(todayStr);
+                }).length;
+                todayTotalSpan.textContent = todayTotal;
+
+                const historyTotal = rows.length;
+                historyTotalSpan.textContent = historyTotal;
+
+                const resolved = rows.filter(r => r.classList.contains('row-resolved')).length;
+                resolvedTotalSpan.textContent = resolved;
+
+                const pending = rows.filter(r => !r.classList.contains('row-resolved') && r.style.display !== 'none').length;
+                pendingTotalSpan.textContent = pending;
+            }
+
+            function markRowAsResolved(row, method, remark) {
+                if (!row) return;
+                
+                row.classList.add('row-resolved');
+                row.classList.remove('row-critical', 'row-warning', 'row-info');
+                
+                const levelBadge = row.querySelector('td:nth-child(2) span');
+                if (levelBadge) {
+                    levelBadge.className = 'px-2 py-1 badge-resolved text-xs rounded font-medium';
+                    levelBadge.textContent = '已处理';
+                }
+                
+                const statusCell = row.querySelector('td:nth-child(7) span');
+                if (statusCell) {
+                    statusCell.className = 'status-resolved text-green-400';
+                    statusCell.innerHTML = '<i class="fas fa-circle text-[8px] mr-1"></i>已处理';
+                }
+                
+                const handleTimeCell = row.querySelector('td:nth-child(8)');
+                if (handleTimeCell) {
+                    handleTimeCell.textContent = getCurrentTimeStr();
+                    handleTimeCell.classList.remove('text-slate-400');
+                    handleTimeCell.classList.add('text-slate-300');
+                }
+                
+                const resultCell = row.querySelector('td:nth-child(9)');
+                if (resultCell) {
+                    const resultText = remark ? `${method} - ${remark}` : method;
+                    resultCell.textContent = resultText;
+                    resultCell.classList.remove('text-slate-400');
+                    resultCell.classList.add('text-slate-300');
+                }
+
+                const cb = row.querySelector('.row-checkbox');
+                if (cb) {
+                    cb.disabled = true;
+                    cb.checked = false;
+                }
+                
+                const actionsCell = row.querySelector('td:nth-child(10)');
+                if (actionsCell) {
+                    actionsCell.innerHTML = '<span class="text-slate-500 text-xs">已处理</span>';
+                }
+                
+                row.dataset.processed = 'true';
+                
+                updateStats();
+                updateSelectAllState();
+                showToast(`告警已处理 (${method})`);
+            }
+
+            function openHandleModal(row) {
+                currentHandleRow = row;
+                const device = row.dataset.device || '未知设备';
+                const type = row.querySelector('td:nth-child(3)')?.textContent || '未知类型';
+                const time = row.dataset.time || '';
+                
+                modalAlertInfo.innerHTML = `
+                    <div class="space-y-1">
+                        <p><span class="text-slate-400">设备：</span><span class="text-white">${device}</span></p>
+                        <p><span class="text-slate-400">告警类型：</span><span class="text-white">${type}</span></p>
+                        <p><span class="text-slate-400">发生时间：</span><span class="text-white">${time}</span></p>
+                    </div>
+                `;
+                
+                handleMethod.value = '';
+                handleRemark.value = '';
+                resolveConfirm.checked = false;
+                
+                modal.classList.add('active');
+            }
+
+            function closeModal() {
+                modal.classList.remove('active');
+                currentHandleRow = null;
+            }
+
+            // 显示详情弹窗
+            function showDetailModal(row) {
+                const device = row.dataset.device || '未知';
+                const location = row.dataset.location || '未知';
+                const time = row.dataset.time || '未知';
+                const id = row.dataset.id || '未知';
+                const level = row.dataset.level || '未知';
+                const type = row.querySelector('td:nth-child(3)')?.textContent || '未知';
+                const detail = row.querySelector('td:nth-child(5)')?.textContent || '未知';
+                const processed = row.classList.contains('row-resolved');
+                const handleTime = row.querySelector('td:nth-child(8)')?.textContent || '-';
+                const handleResult = row.querySelector('td:nth-child(9)')?.textContent || '-';
+
+                detailContent.innerHTML = `
+                    <div class="detail-grid text-sm">
+                        <span class="text-slate-400">告警ID：</span><span class="text-white">${id}</span>
+                        <span class="text-slate-400">设备名称：</span><span class="text-white">${device}</span>
+                        <span class="text-slate-400">安装位置：</span><span class="text-white">${location}</span>
+                        <span class="text-slate-400">告警级别：</span><span class="text-white">${level === 'critical' ? '严重' : level === 'warning' ? '警告' : '提示'}</span>
+                        <span class="text-slate-400">告警类型：</span><span class="text-white">${type}</span>
+                        <span class="text-slate-400">发生时间：</span><span class="text-white">${time}</span>
+                        <span class="text-slate-400">告警详情：</span><span class="text-white">${detail}</span>
+                        <span class="text-slate-400">处理状态：</span><span class="text-white ${processed ? 'text-green-400' : 'text-red-400'}">${processed ? '已处理' : '未处理'}</span>
+                        <span class="text-slate-400">处理时间：</span><span class="text-white">${handleTime}</span>
+                        <span class="text-slate-400">处理结果：</span><span class="text-white">${handleResult}</span>
+                    </div>
+                `;
+                detailModal.classList.add('active');
+            }
+
+            function closeDetailModal() {
+                detailModal.classList.remove('active');
+            }
+
+            // 筛选
+            function filterTable() {
+                const levelVal = document.getElementById('levelFilter').value;
+                const typeVal = document.getElementById('typeFilter').value;
+                const statusVal = document.getElementById('statusFilter').value;
+                const searchVal = document.getElementById('searchInput').value.trim().toLowerCase();
+
+                rows.forEach(row => {
+                    const level = row.dataset.level;
+                    const type = row.dataset.type;
+                    const isResolved = row.classList.contains('row-resolved');
+                    const device = (row.dataset.device || '').toLowerCase();
+                    const location = (row.dataset.location || '').toLowerCase();
+                    const textContent = row.textContent.toLowerCase();
+
+                    let match = true;
+                    if (levelVal && level !== levelVal) match = false;
+                    if (match && typeVal && type !== typeVal) match = false;
+                    if (match && statusVal) {
+                        if (statusVal === 'resolved' && !isResolved) match = false;
+                        if (statusVal === 'pending' && isResolved) match = false;
+                    }
+                    if (match && searchVal) {
+                        if (!(device.includes(searchVal) || location.includes(searchVal) || textContent.includes(searchVal))) {
+                            match = false;
+                        }
+                    }
+                    row.style.display = match ? '' : 'none';
+                });
+
+                updateSelectAllState();
+                updateStats();
+            }
+
+            function sortTable() {
+                const sortValue = document.getElementById('sortOrder').value;
+                const rowsArray = Array.from(rows).filter(r => r.style.display !== 'none');
+                const tbody = tableBody;
+
+                rowsArray.sort((a, b) => {
+                    const timeA = a.dataset.time || '';
+                    const timeB = b.dataset.time || '';
+                    const levelA = a.dataset.level;
+                    const levelB = b.dataset.level;
+                    const levelWeight = { critical: 1, warning: 2, info: 3 };
+
+                    if (sortValue === 'time-desc') {
+                        return timeB.localeCompare(timeA);
+                    } else if (sortValue === 'time-asc') {
+                        return timeA.localeCompare(timeB);
+                    } else if (sortValue === 'level') {
+                        return (levelWeight[levelA] || 99) - (levelWeight[levelB] || 99);
+                    }
+                    return 0;
+                });
+
+                rowsArray.forEach(row => tbody.appendChild(row));
+                const hiddenRows = rows.filter(r => r.style.display === 'none');
+                hiddenRows.forEach(row => tbody.appendChild(row));
+            }
+
+            function updateSelectAllState() {
+                const visibleCheckboxes = Array.from(rowCheckboxes).filter(cb => cb.closest('tr').style.display !== 'none' && !cb.disabled);
+                const checkedVisible = visibleCheckboxes.filter(cb => cb.checked);
+                if (visibleCheckboxes.length === 0) {
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = false;
+                } else if (checkedVisible.length === visibleCheckboxes.length) {
+                    selectAllCheckbox.checked = true;
+                    selectAllCheckbox.indeterminate = false;
+                } else if (checkedVisible.length > 0) {
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = true;
+                } else {
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = false;
+                }
+                updateSelectedCount();
+            }
+
+            function updateSelectedCount() {
+                const checked = Array.from(rowCheckboxes).filter(cb => cb.checked && !cb.disabled).length;
+                if (checked > 0) {
+                    selectedCountSpan.textContent = checked;
+                    selectedCountSpan.classList.remove('hidden');
+                } else {
+                    selectedCountSpan.classList.add('hidden');
+                }
+            }
+
+            // 事件绑定
+            document.getElementById('queryBtn').addEventListener('click', () => {
+                filterTable();
+                sortTable();
+            });
+
+            document.getElementById('searchInput').addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') {
+                    filterTable();
+                    sortTable();
+                }
+            });
+
+            document.getElementById('sortOrder').addEventListener('change', sortTable);
+
+            // 处理按钮
+            document.querySelectorAll('.handle-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const row = this.closest('tr');
+                    if (row.classList.contains('row-resolved')) {
+                        showToast('此告警已处理', 'info');
+                        return;
+                    }
+                    openHandleModal(row);
+                });
+            });
+
+            // 忽略按钮
+            document.querySelectorAll('.ignore-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const row = this.closest('tr');
+                    if (row.classList.contains('row-resolved')) {
+                        showToast('此告警已处理', 'info');
+                        return;
+                    }
+                    markRowAsResolved(row, '忽略', '已忽略');
+                });
+            });
+
+            // 详情按钮
+            document.querySelectorAll('.detail-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const row = this.closest('tr');
+                    showDetailModal(row);
+                });
+            });
+
+            // 关闭详情
+            closeDetailBtn.addEventListener('click', closeDetailModal);
+            closeDetailFooterBtn.addEventListener('click', closeDetailModal);
+            detailModal.addEventListener('click', function(e) {
+                if (e.target === detailModal) closeDetailModal();
+            });
+
+            // 处理弹窗关闭
+            closeModalBtn.addEventListener('click', closeModal);
+            cancelModalBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) closeModal();
+            });
+
+            handleForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const method = handleMethod.value;
+                if (!method) {
+                    alert('请选择处理方式');
+                    return;
+                }
+                
+                if (!currentHandleRow) return;
+                
+                const remark = handleRemark.value.trim() || '无备注';
+                const resolved = resolveConfirm.checked;
+                
+                if (resolved) {
+                    markRowAsResolved(currentHandleRow, method, remark);
+                } else {
+                    showToast(`已记录处理方式: ${method}`, 'info');
+                }
+                closeModal();
+            });
+
+            // 全选
+            selectAllCheckbox.addEventListener('change', function() {
+                const visibleCheckboxes = Array.from(rowCheckboxes).filter(cb => cb.closest('tr').style.display !== 'none' && !cb.disabled);
+                visibleCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+                updateSelectedCount();
+                updateSelectAllState();
+            });
+
+            rowCheckboxes.forEach(cb => {
+                cb.addEventListener('change', updateSelectAllState);
+            });
+
+            document.getElementById('batchProcessBtn').addEventListener('click', function() {
+                const selected = Array.from(rowCheckboxes).filter(cb => cb.checked && !cb.disabled && cb.closest('tr').style.display !== 'none');
+                if (selected.length === 0) {
+                    alert('请先选择未处理的告警记录');
+                    return;
+                }
+                if (confirm(`批量处理 ${selected.length} 条告警，标记为已处理？`)) {
+                    selected.forEach(cb => {
+                        const row = cb.closest('tr');
+                        markRowAsResolved(row, '批量处理', '批量处理');
+                    });
+                    selectAllCheckbox.checked = false;
+                }
+            });
+
+            document.getElementById('exportBtn').addEventListener('click', () => {
+                alert('导出告警列表 (演示)');
+            });
+
+            document.querySelectorAll('.filter-time').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.filter-time').forEach(b => {
+                        b.classList.remove('bg-blue-600', 'text-white');
+                        b.classList.add('bg-slate-700', 'text-slate-300');
+                    });
+                    this.classList.remove('bg-slate-700', 'text-slate-300');
+                    this.classList.add('bg-blue-600', 'text-white');
+                });
+            });
+
+            updateStats();
+        })();
+    </script>
+</body>
+</html>

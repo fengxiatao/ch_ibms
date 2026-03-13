@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧照明控制系统 - 告警信息</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #409eff;
+            --success: #67c23a;
+            --warning: #e6a23c;
+            --danger: #f56c6c;
+            --text: #303133;
+            --text-regular: #606266;
+            --border: #ebeef5;
+            --bg: #f0f2f5;
+            --sidebar-bg: #304156;
+            --sidebar-text: #bfcbd9;
+            --light-bg: #f5f7fa;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        .container { display: flex; min-height: 100vh; }
+        
+        /* 侧边栏 */
+        .sidebar {
+            width: 220px;
+            background-color: var(--sidebar-bg);
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+        .logo {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .menu { padding: 10px 0; }
+        .menu-item {
+            padding: 0 20px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            color: var(--sidebar-text);
+            cursor: pointer;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+            justify-content: space-between;
+        }
+        .menu-item:hover, .menu-item.active {
+            background-color: rgba(64, 158, 255, 0.1);
+            color: var(--primary);
+            border-left-color: var(--primary);
+        }
+        .menu-icon-text { display: flex; align-items: center; }
+        .menu-icon { width: 20px; margin-right: 10px; text-align: center; }
+        .arrow { transition: transform 0.3s; font-size: 12px; }
+        .arrow.expanded { transform: rotate(90deg); }
+        .submenu {
+            background-color: rgba(0,0,0,0.15);
+            overflow: hidden;
+            max-height: 0;
+            transition: max-height 0.3s;
+        }
+        .submenu.expanded { max-height: 400px; }
+        .submenu-item {
+            padding: 12px 20px 12px 50px;
+            color: var(--sidebar-text);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .submenu-item:hover, .submenu-item.active {
+            color: var(--primary);
+            background: rgba(64, 158, 255, 0.05);
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: 220px;
+            padding: 20px;
+        }
+
+        .top-header {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .breadcrumb { color: #606266; font-size: 14px; }
+
+        .view-section { display: none; }
+        .view-section.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 告警信息核心样式 */
+        .alarm-info {
+            background: white;
+            border-radius: 4px;
+            padding: 20px;
+            min-height: calc(100vh - 140px);
+        }
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-select, .filter-input {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            outline: none;
+        }
+        .filter-input { width: 200px; }
+        .filter-btn {
+            padding: 8px 16px;
+            border: none;
+            background: var(--primary);
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .reset-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* 告警表格样式 */
+        .alarm-table-container {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .data-table th {
+            background: #f5f7fa;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #606266;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            color: #303133;
+        }
+        .data-table tr:hover td {
+            background: #f5f7fa;
+        }
+        
+        /* 告警级别标签 */
+        .alarm-level-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .level-warning { background: #fff7e6; color: #fa8c16; }
+        .level-danger { background: #fff2f0; color: #f5222d; }
+        .level-info { background: #e6f7ff; color: #1890ff; }
+        
+        /* 告警状态标签 */
+        .alarm-status-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status-unhandled { background: #fff2f0; color: #f5222d; }
+        .status-handling { background: #fff7e6; color: #fa8c16; }
+        .status-handled { background: #f6ffed; color: #52c41a; }
+        
+        .action-link {
+            color: var(--primary);
+            cursor: pointer;
+            margin-right: 12px;
+            font-size: 13px;
+        }
+        .action-link:hover {
+            text-decoration: underline;
+        }
+        .action-link.danger {
+            color: var(--danger);
+        }
+        .action-link.success {
+            color: var(--success);
+        }
+
+        .pagination-bar {
+            padding: 16px;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            border-top: 1px solid var(--border);
+        }
+        .btn {
+            padding: 8px 20px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .btn-primary:hover {
+            opacity: 0.9;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 侧边栏（保留原有目录结构） -->
+        <aside class="sidebar">
+            <div class="logo">💡 智慧照明系统</div>
+            <div class="menu">
+                <div class="menu-item" onclick="switchView('dashboard')">
+                    <div class="menu-icon-text">
+                        <span class="menu-icon">🏢</span>
+                        <span>智慧楼宇</span>
+                    </div>
+                </div>
+                
+                <div class="menu-item active" onclick="toggleSubmenu(this)">
+                    <div class="menu-icon-text">
+                        <span class="menu-icon">💡</span>
+                        <span>智慧照明</span>
+                    </div>
+                    <span class="arrow expanded">▶</span>
+                </div>
+                
+                <div class="submenu expanded" id="lightSubmenu">
+                    <div class="submenu-item" onclick="switchToDevice()">照明控制</div>
+                    <div class="submenu-item" onclick="switchToScene()">场景控制</div>
+                    <div class="submenu-item" onclick="switchToDeviceManagement()">设备管理</div>
+                    <div class="submenu-item" onclick="switchToOperationLog()">操作日志</div>
+                    <div class="submenu-item active" onclick="switchToAlarmInfo()">告警信息</div>
+                </div>
+
+                <div class="menu-item" onclick="switchToSettings()">
+                    <div class="menu-icon-text">
+                        <span class="menu-icon">⚙️</span>
+                        <span>系统设置</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主内容：告警信息模块核心 -->
+        <main class="main-content">
+            <!-- 告警信息视图 -->
+            <div id="alarmInfoView" class="view-section active">
+                <div class="top-header">
+                    <div class="breadcrumb">首页 / 智慧照明 / 告警信息</div>
+                    <div style="color: #606266;">👤 管理员</div>
+                </div>
+
+                <div class="alarm-info">
+                    <!-- 筛选栏 -->
+                    <div class="filter-bar">
+                        <select class="filter-select" id="alarmLevelFilter" onchange="filterAlarmInfo()">
+                            <option value="all">全部级别</option>
+                            <option value="warning">警告</option>
+                            <option value="danger">紧急</option>
+                            <option value="info">提示</option>
+                        </select>
+                        <select class="filter-select" id="alarmStatusFilter" onchange="filterAlarmInfo()">
+                            <option value="all">全部状态</option>
+                            <option value="unhandled">未处理</option>
+                            <option value="handling">处理中</option>
+                            <option value="handled">已处理</option>
+                        </select>
+                        <select class="filter-select" id="alarmAreaFilter" onchange="filterAlarmInfo()">
+                            <option value="all">全部区域</option>
+                            <option value="A1">A区一层</option>
+                            <option value="A2">A区二层</option>
+                            <option value="B1">B区展厅</option>
+                            <option value="public">公共区域</option>
+                            <option value="machine">机房/弱电间</option>
+                        </select>
+                        <input type="text" class="filter-input" placeholder="搜索告警设备/内容" id="alarmSearchInput" oninput="filterAlarmInfo()">
+                        <button class="filter-btn" onclick="filterAlarmInfo()">查询</button>
+                        <button class="reset-btn" onclick="resetAlarmInfoFilter()">重置</button>
+                        <button class="btn btn-primary" onclick="exportAlarmInfo()" style="margin-left: auto;">📥 导出</button>
+                    </div>
+
+                    <!-- 告警信息表格 -->
+                    <div class="alarm-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>告警编号</th>
+                                    <th>告警设备</th>
+                                    <th>告警级别</th>
+                                    <th>告警内容</th>
+                                    <th>告警时间</th>
+                                    <th>所属区域</th>
+                                    <th>告警状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alarmInfoTableBody">
+                                <!-- 示例数据 -->
+                                <tr>
+                                    <td>ALM-B1-2026013001</td>
+                                    <td>DEV-B1-002（B1展厅调光控制器）</td>
+                                    <td><span class="alarm-level-tag level-danger">紧急</span></td>
+                                    <td>设备通信中断，检测到线路故障</td>
+                                    <td>2026-01-30 10:15:20</td>
+                                    <td>B区展厅</td>
+                                    <td><span class="alarm-status-tag status-unhandled">未处理</span></td>
+                                    <td>
+                                        <span class="action-link success" onclick="handleAlarm('ALM-B1-2026013001')">处理</span>
+                                        <span class="action-link" onclick="viewAlarmDetail('ALM-B1-2026013001')">详情</span>
+                                        <span class="action-link danger" onclick="deleteAlarm('ALM-B1-2026013001')">删除</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>ALM-A1-2026013002</td>
+                                    <td>DEV-A1-005（A1区5号照明回路）</td>
+                                    <td><span class="alarm-level-tag level-warning">警告</span></td>
+                                    <td>设备电流异常，超过阈值10%</td>
+                                    <td>2026-01-30 11:20:15</td>
+                                    <td>A区一层</td>
+                                    <td><span class="alarm-status-tag status-handling">处理中</span></td>
+                                    <td>
+                                        <span class="action-link success" onclick="completeAlarm('ALM-A1-2026013002')">完成处理</span>
+                                        <span class="action-link" onclick="viewAlarmDetail('ALM-A1-2026013002')">详情</span>
+                                        <span class="action-link danger" onclick="deleteAlarm('ALM-A1-2026013002')">删除</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>ALM-M-2026013003</td>
+                                    <td>GW-M-001（机房主网关）</td>
+                                    <td><span class="alarm-level-tag level-info">提示</span></td>
+                                    <td>网关固件版本过低，建议升级</td>
+                                    <td>2026-01-30 09:05:30</td>
+                                    <td>机房/弱电间</td>
+                                    <td><span class="alarm-status-tag status-handled">已处理</span></td>
+                                    <td>
+                                        <span class="action-link" onclick="viewAlarmDetail('ALM-M-2026013003')">详情</span>
+                                        <span class="action-link danger" onclick="deleteAlarm('ALM-M-2026013003')">删除</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 分页栏 -->
+                    <div class="pagination-bar">
+                        <span style="color: #606266;">共 <span id="alarmTotalCount">3</span> 条</span>
+                        <select style="padding: 5px; border: 1px solid #dcdfe6; border-radius: 4px;">
+                            <option>10条/页</option>
+                            <option>20条/页</option>
+                            <option>50条/页</option>
+                        </select>
+                        <button class="btn" style="padding: 5px 12px;">←</button>
+                        <button class="btn btn-primary" style="padding: 5px 12px;">1</button>
+                        <button class="btn" style="padding: 5px 12px;">2</button>
+                        <button class="btn" style="padding: 5px 12px;">→</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // 告警信息筛选功能
+        function filterAlarmInfo() {
+            const levelFilter = document.getElementById('alarmLevelFilter').value;
+            const statusFilter = document.getElementById('alarmStatusFilter').value;
+            const areaFilter = document.getElementById('alarmAreaFilter').value;
+            const searchText = document.getElementById('alarmSearchInput').value.toLowerCase();
+            
+            // 实际项目中这里写筛选逻辑
+            console.log('告警筛选条件：', { levelFilter, statusFilter, areaFilter, searchText });
+            // 可根据筛选条件更新表格数据
+        }
+
+        // 重置告警信息筛选
+        function resetAlarmInfoFilter() {
+            document.getElementById('alarmLevelFilter').value = 'all';
+            document.getElementById('alarmStatusFilter').value = 'all';
+            document.getElementById('alarmAreaFilter').value = 'all';
+            document.getElementById('alarmSearchInput').value = '';
+            filterAlarmInfo(); // 重置后重新筛选
+        }
+
+        // 导出告警信息数据
+        function exportAlarmInfo() {
+            alert('开始导出告警信息数据...');
+            // 实际项目中写导出逻辑（如导出Excel）
+        }
+
+        // 处理告警（未处理→处理中）
+        function handleAlarm(alarmId) {
+            if (confirm(`确认开始处理告警 ${alarmId} 吗？`)) {
+                alert(`已将告警 ${alarmId} 标记为处理中`);
+                // 实际项目中更新告警状态并刷新表格
+            }
+        }
+
+        // 完成告警处理（处理中→已处理）
+        function completeAlarm(alarmId) {
+            if (confirm(`确认完成告警 ${alarmId} 的处理吗？`)) {
+                alert(`已将告警 ${alarmId} 标记为已处理`);
+                // 实际项目中更新告警状态并刷新表格
+            }
+        }
+
+        // 查看告警详情
+        function viewAlarmDetail(alarmId) {
+            alert(`查看告警详情：${alarmId}`);
+            // 实际项目中打开详情弹窗
+        }
+
+        // 删除告警
+        function deleteAlarm(alarmId) {
+            if (confirm(`确定删除告警 ${alarmId} 吗？`)) {
+                alert(`删除告警：${alarmId}`);
+                // 实际项目中写删除逻辑并更新表格
+            }
+        }
+
+        // 侧边栏菜单切换（保留原有目录跳转能力）
+        function toggleSubmenu(el) {
+            const arrow = el.querySelector('.arrow');
+            const submenu = document.getElementById('lightSubmenu');
+            arrow.classList.toggle('expanded');
+            submenu.classList.toggle('expanded');
+        }
+
+        function switchToDevice() {
+            alert('切换到照明控制页面');
+            // 实际项目中写页面切换逻辑
+        }
+
+        function switchToScene() {
+            alert('切换到场景控制页面');
+            // 实际项目中写页面切换逻辑
+        }
+
+        function switchToDeviceManagement() {
+            alert('切换到设备管理页面');
+            // 实际项目中写页面切换逻辑
+        }
+
+        function switchToOperationLog() {
+            alert('切换到操作日志页面');
+            // 实际项目中写页面切换逻辑
+        }
+
+        function switchToAlarmInfo() {
+            // 告警信息页面已激活，无需额外操作
+            console.log('当前已在告警信息页面');
+        }
+
+        function switchToSettings() {
+            alert('切换到系统设置页面');
+            // 实际项目中写页面切换逻辑
+        }
+
+        function switchView(viewName) {
+            alert(`切换到${viewName}页面`);
+            // 实际项目中写页面切换逻辑
+        }
+    </script>
+</body>
+</html>

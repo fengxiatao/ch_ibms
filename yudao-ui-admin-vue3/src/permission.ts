@@ -89,7 +89,18 @@ router.beforeEach(async (to, from, next) => {
           // 修复跳转时不带参数的问题
           const redirect = decodeURIComponent(redirectPath as string)
           const { paramsObject: query } = parseURL(redirect)
-          const nextData = to.path === redirect ? { ...to, replace: true } : { path: redirect, query }
+          // ⚠️ 注意：不要把 `to`（RouteLocationNormalized）整体传给 next() / router.push()
+          // 否则会携带 matched/redirectedFrom 等字段，Vue Router 4 会报 "No match for ..." 并卡在启动阶段
+          const nextData =
+            to.path === redirect
+              ? {
+                  path: to.path,
+                  query: to.query,
+                  hash: to.hash,
+                  params: to.params,
+                  replace: true
+                }
+              : { path: redirect, query }
           next(nextData)
         } else {
           next()

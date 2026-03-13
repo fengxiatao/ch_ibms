@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧照明 · 日志管理（全量任务执行日志）</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --primary-light: #d1fae5;
+            --secondary: #6366f1;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --border: #e5e7eb;
+            --bg-primary: #f3f4f6;
+            --bg-secondary: #ffffff;
+            --sidebar-bg: #1f2937;
+            --sidebar-width: 260px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .app-container { display: flex; min-height: 100vh; }
+        
+        /* ==================== 侧边栏 ==================== */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--sidebar-bg);
+            color: #fff;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 100;
+        }
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .sidebar-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        .sidebar-title { font-size: 18px; font-weight: 600; }
+        .sidebar-subtitle { font-size: 11px; color: rgba(255,255,255,0.5); }
+        .nav-menu { padding: 15px 0; }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+            transition: all 0.2s;
+            gap: 12px;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+        .nav-item.active { background: rgba(16, 185, 129, 0.15); color: var(--primary); }
+        .nav-item-icon { width: 20px; text-align: center; font-size: 16px; }
+        .nav-item-text { flex: 1; }
+        
+        /* ==================== 主内容区 ==================== */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            padding: 20px 30px;
+            min-height: 100vh;
+        }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding: 20px 25px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        .breadcrumb-item.active { color: var(--text-primary); font-weight: 500; }
+        .datetime-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-secondary {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { background: var(--border); }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        
+        /* ==================== 日志筛选 ==================== */
+        .log-filters {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+        }
+        .filter-group {
+            min-width: 140px;
+            flex: 1 0 auto;
+        }
+        .filter-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            background: var(--bg-secondary);
+        }
+        .form-control:focus { outline: none; border-color: var(--primary); }
+        .date-range {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .table-container {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            overflow-x: auto;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .data-table th {
+            text-align: left;
+            padding: 12px 8px;
+            background: var(--bg-primary);
+            font-weight: 600;
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+        .data-table td {
+            padding: 12px 8px;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        .data-table tr:hover { background: var(--bg-primary); }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-block;
+        }
+        .status-success { background: #dcfce7; color: #166534; }
+        .status-partial { background: #fef3c7; color: #92400e; }
+        .status-failed { background: #fee2e2; color: #991b1b; }
+        .type-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+        }
+        .device-type-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .device-light { background: #dbeafe; color: #1e40af; }
+        .device-dimmer { background: #f3e8ff; color: #6b21a8; }
+        .task-badge { background: #e0f2fe; color: #0369a1; }
+        
+        .export-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .toast {
+            position: fixed; top: 20px; right: 20px;
+            padding: 12px 20px; background: var(--bg-secondary);
+            border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex; align-items: center; gap: 10px;
+            z-index: 2000; animation: slideIn 0.3s;
+            max-width: 400px;
+        }
+        .toast.success { border-left: 4px solid var(--primary); }
+        .toast.warning { border-left: 4px solid var(--warning); }
+        .toast.error { border-left: 4px solid var(--danger); }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @media (max-width: 992px) {
+            .sidebar { transform: translateX(-100%); position: fixed; }
+            .main-content { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">💡</div>
+            <div>
+                <div class="sidebar-title">智慧照明控制</div>
+                <div class="sidebar-subtitle">Lighting Control System</div>
+            </div>
+        </div>
+        <nav class="nav-menu">
+            <div class="nav-item active" data-page="log">
+                <span class="nav-item-icon">📋</span>
+                <span class="nav-item-text">日志管理</span>
+            </div>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-header">
+            <div class="breadcrumb">
+                <span class="breadcrumb-item">首页</span><span>/</span>
+                <span class="breadcrumb-item active">日志管理</span>
+            </div>
+            <div class="datetime-display">
+                <span>📅</span>
+                <span id="currentDateTime">2026-03-04 14:30:00</span>
+            </div>
+        </div>
+
+        <!-- 筛选区 -->
+        <div class="log-filters">
+            <div class="filter-group">
+                <div class="filter-label">操作类型</div>
+                <select id="filterType" class="form-control" onchange="applyFilters()">
+                    <option value="all">全部类型</option>
+                    <option value="auto_exec">自动任务执行</option>
+                    <option value="manual_exec">手动任务执行</option>
+                    <option value="remote_control">远程控制</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <div class="filter-label">对象类型</div>
+                <select id="filterObjectType" class="form-control" onchange="applyFilters()">
+                    <option value="all">全部对象</option>
+                    <option value="task">任务</option>
+                    <option value="light">普通照明回路</option>
+                    <option value="dimmer">调光回路</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <div class="filter-label">执行状态</div>
+                <select id="filterStatus" class="form-control" onchange="applyFilters()">
+                    <option value="all">全部状态</option>
+                    <option value="success">成功</option>
+                    <option value="partial">部分成功</option>
+                    <option value="failed">失败</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <div class="filter-label">操作人</div>
+                <select id="filterOperator" class="form-control" onchange="applyFilters()">
+                    <option value="all">全部</option>
+                    <option value="system">系统</option>
+                    <option value="admin">admin</option>
+                    <option value="operator">operator</option>
+                    <option value="张工">张工</option>
+                    <option value="李工">李工</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <div class="filter-label">日期范围</div>
+                <div class="date-range">
+                    <input type="date" id="startDate" class="form-control" style="width:130px;">
+                    <span>—</span>
+                    <input type="date" id="endDate" class="form-control" style="width:130px;">
+                </div>
+            </div>
+            <div class="filter-group" style="flex:2; min-width:200px;">
+                <div class="filter-label">搜索内容</div>
+                <input type="text" id="searchText" class="form-control" placeholder="任务名称/回路名称/详情..." oninput="applyFilters()">
+            </div>
+            <div class="filter-group" style="flex:0 0 auto;">
+                <button class="btn btn-secondary" onclick="resetFilters()">重置</button>
+                <button class="btn btn-primary" onclick="exportLogs()">📥 导出日志</button>
+            </div>
+        </div>
+
+        <!-- 日志表格 (完整任务执行日志 + 回路控制日志) -->
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>操作类型</th>
+                        <th>对象类型</th>
+                        <th>操作人</th>
+                        <th>操作对象</th>
+                        <th>操作内容</th>
+                        <th>操作状态</th>
+                        <th>回路数/详情</th>
+                        <th>结果详情</th>
+                    </tr>
+                </thead>
+                <tbody id="logTableBody">
+                    <!-- 动态填充 -->
+                </tbody>
+            </table>
+            <div class="export-bar">
+                <span style="color:var(--text-secondary);">共 <span id="logTotal">0</span> 条日志</span>
+                <div>
+                    <button class="btn btn-sm btn-primary" onclick="exportLogs()">导出CSV</button>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    (function() {
+        // ==================== 完整数据源 ====================
+        
+        // 1. 回路数据 (普通照明 + 调光设备)
+        const circuitList = [
+            // 普通照明 (light)
+            { id: 'C001', code: 'LT-001', name: 'A1层走廊灯组', type: 'light', typeName: '普通照明', area: 'A座1层', status: 'online' },
+            { id: 'C002', code: 'LT-002', name: 'A1层会议室灯', type: 'light', typeName: '普通照明', area: 'A座1层', status: 'online' },
+            { id: 'C003', code: 'LT-003', name: 'A1层办公室灯', type: 'light', typeName: '普通照明', area: 'A座1层', status: 'offline' },
+            { id: 'C004', code: 'EM-001', name: 'A1层应急照明', type: 'light', typeName: '应急照明', area: 'A座1层', status: 'online' },
+            { id: 'C005', code: 'SK-001', name: 'A1层插座回路', type: 'light', typeName: '插座回路', area: 'A座1层', status: 'maintain' },
+            { id: 'C006', code: 'LT-004', name: 'A2层走廊灯组', type: 'light', typeName: '普通照明', area: 'A座2层', status: 'online' },
+            { id: 'C007', code: 'LT-005', name: 'A2层办公室灯', type: 'light', typeName: '普通照明', area: 'A座2层', status: 'online' },
+            { id: 'C008', code: 'AC-001', name: 'A2层空调回路', type: 'light', typeName: '空调回路', area: 'A座2层', status: 'online' },
+            { id: 'C009', code: 'LT-006', name: 'B1层车间照明', type: 'light', typeName: '普通照明', area: 'B座1层', status: 'online' },
+            { id: 'C010', code: 'EM-002', name: 'B1层应急照明', type: 'light', typeName: '应急照明', area: 'B座1层', status: 'online' },
+            { id: 'C011', code: 'LT-007', name: 'B2层办公区灯', type: 'light', typeName: '普通照明', area: 'B座2层', status: 'offline' },
+            { id: 'C012', code: 'LT-008', name: 'C座食堂照明', type: 'light', typeName: '普通照明', area: 'C座1层', status: 'online' },
+            // 调光设备 (dimmer)
+            { id: 'D001', code: 'DM-001', name: 'A1层会议室调光', type: 'dimmer', typeName: '调光设备', area: 'A座1层', status: 'online' },
+            { id: 'D002', code: 'DM-002', name: 'A2层办公室调光', type: 'dimmer', typeName: '调光设备', area: 'A座2层', status: 'online' },
+            { id: 'D003', code: 'DM-003', name: 'B1层车间调光', type: 'dimmer', typeName: '调光设备', area: 'B座1层', status: 'maintain' },
+            { id: 'D004', code: 'DM-004', name: 'C座食堂调光', type: 'dimmer', typeName: '调光设备', area: 'C座1层', status: 'online' },
+        ];
+
+        // 2. 任务数据 (来自照明任务配置)
+        const taskList = [
+            { id: 'T001', name: '办公模式', locationName: 'A座办公楼 - 1层', type: 'auto', circuits: ['C001','C002','C003'] },
+            { id: 'T002', name: '会议模式', locationName: 'A座办公楼 - 1层', type: 'manual', circuits: ['C002'] },
+            { id: 'T003', name: '节能模式', locationName: 'A座办公楼 - 2层', type: 'auto', circuits: ['C006','C007'] },
+            { id: 'T004', name: '清洁模式', locationName: 'A座办公楼 - 1层', type: 'manual', circuits: ['C001','C002','C003','C004'] },
+            { id: 'T005', name: '应急模式', locationName: 'B座生产车间 - 一层车间', type: 'auto', circuits: ['C009','C010'] },
+            { id: 'T006', name: '周末模式', locationName: 'A座办公楼', type: 'auto', circuits: ['C001','C006'] },
+            { id: 'T007', name: '加班模式', locationName: 'A座办公楼 - 2层', type: 'auto', circuits: ['C006','C007','C008'] },
+        ];
+        const taskMap = Object.fromEntries(taskList.map(t => [t.id, t]));
+
+        // 3. 回路映射
+        const circuitMap = Object.fromEntries(circuitList.map(c => [c.id, c]));
+
+        // 4. 构建完整日志 (任务执行日志 + 远程控制日志)
+        let comprehensiveLogs = [
+            // ========== 自动任务执行日志 (详细) ==========
+            { 
+                time: '2026-03-04 09:00:00', 
+                type: 'auto_exec', 
+                typeName: '自动任务执行', 
+                objectType: 'task',
+                operator: 'system', 
+                objectId: 'T001', 
+                objectName: '办公模式', 
+                content: '定时触发办公模式', 
+                status: 'success', 
+                circuitCount: 3,
+                result: '所有回路正常执行 (C001,C002)' 
+            },
+            { 
+                time: '2026-03-04 00:00:00', 
+                type: 'auto_exec', 
+                typeName: '自动任务执行', 
+                objectType: 'task',
+                operator: 'system', 
+                objectId: 'T005', 
+                objectName: '应急模式', 
+                content: '定时触发应急模式', 
+                status: 'success', 
+                circuitCount: 2,
+                result: '所有回路正常执行 (C009,C010)' 
+            },
+            { 
+                time: '2026-03-03 22:00:00', 
+                type: 'auto_exec', 
+                typeName: '自动任务执行', 
+                objectType: 'task',
+                operator: 'system', 
+                objectId: 'T003', 
+                objectName: '节能模式', 
+                content: '定时触发节能模式', 
+                status: 'success', 
+                circuitCount: 2,
+                result: 'C006,C007执行成功' 
+            },
+            { 
+                time: '2026-03-03 19:00:00', 
+                type: 'auto_exec', 
+                typeName: '自动任务执行', 
+                objectType: 'task',
+                operator: 'system', 
+                objectId: 'T007', 
+                objectName: '加班模式', 
+                content: '定时触发加班模式', 
+                status: 'partial', 
+                circuitCount: 3,
+                result: '部分成功 (2/3)，C008离线' 
+            },
+            { 
+                time: '2026-03-03 09:00:00', 
+                type: 'auto_exec', 
+                typeName: '自动任务执行', 
+                objectType: 'task',
+                operator: 'system', 
+                objectId: 'T001', 
+                objectName: '办公模式', 
+                content: '定时触发办公模式', 
+                status: 'success', 
+                circuitCount: 3,
+                result: '所有回路正常执行' 
+            },
+            { 
+                time: '2026-03-02 22:00:00', 
+                type: 'auto_exec', 
+                typeName: '自动任务执行', 
+                objectType: 'task',
+                operator: 'system', 
+                objectId: 'T003', 
+                objectName: '节能模式', 
+                content: '定时触发节能模式', 
+                status: 'success', 
+                circuitCount: 2,
+                result: 'C006,C007执行成功' 
+            },
+            { 
+                time: '2026-03-02 08:00:00', 
+                type: 'auto_exec', 
+                typeName: '自动任务执行', 
+                objectType: 'task',
+                operator: 'system', 
+                objectId: 'T006', 
+                objectName: '周末模式', 
+                content: '定时触发周末模式', 
+                status: 'success', 
+                circuitCount: 2,
+                result: '所有回路正常执行' 
+            },
+            { 
+                time: '2026-03-01 09:00:00', 
+                type: 'auto_exec', 
+                typeName: '自动任务执行', 
+                objectType: 'task',
+                operator: 'system', 
+                objectId: 'T001', 
+                objectName: '办公模式', 
+                content: '定时触发办公模式', 
+                status: 'partial', 
+                circuitCount: 3,
+                result: '部分成功 (2/3)，C003离线' 
+            },
+            { 
+                time: '2026-03-01 08:00:00', 
+                type: 'auto_exec', 
+                typeName: '自动任务执行', 
+                objectType: 'task',
+                operator: 'system', 
+                objectId: 'T006', 
+                objectName: '周末模式', 
+                content: '定时触发周末模式', 
+                status: 'failed', 
+                circuitCount: 2,
+                result: '失败，C001离线，C006离线' 
+            },
+            
+            // ========== 手动任务执行日志 ==========
+            { 
+                time: '2026-03-04 14:30:00', 
+                type: 'manual_exec', 
+                typeName: '手动任务执行', 
+                objectType: 'task',
+                operator: 'admin', 
+                objectId: 'T002', 
+                objectName: '会议模式', 
+                content: '手动启动会议模式', 
+                status: 'success', 
+                circuitCount: 1,
+                result: '执行成功' 
+            },
+            { 
+                time: '2026-03-03 10:15:00', 
+                type: 'manual_exec', 
+                typeName: '手动任务执行', 
+                objectType: 'task',
+                operator: 'operator', 
+                objectId: 'T002', 
+                objectName: '会议模式', 
+                content: '手动启动会议模式', 
+                status: 'failed', 
+                circuitCount: 1,
+                result: '回路离线' 
+            },
+            { 
+                time: '2026-03-02 07:30:00', 
+                type: 'manual_exec', 
+                typeName: '手动任务执行', 
+                objectType: 'task',
+                operator: 'admin', 
+                objectId: 'T004', 
+                objectName: '清洁模式', 
+                content: '手动启动清洁模式', 
+                status: 'success', 
+                circuitCount: 4,
+                result: '清洁模式执行成功' 
+            },
+            { 
+                time: '2026-03-01 08:00:00', 
+                type: 'manual_exec', 
+                typeName: '手动任务执行', 
+                objectType: 'task',
+                operator: 'operator', 
+                objectId: 'T004', 
+                objectName: '清洁模式', 
+                content: '手动启动清洁模式', 
+                status: 'partial', 
+                circuitCount: 4,
+                result: '部分成功 (3/4)，一个回路维护中' 
+            },
+            
+            // ========== 远程控制 - 普通照明回路 ==========
+            { 
+                time: '2026-03-04 11:20:00', 
+                type: 'remote_control', 
+                typeName: '远程控制', 
+                objectType: 'light',
+                operator: 'admin', 
+                objectId: 'C001', 
+                objectName: 'A1层走廊灯组', 
+                content: '开启回路', 
+                status: 'success', 
+                circuitCount: 1,
+                result: '已开启' 
+            },
+            { 
+                time: '2026-03-04 09:45:00', 
+                type: 'remote_control', 
+                typeName: '远程控制', 
+                objectType: 'light',
+                operator: 'operator', 
+                objectId: 'C012', 
+                objectName: 'C座食堂照明', 
+                content: '关闭回路', 
+                status: 'success', 
+                circuitCount: 1,
+                result: '已关闭' 
+            },
+            { 
+                time: '2026-03-03 16:30:00', 
+                type: 'remote_control', 
+                typeName: '远程控制', 
+                objectType: 'light',
+                operator: 'admin', 
+                objectId: 'C009', 
+                objectName: 'B1层车间照明', 
+                content: '开启回路', 
+                status: 'success', 
+                circuitCount: 1,
+                result: '已开启' 
+            },
+            { 
+                time: '2026-03-03 14:00:00', 
+                type: 'remote_control', 
+                typeName: '远程控制', 
+                objectType: 'light',
+                operator: 'system', 
+                objectId: 'C007', 
+                objectName: 'A2层办公室灯', 
+                content: '传感器触发关灯', 
+                status: 'success', 
+                circuitCount: 1,
+                result: '自动关灯' 
+            },
+            { 
+                time: '2026-03-02 20:15:00', 
+                type: 'remote_control', 
+                typeName: '远程控制', 
+                objectType: 'light',
+                operator: 'admin', 
+                objectId: 'C002', 
+                objectName: 'A1层会议室灯', 
+                content: '尝试开启回路', 
+                status: 'partial', 
+                circuitCount: 1,
+                result: '部分响应' 
+            },
+            { 
+                time: '2026-03-02 10:00:00', 
+                type: 'remote_control', 
+                typeName: '远程控制', 
+                objectType: 'light',
+                operator: 'operator', 
+                objectId: 'C011', 
+                objectName: 'B2层办公区灯', 
+                content: '开启回路', 
+                status: 'failed', 
+                circuitCount: 1,
+                result: '连接超时' 
+            },
+            
+            // ========== 远程控制 - 调光回路 ==========
+            { 
+                time: '2026-03-04 15:10:00', 
+                type: 'remote_control', 
+                typeName: '远程控制', 
+                objectType: 'dimmer',
+                operator: '张工', 
+                objectId: 'D001', 
+                objectName: 'A1层会议室调光', 
+                content: '调节亮度至60%', 
+                status: 'success', 
+                circuitCount: 1,
+                result: '亮度已调整' 
+            },
+            { 
+                time: '2026-03-04 10:30:00', 
+                type: 'remote_control', 
+                typeName: '远程控制', 
+                objectType: 'dimmer',
+                operator: '李工', 
+                objectId: 'D002', 
+                objectName: 'A2层办公室调光', 
+                content: '调节亮度至30%', 
+                status: 'success', 
+                circuitCount: 1,
+                result: '已调整' 
+            },
+            { 
+                time: '2026-03-03 13:20:00', 
+                type: 'remote_control', 
+                typeName: '远程控制', 
+                objectType: 'dimmer',
+                operator: 'admin', 
+                objectId: 'D004', 
+                objectName: 'C座食堂调光', 
+                content: '设置亮度80%', 
+                status: 'success', 
+                circuitCount: 1,
+                result: '执行成功' 
+            },
+            { 
+                time: '2026-03-03 09:15:00', 
+                type: 'remote_control', 
+                typeName: '远程控制', 
+                objectType: 'dimmer',
+                operator: 'operator', 
+                objectId: 'D003', 
+                objectName: 'B1层车间调光', 
+                content: '调节亮度50%', 
+                status: 'failed', 
+                circuitCount: 1,
+                result: '设备维护中' 
+            },
+            { 
+                time: '2026-03-02 16:40:00', 
+                type: 'remote_control', 
+                typeName: '远程控制', 
+                objectType: 'dimmer',
+                operator: '张工', 
+                objectId: 'D001', 
+                objectName: 'A1层会议室调光', 
+                content: '关闭调光', 
+                status: 'success', 
+                circuitCount: 1,
+                result: '已关闭' 
+            },
+        ];
+
+        // 按时间倒序
+        comprehensiveLogs.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+        // 当前筛选后的数据
+        let filteredLogs = [...comprehensiveLogs];
+
+        // 日期时间更新
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('currentDateTime').innerText = now.toISOString().slice(0,10).replace(/-/g,'-') + ' ' + 
+                String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+        }
+        setInterval(updateDateTime,1000);
+        updateDateTime();
+
+        // ==================== 日志表格渲染 ====================
+        function renderLogTable() {
+            const tbody = document.getElementById('logTableBody');
+            const totalSpan = document.getElementById('logTotal');
+            totalSpan.innerText = filteredLogs.length;
+
+            tbody.innerHTML = filteredLogs.map(log => {
+                const statusClass = log.status === 'success' ? 'status-success' : log.status === 'partial' ? 'status-partial' : 'status-failed';
+                const statusText = log.status === 'success' ? '成功' : log.status === 'partial' ? '部分成功' : '失败';
+                
+                // 对象类型显示
+                let objectTypeHtml = '';
+                if (log.objectType === 'task') {
+                    objectTypeHtml = '<span class="task-badge type-badge">任务</span>';
+                } else if (log.objectType === 'light') {
+                    objectTypeHtml = '<span class="device-type-badge device-light">普通照明</span>';
+                } else if (log.objectType === 'dimmer') {
+                    objectTypeHtml = '<span class="device-type-badge device-dimmer">调光设备</span>';
+                } else {
+                    objectTypeHtml = '<span class="type-badge">—</span>';
+                }
+                
+                // 操作对象显示 (丰富信息)
+                let objectDisplay = log.objectName;
+                if (log.objectType === 'task' && taskMap[log.objectId]) {
+                    const task = taskMap[log.objectId];
+                    objectDisplay = `${task.name} (${task.locationName})`;
+                } else if ((log.objectType === 'light' || log.objectType === 'dimmer') && circuitMap[log.objectId]) {
+                    const circuit = circuitMap[log.objectId];
+                    objectDisplay = `${circuit.name} (${circuit.area})`;
+                }
+                
+                // 回路数/详情列
+                let circuitInfo = '';
+                if (log.objectType === 'task') {
+                    circuitInfo = `回路数: ${log.circuitCount || 0}`;
+                } else {
+                    circuitInfo = `单回路控制`;
+                }
+
+                return `
+                    <tr>
+                        <td>${log.time}</td>
+                        <td><span class="type-badge">${log.typeName}</span></td>
+                        <td>${objectTypeHtml}</td>
+                        <td>${log.operator}</td>
+                        <td>${objectDisplay}</td>
+                        <td>${log.content}</td>
+                        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                        <td>${circuitInfo}</td>
+                        <td>${log.result}</td>
+                    </tr>
+                `;
+            }).join('');
+            if (filteredLogs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:30px;">暂无符合条件的日志</td></tr>';
+            }
+        }
+
+        // ==================== 筛选逻辑 ====================
+        window.applyFilters = function() {
+            const type = document.getElementById('filterType').value;
+            const objectType = document.getElementById('filterObjectType').value;
+            const status = document.getElementById('filterStatus').value;
+            const operator = document.getElementById('filterOperator').value;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const search = document.getElementById('searchText').value.toLowerCase();
+
+            filteredLogs = comprehensiveLogs.filter(log => {
+                if (type !== 'all' && log.type !== type) return false;
+                if (objectType !== 'all' && log.objectType !== objectType) return false;
+                if (status !== 'all' && log.status !== status) return false;
+                if (operator !== 'all' && log.operator !== operator) return false;
+                
+                // 搜索范围
+                const searchable = (log.objectName + ' ' + log.content + ' ' + log.result).toLowerCase();
+                if (search && !searchable.includes(search)) return false;
+                
+                if (start && log.time < start) return false;
+                if (end && log.time > end + ' 23:59:59') return false;
+                return true;
+            });
+            renderLogTable();
+        };
+
+        window.resetFilters = function() {
+            document.getElementById('filterType').value = 'all';
+            document.getElementById('filterObjectType').value = 'all';
+            document.getElementById('filterStatus').value = 'all';
+            document.getElementById('filterOperator').value = 'all';
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            document.getElementById('searchText').value = '';
+            filteredLogs = [...comprehensiveLogs];
+            renderLogTable();
+        };
+
+        // ==================== 导出功能 ====================
+        window.exportLogs = function() {
+            if (filteredLogs.length === 0) {
+                showToast('没有可导出的数据', 'warning');
+                return;
+            }
+
+            let csv = '时间,操作类型,对象类型,操作人,操作对象,操作内容,操作状态,回路数,结果详情\n';
+            filteredLogs.forEach(log => {
+                const status = log.status === 'success' ? '成功' : log.status === 'partial' ? '部分成功' : '失败';
+                const result = (log.result || '').replace(/"/g, '""');
+                const content = (log.content || '').replace(/"/g, '""');
+                
+                let objectType = '';
+                if (log.objectType === 'task') objectType = '任务';
+                else if (log.objectType === 'light') objectType = '普通照明';
+                else if (log.objectType === 'dimmer') objectType = '调光设备';
+                
+                // 操作对象
+                let objectDisplay = log.objectName;
+                if (log.objectType === 'task' && taskMap[log.objectId]) {
+                    const task = taskMap[log.objectId];
+                    objectDisplay = `${task.name} (${task.locationName})`;
+                } else if ((log.objectType === 'light' || log.objectType === 'dimmer') && circuitMap[log.objectId]) {
+                    const circuit = circuitMap[log.objectId];
+                    objectDisplay = `${circuit.name} (${circuit.area})`;
+                }
+                
+                const circuitInfo = log.objectType === 'task' ? log.circuitCount || 0 : 1;
+                
+                csv += `${log.time},${log.typeName},${objectType},${log.operator},"${objectDisplay}","${content}",${status},${circuitInfo},"${result}"\n`;
+            });
+
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `全量日志_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('日志导出成功');
+        };
+
+        function showToast(msg, type = 'success') {
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerHTML = `<span>${type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '❌'}</span><span>${msg}</span>`;
+            document.body.appendChild(t);
+            setTimeout(() => {
+                t.style.animation = 'slideIn 0.3s reverse';
+                setTimeout(() => t.remove(), 300);
+            }, 3000);
+        }
+
+        // 侧边栏导航
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // 初始化
+        renderLogTable();
+    })();
+</script>
+</body>
+</html>

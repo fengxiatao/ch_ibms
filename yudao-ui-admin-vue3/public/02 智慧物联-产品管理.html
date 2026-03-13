@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IBMS智慧物联管理平台 - 产品管理 (V2.0编码规范)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        /* 玻璃拟态效果 */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .glass-card {
+            background: rgba(51, 65, 85, 0.4);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            background: rgba(51, 65, 85, 0.6);
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        /* 侧边栏样式 */
+        .sidebar-item {
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), transparent);
+            transition: width 0.3s;
+        }
+
+        .sidebar-item:hover::before, .sidebar-item.active::before {
+            width: 100%;
+        }
+
+        .sidebar-item:hover, .sidebar-item.active {
+            border-left-color: #3b82f6;
+            color: #60a5fa;
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.3);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.5);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.6);
+        }
+
+        /* 模态框动画 */
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-enter {
+            animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes modalSlideIn {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        /* 专业分组标签页 */
+        .professional-tab {
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+        }
+
+        .professional-tab:hover {
+            color: #60a5fa;
+        }
+
+        .professional-tab.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
+
+        /* 搜索框 */
+        .search-input {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+
+        /* 按钮样式 */
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn-primary:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px -5px rgba(59, 130, 246, 0.4);
+        }
+
+        /* 表单样式 */
+        .form-input {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: white;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            color: #94a3b8;
+            margin-bottom: 0.25rem;
+        }
+
+        /* 系统颜色 */
+        .sys-security { color: #3b82f6; }
+        .sys-access { color: #a855f7; }
+        .sys-building { color: #06b6d4; }
+        .sys-energy { color: #f59e0b; }
+        .sys-fire { color: #f43f5e; }
+
+        .bg-sys-security { background: rgba(59, 130, 246, 0.15); }
+        .bg-sys-access { background: rgba(168, 85, 247, 0.15); }
+        .bg-sys-building { background: rgba(6, 182, 212, 0.15); }
+        .bg-sys-energy { background: rgba(245, 158, 11, 0.15); }
+        .bg-sys-fire { background: rgba(244, 63, 94, 0.15); }
+
+        /* 编码高亮 */
+        .code-highlight {
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex">
+
+    <!-- 左侧导航栏 -->
+    <aside class="w-64 glass-panel flex flex-col border-r border-slate-700/30 z-20">
+        <div class="p-6 border-b border-slate-700/30">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <i class="fas fa-network-wired text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white tracking-tight">IBMS平台</h1>
+                    <p class="text-xs text-slate-400">智慧物联管理系统 V2.0</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto py-4">
+         
+
+            
+
+            <a href="#" class="sidebar-item active flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-product-catalog">
+                <i class="fas fa-box-open w-5 text-center"></i>
+                <span>产品管理</span>
+            </a>
+
+            <a href="#" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-type-mgmt">
+              
+               
+            </a>
+
+          
+
+            <a href="#" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-linkage-rules">
+                
+                
+            </a>
+
+            <a href="#" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-workflow">
+           
+                
+          
+            </a>
+
+         
+
+            <a href="#" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-events">
+               
+               
+               
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-slate-700/30">
+            <div class="glass-card rounded-xl p-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-sm font-bold text-white">A</div>
+                    <div class="flex-1 min-w-0">
+                    
+                   
+                    </div>
+                    <button class="text-slate-400 hover:text-white transition-colors">
+                     
+                    </button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 flex flex-col overflow-hidden relative bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800">
+
+        <!-- 顶部栏 -->
+        <header class="h-16 glass-panel border-b border-slate-700/30 flex items-center justify-between px-6 z-10">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 text-sm text-slate-400">
+                    <span>IBMS平台</span>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span>产品目录</span>
+                    <span class="ml-2 px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full">V2.0编码规范</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 px-4 py-2 glass-card rounded-lg">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span class="text-sm text-slate-300">系统运行正常</span>
+                </div>
+
+                <div class="relative">
+                    <button class="p-2 text-slate-400 hover:text-white transition-colors relative">
+                        <i class="fas fa-bell"></i>
+                        <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- 内容区：产品目录 -->
+        <div class="flex-1 overflow-y-auto p-6">
+            <!-- 专业分组标签页 - 根据V2.0规范更新为5个分组 -->
+            <div class="flex gap-6 mb-6 border-b border-slate-700">
+                <button class="professional-tab active px-4 py-2 text-sm font-medium" onclick="switchProfessionalTab('all')">
+                    全部产品
+                </button>
+                <button class="professional-tab px-4 py-2 text-sm font-medium text-slate-400" onclick="switchProfessionalTab('SA')">
+                    <i class="fas fa-shield-alt mr-1 text-blue-400"></i>智慧安防
+                </button>
+                <button class="professional-tab px-4 py-2 text-sm font-medium text-slate-400" onclick="switchProfessionalTab('ST')">
+                    <i class="fas fa-door-open mr-1 text-purple-400"></i>智慧通行
+                </button>
+                <button class="professional-tab px-4 py-2 text-sm font-medium text-slate-400" onclick="switchProfessionalTab('SB')">
+                    <i class="fas fa-building mr-1 text-cyan-400"></i>智慧建筑
+                </button>
+                <button class="professional-tab px-4 py-2 text-sm font-medium text-slate-400" onclick="switchProfessionalTab('SE')">
+                    <i class="fas fa-bolt mr-1 text-amber-400"></i>智慧能源
+                </button>
+                <button class="professional-tab px-4 py-2 text-sm font-medium text-slate-400" onclick="switchProfessionalTab('SF')">
+                    <i class="fas fa-fire-extinguisher mr-1 text-rose-400"></i>消防安全
+                </button>
+            </div>
+
+            <div class="flex justify-between items-center mb-6">
+                <div class="flex gap-4">
+                    <div class="relative">
+                        <input type="text" placeholder="搜索产品名称、型号、厂商..." 
+                               class="w-80 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 pl-10 text-sm focus:outline-none focus:border-blue-500 text-white"
+                               id="product-search" oninput="filterProducts()">
+                        <i class="fas fa-search absolute left-3 top-2.5 text-slate-500"></i>
+                    </div>
+                    <select class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500 text-white" id="product-group-filter" onchange="filterProducts()">
+                        <option value="">全部分组</option>
+                        <option value="SA">智慧安防</option>
+                        <option value="ST">智慧通行</option>
+                        <option value="SB">智慧建筑</option>
+                        <option value="SE">智慧能源</option>
+                        <option value="SF">消防安全</option>
+                    </select>
+                    <select class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500 text-white" id="product-system-filter" onchange="filterProducts()">
+                        <option value="">全部系统</option>
+                    </select>
+                    <select class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500 text-white" id="product-model-filter" onchange="filterProducts()">
+                        <option value="">全部型号</option>
+                    </select>
+                </div>
+                <button onclick="openProductModal()" class="btn-primary px-4 py-2 rounded-lg text-white font-medium flex items-center gap-2">
+                    <i class="fas fa-plus"></i>
+                    <span>添加产品</span>
+                </button>
+            </div>
+
+            <!-- 专业分组统计卡片 - 动态生成 -->
+            <div class="grid grid-cols-5 gap-4 mb-6" id="professional-product-stats">
+                <!-- 动态生成 -->
+            </div>
+
+            <!-- 产品列表 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="product-list">
+                <!-- 产品卡片动态生成 -->
+            </div>
+        </div>
+    </main>
+
+    <!-- 模态框: 添加/编辑产品 (根据V2.0规范更新) -->
+    <div id="modal-product" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50">
+        <div class="glass-panel rounded-xl w-full max-w-3xl max-h-[90vh] overflow-hidden modal-enter flex flex-col">
+            <div class="p-6 border-b border-slate-700/30 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white" id="modal-title">添加产品</h3>
+                <button onclick="closeModal('modal-product')" class="text-slate-400 hover:text-white">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6">
+                <form id="product-form" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="form-label">专业分组 <span class="text-red-400">*</span></label>
+                            <select id="product-group" class="form-input" onchange="onProductGroupChange()" required>
+                                <option value="">请选择分组</option>
+                                <option value="SA">智慧安防</option>
+                                <option value="ST">智慧通行</option>
+                                <option value="SB">智慧建筑</option>
+                                <option value="SE">智慧能源</option>
+                                <option value="SF">消防安全</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">所属系统 <span class="text-red-400">*</span></label>
+                            <select id="product-system" class="form-input" onchange="onProductSystemChange()" disabled required>
+                                <option value="">请先选择分组</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="form-label">型号码 <span class="text-red-400">*</span></label>
+                            <select id="product-model" class="form-input" onchange="updateProductCode()" disabled required>
+                                <option value="">请先选择系统</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">设备类型码 <span class="text-red-400">*</span></label>
+                            <select id="product-device-type" class="form-input" onchange="updateProductCode()" disabled required>
+                                <option value="">请先选择系统</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="form-label">产品编码</label>
+                            <input type="text" id="product-code" class="form-input bg-slate-700/50 font-mono text-xs" readonly placeholder="自动生成">
+                        </div>
+                        <div>
+                            <label class="form-label">产品名称 <span class="text-red-400">*</span></label>
+                            <input type="text" id="product-name" class="form-input" placeholder="如：200万星光级网络摄像机" required>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="form-label">厂商品牌 <span class="text-red-400">*</span></label>
+                            <input type="text" id="product-manufacturer" class="form-input" placeholder="如：海康威视" required>
+                        </div>
+                        <div>
+                            <label class="form-label">产品型号 <span class="text-red-400">*</span></label>
+                            <input type="text" id="product-model-number" class="form-input" placeholder="如：DS-2CD3T26WD-I3" required>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="form-label">通信协议</label>
+                            <select id="product-protocol" class="form-input">
+                                <option value="ONVIF">ONVIF</option>
+                                <option value="Modbus">Modbus</option>
+                                <option value="BACnet">BACnet</option>
+                                <option value="KNX">KNX</option>
+                                <option value="MQTT">MQTT</option>
+                                <option value="HTTP">HTTP</option>
+                                <option value="GB28181">GB/T 28181</option>
+                                <option value="DLT645">DL/T 645</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">图标样式</label>
+                            <select id="product-icon" class="form-input">
+                                <option value="fa-video">📹 摄像机</option>
+                                <option value="fa-id-card">🆔 门禁</option>
+                                <option value="fa-thermometer-half">🌡️ 传感器</option>
+                                <option value="fa-lightbulb">💡 照明</option>
+                                <option value="fa-bolt">⚡ 电表</option>
+                                <option value="fa-shield-alt">🛡️ 安防</option>
+                                <option value="fa-fire-extinguisher">🔥 消防</option>
+                                <option value="fa-microchip">🔌 控制器</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label">产品描述</label>
+                        <textarea id="product-desc" rows="2" class="form-input" placeholder="请输入产品描述..."></textarea>
+                    </div>
+
+                    <!-- 点位类型定义 (根据V2.0点位类型码) -->
+                    <div class="border-t border-slate-700/30 pt-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="text-sm font-medium text-white">点位类型定义</h4>
+                            <button type="button" onclick="addPointType()" class="text-xs text-blue-400 hover:text-blue-300">
+                                <i class="fas fa-plus mr-1"></i>添加点位类型
+                            </button>
+                        </div>
+                        <div class="text-xs text-slate-400 mb-2">
+                            点位类型码参考: VT(视频通道)、AI(报警输入)、DR(门禁点)、DI(数字输入)、PM(电能监测)等
+                        </div>
+                        <div id="product-point-types" class="space-y-2">
+                            <!-- 动态添加点位类型 -->
+                        </div>
+                    </div>
+
+                    <!-- 设备属性定义 -->
+                    <div class="border-t border-slate-700/30 pt-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="text-sm font-medium text-white">设备属性定义</h4>
+                            <button type="button" onclick="addProductProperty()" class="text-xs text-blue-400 hover:text-blue-300">
+                                <i class="fas fa-plus mr-1"></i>添加属性
+                            </button>
+                        </div>
+                        <div id="product-properties" class="space-y-2">
+                            <!-- 动态添加属性 -->
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="p-6 border-t border-slate-700/30 flex justify-end gap-3">
+                <button onclick="closeModal('modal-product')" class="px-4 py-2 glass-card rounded-lg text-slate-300 hover:text-white">取消</button>
+                <button onclick="saveProduct()" class="btn-primary px-4 py-2 rounded-lg text-white">保存产品</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 产品详情模态框 (V2.0编码展示) -->
+    <div id="modal-product-detail" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50">
+        <div class="glass-panel rounded-xl w-full max-w-2xl max-h-[90vh] overflow-hidden modal-enter flex flex-col">
+            <div class="p-6 border-b border-slate-700/30 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white" id="detail-title">产品详情</h3>
+                <button onclick="closeModal('modal-product-detail')" class="text-slate-400 hover:text-white">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6" id="product-detail-content">
+                <!-- 动态填充 -->
+            </div>
+            <div class="p-6 border-t border-slate-700/30 flex justify-end">
+                <button onclick="closeModal('modal-product-detail')" class="btn-primary px-4 py-2 rounded-lg text-white">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <script>
+        // ==================== 数据存储 (根据V2.0编码规范更新) ====================
+        const store = {
+            // 专业分组 (V2.0: 5个分组)
+            professionalGroups: [
+                { code: "SA", name: "智慧安防", icon: "fa-shield-alt", color: "blue", systemCount: 3 },
+                { code: "ST", name: "智慧通行", icon: "fa-door-open", color: "purple", systemCount: 3 },
+                { code: "SB", name: "智慧建筑", icon: "fa-building", color: "cyan", systemCount: 3 },
+                { code: "SE", name: "智慧能源", icon: "fa-bolt", color: "amber", systemCount: 2 },
+                { code: "SF", name: "消防安全", icon: "fa-fire-extinguisher", color: "rose", systemCount: 2 }
+            ],
+
+            // 系统码定义 (V2.0: 13个系统)
+            systems: [
+                { code: "VI", name: "视频监控", english: "Video Surveillance", group_code: "SA", description: "摄像机/NVR/DVR" },
+                { code: "AL", name: "防盗报警", english: "Alarm System", group_code: "SA", description: "报警主机/探测器" },
+                { code: "GR", name: "巡更系统", english: "Guard Tour", group_code: "SA", description: "巡更棒/巡更点" },
+                { code: "AC", name: "门禁系统", english: "Access Control", group_code: "ST", description: "门禁控制器/读卡器" },
+                { code: "IC", name: "智能对讲", english: "Intercom System", group_code: "ST", description: "门口机/管理机" },
+                { code: "CA", name: "停车场", english: "Car Park", group_code: "ST", description: "道闸/摄像机/检测器" },
+                { code: "BA", name: "楼宇自控", english: "Building Automation", group_code: "SB", description: "DDC/传感器/执行器" },
+                { code: "LI", name: "智能照明", english: "Lighting Control", group_code: "SB", description: "照明控制箱/灯具" },
+                { code: "EL", name: "电梯控制", english: "Elevator Control", group_code: "SB", description: "电梯主控器" },
+                { code: "EP", name: "变配电", english: "Power Distribution", group_code: "SE", description: "电力仪表/断路器" },
+                { code: "EN", name: "能源管理", english: "Energy Management", group_code: "SE", description: "电能表/能耗监测" },
+                { code: "FD", name: "火灾报警", english: "Fire Detection", group_code: "SF", description: "火灾报警主机/探测器" },
+                { code: "PA", name: "公共广播", english: "Public Address", group_code: "SF", description: "功放/喇叭" }
+            ],
+
+            // 型号码定义 (V2.0: 11种型号)
+            modelTypes: [
+                { code: "DS", name: "枪机", description: "枪式摄像机", system_code: "VI" },
+                { code: "DP", name: "球机", description: "球型摄像机", system_code: "VI" },
+                { code: "HP", name: "半球摄像机", description: "吸顶安装", system_code: "VI" },
+                { code: "NV", name: "NVR", description: "网络录像机", system_code: "VI" },
+                { code: "CR", name: "IC卡读卡器", description: "读取M1/CPU卡", system_code: "AC" },
+                { code: "FR", name: "指纹读卡器", description: "指纹识别", system_code: "AC" },
+                { code: "LR", name: "人脸识别终端", description: "人脸识别", system_code: "AC" },
+                { code: "CC", name: "单门控制器", description: "控制1道门", system_code: "AC" },
+                { code: "DC", name: "双门控制器", description: "控制2道门", system_code: "AC" },
+                { code: "TS", name: "房间温控器", description: "温度设定控制", system_code: "BA" },
+                { code: "DD", name: "DDC控制器", description: "可编程控制器", system_code: "BA" },
+                { code: "SM", name: "烟感探测器", description: "烟雾探测", system_code: "FD" },
+                { code: "HM", name: "手报按钮", description: "手动报警", system_code: "FD" },
+                { code: "BC", name: "广播分区", description: "广播通道", system_code: "PA" }
+            ],
+
+            // 设备类型码定义 (V2.0: 10种设备类型)
+            deviceTypes: [
+                { code: "CAM", name: "摄像机", description: "视频采集设备" },
+                { code: "READER", name: "读卡器", description: "门禁读卡设备" },
+                { code: "SENSOR", name: "传感器", description: "环境传感器" },
+                { code: "CONTR", name: "控制器", description: "通用控制器" },
+                { code: "DDC", name: "DDC控制器", description: "可编程控制器" },
+                { code: "NVR", name: "网络录像机", description: "视频存储设备" },
+                { code: "DETECTOR", name: "探测器", description: "报警探测器" },
+                { code: "DRIVER", name: "调光驱动", description: "LED调光驱动" },
+                { code: "METER", name: "仪表", description: "电表/水表" },
+                { code: "AMPLIFIER", name: "功放", description: "广播功放" }
+            ],
+
+            // 点位类型码定义 (V2.0: 16种点位类型)
+            pointTypes: [
+                { code: "VT", name: "视频通道", dataType: "视频流", description: "一路摄像机" },
+                { code: "AI", name: "报警输入", dataType: "DI", description: "开关量输入" },
+                { code: "AO", name: "报警输出", dataType: "DO", description: "继电器输出" },
+                { code: "DR", name: "门禁点", dataType: "逻辑点", description: "一扇门" },
+                { code: "DI", name: "数字输入", dataType: "DI", description: "状态信号" },
+                { code: "DO", name: "数字输出", dataType: "DO", description: "控制信号" },
+                { code: "AI_AN", name: "模拟输入", dataType: "AI", description: "连续量采集" },
+                { code: "AO_AN", name: "模拟输出", dataType: "AO", description: "连续量控制" },
+                { code: "IT", name: "对讲终端", dataType: "音视频", description: "门口机/分机" },
+                { code: "FP", name: "消防点位", dataType: "火警/故障", description: "探测器/模块" },
+                { code: "LT", name: "照明回路", dataType: "DO/AO", description: "回路/调光" },
+                { code: "PM", name: "电能监测", dataType: "AI", description: "电能计量" },
+                { code: "EC", name: "电梯通道", dataType: "DI/AI", description: "状态/报警" },
+                { code: "BC", name: "广播通道", dataType: "音频", description: "广播分区" },
+                { code: "GP", name: "巡更点", dataType: "DI", description: "巡更签到点" },
+                { code: "CP", name: "停车场点", dataType: "DI/DO/AI", description: "车道/车位" }
+            ],
+
+            // 区域码定义 (V2.0示例)
+            areaCodes: [
+                { code: "F01", name: "地上1层", type: "楼层" },
+                { code: "F02", name: "地上2层", type: "楼层" },
+                { code: "B01", name: "地下1层", type: "地下室" },
+                { code: "PK", name: "停车场", type: "车库" },
+                { code: "LB", name: "大堂", type: "公共区域" },
+                { code: "FM", name: "机房", type: "设备房" }
+            ],
+
+            // 子区域定义
+            subAreas: [
+                { code: "LBY", name: "大堂", description: "建筑大堂" },
+                { code: "DT", name: "大厅", description: "门厅" },
+                { code: "OFA", name: "办公A区", description: "办公区域A" },
+                { code: "OFB", name: "办公B区", description: "办公区域B" },
+                { code: "PK", name: "停车场", description: "车库区域" }
+            ],
+
+            // 产品定义 (根据V2.0编码规范重新组织)
+            products: [
+                {
+                    product_id: "VI-DS-CAM-001",
+                    product_name: "200万星光级网络摄像机",
+                    group_code: "SA",
+                    system_code: "VI",
+                    model_code: "DS",
+                    device_type_code: "CAM",
+                    manufacturer: "海康威视",
+                    model: "DS-2CD3T26WD-I3",
+                    protocol: "ONVIF/GB28181",
+                    icon: "fa-video",
+                    color: "blue",
+                    description: "200万像素，星光级低照度，红外距离30米",
+                    point_types: [
+                        { code: "VT", name: "视频通道", count: 1 }
+                    ],
+                    properties: [
+                        { name: "resolution", label: "分辨率", type: "select", options: ["1920x1080", "1280x720"], default: "1920x1080" },
+                        { name: "night_vision", label: "夜视距离", type: "number", unit: "米", default: 30 }
+                    ]
+                },
+                {
+                    product_id: "VI-DP-CAM-001",
+                    product_name: "智能球型摄像机",
+                    group_code: "SA",
+                    system_code: "VI",
+                    model_code: "DP",
+                    device_type_code: "CAM",
+                    manufacturer: "海康威视",
+                    model: "DS-2DE4225IW-DE",
+                    protocol: "ONVIF",
+                    icon: "fa-video",
+                    color: "blue",
+                    description: "25倍光学变焦，360度旋转",
+                    point_types: [
+                        { code: "VT", name: "视频通道", count: 1 }
+                    ],
+                    properties: [
+                        { name: "zoom", label: "光学变焦", type: "select", options: ["20x", "25x", "30x"], default: "25x" },
+                        { name: "preset", label: "预置位数量", type: "number", unit: "个", default: 256 }
+                    ]
+                },
+                {
+                    product_id: "AC-CR-READER-001",
+                    product_name: "IC卡读卡器",
+                    group_code: "ST",
+                    system_code: "AC",
+                    model_code: "CR",
+                    device_type_code: "READER",
+                    manufacturer: "中控",
+                    model: "ZK-RF102",
+                    protocol: "Wiegand",
+                    icon: "fa-id-card",
+                    color: "purple",
+                    description: "13.56MHz IC卡读卡器",
+                    point_types: [
+                        { code: "DR", name: "门禁点", count: 1 }
+                    ],
+                    properties: [
+                        { name: "read_distance", label: "读卡距离", type: "number", unit: "cm", default: 5 },
+                        { name: "frequency", label: "频率", type: "select", options: ["13.56MHz", "125kHz"], default: "13.56MHz" }
+                    ]
+                },
+                {
+                    product_id: "AC-LR-READER-001",
+                    product_name: "人脸识别门禁终端",
+                    group_code: "ST",
+                    system_code: "AC",
+                    model_code: "LR",
+                    device_type_code: "READER",
+                    manufacturer: "大华",
+                    model: "DH-ASI8214Y",
+                    protocol: "TCP/IP",
+                    icon: "fa-id-card",
+                    color: "purple",
+                    description: "人脸识别门禁终端，支持活体检测",
+                    point_types: [
+                        { code: "DR", name: "门禁点", count: 1 }
+                    ],
+                    properties: [
+                        { name: "capacity", label: "人脸容量", type: "number", unit: "人", default: 10000 },
+                        { name: "liveness", label: "活体检测", type: "checkbox", default: true }
+                    ]
+                },
+                {
+                    product_id: "BA-TS-SENSOR-001",
+                    product_name: "智能温控器",
+                    group_code: "SB",
+                    system_code: "BA",
+                    model_code: "TS",
+                    device_type_code: "SENSOR",
+                    manufacturer: "西门子",
+                    model: "RDF800",
+                    protocol: "Modbus",
+                    icon: "fa-thermometer-half",
+                    color: "cyan",
+                    description: "房间温控器，支持Modbus通讯",
+                    point_types: [
+                        { code: "AI_AN", name: "模拟输入", count: 1 },
+                        { code: "DI", name: "数字输入", count: 2 },
+                        { code: "DO", name: "数字输出", count: 1 }
+                    ],
+                    properties: [
+                        { name: "control_type", label: "控制类型", type: "select", options: ["2管制", "4管制"], default: "2管制" },
+                        { name: "fan_speed", label: "风速控制", type: "select", options: ["三速", "无极"], default: "三速" }
+                    ]
+                },
+                {
+                    product_id: "BA-DD-CONTR-001",
+                    product_name: "DDC控制器",
+                    group_code: "SB",
+                    system_code: "BA",
+                    model_code: "DD",
+                    device_type_code: "DDC",
+                    manufacturer: "霍尼韦尔",
+                    model: "XL50A",
+                    protocol: "BACnet",
+                    icon: "fa-microchip",
+                    color: "cyan",
+                    description: "可编程DDC控制器，支持BACnet协议",
+                    point_types: [
+                        { code: "DI", name: "数字输入", count: 8 },
+                        { code: "DO", name: "数字输出", count: 6 },
+                        { code: "AI_AN", name: "模拟输入", count: 4 },
+                        { code: "AO_AN", name: "模拟输出", count: 2 }
+                    ],
+                    properties: [
+                        { name: "cpu", label: "处理器", type: "text", default: "32位ARM" },
+                        { name: "memory", label: "内存", type: "select", options: ["128MB", "256MB", "512MB"], default: "256MB" }
+                    ]
+                },
+                {
+                    product_id: "EP-PM-METER-001",
+                    product_name: "三相智能电表",
+                    group_code: "SE",
+                    system_code: "EP",
+                    model_code: "PM",
+                    device_type_code: "METER",
+                    manufacturer: "威胜",
+                    model: "DTSD342-9",
+                    protocol: "Modbus/DLT645",
+                    icon: "fa-bolt",
+                    color: "amber",
+                    description: "三相多功能电能表，支持Modbus和DL/T645",
+                    point_types: [
+                        { code: "PM", name: "电能监测", count: 3 },
+                        { code: "AI_AN", name: "模拟输入", count: 6 }
+                    ],
+                    properties: [
+                        { name: "accuracy_class", label: "精度等级", type: "select", options: ["0.5S", "1.0"], default: "1.0" },
+                        { name: "communication", label: "通讯方式", type: "select", options: ["RS485", "4G"], default: "RS485" }
+                    ]
+                },
+                {
+                    product_id: "FD-SM-DETECTOR-001",
+                    product_name: "智能烟感探测器",
+                    group_code: "SF",
+                    system_code: "FD",
+                    model_code: "SM",
+                    device_type_code: "DETECTOR",
+                    manufacturer: "西门子",
+                    model: "OP720",
+                    protocol: "FD18",
+                    icon: "fa-fire-extinguisher",
+                    color: "rose",
+                    description: "光电式烟感探测器，带报警输出",
+                    point_types: [
+                        { code: "FP", name: "消防点位", count: 1 },
+                        { code: "AI", name: "报警输入", count: 1 }
+                    ],
+                    properties: [
+                        { name: "sensitivity", label: "灵敏度", type: "select", options: ["高", "中", "低"], default: "中" },
+                        { name: "alarm_led", label: "报警指示灯", type: "checkbox", default: true }
+                    ]
+                },
+                {
+                    product_id: "PA-BC-AMPLIFIER-001",
+                    product_name: "广播功放",
+                    group_code: "SF",
+                    system_code: "PA",
+                    model_code: "BC",
+                    device_type_code: "AMPLIFIER",
+                    manufacturer: "ITC",
+                    model: "T-60",
+                    protocol: "TCP/IP",
+                    icon: "fa-volume-up",
+                    color: "rose",
+                    description: "60W网络广播功放",
+                    point_types: [
+                        { code: "BC", name: "广播通道", count: 4 }
+                    ],
+                    properties: [
+                        { name: "power", label: "功率", type: "select", options: ["60W", "120W", "240W"], default: "60W" },
+                        { name: "zone", label: "分区数量", type: "number", unit: "个", default: 4 }
+                    ]
+                }
+            ],
+
+            // 设备数据（用于统计）
+            devices: [
+                { id: "DEV-001", product_id: "VI-DS-CAM-001", group_code: "SA" },
+                { id: "DEV-002", product_id: "VI-DS-CAM-001", group_code: "SA" },
+                { id: "DEV-003", product_id: "VI-DP-CAM-001", group_code: "SA" },
+                { id: "DEV-004", product_id: "AC-CR-READER-001", group_code: "ST" },
+                { id: "DEV-005", product_id: "AC-LR-READER-001", group_code: "ST" },
+                { id: "DEV-006", product_id: "BA-TS-SENSOR-001", group_code: "SB" },
+                { id: "DEV-007", product_id: "BA-DD-CONTR-001", group_code: "SB" },
+                { id: "DEV-008", product_id: "EP-PM-METER-001", group_code: "SE" },
+                { id: "DEV-009", product_id: "FD-SM-DETECTOR-001", group_code: "SF" },
+                { id: "DEV-010", product_id: "PA-BC-AMPLIFIER-001", group_code: "SF" },
+                { id: "DEV-011", product_id: "VI-DP-CAM-001", group_code: "SA" }
+            ]
+        };
+
+        // ==================== 全局变量 ====================
+        let currentProductTab = 'all';
+        let currentProduct = null;
+
+        // ==================== 初始化函数 ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            renderProductCatalog();
+            renderProductStats();
+            populateFilterOptions();
+        });
+
+        function populateFilterOptions() {
+            // 填充系统筛选
+            const systemSelect = document.getElementById('product-system-filter');
+            systemSelect.innerHTML = '<option value="">全部系统</option>';
+            store.systems.forEach(sys => {
+                const option = document.createElement('option');
+                option.value = sys.code;
+                option.textContent = `${sys.code} - ${sys.name}`;
+                systemSelect.appendChild(option);
+            });
+
+            // 填充型号筛选
+            const modelSelect = document.getElementById('product-model-filter');
+            modelSelect.innerHTML = '<option value="">全部型号</option>';
+            store.modelTypes.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.code;
+                option.textContent = `${model.code} - ${model.name}`;
+                modelSelect.appendChild(option);
+            });
+        }
+
+        // ==================== 专业分组标签切换 ====================
+        function switchProfessionalTab(tabId) {
+            // 更新标签样式
+            document.querySelectorAll('.professional-tab').forEach(tab => {
+                tab.classList.remove('active');
+                tab.classList.add('text-slate-400');
+            });
+            event.target.classList.add('active');
+            event.target.classList.remove('text-slate-400');
+
+            currentProductTab = tabId;
+            renderProductCatalog();
+        }
+
+        // ==================== 产品目录函数 ====================
+        function renderProductCatalog() {
+            const container = document.getElementById('product-list');
+            if (!container) return;
+
+            let filtered = [...store.products];
+
+            // 分组过滤
+            if (currentProductTab !== 'all') {
+                filtered = filtered.filter(p => p.group_code === currentProductTab);
+            }
+
+            // 搜索过滤
+            const searchTerm = document.getElementById('product-search')?.value.toLowerCase();
+            if (searchTerm) {
+                filtered = filtered.filter(p => 
+                    p.product_name.toLowerCase().includes(searchTerm) ||
+                    p.model.toLowerCase().includes(searchTerm) ||
+                    p.manufacturer.toLowerCase().includes(searchTerm) ||
+                    p.product_id.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            // 系统过滤
+            const systemFilter = document.getElementById('product-system-filter')?.value;
+            if (systemFilter) {
+                filtered = filtered.filter(p => p.system_code === systemFilter);
+            }
+
+            // 型号过滤
+            const modelFilter = document.getElementById('product-model-filter')?.value;
+            if (modelFilter) {
+                filtered = filtered.filter(p => p.model_code === modelFilter);
+            }
+
+            // 分组下拉筛选
+            const groupFilter = document.getElementById('product-group-filter')?.value;
+            if (groupFilter) {
+                filtered = filtered.filter(p => p.group_code === groupFilter);
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="col-span-3 text-center py-12 text-slate-500">暂无产品数据</div>';
+                return;
+            }
+
+            let html = '';
+            filtered.forEach(product => {
+                const group = store.professionalGroups.find(g => g.code === product.group_code) || {};
+                const system = store.systems.find(s => s.code === product.system_code) || {};
+                const modelType = store.modelTypes.find(m => m.code === product.model_code) || {};
+                const deviceType = store.deviceTypes.find(d => d.code === product.device_type_code) || {};
+
+                const deviceCount = store.devices.filter(d => d.product_id === product.product_id).length;
+                const pointTypeCount = product.point_types?.reduce((sum, pt) => sum + (pt.count || 1), 0) || 0;
+
+                html += `
+                <div class="glass-card rounded-xl p-5 hover:border-blue-500/30 cursor-pointer" onclick="viewProductDetail('${product.product_id}')">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="w-12 h-12 rounded-xl bg-${group.color || 'blue'}-500/20 flex items-center justify-center">
+                            <i class="fas ${product.icon || 'fa-box-open'} text-${group.color || 'blue'}-400 text-xl"></i>
+                        </div>
+                        <span class="px-2 py-1 bg-${group.color || 'blue'}-500/20 text-${group.color || 'blue'}-400 rounded text-xs">
+                            ${group.name || product.group_code}
+                        </span>
+                    </div>
+
+                    <h4 class="text-lg font-semibold text-white mb-1">${product.product_name}</h4>
+                    <p class="text-sm text-slate-400 mb-2">${product.manufacturer} · ${product.model}</p>
+
+                    <div class="flex flex-wrap items-center gap-2 mb-3">
+                        <span class="text-xs px-2 py-1 bg-slate-700 rounded-full text-slate-300" title="系统码">${system.code || product.system_code}</span>
+                        <span class="text-xs px-2 py-1 bg-slate-700 rounded-full text-slate-300" title="型号码">${modelType.code || product.model_code}</span>
+                        <span class="text-xs px-2 py-1 bg-slate-700 rounded-full text-slate-300" title="设备类型码">${deviceType.code || product.device_type_code}</span>
+                    </div>
+
+                    <div class="code-highlight mb-3">
+                        <i class="fas fa-barcode mr-1"></i>${product.product_id}
+                    </div>
+
+                    <div class="flex justify-between items-center text-sm mb-2">
+                        <span class="text-slate-400">已接入设备</span>
+                        <span class="text-white font-bold">${deviceCount}</span>
+                    </div>
+
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">点位类型</span>
+                        <span class="text-white font-bold">${pointTypeCount} 个</span>
+                    </div>
+
+                    <div class="mt-3 flex gap-2">
+                        <button onclick="event.stopPropagation();editProduct('${product.product_id}')" class="flex-1 py-1.5 glass-card rounded text-slate-300 hover:text-white text-sm">
+                            <i class="fas fa-edit mr-1"></i>编辑
+                        </button>
+                        <button onclick="event.stopPropagation();deleteProduct('${product.product_id}')" class="flex-1 py-1.5 glass-card rounded text-red-400 hover:text-red-300 text-sm">
+                            <i class="fas fa-trash mr-1"></i>删除
+                        </button>
+                    </div>
+                </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderProductStats() {
+            const container = document.getElementById('professional-product-stats');
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            store.professionalGroups.forEach(group => {
+                const count = store.products.filter(p => p.group_code === group.code).length;
+                const systemCount = store.systems.filter(s => s.group_code === group.code).length;
+
+                container.innerHTML += `
+                <div class="glass-card p-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-${group.color}-500/20 flex items-center justify-center">
+                            <i class="fas ${group.icon} text-${group.color}-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-white">${group.name}</p>
+                            <p class="text-xs text-slate-400">${count} 个产品 · ${systemCount} 个系统</p>
+                        </div>
+                    </div>
+                </div>
+                `;
+            });
+        }
+
+        function filterProducts() {
+            renderProductCatalog();
+        }
+
+        function openProductModal() {
+            document.getElementById('modal-title').textContent = '添加产品';
+            document.getElementById('product-form').reset();
+            document.getElementById('product-system').disabled = true;
+            document.getElementById('product-model').disabled = true;
+            document.getElementById('product-device-type').disabled = true;
+            document.getElementById('product-code').value = '将自动生成';
+            document.getElementById('product-point-types').innerHTML = '';
+            document.getElementById('product-properties').innerHTML = '';
+
+            // 添加默认点位类型行
+            addPointType();
+
+            currentProduct = null;
+            openModal('modal-product');
+        }
+
+        function editProduct(productId) {
+            const product = store.products.find(p => p.product_id === productId);
+            if (!product) return;
+
+            currentProduct = product;
+            document.getElementById('modal-title').textContent = '编辑产品';
+
+            // 填充表单
+            document.getElementById('product-group').value = product.group_code;
+            onProductGroupChange(true);
+
+            setTimeout(() => {
+                document.getElementById('product-system').value = product.system_code;
+                onProductSystemChange(true);
+
+                setTimeout(() => {
+                    document.getElementById('product-model').value = product.model_code;
+                    document.getElementById('product-device-type').value = product.device_type_code;
+                    document.getElementById('product-name').value = product.product_name;
+                    document.getElementById('product-manufacturer').value = product.manufacturer;
+                    document.getElementById('product-model-number').value = product.model;
+                    document.getElementById('product-protocol').value = product.protocol || 'ONVIF';
+                    document.getElementById('product-icon').value = product.icon || 'fa-box-open';
+                    document.getElementById('product-desc').value = product.description || '';
+                    document.getElementById('product-code').value = product.product_id;
+
+                    // 填充点位类型
+                    if (product.point_types && product.point_types.length > 0) {
+                        renderPointTypes(product.point_types);
+                    } else {
+                        addPointType();
+                    }
+
+                    // 填充属性
+                    if (product.properties && product.properties.length > 0) {
+                        renderProductProperties(product.properties);
+                    }
+                }, 100);
+            }, 100);
+
+            openModal('modal-product');
+        }
+
+        function deleteProduct(productId) {
+            if (confirm('确定要删除这个产品吗？删除后关联的设备将无法使用该产品。')) {
+                store.products = store.products.filter(p => p.product_id !== productId);
+                renderProductCatalog();
+                renderProductStats();
+                showToast('产品已删除', 'success');
+            }
+        }
+
+        function viewProductDetail(productId) {
+            const product = store.products.find(p => p.product_id === productId);
+            if (!product) return;
+
+            const group = store.professionalGroups.find(g => g.code === product.group_code) || {};
+            const system = store.systems.find(s => s.code === product.system_code) || {};
+            const modelType = store.modelTypes.find(m => m.code === product.model_code) || {};
+            const deviceType = store.deviceTypes.find(d => d.code === product.device_type_code) || {};
+            
+            let pointTypesHtml = '';
+            if (product.point_types && product.point_types.length > 0) {
+                product.point_types.forEach(pt => {
+                    const pointType = store.pointTypes.find(p => p.code === pt.code) || {};
+                    pointTypesHtml += `
+                    <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                        <span><span class="font-mono text-blue-400">${pt.code}</span> - ${pt.name || pointType.name}</span>
+                        <span class="bg-slate-700 px-2 py-1 rounded text-xs">${pt.count || 1} 个</span>
+                    </div>
+                    `;
+                });
+            }
+
+            let propertiesHtml = '';
+            if (product.properties && product.properties.length > 0) {
+                product.properties.forEach(prop => {
+                    propertiesHtml += `
+                    <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                        <span>${prop.label}</span>
+                        <span class="text-slate-400">${prop.default || '-'}</span>
+                    </div>
+                    `;
+                });
+            }
+
+            const deviceCount = store.devices.filter(d => d.product_id === product.product_id).length;
+
+            const content = `
+            <div class="space-y-4">
+                <div class="flex items-center gap-4 p-4 glass-card rounded-lg">
+                    <div class="w-16 h-16 rounded-xl bg-${group.color}-500/20 flex items-center justify-center">
+                        <i class="fas ${product.icon || 'fa-box-open'} text-${group.color}-400 text-3xl"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-xl font-bold text-white">${product.product_name}</h4>
+                        <p class="text-sm text-slate-400">${product.manufacturer} · ${product.model}</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="glass-card p-4">
+                        <p class="text-xs text-slate-400 mb-1">产品编码</p>
+                        <p class="font-mono text-sm text-blue-400">${product.product_id}</p>
+                    </div>
+                    <div class="glass-card p-4">
+                        <p class="text-xs text-slate-400 mb-1">已接入设备</p>
+                        <p class="text-2xl font-bold text-white">${deviceCount}</p>
+                    </div>
+                </div>
+
+                <div class="glass-card p-4">
+                    <h5 class="text-sm font-medium text-white mb-3">编码信息</h5>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <p class="text-xs text-slate-400">专业分组</p>
+                            <p>${group.name} (${product.group_code})</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400">所属系统</p>
+                            <p>${system.name} (${product.system_code})</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400">型号码</p>
+                            <p>${modelType.name} (${product.model_code})</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400">设备类型码</p>
+                            <p>${deviceType.name} (${product.device_type_code})</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card p-4">
+                    <h5 class="text-sm font-medium text-white mb-3">点位类型</h5>
+                    ${pointTypesHtml || '<p class="text-sm text-slate-400">暂无点位类型定义</p>'}
+                </div>
+
+                <div class="glass-card p-4">
+                    <h5 class="text-sm font-medium text-white mb-3">设备属性</h5>
+                    ${propertiesHtml || '<p class="text-sm text-slate-400">暂无属性定义</p>'}
+                </div>
+
+                <div class="glass-card p-4">
+                    <h5 class="text-sm font-medium text-white mb-3">产品描述</h5>
+                    <p class="text-sm text-slate-300">${product.description || '暂无描述'}</p>
+                </div>
+            </div>
+            `;
+
+            document.getElementById('product-detail-content').innerHTML = content;
+            document.getElementById('detail-title').textContent = product.product_name;
+            openModal('modal-product-detail');
+        }
+
+        function onProductGroupChange(skipClear) {
+            const group = document.getElementById('product-group').value;
+            const systemSelect = document.getElementById('product-system');
+
+            if (!group) {
+                systemSelect.disabled = true;
+                systemSelect.innerHTML = '<option value="">请先选择分组</option>';
+                return;
+            }
+
+            const systems = store.systems.filter(s => s.group_code === group);
+            systemSelect.innerHTML = '<option value="">请选择系统</option>';
+            systems.forEach(sys => {
+                const option = document.createElement('option');
+                option.value = sys.code;
+                option.textContent = `${sys.code} - ${sys.name}`;
+                systemSelect.appendChild(option);
+            });
+
+            systemSelect.disabled = false;
+
+            if (!skipClear) {
+                document.getElementById('product-model').disabled = true;
+                document.getElementById('product-model').innerHTML = '<option value="">请先选择系统</option>';
+                document.getElementById('product-device-type').disabled = true;
+                document.getElementById('product-device-type').innerHTML = '<option value="">请先选择系统</option>';
+                document.getElementById('product-code').value = '将自动生成';
+            }
+        }
+
+        function onProductSystemChange(skipClear) {
+            const system = document.getElementById('product-system').value;
+            const group = document.getElementById('product-group').value;
+            const modelSelect = document.getElementById('product-model');
+            const deviceTypeSelect = document.getElementById('product-device-type');
+
+            if (!system || !group) {
+                modelSelect.disabled = true;
+                modelSelect.innerHTML = '<option value="">请先选择系统</option>';
+                deviceTypeSelect.disabled = true;
+                deviceTypeSelect.innerHTML = '<option value="">请先选择系统</option>';
+                return;
+            }
+
+            // 填充型号码
+            const models = store.modelTypes.filter(m => m.system_code === system);
+            modelSelect.innerHTML = '<option value="">请选择型号码</option>';
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.code;
+                option.textContent = `${model.code} - ${model.name}`;
+                modelSelect.appendChild(option);
+            });
+
+            // 填充设备类型码 (所有设备类型)
+            deviceTypeSelect.innerHTML = '<option value="">请选择设备类型码</option>';
+            store.deviceTypes.forEach(dt => {
+                const option = document.createElement('option');
+                option.value = dt.code;
+                option.textContent = `${dt.code} - ${dt.name}`;
+                deviceTypeSelect.appendChild(option);
+            });
+
+            modelSelect.disabled = false;
+            deviceTypeSelect.disabled = false;
+
+            if (!skipClear) {
+                updateProductCode();
+            }
+        }
+
+        function updateProductCode() {
+            const system = document.getElementById('product-system').value;
+            const model = document.getElementById('product-model').value;
+            const deviceType = document.getElementById('product-device-type').value;
+
+            if (system && model && deviceType) {
+                // 生成产品编码：系统码-型号码-设备类型码-序号
+                const existing = store.products.filter(p => 
+                    p.system_code === system && p.model_code === model && p.device_type_code === deviceType
+                );
+                const nextNum = String(existing.length + 1).padStart(3, '0');
+                document.getElementById('product-code').value = `${system}-${model}-${deviceType}-${nextNum}`;
+            }
+        }
+
+        function addPointType() {
+            const container = document.getElementById('product-point-types');
+            const index = container.children.length;
+
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-12 gap-2 items-center';
+            div.innerHTML = `
+                <div class="col-span-4">
+                    <select class="form-input text-sm" data-point="code">
+                        <option value="">选择点位类型</option>
+                        ${store.pointTypes.map(pt => `<option value="${pt.code}">${pt.code} - ${pt.name}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="col-span-3">
+                    <input type="text" placeholder="点位名称" class="form-input text-sm" data-point="name">
+                </div>
+                <div class="col-span-2">
+                    <input type="number" placeholder="数量" class="form-input text-sm" data-point="count" value="1" min="1">
+                </div>
+                <div class="col-span-2">
+                    <input type="text" placeholder="数据类型" class="form-input text-sm" data-point="dataType" readonly>
+                </div>
+                <div class="col-span-1">
+                    <button type="button" onclick="this.parentElement.parentElement.remove()" class="text-red-400 hover:text-red-300">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+            // 添加change事件自动填充数据类型
+            const select = div.querySelector('[data-point="code"]');
+            const dataTypeInput = div.querySelector('[data-point="dataType"]');
+            select.addEventListener('change', function() {
+                const pointType = store.pointTypes.find(pt => pt.code === this.value);
+                if (pointType) {
+                    dataTypeInput.value = pointType.dataType;
+                    const nameInput = div.querySelector('[data-point="name"]');
+                    if (!nameInput.value) {
+                        nameInput.value = pointType.name;
+                    }
+                } else {
+                    dataTypeInput.value = '';
+                }
+            });
+
+            container.appendChild(div);
+        }
+
+        function renderPointTypes(pointTypes) {
+            const container = document.getElementById('product-point-types');
+            container.innerHTML = '';
+
+            pointTypes.forEach(pt => {
+                const div = document.createElement('div');
+                div.className = 'grid grid-cols-12 gap-2 items-center';
+                div.innerHTML = `
+                    <div class="col-span-4">
+                        <select class="form-input text-sm" data-point="code">
+                            <option value="">选择点位类型</option>
+                            ${store.pointTypes.map(p => `<option value="${p.code}" ${p.code === pt.code ? 'selected' : ''}>${p.code} - ${p.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="col-span-3">
+                        <input type="text" value="${pt.name || ''}" placeholder="点位名称" class="form-input text-sm" data-point="name">
+                    </div>
+                    <div class="col-span-2">
+                        <input type="number" value="${pt.count || 1}" placeholder="数量" class="form-input text-sm" data-point="count" min="1">
+                    </div>
+                    <div class="col-span-2">
+                        <input type="text" value="${pt.dataType || ''}" placeholder="数据类型" class="form-input text-sm" data-point="dataType" readonly>
+                    </div>
+                    <div class="col-span-1">
+                        <button type="button" onclick="this.parentElement.parentElement.remove()" class="text-red-400 hover:text-red-300">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+
+                // 设置change事件自动填充数据类型
+                const select = div.querySelector('[data-point="code"]');
+                const dataTypeInput = div.querySelector('[data-point="dataType"]');
+                select.addEventListener('change', function() {
+                    const pointType = store.pointTypes.find(p => p.code === this.value);
+                    if (pointType) {
+                        dataTypeInput.value = pointType.dataType;
+                        const nameInput = div.querySelector('[data-point="name"]');
+                        if (!nameInput.value) {
+                            nameInput.value = pointType.name;
+                        }
+                    } else {
+                        dataTypeInput.value = '';
+                    }
+                });
+
+                // 触发一次change事件以填充数据类型
+                if (pt.code) {
+                    setTimeout(() => {
+                        select.dispatchEvent(new Event('change'));
+                    }, 0);
+                }
+
+                container.appendChild(div);
+            });
+        }
+
+        function addProductProperty() {
+            const container = document.getElementById('product-properties');
+            const index = container.children.length;
+
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-12 gap-2 items-center';
+            div.innerHTML = `
+                <div class="col-span-3">
+                    <input type="text" placeholder="属性名" class="form-input text-sm" data-prop="name">
+                </div>
+                <div class="col-span-3">
+                    <input type="text" placeholder="显示标签" class="form-input text-sm" data-prop="label">
+                </div>
+                <div class="col-span-2">
+                    <select class="form-input text-sm" data-prop="type">
+                        <option value="text">文本</option>
+                        <option value="number">数字</option>
+                        <option value="select">下拉</option>
+                        <option value="checkbox">开关</option>
+                    </select>
+                </div>
+                <div class="col-span-3">
+                    <input type="text" placeholder="默认值" class="form-input text-sm" data-prop="default">
+                </div>
+                <div class="col-span-1">
+                    <button type="button" onclick="this.parentElement.parentElement.remove()" class="text-red-400 hover:text-red-300">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+            container.appendChild(div);
+        }
+
+        function renderProductProperties(properties) {
+            const container = document.getElementById('product-properties');
+            container.innerHTML = '';
+
+            properties.forEach(prop => {
+                const div = document.createElement('div');
+                div.className = 'grid grid-cols-12 gap-2 items-center';
+                div.innerHTML = `
+                    <div class="col-span-3">
+                        <input type="text" value="${prop.name || ''}" placeholder="属性名" class="form-input text-sm" data-prop="name">
+                    </div>
+                    <div class="col-span-3">
+                        <input type="text" value="${prop.label || ''}" placeholder="显示标签" class="form-input text-sm" data-prop="label">
+                    </div>
+                    <div class="col-span-2">
+                        <select class="form-input text-sm" data-prop="type">
+                            <option value="text" ${prop.type === 'text' ? 'selected' : ''}>文本</option>
+                            <option value="number" ${prop.type === 'number' ? 'selected' : ''}>数字</option>
+                            <option value="select" ${prop.type === 'select' ? 'selected' : ''}>下拉</option>
+                            <option value="checkbox" ${prop.type === 'checkbox' ? 'selected' : ''}>开关</option>
+                        </select>
+                    </div>
+                    <div class="col-span-3">
+                        <input type="text" value="${prop.default || ''}" placeholder="默认值" class="form-input text-sm" data-prop="default">
+                    </div>
+                    <div class="col-span-1">
+                        <button type="button" onclick="this.parentElement.parentElement.remove()" class="text-red-400 hover:text-red-300">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function saveProduct() {
+            // 验证必填字段
+            const required = ['product-group', 'product-system', 'product-model', 'product-device-type', 'product-name', 'product-manufacturer', 'product-model-number'];
+            for (const field of required) {
+                const value = document.getElementById(field).value;
+                if (!value) {
+                    showToast('请填写所有必填字段', 'error');
+                    return;
+                }
+            }
+
+            const group = document.getElementById('product-group').value;
+            const system = document.getElementById('product-system').value;
+            const model = document.getElementById('product-model').value;
+            const deviceType = document.getElementById('product-device-type').value;
+            const code = document.getElementById('product-code').value;
+
+            // 收集点位类型
+            const pointTypes = [];
+            const pointRows = document.querySelectorAll('#product-point-types > div');
+            pointRows.forEach(row => {
+                const code = row.querySelector('[data-point="code"]')?.value;
+                const name = row.querySelector('[data-point="name"]')?.value;
+                const count = row.querySelector('[data-point="count"]')?.value;
+                const dataType = row.querySelector('[data-point="dataType"]')?.value;
+
+                if (code && name) {
+                    pointTypes.push({ 
+                        code, 
+                        name, 
+                        count: parseInt(count) || 1,
+                        dataType 
+                    });
+                }
+            });
+
+            // 收集属性
+            const properties = [];
+            const propRows = document.querySelectorAll('#product-properties > div');
+            propRows.forEach(row => {
+                const name = row.querySelector('[data-prop="name"]')?.value;
+                const label = row.querySelector('[data-prop="label"]')?.value;
+                const type = row.querySelector('[data-prop="type"]')?.value;
+                const defaultValue = row.querySelector('[data-prop="default"]')?.value;
+
+                if (name && label) {
+                    properties.push({ name, label, type, default: defaultValue });
+                }
+            });
+
+            const productData = {
+                product_id: code,
+                product_name: document.getElementById('product-name').value,
+                group_code: group,
+                system_code: system,
+                model_code: model,
+                device_type_code: deviceType,
+                manufacturer: document.getElementById('product-manufacturer').value,
+                model: document.getElementById('product-model-number').value,
+                protocol: document.getElementById('product-protocol').value,
+                icon: document.getElementById('product-icon').value,
+                description: document.getElementById('product-desc').value,
+                point_types: pointTypes,
+                properties: properties,
+                color: store.professionalGroups.find(g => g.code === group)?.color || 'blue'
+            };
+
+            if (currentProduct) {
+                // 更新
+                const index = store.products.findIndex(p => p.product_id === currentProduct.product_id);
+                if (index !== -1) {
+                    store.products[index] = { ...store.products[index], ...productData };
+                }
+                showToast('产品更新成功', 'success');
+            } else {
+                // 新增
+                store.products.push(productData);
+                showToast('产品添加成功', 'success');
+            }
+
+            closeModal('modal-product');
+            currentProduct = null;
+            renderProductCatalog();
+            renderProductStats();
+            populateFilterOptions();
+        }
+
+        // ==================== 通用函数 ====================
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+            document.getElementById(modalId).classList.add('flex');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+            document.getElementById(modalId).classList.remove('flex');
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+
+            const types = {
+                success: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                error: 'bg-red-500/20 text-red-400 border-red-500/30',
+                warning: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+                info: 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+            };
+
+            const icons = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                warning: 'fa-exclamation-triangle',
+                info: 'fa-info-circle'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `flex items-center gap-3 px-4 py-3 rounded-lg border ${types[type]} glass-panel animate-slideIn`;
+            toast.innerHTML = `
+                <i class="fas ${icons[type]}"></i>
+                <span class="text-sm">${message}</span>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // 导出全局函数
+        window.switchProfessionalTab = switchProfessionalTab;
+        window.filterProducts = filterProducts;
+        window.openProductModal = openProductModal;
+        window.editProduct = editProduct;
+        window.deleteProduct = deleteProduct;
+        window.viewProductDetail = viewProductDetail;
+        window.onProductGroupChange = onProductGroupChange;
+        window.onProductSystemChange = onProductSystemChange;
+        window.addPointType = addPointType;
+        window.addProductProperty = addProductProperty;
+        window.saveProduct = saveProduct;
+        window.closeModal = closeModal;
+        window.updateProductCode = updateProductCode;
+    </script>
+</body>
+</html>

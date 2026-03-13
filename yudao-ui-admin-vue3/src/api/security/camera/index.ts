@@ -98,6 +98,35 @@ export const getCameraDevicesFromIoT = () => {
   })
 }
 
+/** Security 摄像头分页（用于录像回放等，返回 security_camera 表数据） */
+export interface SecurityCameraPageReqVO {
+  pageNo?: number
+  pageSize?: number
+  floorId?: number
+  buildingId?: number
+  nvrId?: number
+  cameraName?: string
+}
+
+export interface SecurityCameraVO {
+  id: number
+  cameraName: string
+  channelNo: number
+  nvrId?: number
+  status?: number
+  buildingId?: number
+  floorId?: number
+  [key: string]: any
+}
+
+/** 分页查询 Security 摄像头（用于录像回放设备树，确保使用 security_camera.id） */
+export const getSecurityCameraPage = (params: SecurityCameraPageReqVO) => {
+  return request.get<{ list: SecurityCameraVO[]; total: number }>({
+    url: '/security/camera/page',
+    params
+  })
+}
+
 
 
 
