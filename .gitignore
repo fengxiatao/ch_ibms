@@ -91,3 +91,7 @@ Thumbs.db
 /compile_output.txt
 /build.log
 /*.py
+
+# ===== 不纳入主仓库的嵌套项目 =====
+/ibms-server/
+/ibms-ui-admin/
