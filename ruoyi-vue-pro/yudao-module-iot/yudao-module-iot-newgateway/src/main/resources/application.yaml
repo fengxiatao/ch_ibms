@@ -6,7 +6,7 @@ spring:
   application:
     name: iot-newgateway-server
   profiles:
-    active: local  # 默认激活本地开发环境
+    active: dev  # 默认激活本地开发环境
 
   # Redis 配置
   data:

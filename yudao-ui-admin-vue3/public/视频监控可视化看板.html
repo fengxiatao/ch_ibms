@@ -1,0 +1,1681 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频监控可视化看板 · 增强交互版</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        :root {
+            --bg-primary: #0a0f1a;
+            --bg-card: #111827;
+            --bg-hover: #1f2937;
+            --border-default: #1e3a5f;
+            --border-active: #3b82f6;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-orange: #f59e0b;
+            --accent-red: #ef4444;
+            --glow-blue: 0 0 20px rgba(59, 130, 246, 0.3);
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 24px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.03) 0%, transparent 50%);
+        }
+
+        .dashboard {
+            max-width: 1920px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            padding: 16px 28px;
+            border-radius: 16px;
+            border: 1px solid var(--border-default);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 4px;
+            background: linear-gradient(to bottom, var(--accent-blue), var(--accent-green));
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .logo-area h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .badge-system {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            background: rgba(59, 130, 246, 0.1);
+            padding: 4px 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .command-center-info {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .time-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.4rem;
+            color: var(--accent-blue);
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .user-permission {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: rgba(30, 41, 59, 0.8);
+            padding: 8px 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border-default);
+        }
+
+        .permission-badge {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .user-avatar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border-default);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--border-active), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .card:hover {
+            border-color: var(--border-active);
+            transform: translateY(-2px);
+            box-shadow: var(--glow-blue);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .card-header h3 {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-header h3 i {
+            color: var(--accent-blue);
+            font-size: 1.1rem;
+        }
+
+        .badge-option {
+            background: rgba(59, 130, 246, 0.1);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            color: var(--accent-blue);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            font-weight: 500;
+        }
+
+        .badge-option.alert {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--accent-red);
+            border-color: rgba(239, 68, 68, 0.3);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* 网格布局 */
+        .grid-main {
+            display: grid;
+            grid-template-columns: 3fr 1.5fr 1.5fr;
+            gap: 20px;
+        }
+
+        .grid-secondary {
+            display: grid;
+            grid-template-columns: 1.2fr 1.8fr;
+            gap: 20px;
+        }
+
+        /* 视频区域 */
+        .video-section {
+            grid-row: span 1;
+        }
+
+        .video-wall {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            height: calc(100% - 60px);
+            transition: all 0.3s;
+            min-height: 400px;
+        }
+
+        /* 视图布局样式 - 自定义视图分屏类型 */
+        .video-wall.layout-daily { /* 日常监控 - 4分屏 */
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+        .video-wall.layout-emergency { /* 紧急视频 - 2分屏 */
+            grid-template-columns: repeat(1, 1fr) !important;
+        }
+        .video-wall.layout-leader { /* 领导检查 - 1分屏 */
+            grid-template-columns: repeat(1, 1fr) !important;
+        }
+        .video-wall.layout-outdoor { /* 户外监控 - 6分屏 */
+            grid-template-columns: repeat(3, 1fr) !important;
+        }
+
+        /* 单个放大模式 */
+        .video-wall.single-max {
+            grid-template-columns: 1fr !important;
+        }
+        .video-wall.single-max .cam-preview {
+            display: none;
+        }
+        .video-wall.single-max .cam-preview.maximized {
+            display: flex;
+            height: 100%;
+        }
+
+        /* 全屏样式 */
+        .fullscreen-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .fullscreen-content {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        .fullscreen-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .cam-preview {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            border-radius: 12px;
+            position: relative;
+            border: 2px solid var(--border-default);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s;
+            aspect-ratio: 16/9;
+        }
+
+        .cam-preview.selected {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 0 2px rgba(16,185,129,0.5);
+        }
+
+        .cam-preview:hover {
+            border-color: var(--accent-blue);
+            transform: scale(1.02);
+            z-index: 10;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .cam-preview::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                linear-gradient(45deg, transparent 48%, rgba(59, 130, 246, 0.05) 50%, transparent 52%),
+                linear-gradient(-45deg, transparent 48%, rgba(59, 130, 246, 0.05) 50%, transparent 52%);
+            background-size: 20px 20px;
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .cam-header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 8px 12px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 5;
+        }
+
+        .cam-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .cam-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+        }
+
+        .cam-status.offline {
+            background: var(--accent-red);
+            box-shadow: 0 0 10px var(--accent-red);
+        }
+
+        /* 摄像头放大按钮 */
+        .cam-max-btn {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .cam-max-btn:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .cam-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+        }
+
+        .cam-body i {
+            font-size: 3rem;
+            opacity: 0.3;
+        }
+
+        .cam-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 8px 12px;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            z-index: 5;
+        }
+
+        .video-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .control-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: var(--accent-blue);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .control-btn:hover {
+            background: rgba(59, 130, 246, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .control-btn.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .control-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* 视图选择下拉菜单 */
+        .view-selector {
+            position: relative;
+            display: inline-block;
+        }
+        .view-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: var(--bg-card);
+            border: 1px solid var(--border-default);
+            border-radius: 8px;
+            padding: 8px 0;
+            min-width: 180px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 100;
+            display: none;
+        }
+        .view-menu.show {
+            display: block;
+        }
+        .view-menu-item {
+            padding: 8px 16px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .view-menu-item:hover {
+            background: var(--bg-hover);
+        }
+        .view-menu-item.active {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--accent-blue);
+        }
+        .view-menu-item .split-info {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .live-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: var(--accent-green);
+        }
+
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* 报警时间轴 */
+        .alert-timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 360px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .alert-timeline::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .alert-timeline::-webkit-scrollbar-thumb {
+            background: var(--border-default);
+            border-radius: 4px;
+        }
+
+        .alert-item {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 12px;
+            padding: 14px;
+            border-left: 3px solid;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .alert-item:hover {
+            background: rgba(59, 130, 246, 0.1);
+            transform: translateX(4px);
+        }
+
+        .alert-item.critical { border-left-color: var(--accent-red); }
+        .alert-item.warning { border-left-color: var(--accent-orange); }
+        .alert-item.info { border-left-color: var(--accent-blue); }
+
+        .alert-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .alert-item.critical .alert-icon { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); }
+        .alert-item.warning .alert-icon { background: rgba(245, 158, 11, 0.15); color: var(--accent-orange); }
+        .alert-item.info .alert-icon { background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); }
+
+        .alert-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .alert-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .alert-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .alert-time {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-blue);
+        }
+
+        /* 设备仪表盘 */
+        .device-dashboard {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .device-main-stat {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border-default);
+        }
+
+        .circular-chart {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            flex-shrink: 0;
+        }
+
+        .circular-chart.channel-chart {
+            margin-left: 20px;
+        }
+
+        .circular-chart svg {
+            transform: rotate(-90deg);
+        }
+
+        .circle-bg {
+            fill: none;
+            stroke: rgba(148, 163, 184, 0.1);
+            stroke-width: 8;
+        }
+
+        .circle {
+            fill: none;
+            stroke-width: 8;
+            stroke-linecap: round;
+            transition: stroke-dasharray 0.6s ease;
+        }
+
+        .circle.online {
+            stroke: url(#gradientOnline);
+        }
+
+        .circle.channel {
+            stroke: url(#gradientChannel);
+        }
+
+        .chart-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .chart-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1;
+        }
+
+        .chart-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .device-summary {
+            flex: 1;
+        }
+
+        .summary-title {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .summary-stats {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .stat-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .stat-pill.online {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+        }
+
+        .stat-pill.offline {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+        }
+
+        /* 通道在线率样式 - 参考设备在线率 */
+        .stat-pill.channel {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-blue);
+        }
+
+        .device-categories {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .category-card {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 12px;
+            padding: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .category-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .category-count {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-blue);
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .category-bar {
+            height: 6px;
+            background: rgba(148, 163, 184, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .category-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.6s ease;
+        }
+
+        .category-fill.online { background: var(--accent-green); }
+        .category-fill.channel { background: var(--accent-blue); }
+
+        .category-status {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+        }
+
+        .status-online { color: var(--accent-green); font-weight: 600; }
+        .status-offline { color: var(--accent-red); font-weight: 600; }
+        .status-channel { color: var(--accent-blue); font-weight: 600; }
+
+        /* AI 卡片 - 已删除相关样式，保留基础结构 */
+        .ai-grid {
+            display: none;
+        }
+
+        /* 录像存储 */
+        .recording-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .rec-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .metric-box {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 12px;
+            padding: 16px 8px;
+            text-align: center;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            transition: all 0.3s;
+        }
+
+        .metric-box:hover {
+            border-color: var(--accent-blue);
+            transform: translateY(-2px);
+        }
+
+        .metric-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .storage-section {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .storage-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .storage-title {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .storage-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .storage-bar {
+            height: 10px;
+            background: rgba(148, 163, 184, 0.1);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .storage-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+            border-radius: 5px;
+            transition: width 0.6s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .storage-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .storage-details {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* 区域分布 */
+        .distribution-section {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 40px;
+            align-items: center;
+        }
+
+        .pie-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .pie-chart {
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            background: conic-gradient(
+                var(--accent-blue) 0deg 172.8deg,
+                var(--accent-orange) 172.8deg 273.6deg,
+                var(--accent-green) 273.6deg 345.6deg,
+                var(--accent-red) 345.6deg 360deg
+            );
+            position: relative;
+            box-shadow: 0 0 40px rgba(59, 130, 246, 0.2);
+            transition: background 0.3s;
+        }
+
+        .pie-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            background: var(--bg-card);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid var(--border-default);
+        }
+
+        .pie-total {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .pie-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .pie-legend {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 16px;
+            margin-top: 16px;
+            width: 100%;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .legend-color {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+        }
+
+        .legend-value {
+            margin-left: auto;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .bars-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .bar-item {
+            display: grid;
+            grid-template-columns: 90px 1fr 50px;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .bar-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .bar-track {
+            height: 10px;
+            background: rgba(148, 163, 184, 0.1);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.6s ease;
+        }
+
+        .bar-value {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-align: right;
+        }
+
+        /* 底部状态栏 */
+        .status-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.8);
+            padding: 16px 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border-default);
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            backdrop-filter: blur(10px);
+        }
+
+        .status-group {
+            display: flex;
+            gap: 24px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.good { background: var(--accent-green); }
+        .status-indicator.warn { background: var(--accent-orange); }
+
+        /* 模拟数据标注 */
+        .sim-badge {
+            font-size: 0.7rem;
+            background: rgba(255,165,0,0.2);
+            color: orange;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+        }
+
+        .region-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 8px;
+            font-size: 0.8rem;
+        }
+
+        /* 放大模式下的控制条 */
+        .maximize-controls {
+            margin-top: 8px;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+    </style>
+</head>
+<body>
+    <svg style="display: none;">
+        <defs>
+            <linearGradient id="gradientOnline" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#34d399;stop-opacity:1" />
+            </linearGradient>
+            <linearGradient id="gradientChannel" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#60a5fa;stop-opacity:1" />
+            </linearGradient>
+        </defs>
+    </svg>
+
+    <div class="dashboard">
+        <!-- 头部 -->
+        <div class="header">
+            <div class="logo-area">
+                <h1><i class="fas fa-shield-halved"></i> 视频监控可视化看板</h1>
+                <span class="badge-system">动态数据模拟 <i class="fas fa-robot sim-badge" style="margin-left:0;"></i></span>
+            </div>
+            <div class="command-center-info">
+                <div class="time-display" id="clock">14:32:18</div>
+                <div class="user-permission">
+                    <div class="permission-badge">
+                        <i class="fas fa-crown"></i> 最高权限
+                    </div>
+                    <div class="user-avatar">
+                        <i class="fas fa-user-shield"></i>
+                        <span>赵指挥</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第一行：核心监控 -->
+        <div class="grid-main">
+            <!-- 视频监控 - 修改为视图按钮和自定义视图列表 -->
+            <div class="card video-section">
+                <div class="card-header">
+                    <h3><i class="fas fa-video"></i> 实时监控画面</h3>
+                    <div style="display: flex; gap: 8px; align-items:center;">
+                        <!-- 视图选择下拉菜单 - 改为视图按钮和自定义视图列表 -->
+                        <div class="view-selector">
+                            <span class="badge-option" id="layout-indicator"><i class="fas fa-th-large"></i> 日常监控</span>
+                            <div class="view-menu" id="view-menu">
+                                <div class="view-menu-item active" data-layout="layout-daily">
+                                    <span>日常监控</span>
+                                    <span class="split-info">4分屏</span>
+                                </div>
+                                <div class="view-menu-item" data-layout="layout-emergency">
+                                    <span>紧急视频</span>
+                                    <span class="split-info">2分屏</span>
+                                </div>
+                                <div class="view-menu-item" data-layout="layout-leader">
+                                    <span>领导检查</span>
+                                    <span class="split-info">1分屏</span>
+                                </div>
+                                <div class="view-menu-item" data-layout="layout-outdoor">
+                                    <span>户外监控</span>
+                                    <span class="split-info">6分屏</span>
+                                </div>
+                            </div>
+                        </div>
+                        <span class="live-indicator"><span class="live-dot"></span> 实时</span>
+                    </div>
+                </div>
+                <div class="video-wall layout-daily" id="video-wall">
+                    <!-- 动态JS生成摄像头 -->
+                </div>
+                <div class="video-controls">
+                    <div class="control-group">
+                        <button class="control-btn active" id="auto-poll-btn"><i class="fas fa-sync-alt"></i> 自动轮询</button>
+                        <button class="control-btn" id="fullscreen-btn"><i class="fas fa-expand-arrows-alt"></i> 全屏展示</button>
+                    </div>
+                    <div class="control-group">
+                        <button class="control-btn" id="screenshot-btn"><i class="fas fa-camera"></i> 截图</button>
+                        <button class="control-btn" id="emergency-record-btn"><i class="fas fa-save"></i> 紧急录像</button>
+                    </div>
+                </div>
+                <div class="maximize-controls" id="maximize-controls" style="display: none;">
+                    <button class="control-btn" id="exit-maximize-btn"><i class="fas fa-compress"></i> 退出放大</button>
+                </div>
+                <div class="region-selector">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>当前显示: 用户预选摄像头 (可自定义) </span>
+                    <button class="control-btn" style="padding:4px 8px;" id="open-camera-config"><i class="fas fa-edit"></i> 配置</button>
+                </div>
+            </div>
+
+            <!-- 报警时间轴 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-bell"></i> 实时告警</h3>
+                    <span class="badge-option alert" id="unread-alert-badge"><i class="fas fa-exclamation-circle"></i> 3条</span>
+                </div>
+                <div class="alert-timeline" id="alert-timeline">
+                    <!-- 动态生成告警 -->
+                </div>
+            </div>
+
+            <!-- 设备健康 - 优化通道在线率样式 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-server"></i> 设备健康 <span class="sim-badge">IPC/服务器/存储</span></h3>
+                    <span class="badge-option" id="device-total">23通道</span>
+                </div>
+                <div class="device-dashboard" id="device-dashboard">
+                    <!-- 动态生成设备健康 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 第二行：智能分析 - 已删除人员/车辆检测卡片 -->
+        <div class="ai-grid" id="ai-grid">
+            <!-- 已删除AI卡片 -->
+        </div>
+
+        <!-- 第三行：录像统计与区域分布 -->
+        <div class="grid-secondary">
+            <div class="card" id="storage-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-record-vinyl"></i> 录像存储</h3>
+                    <span class="badge-option">实时</span>
+                </div>
+                <div class="recording-stats" id="recording-stats">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+
+            <div class="card" id="region-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-pie"></i> 监控区域分布</h3>
+                    <span class="badge-option" id="region-total">25路摄像头</span>
+                </div>
+                <div class="distribution-section" id="distribution-section">
+                    <!-- 动态生成区域分布 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部状态栏 -->
+        <div class="status-footer">
+            <div class="status-group">
+                <div class="status-item">
+                    <span class="status-indicator good" id="storage-health-led"></span>
+                    <span id="storage-health-text">存储系统正常</span>
+                </div>
+                <div class="status-item">
+                    <i class="fas fa-video" style="color: var(--accent-blue);"></i>
+                    <span id="fps-status">主码流 25fps</span>
+                </div>
+                <div class="status-item">
+                    <i class="fas fa-bell" style="color: var(--accent-orange);"></i>
+                    <span id="last-alert-time">最后报警 14:28</span>
+                </div>
+            </div>
+            <div class="status-group">
+                <div class="status-item">
+                    <i class="fas fa-shield-halved" style="color: var(--accent-green);"></i>
+                    <span>系统状态正常</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 全屏展示容器 -->
+    <div class="fullscreen-overlay" id="fullscreen-overlay" style="display: none;">
+        <button class="fullscreen-close" id="fullscreen-close"><i class="fas fa-times"></i></button>
+        <div class="fullscreen-content" id="fullscreen-content"></div>
+    </div>
+
+    <script>
+        // 时钟更新
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('clock').textContent = `${hours}:${minutes}:${seconds}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // 生成摄像头列表（根据不同视图调整数量）
+        const cameraList = [
+            { id: 1, name: '出入口-主通道', status: 'online', resolution: '1080P', bitrate: '4Mbps' },
+            { id: 2, name: '停车场-北区', status: 'online', resolution: '1080P', bitrate: '4Mbps' },
+            { id: 3, name: '办公楼-大厅', status: 'online', resolution: '720P', bitrate: '2Mbps' },
+            { id: 4, name: '仓库-1号区', status: 'offline', resolution: '1080P', bitrate: '4Mbps' },
+            { id: 5, name: '办公楼-电梯口', status: 'online', resolution: '1080P', bitrate: '4Mbps' },
+            { id: 6, name: '停车场-南区', status: 'online', resolution: '720P', bitrate: '2Mbps' },
+            { id: 7, name: '园区-东门', status: 'online', resolution: '1080P', bitrate: '4Mbps' },
+            { id: 8, name: '园区-西门', status: 'online', resolution: '1080P', bitrate: '4Mbps' }
+        ];
+
+        const videoWall = document.getElementById('video-wall');
+        // 根据当前视图动态渲染摄像头
+        function renderCameras(layoutType) {
+            videoWall.innerHTML = '';
+            let cameraCount = 4; // 默认4个
+            
+            // 根据视图类型设置摄像头数量
+            switch(layoutType) {
+                case 'layout-daily': cameraCount = 4; break; // 日常监控 - 4分屏
+                case 'layout-emergency': cameraCount = 2; break; // 紧急视频 - 2分屏
+                case 'layout-leader': cameraCount = 1; break; // 领导检查 - 1分屏
+                case 'layout-outdoor': cameraCount = 6; break; // 户外监控 - 6分屏
+            }
+            
+            // 渲染对应数量的摄像头
+            cameraList.slice(0, cameraCount).forEach(camera => {
+                const camPreview = document.createElement('div');
+                camPreview.className = `cam-preview ${camera.status}`;
+                camPreview.dataset.cameraId = camera.id;
+                
+                camPreview.innerHTML = `
+                    <div class="cam-header">
+                        <div class="cam-title">
+                            <span class="cam-status ${camera.status}"></span>
+                            ${camera.name}
+                        </div>
+                        <button class="cam-max-btn" data-camera-id="${camera.id}">
+                            <i class="fas fa-expand"></i>
+                        </button>
+                    </div>
+                    <div class="cam-body">
+                        <i class="fas fa-video"></i>
+                    </div>
+                    <div class="cam-footer">
+                        <span>${camera.resolution}</span>
+                        <span>${camera.bitrate}</span>
+                    </div>
+                `;
+                
+                videoWall.appendChild(camPreview);
+                
+                // 双击全屏
+                camPreview.addEventListener('dblclick', function() {
+                    openFullscreen(camera.id);
+                });
+                
+                // 绑定放大按钮事件
+                camPreview.querySelector('.cam-max-btn').addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    handleCamMaximize(camera.id);
+                });
+            });
+        }
+
+        // 初始化渲染日常监控视图
+        renderCameras('layout-daily');
+
+        // 单个摄像头放大逻辑
+        function handleCamMaximize(cameraId) {
+            const videoWall = document.getElementById('video-wall');
+            const camPreview = document.querySelector(`.cam-preview[data-camera-id="${cameraId}"]`);
+            
+            // 切换单个放大模式
+            if (videoWall.classList.contains('single-max')) {
+                // 退出放大
+                videoWall.classList.remove('single-max');
+                document.querySelectorAll('.cam-preview').forEach(cam => {
+                    cam.classList.remove('maximized');
+                });
+                document.getElementById('maximize-controls').style.display = 'none';
+            } else {
+                // 进入放大
+                videoWall.classList.add('single-max');
+                document.querySelectorAll('.cam-preview').forEach(cam => {
+                    cam.classList.remove('maximized');
+                });
+                camPreview.classList.add('maximized');
+                document.getElementById('maximize-controls').style.display = 'flex';
+            }
+        }
+
+        // 退出单个放大
+        document.getElementById('exit-maximize-btn').addEventListener('click', function() {
+            const videoWall = document.getElementById('video-wall');
+            videoWall.classList.remove('single-max');
+            document.querySelectorAll('.cam-preview').forEach(cam => {
+                cam.classList.remove('maximized');
+            });
+            document.getElementById('maximize-controls').style.display = 'none';
+        });
+
+        // 视图选择功能 - 自定义视图列表
+        const viewSelector = document.querySelector('.view-selector');
+        const viewMenu = document.getElementById('view-menu');
+        const layoutIndicator = document.getElementById('layout-indicator');
+        const viewMenuItems = document.querySelectorAll('.view-menu-item');
+
+        viewSelector.addEventListener('click', function() {
+            viewMenu.classList.toggle('show');
+        });
+
+        // 点击外部关闭下拉菜单
+        document.addEventListener('click', function(e) {
+            if (!viewSelector.contains(e.target)) {
+                viewMenu.classList.remove('show');
+            }
+        });
+
+        // 选择视图布局 - 自定义视图
+        viewMenuItems.forEach(item => {
+            item.addEventListener('click', function() {
+                // 移除所有active类
+                viewMenuItems.forEach(i => i.classList.remove('active'));
+                // 添加当前active类
+                this.classList.add('active');
+                
+                // 更新布局
+                const layoutClass = this.dataset.layout;
+                videoWall.className = `video-wall ${layoutClass}`;
+                
+                // 更新显示文本
+                const viewName = this.querySelector('span:first-child').textContent;
+                layoutIndicator.innerHTML = `<i class="fas fa-th-large"></i> ${viewName}`;
+                
+                // 重新渲染对应视图的摄像头
+                renderCameras(layoutClass);
+                
+                // 关闭菜单
+                viewMenu.classList.remove('show');
+            });
+        });
+
+        // 全屏展示功能
+        const fullscreenOverlay = document.getElementById('fullscreen-overlay');
+        const fullscreenContent = document.getElementById('fullscreen-content');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        const fullscreenClose = document.getElementById('fullscreen-close');
+
+        // 打开全屏
+        function openFullscreen(cameraId = null) {
+            let content = '';
+            if (cameraId) {
+                // 单个摄像头全屏
+                const camera = cameraList.find(cam => cam.id == cameraId);
+                content = `
+                    <div class="cam-preview" style="width:100%;height:100%;">
+                        <div class="cam-header">
+                            <div class="cam-title">
+                                <span class="cam-status ${camera.status}"></span>
+                                ${camera.name}
+                            </div>
+                        </div>
+                        <div class="cam-body">
+                            <i class="fas fa-video" style="font-size:8rem;"></i>
+                        </div>
+                        <div class="cam-footer">
+                            <span>${camera.resolution}</span>
+                            <span>${camera.bitrate}</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // 全部摄像头全屏
+                content = videoWall.innerHTML;
+            }
+            
+            fullscreenContent.innerHTML = content;
+            fullscreenOverlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        // 关闭全屏
+        function closeFullscreen() {
+            fullscreenOverlay.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        fullscreenBtn.addEventListener('click', function() {
+            openFullscreen();
+        });
+
+        fullscreenClose.addEventListener('click', closeFullscreen);
+
+        // 生成告警列表
+        const alertList = [
+            { id: 1, type: 'critical', title: '出入口异常闯入', time: '14:28:45', location: '出入口-主通道' },
+            { id: 2, type: 'warning', title: '停车场可疑停留', time: '14:15:22', location: '停车场-北区' },
+            { id: 3, type: 'info', title: '仓库摄像头离线', time: '13:58:10', location: '仓库-1号区' }
+        ];
+
+        const alertTimeline = document.getElementById('alert-timeline');
+        alertList.forEach(alert => {
+            const alertIcon = alert.type === 'critical' ? 'fa-exclamation-triangle' : 
+                             alert.type === 'warning' ? 'fa-exclamation-circle' : 'fa-info-circle';
+            
+            const alertItem = document.createElement('div');
+            alertItem.className = `alert-item ${alert.type}`;
+            alertItem.innerHTML = `
+                <div class="alert-icon">
+                    <i class="fas ${alertIcon}"></i>
+                </div>
+                <div class="alert-content">
+                    <div class="alert-title">${alert.title}</div>
+                    <div class="alert-meta">
+                        <span class="alert-time">${alert.time}</span>
+                        <span><i class="fas fa-map-marker-alt"></i> ${alert.location}</span>
+                    </div>
+                </div>
+            `;
+            alertTimeline.appendChild(alertItem);
+        });
+
+        // 生成设备健康数据 - 优化通道在线率样式，参考设备在线率
+        const deviceDashboard = document.getElementById('device-dashboard');
+        deviceDashboard.innerHTML = `
+            <div class="device-main-stat">
+                <div class="circular-chart">
+                    <svg width="100" height="100" viewBox="0 0 100 100">
+                        <circle class="circle-bg" cx="50" cy="50" r="40"></circle>
+                        <circle class="circle online" cx="50" cy="50" r="40" stroke-dasharray="251.2 78.8" stroke-dashoffset="0"></circle>
+                    </svg>
+                    <div class="chart-text">
+                        <div class="chart-value">82%</div>
+                        <div class="chart-label">设备在线率</div>
+                    </div>
+                </div>
+                <div class="circular-chart channel-chart">
+                    <svg width="100" height="100" viewBox="0 0 100 100">
+                        <circle class="circle-bg" cx="50" cy="50" r="40"></circle>
+                        <circle class="circle channel" cx="50" cy="50" r="40" stroke-dasharray="282.6 78.4" stroke-dashoffset="0"></circle>
+                    </svg>
+                    <div class="chart-text">
+                        <div class="chart-value">95%</div>
+                        <div class="chart-label">通道在线率</div>
+                    </div>
+                </div>
+                <div class="device-summary">
+                    <div class="summary-title">设备状态汇总</div>
+                    <div class="summary-stats">
+                        <div class="stat-pill online">
+                            <i class="fas fa-check"></i> 19 在线
+                        </div>
+                        <div class="stat-pill offline">
+                            <i class="fas fa-times"></i> 4 离线
+                        </div>
+                        <div class="stat-pill channel">
+                            <i class="fas fa-video"></i> 95% 通道在线
+                        </div>
+                    </div>
+                    <div class="summary-title" style="margin-top: 12px;">通道状态汇总</div>
+                    <div class="summary-stats">
+                        <div class="stat-pill channel">
+                            <i class="fas fa-check-circle"></i> 22 通道正常
+                        </div>
+                        <div class="stat-pill offline">
+                            <i class="fas fa-times-circle"></i> 1 通道异常
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="device-categories">
+                <div class="category-card">
+                    <div class="category-header">
+                        <span>IPC摄像头</span>
+                        <span class="category-count">20</span>
+                    </div>
+                    <div class="category-bar">
+                        <div class="category-fill online" style="width: 85%;"></div>
+                    </div>
+                    <div class="category-status">
+                        <span class="status-online">17 在线</span>
+                        <span class="status-offline">3 离线</span>
+                    </div>
+                </div>
+                <div class="category-card">
+                    <div class="category-header">
+                        <span>视频通道</span>
+                        <span class="category-count">23</span>
+                    </div>
+                    <div class="category-bar">
+                        <div class="category-fill channel" style="width: 95%;"></div>
+                    </div>
+                    <div class="category-status">
+                        <span class="status-channel">22 正常</span>
+                        <span class="status-offline">1 异常</span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // 生成录像存储数据（只显示存储池使用和日均写入）
+        const recordingStats = document.getElementById('recording-stats');
+        recordingStats.innerHTML = `
+            <div class="rec-metrics">
+                <div class="metric-box">
+                    <div class="metric-value">68%</div>
+                    <div class="metric-label"><i class="fas fa-hdd"></i> 存储池使用率</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-value">286GB</div>
+                    <div class="metric-label"><i class="fas fa-download"></i> 日均写入量</div>
+                </div>
+            </div>
+            <div class="storage-section">
+                <div class="storage-header">
+                    <div class="storage-title"><i class="fas fa-database"></i> 总存储容量</div>
+                    <div class="storage-value">8TB / 12TB</div>
+                </div>
+                <div class="storage-bar">
+                    <div class="storage-fill" style="width: 68%;"></div>
+                </div>
+                <div class="storage-details">
+                    <span>可用: 3.84TB</span>
+                    <span>预计可用天数: 13</span>
+                </div>
+            </div>
+        `;
+
+        // 生成区域分布数据
+        const distributionSection = document.getElementById('distribution-section');
+        distributionSection.innerHTML = `
+            <div class="pie-container">
+                <div class="pie-chart">
+                    <div class="pie-center">
+                        <div class="pie-total">25</div>
+                        <div class="pie-label">摄像头总数</div>
+                    </div>
+                </div>
+                <div class="pie-legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--accent-blue);"></div>
+                        <span>出入口</span>
+                        <span class="legend-value">12</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--accent-orange);"></div>
+                        <span>停车场</span>
+                        <span class="legend-value">7</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--accent-green);"></div>
+                        <span>办公楼</span>
+                        <span class="legend-value">4</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--accent-red);"></div>
+                        <span>仓库</span>
+                        <span class="legend-value">2</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bars-container">
+                <div class="bar-item">
+                    <div class="bar-label"><i class="fas fa-door-open"></i> 出入口</div>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: 48%; background: var(--accent-blue);"></div>
+                    </div>
+                    <div class="bar-value">12</div>
+                </div>
+                <div class="bar-item">
+                    <div class="bar-label"><i class="fas fa-parking"></i> 停车场</div>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: 28%; background: var(--accent-orange);"></div>
+                    </div>
+                    <div class="bar-value">7</div>
+                </div>
+                <div class="bar-item">
+                    <div class="bar-label"><i class="fas fa-building"></i> 办公楼</div>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: 16%; background: var(--accent-green);"></div>
+                    </div>
+                    <div class="bar-value">4</div>
+                </div>
+                <div class="bar-item">
+                    <div class="bar-label"><i class="fas fa-warehouse"></i> 仓库</div>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: 8%; background: var(--accent-red);"></div>
+                    </div>
+                    <div class="bar-value">2</div>
+                </div>
+            </div>
+        `;
+    </script>
+</body>
+</html>

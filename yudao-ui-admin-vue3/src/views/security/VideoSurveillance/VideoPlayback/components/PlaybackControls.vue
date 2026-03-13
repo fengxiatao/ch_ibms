@@ -98,6 +98,16 @@
 
     <!-- 右侧：布局、全屏 -->
     <div class="controls-right">
+      <el-radio-group
+        v-if="playbackMode"
+        v-model="localPlaybackMode"
+        size="small"
+        class="playback-mode-switch"
+        @change="handlePlaybackModeChange"
+      >
+        <el-radio-button label="sdk">内网</el-radio-button>
+        <el-radio-button label="stream">外网</el-radio-button>
+      </el-radio-group>
       <el-select
         v-model="localLayout"
         size="small"
@@ -131,6 +141,7 @@ const props = defineProps<{
   isMuted: boolean
   playbackSpeed: number
   gridLayout: GridLayoutType
+  playbackMode?: 'sdk' | 'stream'
   // 裁剪相关
   isCutting?: boolean       // 是否正在裁剪
   cutProgress?: number      // 裁剪进度 0-100
@@ -162,6 +173,7 @@ const emit = defineEmits<{
   (e: 'fullscreen'): void
   (e: 'speed-change', speed: number): void
   (e: 'layout-change', layout: GridLayoutType): void
+  (e: 'mode-change', mode: 'sdk' | 'stream'): void
   (e: 'clip-video'): void    // 剪切录像
   (e: 'sync-all'): void      // 同步所有窗口
 }>()
@@ -169,6 +181,7 @@ const emit = defineEmits<{
 // 本地状态
 const localSpeed = ref(props.playbackSpeed)
 const localLayout = ref(props.gridLayout)
+const localPlaybackMode = ref<'sdk' | 'stream'>(props.playbackMode || 'sdk')
 const localSettings = reactive({
   uploadToServer: false
 })
@@ -188,6 +201,15 @@ watch(
   }
 )
 
+watch(
+  () => props.playbackMode,
+  (val) => {
+    if (val) {
+      localPlaybackMode.value = val
+    }
+  }
+)
+
 // 事件处理
 const handleSpeedChange = (speed: number) => {
   emit('speed-change', speed)
@@ -195,6 +217,10 @@ const handleSpeedChange = (speed: number) => {
 
 const handleLayoutChange = (layout: GridLayoutType) => {
   emit('layout-change', layout)
+}
+
+const handlePlaybackModeChange = (mode: 'sdk' | 'stream') => {
+  emit('mode-change', mode)
 }
 
 // 暴露设置
@@ -228,6 +254,12 @@ defineExpose({
     width: 32px;
     height: 32px;
     padding: 0;
+  }
+
+  .playback-mode-switch {
+    :deep(.el-radio-button__inner) {
+      padding: 6px 10px;
+    }
   }
   
   // 裁剪进度

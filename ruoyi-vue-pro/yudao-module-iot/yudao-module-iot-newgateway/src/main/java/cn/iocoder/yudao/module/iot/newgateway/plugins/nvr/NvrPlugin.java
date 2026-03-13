@@ -72,6 +72,9 @@ public class NvrPlugin implements ActiveDeviceHandler {
     
     /** 查询录像文件 */
     public static final String CMD_QUERY_RECORD = "QUERY_RECORD";
+
+    /** 批量查询录像文件（同一台 NVR 一次查询多个通道） */
+    public static final String CMD_QUERY_RECORD_BATCH = "QUERY_RECORD_BATCH";
     
     /** 下载录像文件 */
     public static final String CMD_DOWNLOAD_RECORD = "DOWNLOAD_RECORD";
@@ -111,6 +114,7 @@ public class NvrPlugin implements ActiveDeviceHandler {
         // 录像查询命令映射
         Map.entry("SEARCH_RECORD", CMD_QUERY_RECORD),
         Map.entry("SEARCH_RECORDS", CMD_QUERY_RECORD),
+        Map.entry("SEARCH_RECORDS_BATCH", CMD_QUERY_RECORD_BATCH),
         Map.entry("FIND_RECORD", CMD_QUERY_RECORD),
         // 通道查询命令映射
         Map.entry("SCAN_CHANNELS", CMD_QUERY_CHANNELS),
@@ -344,6 +348,8 @@ public class NvrPlugin implements ActiveDeviceHandler {
                     return executeStopPlayback(deviceId, command);
                 case CMD_QUERY_RECORD:
                     return executeQueryRecord(deviceId, command);
+                case CMD_QUERY_RECORD_BATCH:
+                    return executeQueryRecordBatch(deviceId, command);
                 case CMD_QUERY_CHANNELS:
                     return executeQueryChannels(deviceId);
                 case CMD_QUERY_DISK_STATUS:
@@ -553,7 +559,7 @@ public class NvrPlugin implements ActiveDeviceHandler {
             }
             
             // 通过查询通道信息来验证连接是否有效
-            NvrOperationResult result = sdkWrapper.queryChannels(loginHandle);
+            sdkWrapper.queryChannels(loginHandle);
             
             connectionManager.updateHeartbeat(deviceId);
             lifecycleManager.updateLastSeen(deviceId);
@@ -599,11 +605,25 @@ public class NvrPlugin implements ActiveDeviceHandler {
                 NvrOperationResult result = sdkWrapper.queryChannels(loginHandle);
                 
                 if (result.isSuccess()) {
-                    @SuppressWarnings("unchecked")
                     Map<String, Object> data = result.getData();
-                    @SuppressWarnings("unchecked")
-                    java.util.List<Map<String, Object>> channels = (java.util.List<Map<String, Object>>) data.get("channels");
-                    int totalCount = data.get("totalCount") != null ? (int) data.get("totalCount") : 0;
+                    java.util.List<Map<String, Object>> channels = null;
+                    Object channelsObj = data != null ? data.get("channels") : null;
+                    if (channelsObj instanceof java.util.List) {
+                        channels = new java.util.ArrayList<>();
+                        for (Object item : (java.util.List<?>) channelsObj) {
+                            if (!(item instanceof Map)) {
+                                continue;
+                            }
+                            Map<String, Object> mapped = new HashMap<>();
+                            for (Map.Entry<?, ?> e : ((Map<?, ?>) item).entrySet()) {
+                                if (e.getKey() != null) {
+                                    mapped.put(String.valueOf(e.getKey()), e.getValue());
+                                }
+                            }
+                            channels.add(mapped);
+                        }
+                    }
+                    int totalCount = data != null && data.get("totalCount") != null ? (int) data.get("totalCount") : 0;
                     
                     log.info("{} ✅ 通道查询成功: deviceId={}, totalCount={}", LOG_PREFIX, deviceId, totalCount);
                     
@@ -619,8 +639,16 @@ public class NvrPlugin implements ActiveDeviceHandler {
                             
                             // 构建 capabilities
                             Map<String, Object> capabilities = new HashMap<>();
-                            @SuppressWarnings("unchecked")
-                            Map<String, Object> srcCaps = (Map<String, Object>) ch.get("capabilities");
+                            Map<String, Object> srcCaps = null;
+                            Object capsObj = ch.get("capabilities");
+                            if (capsObj instanceof Map) {
+                                srcCaps = new HashMap<>();
+                                for (Map.Entry<?, ?> e : ((Map<?, ?>) capsObj).entrySet()) {
+                                    if (e.getKey() != null) {
+                                        srcCaps.put(String.valueOf(e.getKey()), e.getValue());
+                                    }
+                                }
+                            }
                             if (srcCaps != null) {
                                 capabilities.put("ptzSupport", srcCaps.get("ptzSupport"));
                                 capabilities.put("audioSupport", srcCaps.get("audioSupport"));
@@ -818,7 +846,6 @@ public class NvrPlugin implements ActiveDeviceHandler {
      *     <li>STOP - 停止设备巡航</li>
      * </ul>
      */
-    @SuppressWarnings("unchecked")
     private CommandResult executeTourControl(Long deviceId, DeviceCommand command) {
         Integer channelNo = command.getParam("channelNo");
         String tourAction = command.getParam("tourAction");
@@ -998,6 +1025,112 @@ public class NvrPlugin implements ActiveDeviceHandler {
         } catch (Exception e) {
             log.error("{} 查询录像文件异常: deviceId={}", LOG_PREFIX, deviceId, e);
             return CommandResult.failure("查询录像文件异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 执行批量查询录像文件命令
+     *
+     * <p>同一台 NVR 复用 loginHandle，对多个通道依次（小并发上限）查询并汇总结果。</p>
+     */
+    private CommandResult executeQueryRecordBatch(Long deviceId, DeviceCommand command) {
+        Object channelNosObj = command.getParam("channelNos");
+        String startTime = command.getParam("startTime");
+        String endTime = command.getParam("endTime");
+        Integer recordType = command.getParam("recordType");
+
+        if (channelNosObj == null) {
+            return CommandResult.failure("缺少 channelNos 参数");
+        }
+        if (startTime == null || endTime == null) {
+            return CommandResult.failure("缺少 startTime 或 endTime 参数");
+        }
+
+        final java.util.List<Integer> channelNos = new java.util.ArrayList<>();
+        if (channelNosObj instanceof java.util.List) {
+            for (Object o : (java.util.List<?>) channelNosObj) {
+                if (o == null) continue;
+                try {
+                    channelNos.add(Integer.parseInt(o.toString()));
+                } catch (Exception ignored) {}
+            }
+        } else {
+            // 兼容单值
+            try {
+                channelNos.add(Integer.parseInt(channelNosObj.toString()));
+            } catch (Exception ignored) {}
+        }
+        if (channelNos.isEmpty()) {
+            return CommandResult.failure("channelNos 为空");
+        }
+
+        log.info("{} 批量查询录像文件: deviceId={}, channels={}, start={}, end={}",
+                LOG_PREFIX, deviceId, channelNos.size(), startTime, endTime);
+
+        try {
+            Long loginHandle = connectionManager.getLoginHandle(deviceId);
+            if (loginHandle == null || loginHandle <= 0) {
+                return CommandResult.failure("设备未连接");
+            }
+
+            // 同一设备并发建议极低，避免 SDK/设备压力；这里默认 2，可后续做成配置项
+            final int concurrency = Math.min(2, channelNos.size());
+            final java.util.concurrent.ConcurrentHashMap<Integer, java.util.List<java.util.Map<String, Object>>> filesByChannelNo =
+                    new java.util.concurrent.ConcurrentHashMap<>();
+
+            final java.util.concurrent.ConcurrentLinkedQueue<Integer> queue =
+                    new java.util.concurrent.ConcurrentLinkedQueue<>(channelNos);
+
+            java.util.List<java.util.concurrent.CompletableFuture<Void>> workers = new java.util.ArrayList<>();
+            for (int i = 0; i < concurrency; i++) {
+                workers.add(java.util.concurrent.CompletableFuture.runAsync(() -> {
+                    Integer chNo;
+                    while ((chNo = queue.poll()) != null) {
+                        try {
+                            NvrOperationResult sdkResult = sdkWrapper.queryRecordFiles(
+                                    loginHandle, chNo, startTime, endTime, recordType);
+                            if (sdkResult != null && sdkResult.isSuccess()) {
+                                Map<String, Object> data = sdkResult.getData();
+                                Object filesObj = data != null ? data.get("files") : null;
+            java.util.List<java.util.Map<String, Object>> files = new java.util.ArrayList<>();
+                                if (filesObj instanceof java.util.List) {
+                                    for (Object f : (java.util.List<?>) filesObj) {
+                                        if (f instanceof Map) {
+                        java.util.Map<String, Object> mapped = new java.util.HashMap<>();
+                        for (java.util.Map.Entry<?, ?> e : ((java.util.Map<?, ?>) f).entrySet()) {
+                            if (e.getKey() != null) {
+                                mapped.put(String.valueOf(e.getKey()), e.getValue());
+                            }
+                        }
+                        files.add(mapped);
+                                        }
+                                    }
+                                }
+                                filesByChannelNo.put(chNo, files);
+                            } else {
+                                filesByChannelNo.put(chNo, java.util.List.of());
+                            }
+                        } catch (Exception e) {
+                            log.warn("{} 批量查询单通道失败: deviceId={}, channel={}, err={}",
+                                    LOG_PREFIX, deviceId, chNo, e.getMessage());
+                            filesByChannelNo.put(chNo, java.util.List.of());
+                        }
+                    }
+                }));
+            }
+
+            java.util.concurrent.CompletableFuture.allOf(workers.toArray(new java.util.concurrent.CompletableFuture[0])).join();
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("filesByChannelNo", filesByChannelNo);
+            resp.put("totalChannels", channelNos.size());
+            resp.put("queryStartTime", startTime);
+            resp.put("queryEndTime", endTime);
+
+            return CommandResult.success(resp);
+        } catch (Exception e) {
+            log.error("{} 批量查询录像文件异常: deviceId={}, error={}", LOG_PREFIX, deviceId, e.getMessage(), e);
+            return CommandResult.failure("批量查询录像文件异常: " + e.getMessage());
         }
     }
 

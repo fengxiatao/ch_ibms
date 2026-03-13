@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧照明控制系统 - 通道回路设置</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #3b82f6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --bg: #f8fafc;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        /* 侧边栏样式 */
+        .sidebar {
+            width: 240px;
+            background: #1e293b;
+            position: fixed;
+            height: 100vh;
+            color: white;
+        }
+
+        .logo {
+            height: 64px;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .logo i {
+            color: var(--primary);
+            margin-right: 12px;
+            font-size: 20px;
+        }
+
+        .menu-item {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .menu-item:hover, .menu-item.active {
+            background: #334155;
+            color: white;
+        }
+
+        .menu-item i {
+            width: 20px;
+            margin-right: 12px;
+            font-size: 14px;
+        }
+
+        .main-content {
+            margin-left: 240px;
+            padding: 20px;
+        }
+
+        /* 卡片样式 */
+        .settings-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .settings-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .settings-title i {
+            color: var(--primary);
+        }
+
+        /* 筛选工具栏 */
+        .filter-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            position: relative;
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .search-box i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-light);
+            font-size: 14px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 10px 10px 36px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+        }
+
+        .filter-select {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            background: white;
+            min-width: 140px;
+        }
+
+        .stats-badge {
+            background: #f1f5f9;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* 控制器列表 - 紧凑卡片 */
+        .controller-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .controller-item {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .controller-item:hover {
+            border-color: var(--primary);
+            background: #f8fafc;
+        }
+
+        .controller-item.selected {
+            border-color: var(--primary);
+            background: #eff6ff;
+            box-shadow: 0 2px 8px rgba(59,130,246,0.1);
+        }
+
+        .controller-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .controller-name {
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--text);
+        }
+
+        .controller-model {
+            font-size: 12px;
+            color: var(--text-light);
+            background: #f1f5f9;
+            padding: 2px 8px;
+            border-radius: 16px;
+        }
+
+        .controller-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .controller-select-icon {
+            color: var(--primary);
+            font-size: 18px;
+            opacity: 0;
+        }
+
+        .controller-item.selected .controller-select-icon {
+            opacity: 1;
+        }
+
+        /* 通道网格 - 选中控制器后显示 */
+        .channels-section {
+            margin-top: 20px;
+            border-top: 1px solid var(--border);
+            padding-top: 20px;
+        }
+
+        .channels-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .channels-title {
+            font-weight: 600;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .channels-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+        }
+
+        .channel-item {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .channel-item:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+
+        .channel-item.selected {
+            border-color: var(--primary);
+            background: #eff6ff;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+        }
+
+        .channel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .channel-number {
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--text);
+        }
+
+        .channel-status {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        .channel-status.configured {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .channel-status.unconfigured {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .channel-name {
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .channel-spec {
+            font-size: 11px;
+            color: var(--text-light);
+        }
+
+        /* 编辑面板 */
+        .edit-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            border: 1px solid var(--primary);
+            box-shadow: 0 4px 12px rgba(59,130,246,0.1);
+        }
+
+        .edit-panel-title {
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--primary);
+            font-size: 16px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-light);
+            margin-bottom: 4px;
+        }
+
+        .form-control, .form-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            background: white;
+        }
+
+        .form-control:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+        }
+
+        /* 三级联动区域选择 */
+        .area-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .area-select {
+            flex: 1;
+            min-width: 100px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+
+        .btn-secondary {
+            background: white;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .action-bar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .status-badge.online {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        /* 空状态提示 */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-light);
+            background: #f8fafc;
+            border-radius: 12px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 侧边栏 -->
+    <div class="sidebar">
+        <div class="logo">
+            <i class="fas fa-lightbulb"></i>
+            <span>智慧照明系统</span>
+        </div>
+        <div class="menu-item" onclick="window.location.href='智能照明数据总览.html'">
+         
+        </div>
+        <div class="menu-item" onclick="window.location.href='03 设备管理（2026.03.04）.html'">
+        
+        </div>
+        <div class="menu-item active">
+            <i class="fas fa-sliders-h"></i><span>通道回路设置</span>
+        </div>
+        <div class="menu-item" onclick="window.location.href='场景控制.html'">
+            
+        </div>
+        <div class="menu-item" onclick="window.location.href='操作日志.html'">
+           
+        </div>
+        <div class="menu-item" onclick="window.location.href='告警信息.html'">
+       
+        </div>
+        <div class="menu-item" onclick="window.location.href='06 系统设置.html'">
+           
+        </div>
+    </div>
+
+    <div class="main-content">
+        <!-- 顶部标题 -->
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h1 class="text-xl font-bold">通道回路设置</h1>
+                <p class="text-sm text-slate-500 mt-1">搜索并选择执行控制器，配置其通道回路</p>
+            </div>
+            <div class="text-sm text-slate-500" id="currentTime"></div>
+        </div>
+
+        <!-- 执行控制器配置状态 - 可筛选搜索卡片列表 -->
+        <div class="settings-card">
+            <div class="settings-title">
+                <i class="fas fa-server"></i> 执行控制器配置状态
+                <span class="text-sm font-normal text-slate-500 ml-2">选择控制器后配置通道</span>
+            </div>
+            
+            <!-- 筛选搜索工具栏 -->
+            <div class="filter-bar">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="搜索控制器名称、ID或型号..." oninput="filterControllers()">
+                </div>
+                <select class="filter-select" id="statusFilter" onchange="filterControllers()">
+                    <option value="all">全部状态</option>
+                    <option value="configured">已配置通道</option>
+                    <option value="unconfigured">未配置通道</option>
+                </select>
+                <div class="stats-badge">
+                    <span><i class="fas fa-microchip"></i> 控制器总数: <span id="totalControllers">2</span></span>
+                    <span class="text-slate-300">|</span>
+                    <span><i class="fas fa-check-circle text-green-500"></i> 已配置: <span id="configuredControllers">2</span></span>
+                </div>
+            </div>
+
+            <!-- 控制器列表 (紧凑卡片) -->
+            <div class="controller-list" id="controllerList">
+                <!-- 动态生成 -->
+            </div>
+
+            <!-- 选中的控制器通道网格 -->
+            <div class="channels-section" id="channelsSection" style="display: none;">
+                <div class="channels-header">
+                    <div class="channels-title">
+                        <i class="fas fa-th-large text-primary"></i>
+                        <span id="selectedControllerDisplay">未选择控制器</span>
+                    </div>
+                    <span class="text-sm text-slate-500">点击通道进行编辑</span>
+                </div>
+                <div class="channels-grid" id="channelsGrid">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+
+            <!-- 通道编辑面板 -->
+            <div class="edit-panel" id="editPanel" style="display: none;">
+                <div class="edit-panel-title">
+                    <i class="fas fa-edit"></i>
+                    编辑通道配置 - <span id="selectedControllerName"></span> 通道 <span id="selectedChannelNum"></span>
+                </div>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">通道名称</label>
+                        <input type="text" class="form-control" id="channelName" placeholder="例如：A1层走廊灯组">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">设备类型</label>
+                        <select class="form-select" id="deviceType">
+                            <option value="light">普通照明</option>
+                            <option value="dimmer">调光设备</option>
+                            <option value="sensor">传感器</option>
+                            <option value="other">其他</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">灯具数量</label>
+                        <input type="number" class="form-control" id="lightCount" value="1" min="1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">单灯功率 (W)</label>
+                        <input type="number" class="form-control" id="lightPower" value="18" min="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">总功率 (W)</label>
+                        <input type="number" class="form-control" id="totalPower" readonly>
+                    </div>
+                    
+                    <!-- 三级联动区域选择 -->
+                    <div class="form-group">
+                        <label class="form-label">所属区域 <span class="text-xs text-slate-400">(建筑-楼层-区域)</span></label>
+                        <div class="area-selector">
+                            <select class="form-select area-select" id="buildingSelect" onchange="updateFloors()">
+                                <option value="">请选择建筑</option>
+                                <option value="A">A座</option>
+                                <option value="B">B座</option>
+                                <option value="C">C座</option>
+                            </select>
+                            <select class="form-select area-select" id="floorSelect" onchange="updateAreas()">
+                                <option value="">请选择楼层</option>
+                            </select>
+                            <select class="form-select area-select" id="areaSelect">
+                                <option value="">请选择区域</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">备注</label>
+                        <input type="text" class="form-control" id="channelRemark" placeholder="选填">
+                    </div>
+                </div>
+                
+                <div class="action-bar">
+                    <button class="btn btn-secondary" onclick="cancelEdit()">取消</button>
+                    <button class="btn btn-success" onclick="saveChannelConfig()">保存配置</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 已配置回路清单 -->
+        <div class="settings-card">
+            <div class="settings-title">
+                <i class="fas fa-list"></i> 已配置回路清单
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left">控制器</th>
+                            <th class="px-4 py-2 text-left">通道</th>
+                            <th class="px-4 py-2 text-left">通道名称</th>
+                            <th class="px-4 py-2 text-left">设备类型</th>
+                            <th class="px-4 py-2 text-left">规格</th>
+                            <th class="px-4 py-2 text-left">区域</th>
+                            <th class="px-4 py-2 text-left">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="configuredCircuitsList">
+                        <!-- 动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 执行控制器数据
+        const controllers = [
+            { id: 'CT001', name: 'A座执行控制器', model: 'LC-8CH-20A', channelCount: 8 },
+            { id: 'CT002', name: 'B座执行控制器', model: 'LC-8CH-20A', channelCount: 8 },
+            { id: 'CT003', name: 'C座执行控制器', model: 'LC-4CH-16A', channelCount: 4 },
+            { id: 'CT004', name: 'D座执行控制器', model: 'LC-8CH-20A', channelCount: 8 }
+        ];
+
+        // 建筑楼层数据
+        const buildingData = {
+            'A': { name: 'A座', floors: ['1层', '2层', '3层', '4层', '5层'] },
+            'B': { name: 'B座', floors: ['1层', '2层', '3层'] },
+            'C': { name: 'C座', floors: ['1层', '2层'] }
+        };
+
+        const floorAreas = {
+            '1层': ['大堂', '会议室', '办公室', '走廊', '电梯厅'],
+            '2层': ['办公区A', '办公区B', '会议室', '休息区'],
+            '3层': ['车间', '仓库', '更衣室'],
+            '4层': ['设备层'],
+            '5层': ['机房']
+        };
+
+        // 通道配置数据存储
+        let channelConfigs = {};
+
+        // 初始化示例数据
+        const initialCircuits = [
+            { controllerId: 'CT001', channel: 1, name: 'A1层走廊灯组', type: 'light', lightCount: 6, lightPower: 72, totalPower: 432, area: 'A座/1层/走廊', remark: '6盏LED筒灯' },
+            { controllerId: 'CT001', channel: 2, name: 'A1层会议室灯', type: 'light', lightCount: 8, lightPower: 96, totalPower: 768, area: 'A座/1层/会议室', remark: '8盏LED面板灯' },
+            { controllerId: 'CT001', channel: 3, name: 'A1层会议室调光', type: 'dimmer', lightCount: 4, lightPower: 90, totalPower: 360, area: 'A座/1层/会议室', remark: '可调光射灯' },
+            { controllerId: 'CT001', channel: 4, name: 'A1层办公室灯', type: 'light', lightCount: 12, lightPower: 144, totalPower: 1728, area: 'A座/1层/办公室', remark: '' },
+            { controllerId: 'CT001', channel: 5, name: 'A1层应急照明', type: 'light', lightCount: 4, lightPower: 96, totalPower: 384, area: 'A座/1层/走廊', remark: '应急回路' },
+            { controllerId: 'CT001', channel: 6, name: 'A2层走廊灯组', type: 'light', lightCount: 6, lightPower: 96, totalPower: 576, area: 'A座/2层/走廊', remark: '' },
+            { controllerId: 'CT001', channel: 7, name: 'A2层办公室灯', type: 'light', lightCount: 8, lightPower: 88, totalPower: 704, area: 'A座/2层/办公区A', remark: '' },
+            { controllerId: 'CT001', channel: 8, name: 'A2层办公室调光', type: 'dimmer', lightCount: 5, lightPower: 80, totalPower: 400, area: 'A座/2层/办公区B', remark: '可调光' },
+            { controllerId: 'CT002', channel: 1, name: 'B1层车间照明', type: 'light', lightCount: 10, lightPower: 180, totalPower: 1800, area: 'B座/1层/车间', remark: '工矿灯' },
+            { controllerId: 'CT002', channel: 2, name: 'B1层应急照明', type: 'light', lightCount: 3, lightPower: 64, totalPower: 192, area: 'B座/1层/走廊', remark: '' },
+            { controllerId: 'CT002', channel: 3, name: 'B2层办公区灯', type: 'light', lightCount: 8, lightPower: 96, totalPower: 768, area: 'B座/2层/办公区', remark: '' },
+            { controllerId: 'CT002', channel: 4, name: 'C座食堂照明', type: 'light', lightCount: 12, lightPower: 200, totalPower: 2400, area: 'C座/1层/食堂', remark: '' },
+            { controllerId: 'CT002', channel: 5, name: 'B1层车间调光', type: 'dimmer', lightCount: 6, lightPower: 120, totalPower: 720, area: 'B座/1层/车间', remark: '' },
+            { controllerId: 'CT002', channel: 6, name: 'C座食堂调光', type: 'dimmer', lightCount: 8, lightPower: 150, totalPower: 1200, area: 'C座/1层/食堂', remark: '' }
+        ];
+
+        // 初始化channelConfigs
+        initialCircuits.forEach(c => {
+            if (!channelConfigs[c.controllerId]) {
+                channelConfigs[c.controllerId] = {};
+            }
+            channelConfigs[c.controllerId][c.channel] = {
+                name: c.name,
+                type: c.type,
+                lightCount: c.lightCount,
+                lightPower: c.lightPower,
+                totalPower: c.totalPower,
+                area: c.area,
+                remark: c.remark || ''
+            };
+        });
+
+        // 当前选中的控制器和通道
+        let selectedControllerId = null;
+        let selectedChannel = null;
+
+        // 更新时间
+        function updateTime() {
+            document.getElementById('currentTime').innerText = new Date().toLocaleString('zh-CN');
+        }
+
+        // 过滤控制器
+        function filterControllers() {
+            const searchText = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            
+            const filtered = controllers.filter(controller => {
+                // 搜索匹配
+                const matchesSearch = controller.name.toLowerCase().includes(searchText) ||
+                                     controller.id.toLowerCase().includes(searchText) ||
+                                     controller.model.toLowerCase().includes(searchText);
+                
+                if (!matchesSearch) return false;
+                
+                // 状态过滤
+                if (statusFilter === 'all') return true;
+                
+                const configs = channelConfigs[controller.id] || {};
+                const configuredCount = Object.keys(configs).length;
+                
+                if (statusFilter === 'configured') return configuredCount > 0;
+                if (statusFilter === 'unconfigured') return configuredCount === 0;
+                
+                return true;
+            });
+            
+            renderControllerList(filtered);
+            updateStats();
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            document.getElementById('totalControllers').innerText = controllers.length;
+            const configuredCount = controllers.filter(c => {
+                const configs = channelConfigs[c.id] || {};
+                return Object.keys(configs).length > 0;
+            }).length;
+            document.getElementById('configuredControllers').innerText = configuredCount;
+        }
+
+        // 渲染控制器列表
+        function renderControllerList(controllerList = controllers) {
+            const list = document.getElementById('controllerList');
+            let html = '';
+
+            controllerList.forEach(controller => {
+                const configs = channelConfigs[controller.id] || {};
+                const configuredCount = Object.keys(configs).length;
+                const isSelected = selectedControllerId === controller.id;
+                
+                html += `<div class="controller-item ${isSelected ? 'selected' : ''}" onclick="selectController('${controller.id}')">`;
+                html += `<div class="controller-info">`;
+                html += `<span class="controller-name">${controller.name}</span>`;
+                html += `<span class="controller-model">${controller.model}</span>`;
+                html += `<div class="controller-stats">`;
+                html += `<span class="stat-item"><i class="fas fa-microchip text-slate-400"></i> <span class="stat-value">${configuredCount}/${controller.channelCount}</span> 已配置</span>`;
+                
+                // 计算在线通道数（模拟）
+                const onlineCount = configuredCount > 0 ? Math.floor(configuredCount * 0.8) : 0;
+                html += `<span class="stat-item"><i class="fas fa-plug text-green-500"></i> <span class="stat-value">${onlineCount}</span> 在线</span>`;
+                html += `</div>`;
+                html += `</div>`;
+                html += `<span class="controller-select-icon"><i class="fas fa-check-circle"></i></span>`;
+                html += `</div>`;
+            });
+
+            if (controllerList.length === 0) {
+                html = `<div class="empty-state"><i class="fas fa-search mb-2 text-2xl"></i><p>未找到匹配的控制器</p></div>`;
+            }
+
+            list.innerHTML = html;
+        }
+
+        // 选择控制器
+        function selectController(controllerId) {
+            selectedControllerId = controllerId;
+            selectedChannel = null;
+            
+            // 更新控制器列表选中状态
+            renderControllerList();
+            
+            // 显示通道网格
+            document.getElementById('channelsSection').style.display = 'block';
+            
+            // 更新选中控制器显示
+            const controller = controllers.find(c => c.id === controllerId);
+            document.getElementById('selectedControllerDisplay').innerHTML = `<i class="fas fa-server text-primary mr-2"></i>${controller.name} (${controller.id}) - 通道列表`;
+            
+            // 渲染通道网格
+            renderChannelsGrid(controllerId);
+            
+            // 隐藏编辑面板
+            document.getElementById('editPanel').style.display = 'none';
+        }
+
+        // 渲染通道网格
+        function renderChannelsGrid(controllerId) {
+            const controller = controllers.find(c => c.id === controllerId);
+            if (!controller) return;
+            
+            const configs = channelConfigs[controllerId] || {};
+            const grid = document.getElementById('channelsGrid');
+            let html = '';
+
+            for (let ch = 1; ch <= controller.channelCount; ch++) {
+                const config = configs[ch];
+                const isConfigured = !!config;
+                const isSelected = (selectedChannel === ch);
+                
+                html += `<div class="channel-item ${isSelected ? 'selected' : ''}" onclick="selectChannel(${ch})">`;
+                html += `<div class="channel-header">`;
+                html += `<span class="channel-number">CH ${ch}</span>`;
+                html += `<span class="channel-status ${isConfigured ? 'configured' : 'unconfigured'}">${isConfigured ? '已配置' : '未配置'}</span>`;
+                html += `</div>`;
+                
+                if (isConfigured) {
+                    html += `<div class="channel-name">${config.name || '未命名'}</div>`;
+                    html += `<div class="channel-spec">${config.lightCount}×${config.lightPower}W</div>`;
+                } else {
+                    html += `<div class="channel-name text-slate-400">未配置</div>`;
+                    html += `<div class="channel-spec">-</div>`;
+                }
+                html += `</div>`;
+            }
+
+            grid.innerHTML = html;
+        }
+
+        // 选择通道
+        function selectChannel(channel) {
+            selectedChannel = channel;
+            
+            // 更新通道网格选中状态
+            renderChannelsGrid(selectedControllerId);
+
+            // 获取当前配置
+            const config = channelConfigs[selectedControllerId]?.[channel] || {};
+            
+            // 显示编辑面板
+            document.getElementById('editPanel').style.display = 'block';
+            const controller = controllers.find(c => c.id === selectedControllerId);
+            document.getElementById('selectedControllerName').innerText = controller?.name || selectedControllerId;
+            document.getElementById('selectedChannelNum').innerText = channel;
+            
+            // 填充表单
+            document.getElementById('channelName').value = config.name || '';
+            document.getElementById('deviceType').value = config.type || 'light';
+            document.getElementById('lightCount').value = config.lightCount || 1;
+            document.getElementById('lightPower').value = config.lightPower || 18;
+            document.getElementById('channelRemark').value = config.remark || '';
+            
+            // 解析区域并设置三级联动
+            if (config.area) {
+                const parts = config.area.split('/');
+                if (parts.length >= 3) {
+                    const building = parts[0].replace('座', '');
+                    document.getElementById('buildingSelect').value = building;
+                    
+                    updateFloors();
+                    
+                    setTimeout(() => {
+                        document.getElementById('floorSelect').value = parts[1];
+                        updateAreas();
+                        setTimeout(() => {
+                            document.getElementById('areaSelect').value = parts[2];
+                        }, 50);
+                    }, 50);
+                }
+            } else {
+                document.getElementById('buildingSelect').value = '';
+                document.getElementById('floorSelect').innerHTML = '<option value="">请选择楼层</option>';
+                document.getElementById('areaSelect').innerHTML = '<option value="">请选择区域</option>';
+            }
+            
+            calculateTotalPower();
+        }
+
+        // 更新楼层下拉
+        function updateFloors() {
+            const building = document.getElementById('buildingSelect').value;
+            const floorSelect = document.getElementById('floorSelect');
+            
+            floorSelect.innerHTML = '<option value="">请选择楼层</option>';
+            document.getElementById('areaSelect').innerHTML = '<option value="">请选择区域</option>';
+            
+            if (building && buildingData[building]) {
+                buildingData[building].floors.forEach(floor => {
+                    const option = document.createElement('option');
+                    option.value = floor;
+                    option.textContent = floor;
+                    floorSelect.appendChild(option);
+                });
+            }
+        }
+
+        // 更新区域下拉
+        function updateAreas() {
+            const floor = document.getElementById('floorSelect').value;
+            const areaSelect = document.getElementById('areaSelect');
+            
+            areaSelect.innerHTML = '<option value="">请选择区域</option>';
+            
+            if (floor && floorAreas[floor]) {
+                floorAreas[floor].forEach(area => {
+                    const option = document.createElement('option');
+                    option.value = area;
+                    option.textContent = area;
+                    areaSelect.appendChild(option);
+                });
+            }
+        }
+
+        // 计算总功率
+        function calculateTotalPower() {
+            const count = parseInt(document.getElementById('lightCount').value) || 0;
+            const power = parseInt(document.getElementById('lightPower').value) || 0;
+            document.getElementById('totalPower').value = count * power;
+        }
+
+        // 监听数量/功率变化
+        document.getElementById('lightCount').addEventListener('input', calculateTotalPower);
+        document.getElementById('lightPower').addEventListener('input', calculateTotalPower);
+
+        // 取消编辑
+        function cancelEdit() {
+            selectedChannel = null;
+            document.getElementById('editPanel').style.display = 'none';
+            if (selectedControllerId) {
+                renderChannelsGrid(selectedControllerId);
+            }
+        }
+
+        // 保存通道配置
+        function saveChannelConfig() {
+            if (!selectedControllerId || !selectedChannel) {
+                alert('请先选择通道');
+                return;
+            }
+
+            const name = document.getElementById('channelName').value.trim();
+            if (!name) {
+                alert('请输入通道名称');
+                return;
+            }
+
+            // 获取区域路径
+            const building = document.getElementById('buildingSelect').value;
+            const floor = document.getElementById('floorSelect').value;
+            const area = document.getElementById('areaSelect').value;
+            
+            let areaPath = '';
+            if (building && floor && area) {
+                const buildingName = buildingData[building]?.name || building + '座';
+                areaPath = `${buildingName}/${floor}/${area}`;
+            } else {
+                areaPath = '未指定区域';
+            }
+
+            // 构建配置对象
+            const config = {
+                name: name,
+                type: document.getElementById('deviceType').value,
+                lightCount: parseInt(document.getElementById('lightCount').value) || 1,
+                lightPower: parseInt(document.getElementById('lightPower').value) || 0,
+                totalPower: parseInt(document.getElementById('totalPower').value) || 0,
+                area: areaPath,
+                remark: document.getElementById('channelRemark').value
+            };
+
+            // 保存配置
+            if (!channelConfigs[selectedControllerId]) {
+                channelConfigs[selectedControllerId] = {};
+            }
+            channelConfigs[selectedControllerId][selectedChannel] = config;
+
+            // 更新界面
+            renderControllerList();
+            renderChannelsGrid(selectedControllerId);
+            renderConfiguredCircuits();
+            filterControllers(); // 刷新统计
+            
+            alert('配置已保存');
+        }
+
+        // 渲染已配置回路清单
+        function renderConfiguredCircuits() {
+            const tbody = document.getElementById('configuredCircuitsList');
+            let html = '';
+
+            controllers.forEach(controller => {
+                const configs = channelConfigs[controller.id] || {};
+                for (let ch = 1; ch <= controller.channelCount; ch++) {
+                    const config = configs[ch];
+                    if (config) {
+                        const typeMap = { light: '普通照明', dimmer: '调光设备', sensor: '传感器', other: '其他' };
+                        html += `<tr class="border-b">`;
+                        html += `<td class="px-4 py-2">${controller.name}</td>`;
+                        html += `<td class="px-4 py-2">${ch}</td>`;
+                        html += `<td class="px-4 py-2">${config.name}</td>`;
+                        html += `<td class="px-4 py-2">${typeMap[config.type] || config.type}</td>`;
+                        html += `<td class="px-4 py-2">${config.lightCount}×${config.lightPower}W = ${config.totalPower}W</td>`;
+                        html += `<td class="px-4 py-2">${config.area}</td>`;
+                        html += `<td class="px-4 py-2"><span class="status-badge online">已配置</span></td>`;
+                        html += `</tr>`;
+                    }
+                }
+            });
+
+            if (html === '') {
+                html = `<tr><td colspan="7" class="text-center py-4 text-slate-400">暂无已配置回路</td></tr>`;
+            }
+
+            tbody.innerHTML = html;
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            updateTime();
+            setInterval(updateTime, 1000);
+            renderControllerList();
+            renderConfiguredCircuits();
+            updateStats();
+        });
+    </script>
+</body>
+</html>

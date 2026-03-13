@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能照明数据总览 · 静态版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+        
+        body {
+            font-family: 'Inter', 'Noto Sans SC', sans-serif;
+            background: #f0f4f8;
+            color: #1e293b;
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+        }
+        
+        .neon-glow {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .live-indicator::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: blink 2s infinite;
+        }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        
+        .scrollable-content {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 4px;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 #f1f5f9;
+        }
+        .scrollable-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        .scrollable-content::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+        .scrollable-content::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        .scrollable-content::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        .dashboard-card {
+            background: linear-gradient(135deg, #ffffff, #f8fafc);
+            border: 1px solid #e2e8f0;
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+        }
+        
+        .status-donut-container {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .status-stat-card {
+            background: white;
+            border-radius: 1rem;
+            padding: 1rem;
+            text-align: center;
+            flex: 1;
+            min-width: 100px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+            border: 1px solid #e2e8f0;
+        }
+        .status-stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .status-stat-label {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-top: 0.25rem;
+        }
+        
+        .rank-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .rank-item:last-child {
+            border-bottom: none;
+        }
+        .rank-number {
+            width: 24px;
+            height: 24px;
+            border-radius: 9999px;
+            background: #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #475569;
+            margin-right: 0.5rem;
+            flex-shrink: 0;
+        }
+        .rank-number.top-1 { background: #fbbf24; color: #92400e; }
+        .rank-number.top-2 { background: #94a3b8; color: #1e293b; }
+        .rank-number.top-3 { background: #b45309; color: #fffbeb; }
+        
+        .rank-value {
+            font-weight: 600;
+            color: #2563eb;
+            flex-shrink: 0;
+        }
+        .rank-unit {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-left: 0.25rem;
+        }
+        
+        .progress-bar {
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 20px;
+            overflow: hidden;
+            flex: 1;
+            margin: 0 0.5rem;
+            min-width: 60px;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 20px;
+            background: #3b82f6;
+        }
+        
+        .data-basis {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px dashed #e2e8f0;
+        }
+        
+        .chart-ring-container {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .fused-card {
+            background: linear-gradient(135deg, #ffffff, #f8fafc);
+            border: 1px solid #e2e8f0;
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+        }
+
+        /* 时段占比卡片样式 */
+        .period-stats {
+            background: #1e293b;
+            border-radius: 1rem;
+            padding: 1rem;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-6 overflow-x-hidden">
+
+    <!-- 顶部导航栏 -->
+    <header class="glass-panel rounded-2xl p-6 mb-6 flex flex-wrap justify-between items-center gap-4">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center neon-glow">
+                <i class="fas fa-lightbulb text-2xl text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold gradient-text">智能照明数据总览</h1>
+                <p class="text-slate-500 text-sm mt-1">Intelligent Lighting Data Overview</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-6">
+            <div class="text-right">
+                <div class="text-3xl font-bold text-slate-800" id="current-time">--:--:--</div>
+                <div class="text-slate-500 text-sm" id="current-date">2026-03-04</div>
+            </div>
+            <div class="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full">
+                <span class="live-indicator text-green-600 text-sm font-medium">系统运行正常</span>
+            </div>
+            <button class="p-2 hover:bg-slate-100 rounded-lg transition-colors" onclick="refreshData()">
+                <i class="fas fa-sync-alt text-slate-500 hover:text-slate-800"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- 第一行：设备运行状态融合卡片 + 照明回路状态统计 + 告警状态统计 -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <!-- 左侧：设备运行状态融合卡片 -->
+        <div class="fused-card">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <p class="text-slate-500 text-sm mb-1">设备运行状态</p>
+                    <h3 class="text-3xl font-bold text-slate-800">98.2%</h3>
+                    <p class="text-green-600 text-xs mt-2 flex items-center gap-2">
+                        <i class="fas fa-arrow-up mr-1"></i>设备在线率 较昨日 +0.5%
+                        <span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full ml-2">17在线 / 1离线</span>
+                    </p>
+                </div>
+                <div class="w-12 h-12 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-chart-pie text-blue-600 text-xl"></i>
+                </div>
+            </div>
+            
+            <div class="mt-2">
+                <div class="flex items-center gap-2 mb-3">
+                    <i class="fas fa-cubes text-blue-500 text-sm"></i>
+                    <span class="font-medium text-slate-700">设备类型分布</span>
+                    <span class="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full ml-auto">总计 17 台</span>
+                </div>
+                
+                <div class="chart-ring-container">
+                    <div style="width:120px; height:120px;" class="shrink-0">
+                        <canvas id="deviceDonutChart"></canvas>
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-3 gap-y-1 flex-1">
+                        <div class="flex items-center"><span class="legend-dot" style="background:#6366f1;"></span> <span class="text-xs">智能网关</span> <span class="font-bold ml-auto">2</span></div>
+                        <div class="flex items-center"><span class="legend-dot" style="background:#eab308;"></span> <span class="text-xs">执行控制器</span> <span class="font-bold ml-auto">2</span></div>
+                        <div class="flex items-center"><span class="legend-dot" style="background:#22c55e;"></span> <span class="text-xs">传感器</span> <span class="font-bold ml-auto">13</span></div>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3 mt-3 text-xs text-slate-500 border-t border-slate-100 pt-3">
+                    <span><i class="fas fa-circle text-green-500 mr-1"></i>在线: 17台</span>
+                    <span><i class="fas fa-circle text-red-500 mr-1"></i>离线: 1台</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中间：照明回路状态统计 -->
+        <div class="glass-panel rounded-2xl p-6">
+            <div class="flex items-center gap-2 mb-4">
+                <i class="fas fa-chart-pie text-blue-600"></i>
+                <h2 class="text-lg font-semibold text-slate-800">照明回路状态统计</h2>
+            </div>
+            
+            <div class="status-donut-container mb-4">
+                <div style="width:130px; height:130px;" class="shrink-0">
+                    <canvas id="circuitStatusDonut"></canvas>
+                </div>
+                
+                <div class="flex-1 grid grid-cols-2 gap-3">
+                    <div class="status-stat-card">
+                        <div class="status-stat-value" id="totalCircuitsCount">15</div>
+                        <div class="status-stat-label">回路总数</div>
+                    </div>
+                    <div class="status-stat-card">
+                        <div class="status-stat-value text-green-600" id="onCircuitsCount">11</div>
+                        <div class="status-stat-label">开启回路</div>
+                    </div>
+                    <div class="status-stat-card">
+                        <div class="status-stat-value text-slate-500" id="offCircuitsCount">4</div>
+                        <div class="status-stat-label">关闭回路</div>
+                    </div>
+                    <div class="status-stat-card">
+                        <div class="status-stat-value text-blue-600" id="onlineRate">73%</div>
+                        <div class="status-stat-label">开启率</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="data-basis mt-2">
+                <i class="fas fa-info-circle text-slate-400"></i>
+                <span>数据基准：基于今日实时状态 (2026-03-04 14:30 更新)</span>
+            </div>
+            
+            <div class="flex justify-between text-xs text-slate-400 mt-2 pt-2 border-t border-slate-100">
+                <span><i class="fas fa-circle text-green-500 mr-1"></i>开启: <span id="onCircuitsCount2">11</span>回路</span>
+                <span><i class="fas fa-circle text-slate-400 mr-1"></i>关闭: <span id="offCircuitsCount2">4</span>回路</span>
+                <span><i class="fas fa-chart-line text-blue-500 mr-1"></i>在线率 100%</span>
+            </div>
+        </div>
+
+        <!-- 右侧：告警状态统计 -->
+        <div class="fused-card">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <p class="text-slate-500 text-sm mb-1">告警状态统计</p>
+                    <h3 class="text-3xl font-bold text-slate-800">1</h3>
+                    <p class="text-orange-600 text-xs mt-2">待处理告警总数</p>
+                </div>
+                <div class="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-exclamation-triangle text-orange-600 text-xl"></i>
+                </div>
+            </div>
+            
+            <div class="mt-2">
+                <div class="flex items-center gap-2 mb-3">
+                    <i class="fas fa-bell text-orange-500 text-sm"></i>
+                    <span class="font-medium text-slate-700">告警类型分布</span>
+                </div>
+                
+                <div class="chart-ring-container">
+                    <div style="width:120px; height:120px;" class="shrink-0">
+                        <canvas id="alertDonutChart"></canvas>
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-3 gap-y-1 flex-1">
+                        <div class="flex items-center"><span class="legend-dot" style="background:#ef4444;"></span> <span class="text-xs">严重告警</span> <span class="font-bold ml-auto">1</span></div>
+                        <div class="flex items-center"><span class="legend-dot" style="background:#f59e0b;"></span> <span class="text-xs">警告告警</span> <span class="font-bold ml-auto">0</span></div>
+                        <div class="flex items-center"><span class="legend-dot" style="background:#94a3b8;"></span> <span class="text-xs">提示告警</span> <span class="font-bold ml-auto">0</span></div>
+                    </div>
+                </div>
+                
+                <div class="data-basis mt-2">
+                    <i class="fas fa-info-circle text-slate-400"></i>
+                    <span>数据基准：基于今日实时告警 (2026-03-04 14:30 更新)</span>
+                </div>
+                
+                <div class="flex gap-3 mt-3 text-xs text-slate-500 border-t border-slate-100 pt-3">
+                    <span><i class="fas fa-circle text-red-500 mr-1"></i>严重: 1 (执行控制器离线)</span>
+                    <span><i class="fas fa-circle text-orange-500 mr-1"></i>警告: 0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 第二行：今日照明能耗卡片 (已删除时间筛选) -->
+    <div class="glass-panel rounded-2xl p-6 mb-6">
+        <div class="flex items-center gap-2 mb-4">
+            <i class="fas fa-bolt text-yellow-500 text-xl"></i>
+            <h2 class="text-lg font-semibold text-slate-800">今日照明能耗</h2>
+            <span class="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full ml-2">预估值</span>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200">
+                <div class="text-sm text-blue-600 mb-1">今日预估</div>
+                <div class="text-3xl font-bold text-blue-700">46.8</div>
+                <div class="text-sm text-slate-500 mb-2">kWh</div>
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="bg-green-100 text-green-600 px-2 py-0.5 rounded-full">环比 -8%</span>
+                    <span class="text-slate-400">较昨日</span>
+                </div>
+                <div class="data-basis mt-2 text-[0.65rem]">
+                    <i class="fas fa-info-circle text-slate-400"></i>
+                    <span>基于实时功率估算</span>
+                </div>
+            </div>
+            
+            <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-5 border border-purple-200">
+                <div class="text-sm text-purple-600 mb-1">本周累计</div>
+                <div class="text-3xl font-bold text-purple-700">328.5</div>
+                <div class="text-sm text-slate-500 mb-2">kWh</div>
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">环比 -3%</span>
+                    <span class="text-slate-400">较上周</span>
+                </div>
+                <div class="data-basis mt-2 text-[0.65rem]">
+                    <i class="fas fa-info-circle text-slate-400"></i>
+                    <span>统计周期: 2026-02-24 ~ 2026-03-04</span>
+                </div>
+            </div>
+            
+            <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-5 border border-green-200">
+                <div class="text-sm text-green-600 mb-1">本月累计</div>
+                <div class="text-3xl font-bold text-green-700">1,284</div>
+                <div class="text-sm text-slate-500 mb-2">kWh</div>
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="bg-green-100 text-green-600 px-2 py-0.5 rounded-full">环比 -12%</span>
+                    <span class="text-slate-400">较上月</span>
+                </div>
+                <div class="data-basis mt-2 text-[0.65rem]">
+                    <i class="fas fa-info-circle text-slate-400"></i>
+                    <span>统计周期: 2026-03-01 ~ 2026-03-31</span>
+                </div>
+            </div>
+            
+            <!-- 时段占比卡片 (静态) -->
+            <div class="bg-slate-800 rounded-xl p-5 text-white">
+                <div class="text-sm text-slate-300 mb-3">时段占比</div>
+                <div class="space-y-3">
+                    <div class="flex justify-between text-sm">
+                        <span><i class="fas fa-sun text-yellow-300 mr-2"></i>日间 (06-18)</span>
+                        <span class="font-bold">32.5 kWh</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span><i class="fas fa-moon text-blue-300 mr-2"></i>夜间 (18-06)</span>
+                        <span class="font-bold">14.3 kWh</span>
+                    </div>
+                </div>
+                <div class="data-basis mt-2 text-[0.65rem] text-slate-400 border-t border-slate-600 pt-2">
+                    <i class="fas fa-info-circle"></i>
+                    <span>基于今日时段静态比例</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 第三行：左侧排行榜 + 右侧任务执行状态分布 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- 左侧：排行榜上下结构 -->
+        <div class="space-y-6">
+            <!-- 上方：照明回路负载排行榜 -->
+            <div class="glass-panel rounded-2xl p-6">
+                <div class="flex items-center gap-2 mb-2">
+                    <i class="fas fa-chart-line text-orange-500"></i>
+                    <h2 class="text-lg font-semibold text-slate-800">照明回路负载排行榜</h2>
+                    <span class="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full ml-auto">静态统计</span>
+                </div>
+                <div class="data-basis">
+                    <i class="fas fa-info-circle text-slate-400"></i>
+                    <span>基于照明回路配置 (额定功率)</span>
+                </div>
+                <div class="scrollable-content mt-3" style="max-height: 280px;" id="loadRankingContainer">
+                    <div class="space-y-3" id="loadRankingList">
+                        <!-- 动态生成负载排行榜 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 下方：照明开启时间排行榜 (静态本周数据) -->
+            <div class="glass-panel rounded-2xl p-6">
+                <div class="flex items-center gap-2 mb-2">
+                    <i class="fas fa-clock text-blue-500"></i>
+                    <h2 class="text-lg font-semibold text-slate-800">照明开启时间排行榜</h2>
+                    <span class="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full ml-auto">累计时长</span>
+                </div>
+                <div class="data-basis">
+                    <i class="fas fa-info-circle text-slate-400"></i>
+                    <span>基于本周累计开启时长 (2026-02-24 ~ 2026-03-04)</span>
+                </div>
+                <div class="scrollable-content mt-3" style="max-height: 280px;" id="runtimeRankingContainer">
+                    <div class="space-y-3" id="runtimeRankingList">
+                        <!-- 动态生成时间排行榜 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：任务执行状态分布 (静态本周数据) -->
+        <div class="glass-panel rounded-2xl p-6">
+            <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-slate-800">
+                <i class="fas fa-tasks text-indigo-600"></i>
+                任务执行状态分布
+            </h2>
+            
+            <div class="data-basis mt-0 mb-3">
+                <i class="fas fa-info-circle text-slate-400"></i>
+                <span>基于任务执行日志 (2026-02-24 ~ 2026-03-04)</span>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-3 border border-blue-200">
+                    <div class="text-xs text-blue-600 mb-1">总执行次数</div>
+                    <div class="text-2xl font-bold text-slate-800" id="totalTasksCount">13</div>
+                    <div class="text-xs text-slate-500 mt-1">本周累计</div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-3 border border-purple-200">
+                    <div class="text-xs text-purple-600 mb-1">任务成功率</div>
+                    <div class="text-2xl font-bold text-green-600" id="taskSuccessRate">69%</div>
+                    <div class="text-xs text-slate-500 mt-1">较上周 +5%</div>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4 mb-4">
+                <div style="width: 100px; height: 100px;" class="shrink-0">
+                    <canvas id="taskStatusDonut"></canvas>
+                </div>
+                <div class="flex-1 grid grid-cols-1 gap-2">
+                    <div class="flex items-center justify-between text-sm">
+                        <div class="flex items-center">
+                            <span class="legend-dot" style="background:#10b981;"></span>
+                            <span>成功</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold" id="successCount">9</span>
+                            <span class="text-xs text-slate-400" id="successPercent">69%</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between text-sm">
+                        <div class="flex items-center">
+                            <span class="legend-dot" style="background:#f59e0b;"></span>
+                            <span>部分成功</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold" id="partialCount">2</span>
+                            <span class="text-xs text-slate-400" id="partialPercent">15%</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between text-sm">
+                        <div class="flex items-center">
+                            <span class="legend-dot" style="background:#ef4444;"></span>
+                            <span>失败</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold" id="failedCount">2</span>
+                            <span class="text-xs text-slate-400" id="failedPercent">16%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs font-medium text-slate-600">最近任务执行</span>
+                    <span class="text-xs text-blue-600 cursor-pointer hover:underline" onclick="alert('即将跳转到日志管理页面')">查看全部 <i class="fas fa-arrow-right ml-1"></i></span>
+                </div>
+                <div class="scrollable-content" style="max-height: 220px;" id="recentTasksList">
+                    <!-- 动态生成最近任务 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ==================== 静态数据源 ====================
+            
+            // 回路数据 (用于设备类型分布统计，仅网关/控制器/传感器)
+            const circuitList = [
+                { id: 'C001', code: 'LT-001', name: 'A1层走廊灯组', type: 'light', typeName: '普通照明', area: 'A座1层', status: 'online' },
+                { id: 'C002', code: 'LT-002', name: 'A1层会议室灯', type: 'light', typeName: '普通照明', area: 'A座1层', status: 'online' },
+                { id: 'C003', code: 'LT-003', name: 'A1层办公室灯', type: 'light', typeName: '普通照明', area: 'A座1层', status: 'offline' },
+                { id: 'C004', code: 'EM-001', name: 'A1层应急照明', type: 'light', typeName: '应急照明', area: 'A座1层', status: 'online' },
+                { id: 'C005', code: 'SK-001', name: 'A1层插座回路', type: 'light', typeName: '插座回路', area: 'A座1层', status: 'maintain' },
+                { id: 'C006', code: 'LT-004', name: 'A2层走廊灯组', type: 'light', typeName: '普通照明', area: 'A座2层', status: 'online' },
+                { id: 'C007', code: 'LT-005', name: 'A2层办公室灯', type: 'light', typeName: '普通照明', area: 'A座2层', status: 'online' },
+                { id: 'C008', code: 'AC-001', name: 'A2层空调回路', type: 'light', typeName: '空调回路', area: 'A座2层', status: 'online' },
+                { id: 'C009', code: 'LT-006', name: 'B1层车间照明', type: 'light', typeName: '普通照明', area: 'B座1层', status: 'online' },
+                { id: 'C010', code: 'EM-002', name: 'B1层应急照明', type: 'light', typeName: '应急照明', area: 'B座1层', status: 'online' },
+                { id: 'C011', code: 'LT-007', name: 'B2层办公区灯', type: 'light', typeName: '普通照明', area: 'B座2层', status: 'offline' },
+                { id: 'C012', code: 'LT-008', name: 'C座食堂照明', type: 'light', typeName: '普通照明', area: 'C座1层', status: 'online' },
+                { id: 'D001', code: 'DM-001', name: 'A1层会议室调光', type: 'dimmer', typeName: '调光设备', area: 'A座1层', status: 'online' },
+                { id: 'D002', code: 'DM-002', name: 'A2层办公室调光', type: 'dimmer', typeName: '调光设备', area: 'A座2层', status: 'online' },
+                { id: 'D003', code: 'DM-003', name: 'B1层车间调光', type: 'dimmer', typeName: '调光设备', area: 'B座1层', status: 'maintain' },
+                { id: 'D004', code: 'DM-004', name: 'C座食堂调光', type: 'dimmer', typeName: '调光设备', area: 'C座1层', status: 'online' },
+            ];
+
+            // 任务数据
+            const taskList = [
+                { id: 'T001', name: '办公模式', locationName: 'A座办公楼 - 1层', type: 'auto', circuits: ['C001','C002','C003'] },
+                { id: 'T002', name: '会议模式', locationName: 'A座办公楼 - 1层', type: 'manual', circuits: ['C002'] },
+                { id: 'T003', name: '节能模式', locationName: 'A座办公楼 - 2层', type: 'auto', circuits: ['C006','C007'] },
+                { id: 'T004', name: '清洁模式', locationName: 'A座办公楼 - 1层', type: 'manual', circuits: ['C001','C002','C003','C004'] },
+                { id: 'T005', name: '应急模式', locationName: 'B座生产车间 - 一层车间', type: 'auto', circuits: ['C009','C010'] },
+                { id: 'T006', name: '周末模式', locationName: 'A座办公楼', type: 'auto', circuits: ['C001','C006'] },
+                { id: 'T007', name: '加班模式', locationName: 'A座办公楼 - 2层', type: 'auto', circuits: ['C006','C007','C008'] },
+            ];
+
+            // 完整日志数据
+            let comprehensiveLogs = [
+                { time: '2026-03-04 09:00:00', type: 'auto_exec', typeName: '自动任务执行', objectType: 'task', operator: 'system', objectId: 'T001', objectName: '办公模式', content: '定时触发办公模式', status: 'success', circuitCount: 3, result: '所有回路正常执行 (C001,C002)' },
+                { time: '2026-03-04 00:00:00', type: 'auto_exec', typeName: '自动任务执行', objectType: 'task', operator: 'system', objectId: 'T005', objectName: '应急模式', content: '定时触发应急模式', status: 'success', circuitCount: 2, result: '所有回路正常执行 (C009,C010)' },
+                { time: '2026-03-03 22:00:00', type: 'auto_exec', typeName: '自动任务执行', objectType: 'task', operator: 'system', objectId: 'T003', objectName: '节能模式', content: '定时触发节能模式', status: 'success', circuitCount: 2, result: 'C006,C007执行成功' },
+                { time: '2026-03-03 19:00:00', type: 'auto_exec', typeName: '自动任务执行', objectType: 'task', operator: 'system', objectId: 'T007', objectName: '加班模式', content: '定时触发加班模式', status: 'partial', circuitCount: 3, result: '部分成功 (2/3)，C008离线' },
+                { time: '2026-03-03 09:00:00', type: 'auto_exec', typeName: '自动任务执行', objectType: 'task', operator: 'system', objectId: 'T001', objectName: '办公模式', content: '定时触发办公模式', status: 'success', circuitCount: 3, result: '所有回路正常执行' },
+                { time: '2026-03-02 22:00:00', type: 'auto_exec', typeName: '自动任务执行', objectType: 'task', operator: 'system', objectId: 'T003', objectName: '节能模式', content: '定时触发节能模式', status: 'success', circuitCount: 2, result: 'C006,C007执行成功' },
+                { time: '2026-03-02 08:00:00', type: 'auto_exec', typeName: '自动任务执行', objectType: 'task', operator: 'system', objectId: 'T006', objectName: '周末模式', content: '定时触发周末模式', status: 'success', circuitCount: 2, result: '所有回路正常执行' },
+                { time: '2026-03-01 09:00:00', type: 'auto_exec', typeName: '自动任务执行', objectType: 'task', operator: 'system', objectId: 'T001', objectName: '办公模式', content: '定时触发办公模式', status: 'partial', circuitCount: 3, result: '部分成功 (2/3)，C003离线' },
+                { time: '2026-03-01 08:00:00', type: 'auto_exec', typeName: '自动任务执行', objectType: 'task', operator: 'system', objectId: 'T006', objectName: '周末模式', content: '定时触发周末模式', status: 'failed', circuitCount: 2, result: '失败，C001离线，C006离线' },
+                { time: '2026-03-04 14:30:00', type: 'manual_exec', typeName: '手动任务执行', objectType: 'task', operator: 'admin', objectId: 'T002', objectName: '会议模式', content: '手动启动会议模式', status: 'success', circuitCount: 1, result: '执行成功' },
+                { time: '2026-03-03 10:15:00', type: 'manual_exec', typeName: '手动任务执行', objectType: 'task', operator: 'operator', objectId: 'T002', objectName: '会议模式', content: '手动启动会议模式', status: 'failed', circuitCount: 1, result: '回路离线' },
+                { time: '2026-03-02 07:30:00', type: 'manual_exec', typeName: '手动任务执行', objectType: 'task', operator: 'admin', objectId: 'T004', objectName: '清洁模式', content: '手动启动清洁模式', status: 'success', circuitCount: 4, result: '清洁模式执行成功' },
+                { time: '2026-03-01 08:00:00', type: 'manual_exec', typeName: '手动任务执行', objectType: 'task', operator: 'operator', objectId: 'T004', objectName: '清洁模式', content: '手动启动清洁模式', status: 'partial', circuitCount: 4, result: '部分成功 (3/4)，一个回路维护中' },
+            ];
+            comprehensiveLogs.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+            // 回路静态数据 (15回路，用于回路状态和排行榜)
+            const circuits = [
+                { id:'01', name:'照明回路-01', area:'A区一层大厅', power:96, status:'on', runtime:128, energy:12.4 },
+                { id:'02', name:'照明回路-02', area:'A区一层走廊', power:72, status:'on', runtime:96, energy:8.8 },
+                { id:'03', name:'照明回路-03', area:'A区一层会议室', power:120, status:'off', runtime:0, energy:0 },
+                { id:'04', name:'照明回路-04', area:'A区一层办公室', power:144, status:'on', runtime:142, energy:16.8 },
+                { id:'05', name:'照明回路-05', area:'A区二层展厅', power:96, status:'on', runtime:110, energy:10.5 },
+                { id:'06', name:'照明回路-06', area:'A区二层休息室', power:96, status:'on', runtime:88, energy:7.9 },
+                { id:'07', name:'照明回路-07', area:'B区展厅', power:48, status:'off', runtime:0, energy:0 },
+                { id:'08', name:'照明回路-08', area:'B区走廊', power:48, status:'on', runtime:72, energy:3.5 },
+                { id:'09', name:'照明回路-09', area:'C区大堂', power:180, status:'on', runtime:156, energy:22.3 },
+                { id:'10', name:'照明回路-10', area:'C区走廊', power:64, status:'off', runtime:0, energy:0 },
+                { id:'11', name:'照明回路-11', area:'D区办公室', power:96, status:'on', runtime:118, energy:11.2 },
+                { id:'12', name:'照明回路-12', area:'D区会议室', power:120, status:'on', runtime:85, energy:8.9 },
+                { id:'13', name:'照明回路-13', area:'E区大堂', power:200, status:'on', runtime:168, energy:26.5 },
+                { id:'14', name:'照明回路-14', area:'E区走廊', power:80, status:'on', runtime:92, energy:7.2 },
+                { id:'15', name:'照明回路-15', area:'F区仓库', power:60, status:'off', runtime:0, energy:0 }
+            ];
+
+            // ==================== 静态函数 (所有数据固定) ====================
+            
+            // 获取任务统计 (固定使用全部日志)
+            function getTaskStats() {
+                const taskLogs = comprehensiveLogs.filter(log => 
+                    log.objectType === 'task' && 
+                    (log.type === 'auto_exec' || log.type === 'manual_exec')
+                );
+                
+                const stats = {
+                    total: taskLogs.length,
+                    success: taskLogs.filter(log => log.status === 'success').length,
+                    partial: taskLogs.filter(log => log.status === 'partial').length,
+                    failed: taskLogs.filter(log => log.status === 'failed').length
+                };
+                
+                stats.successPercent = stats.total ? Math.round((stats.success / stats.total) * 100) : 0;
+                stats.partialPercent = stats.total ? Math.round((stats.partial / stats.total) * 100) : 0;
+                stats.failedPercent = stats.total ? Math.round((stats.failed / stats.total) * 100) : 0;
+                
+                return { stats, taskLogs };
+            }
+
+            // 初始化任务状态环形图
+            function initTaskStatusChart() {
+                const { stats } = getTaskStats();
+                const ctx = document.getElementById('taskStatusDonut').getContext('2d');
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['成功', '部分成功', '失败'],
+                        datasets: [{
+                            data: [stats.success, stats.partial, stats.failed],
+                            backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                            borderWidth: 2,
+                            borderColor: 'white',
+                            borderRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        cutout: '70%',
+                        plugins: { legend: { display: false }, tooltip: { enabled: true } }
+                    }
+                });
+            }
+
+            // 更新任务统计数字
+            function updateTaskCounts() {
+                const { stats } = getTaskStats();
+                
+                document.getElementById('totalTasksCount').innerText = stats.total;
+                document.getElementById('taskSuccessRate').innerText = stats.successPercent + '%';
+                document.getElementById('successCount').innerText = stats.success;
+                document.getElementById('partialCount').innerText = stats.partial;
+                document.getElementById('failedCount').innerText = stats.failed;
+                document.getElementById('successPercent').innerText = stats.successPercent + '%';
+                document.getElementById('partialPercent').innerText = stats.partialPercent + '%';
+                document.getElementById('failedPercent').innerText = stats.failedPercent + '%';
+            }
+
+            // 渲染最近任务列表
+            function renderRecentTasks() {
+                const { taskLogs } = getTaskStats();
+                const container = document.getElementById('recentTasksList');
+                if (!container) return;
+                
+                container.innerHTML = '';
+                
+                const recentTasks = [...taskLogs]
+                    .sort((a, b) => new Date(b.time) - new Date(a.time))
+                    .slice(0, 5);
+                
+                if (recentTasks.length === 0) {
+                    container.innerHTML = '<div class="text-center text-slate-400 py-4">暂无任务执行记录</div>';
+                    return;
+                }
+                
+                recentTasks.forEach(task => {
+                    let statusColor = 'text-green-600';
+                    let statusBg = 'bg-green-100';
+                    let statusIcon = 'fa-check-circle';
+                    
+                    if (task.status === 'partial') {
+                        statusColor = 'text-yellow-600';
+                        statusBg = 'bg-yellow-100';
+                        statusIcon = 'fa-exclamation-circle';
+                    } else if (task.status === 'failed') {
+                        statusColor = 'text-red-600';
+                        statusBg = 'bg-red-100';
+                        statusIcon = 'fa-times-circle';
+                    }
+                    
+                    const item = document.createElement('div');
+                    item.className = 'flex items-center justify-between text-xs p-2 bg-white rounded-lg border border-slate-100 hover:border-slate-200 transition-colors';
+                    item.innerHTML = `
+                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                            <i class="fas ${statusIcon} ${statusColor}"></i>
+                            <span class="font-medium truncate">${task.objectName}</span>
+                            <span class="text-slate-400">${task.time.slice(5, 16)}</span>
+                        </div>
+                        <span class="${statusBg} ${statusColor} px-2 py-0.5 rounded-full text-[0.65rem] font-medium">
+                            ${task.status === 'success' ? '成功' : task.status === 'partial' ? '部分成功' : '失败'}
+                        </span>
+                    `;
+                    container.appendChild(item);
+                });
+            }
+
+            // ==================== 原有看板函数 ====================
+            
+            function updateTime() {
+                const now = new Date();
+                document.getElementById('current-time').textContent = now.toLocaleTimeString('zh-CN');
+                document.getElementById('current-date').textContent = now.toLocaleDateString('zh-CN');
+            }
+            setInterval(updateTime, 1000);
+            updateTime();
+
+            // 初始化回路状态环形图
+            function initCircuitStatusChart() {
+                const onCount = circuits.filter(c => c.status === 'on').length;
+                const offCount = circuits.filter(c => c.status === 'off').length;
+                
+                const ctx = document.getElementById('circuitStatusDonut').getContext('2d');
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['开启回路', '关闭回路'],
+                        datasets: [{
+                            data: [onCount, offCount],
+                            backgroundColor: ['#10b981', '#94a3b8'],
+                            borderWidth: 2,
+                            borderColor: 'white',
+                            borderRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        cutout: '70%',
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+
+            // 渲染负载排行榜 (基于额定功率)
+            function renderLoadRanking() {
+                const activeCircuits = circuits.filter(c => c.status === 'on');
+                const sortedByPower = [...activeCircuits].sort((a, b) => b.power - a.power);
+                
+                const maxPower = Math.max(...sortedByPower.map(c => c.power));
+                const container = document.getElementById('loadRankingList');
+                container.innerHTML = '';
+                
+                sortedByPower.forEach((circuit, index) => {
+                    const percent = Math.round((circuit.power / maxPower) * 100);
+                    const rankClass = index === 0 ? 'top-1' : (index === 1 ? 'top-2' : (index === 2 ? 'top-3' : ''));
+                    
+                    const item = document.createElement('div');
+                    item.className = 'rank-item';
+                    item.innerHTML = `
+                        <div class="flex items-center flex-1 min-w-0">
+                            <span class="rank-number ${rankClass}">${index + 1}</span>
+                            <span class="text-sm font-medium truncate">${circuit.name}</span>
+                            <span class="text-xs text-slate-400 ml-1 truncate">${circuit.area}</span>
+                        </div>
+                        <div class="flex items-center flex-shrink-0">
+                            <div class="progress-bar" style="width: 70px;">
+                                <div class="progress-fill" style="width: ${percent}%;"></div>
+                            </div>
+                            <span class="rank-value ml-2">${circuit.power}</span>
+                            <span class="rank-unit">W</span>
+                        </div>
+                    `;
+                    container.appendChild(item);
+                });
+            }
+
+            // 渲染开启时间排行榜 (使用原始runtime)
+            function renderRuntimeRanking() {
+                const activeCircuits = circuits.filter(c => c.status === 'on');
+                const sortedByRuntime = [...activeCircuits].sort((a, b) => b.runtime - a.runtime);
+                
+                const maxRuntime = Math.max(...sortedByRuntime.map(c => c.runtime));
+                const container = document.getElementById('runtimeRankingList');
+                container.innerHTML = '';
+                
+                sortedByRuntime.forEach((circuit, index) => {
+                    const percent = Math.round((circuit.runtime / maxRuntime) * 100);
+                    const rankClass = index === 0 ? 'top-1' : (index === 1 ? 'top-2' : (index === 2 ? 'top-3' : ''));
+                    
+                    const item = document.createElement('div');
+                    item.className = 'rank-item';
+                    item.innerHTML = `
+                        <div class="flex items-center flex-1 min-w-0">
+                            <span class="rank-number ${rankClass}">${index + 1}</span>
+                            <span class="text-sm font-medium truncate">${circuit.name}</span>
+                            <span class="text-xs text-slate-400 ml-1 truncate">${circuit.area}</span>
+                        </div>
+                        <div class="flex items-center flex-shrink-0">
+                            <div class="progress-bar" style="width: 70px;">
+                                <div class="progress-fill" style="width: ${percent}%;"></div>
+                            </div>
+                            <span class="rank-value ml-2">${circuit.runtime}</span>
+                            <span class="rank-unit">h</span>
+                        </div>
+                    `;
+                    container.appendChild(item);
+                });
+            }
+
+            // 初始化设备环形图 (仅网关/控制器/传感器)
+            function initDeviceChart() {
+                const ctx = document.getElementById('deviceDonutChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['智能网关', '执行控制器', '传感器'],
+                        datasets: [{
+                            data: [2, 2, 13],
+                            backgroundColor: ['#6366f1', '#eab308', '#22c55e'],
+                            borderWidth: 2,
+                            borderColor: 'white',
+                            borderRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        cutout: '65%',
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+
+            // 初始化告警环形图
+            function initAlertChart() {
+                const ctx = document.getElementById('alertDonutChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['严重告警', '警告告警', '提示告警'],
+                        datasets: [{
+                            data: [1, 0, 0],
+                            backgroundColor: ['#ef4444', '#f59e0b', '#94a3b8'],
+                            borderWidth: 2,
+                            borderColor: 'white',
+                            borderRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        cutout: '65%',
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+
+            function updateCircuitCounts() {
+                const totalOn = circuits.filter(c => c.status === 'on').length;
+                const totalOff = circuits.length - totalOn;
+                const onlineRate = Math.round((totalOn / circuits.length) * 100);
+                
+                document.getElementById('totalCircuitsCount').innerText = circuits.length;
+                document.getElementById('onCircuitsCount').innerText = totalOn;
+                document.getElementById('offCircuitsCount').innerText = totalOff;
+                document.getElementById('onlineRate').innerText = onlineRate + '%';
+                
+                document.getElementById('onCircuitsCount2').innerText = totalOn;
+                document.getElementById('offCircuitsCount2').innerText = totalOff;
+            }
+
+            // 全局刷新函数
+            window.refreshData = function() {
+                updateCircuitCounts();
+                initCircuitStatusChart();
+                renderLoadRanking();
+                renderRuntimeRanking();
+                initDeviceChart();
+                initAlertChart();
+                updateTaskCounts();
+                initTaskStatusChart();
+                renderRecentTasks();
+                updateTime();
+                
+                const toast = document.createElement('div');
+                toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-bounce';
+                toast.innerText = '数据已刷新';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 2000);
+            };
+
+            // 页面加载初始化
+            window.onload = function() {
+                updateCircuitCounts();
+                initCircuitStatusChart();
+                renderLoadRanking();
+                renderRuntimeRanking();
+                initDeviceChart();
+                initAlertChart();
+                updateTaskCounts();
+                initTaskStatusChart();
+                renderRecentTasks();
+                updateTime();
+            };
+        })();
+    </script>
+</body>
+</html>

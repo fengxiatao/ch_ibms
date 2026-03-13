@@ -1,64 +1,75 @@
 <template>
   <ContentWrap
     :body-style="{ padding: '0', height: '100%', display: 'flex', flexDirection: 'column' }"
-    style="height: 100%; margin-bottom: 0"
+    style="
+      height: calc(100vh - var(--page-top-gap, 70px));
+      padding-top: max(0px, calc(var(--page-top-gap, 70px) - (var(--app-content-padding) + 10px)));
+      margin-bottom: 0;
+    "
   >
     <div class="dark-theme-page">
       <div class="video-playback-container">
-        <!-- 顶部导航栏 -->
-        <div class="top-nav">
-          <div class="nav-left">
-            <span class="page-title">智慧安防 / 视频监控 / 录像回放</span>
-          </div>
-          <div class="nav-right">
-            <el-button @click="handleRefresh" :loading="loading">
-              <Icon icon="ep:refresh" />
-              刷新
-            </el-button>
-          </div>
-        </div>
-
         <!-- 主要内容区域 -->
         <div class="main-layout">
-            <!-- 左侧面板：设备树 + 时间筛选 -->
-            <div class="left-panel">
+          <!-- 左侧面板：设备树 + 时间筛选 -->
+          <div class="left-panel">
             <PlaybackDeviceTree
-              ref="deviceTreeRef"
+              :searching="isSearchingRecordings"
               @search="handleSearch"
               @channel-drag-start="handleChannelDragStart"
               @channels-change="handleChannelsChange"
             />
-              </div>
+          </div>
 
           <!-- 中间面板：播放器网格 + 时间轴 + 控制栏 -->
-            <div class="center-panel">
-            <!-- 播放器网格 -->
+          <div class="center-panel">
+            <!-- SDK 模式：大华 NVR 播放器网格 -->
+            <template v-if="playbackMode === 'sdk'">
               <div class="player-section">
-              <PlaybackPlayerGrid
-                ref="playerGridRef"
-                :panes="panes"
-                :active-pane="activePane"
-                :grid-layout="gridLayout"
-                @update:active-pane="activePane = $event"
-                @pane-drop="handlePaneDrop"
-                @pane-ref="handlePaneRef"
-                @pane-dblclick="handlePaneDblClick"
-              />
-                    </div>
-                    
-                  <!-- 时间轴 -->
+                <PlaybackPlayerGrid
+                  ref="playerGridRef"
+                  :panes="panes"
+                  :active-pane="activePane"
+                  :grid-layout="gridLayout"
+                  @update:active-pane="activePane = $event"
+                  @pane-drop="handlePaneDrop"
+                  @pane-ref="handlePaneRef"
+                  @pane-dblclick="handlePaneDblClick"
+                />
+              </div>
+            </template>
+            <!-- 流媒体模式：ZLM WebRTC/FLV 播放器网格 -->
+            <template v-else>
+              <div class="player-section">
+                <StreamPlaybackGrid
+                  :windows="streamWindows"
+                  :active-pane="activePane"
+                  :grid-layout="gridLayout"
+                  @update:active-pane="activePane = $event"
+                  @cell-drop="handleStreamPaneDrop"
+                  @cell-dblclick="handleStreamCellDblClick"
+                />
+              </div>
+            </template>
+
+            <!-- 时间轴 -->
             <PlaybackTimeline
               :start-time="filterTimeRange[0]"
               :end-time="filterTimeRange[1]"
               :recording-info-list="recordingInfoList"
               :current-play-time="currentPlayTime"
               :show-cursor="isPlaying"
+              :active-channel-id="activeChannelId"
               @timeline-click="handleTimelineClick"
               @time-change="handleTimeChange"
             />
 
             <!-- 裁剪任务进度面板（可折叠） -->
-            <div v-if="cutTaskList.length > 0" class="cut-tasks-panel" :class="{ collapsed: cutTasksCollapsed }">
+            <div
+              v-if="cutTaskList.length > 0"
+              class="cut-tasks-panel"
+              :class="{ collapsed: cutTasksCollapsed }"
+            >
               <div class="cut-tasks-header" @click="cutTasksCollapsed = !cutTasksCollapsed">
                 <Icon icon="ep:download" />
                 <span>裁剪任务 ({{ cutTaskList.length }})</span>
@@ -67,27 +78,23 @@
                   {{ cutTasksSummary }}
                 </span>
                 <div class="header-actions">
-                  <el-button 
-                    v-if="cutTaskList.length > 1 && !cutTasksCollapsed" 
-                    size="small" 
-                    type="danger" 
-                    text 
+                  <el-button
+                    v-if="cutTaskList.length > 1 && !cutTasksCollapsed"
+                    size="small"
+                    type="danger"
+                    text
                     @click.stop="handleCancelAllCutTasks"
                   >
                     全部取消
                   </el-button>
-                  <Icon 
-                    :icon="cutTasksCollapsed ? 'ep:arrow-up' : 'ep:arrow-down'" 
+                  <Icon
+                    :icon="cutTasksCollapsed ? 'ep:arrow-up' : 'ep:arrow-down'"
                     class="collapse-icon"
                   />
                 </div>
               </div>
               <div v-show="!cutTasksCollapsed" class="cut-tasks-list">
-                <div 
-                  v-for="task in cutTaskList" 
-                  :key="task.paneIndex" 
-                  class="cut-task-item"
-                >
+                <div v-for="task in cutTaskList" :key="task.paneIndex" class="cut-task-item">
                   <div class="task-info">
                     <span class="task-channel">{{ task.channelName }}</span>
                     <span class="task-status">
@@ -106,19 +113,19 @@
                     </span>
                   </div>
                   <div class="task-progress">
-                    <el-progress 
-                      :percentage="task.progress" 
+                    <el-progress
+                      :percentage="task.progress"
                       :stroke-width="8"
                       :show-text="false"
                       :status="task.progress >= 100 ? 'success' : ''"
                     />
                     <span class="progress-text">{{ task.progress }}%</span>
                   </div>
-                  <el-button 
+                  <el-button
                     v-if="task.progress < 100"
-                    size="small" 
-                    type="danger" 
-                    text 
+                    size="small"
+                    type="danger"
+                    text
                     circle
                     @click="handleCancelCutTask(task.paneIndex)"
                     title="取消"
@@ -140,6 +147,7 @@
               :is-cutting="isCutting"
               :cut-progress="cutProgress"
               :clip-start-time="clipStartTime"
+              :playback-mode="playbackMode"
               @toggle-play="handleTogglePlay"
               @stop="handleStop"
               @backward="handleBackward"
@@ -149,13 +157,14 @@
               @fullscreen="handleFullscreen"
               @speed-change="handleSpeedChange"
               @layout-change="handleLayoutChange"
+              @mode-change="playbackMode = $event"
               @clip-video="handleClipVideo"
               @sync-all="handleSyncAll"
             />
           </div>
-          </div>
-          </div>
-          </div>
+        </div>
+      </div>
+    </div>
   </ContentWrap>
 </template>
 
@@ -164,31 +173,34 @@
  * 录像回放页面（组件化重构版）
  * - 使用大华 SDK 进行录像查询和回放
  */
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ContentWrap } from '@/components/ContentWrap'
 import { Icon } from '@/components/Icon'
-import { DEFAULT_NVR_CONFIG } from '@/composables/useDahuaPlayer'
 
 // 组件
 import PlaybackDeviceTree from './components/PlaybackDeviceTree.vue'
 import PlaybackPlayerGrid from './components/PlaybackPlayerGrid.vue'
 import PlaybackTimeline from './components/PlaybackTimeline.vue'
 import PlaybackControls from './components/PlaybackControls.vue'
+import StreamPlaybackGrid from './components/StreamPlaybackGrid.vue'
 
-// Composables - 使用大华 SDK
+// Composables
 import { useDahuaPlayback, createPlaybackPanes } from './composables/useDahuaPlayback'
+import { useStreamPlayback } from './composables/useStreamPlayback'
+
+// API（流媒体模式查询录像）
+import { PlaybackApi } from '@/api/security/playback'
 
 // 类型
 import type { PlaybackPane, GridLayoutType, ChannelRecordingInfo, IbmsChannel } from './types'
+import type { StreamPaneState } from './composables/useStreamPlayback'
 
 // ==================== 组件引用 ====================
-const deviceTreeRef = ref<InstanceType<typeof PlaybackDeviceTree>>()
 const playerGridRef = ref<InstanceType<typeof PlaybackPlayerGrid>>()
 
 // ==================== 大华回放 Composable ====================
 const {
-  recordsLoading,
   queryMultipleChannelRecords,
   startPlayback: startDahuaPlayback,
   stopPlayback: stopDahuaPlayback,
@@ -203,9 +215,38 @@ const {
   cutTasks
 } = useDahuaPlayback()
 
+// 播放模式：sdk = 大华 NVR SDK（内网），stream = 流媒体回放（外网）
+const playbackMode = ref<'sdk' | 'stream'>('sdk')
+
+// 流媒体回放（外网 ZLM）
+const {
+  getState: getStreamState,
+  stopPlayback: stopStreamPlayback,
+  isTimeInSegment: isStreamTimeInSegment,
+  startPlaybackByCurrentTime: startStreamPlaybackByCurrentTime,
+  seekByRestart: streamSeekByRestart
+} = useStreamPlayback()
+
+// 流媒体模式下的窗口状态（与 gridLayout 数量一致）
+interface StreamWindow {
+  cameraId?: number
+  cameraName?: string
+  /** 当前筛选时间范围内是否有录像（用于提示与时间轴过滤策略） */
+  hasRecording?: boolean
+  playing: boolean
+  state?: StreamPaneState
+}
+const streamWindows = ref<StreamWindow[]>(
+  Array.from({ length: 6 }, () => ({ playing: false }))
+)
+
 // 当前活动窗口的裁剪状态
 const currentCutState = computed(() => getCutTaskState(activePane.value))
-const isCutting = computed(() => currentCutState.value.isCutting || currentCutState.value.progress > 0 && currentCutState.value.progress < 100)
+const isCutting = computed(
+  () =>
+    currentCutState.value.isCutting ||
+    (currentCutState.value.progress > 0 && currentCutState.value.progress < 100)
+)
 const cutProgress = computed(() => currentCutState.value.progress)
 
 // 所有裁剪任务列表（用于显示进度面板）
@@ -235,11 +276,11 @@ const cutTasksCollapsed = ref(false)
 const cutTasksSummary = computed(() => {
   const tasks = cutTaskList.value
   if (tasks.length === 0) return ''
-  
-  const inProgress = tasks.filter(t => t.progress > 0 && t.progress < 100).length
-  const completed = tasks.filter(t => t.progress >= 100).length
+
+  const inProgress = tasks.filter((t) => t.progress > 0 && t.progress < 100).length
+  const completed = tasks.filter((t) => t.progress >= 100).length
   const avgProgress = Math.round(tasks.reduce((sum, t) => sum + t.progress, 0) / tasks.length)
-  
+
   if (completed === tasks.length) {
     return '全部完成'
   }
@@ -259,8 +300,6 @@ const handleCancelAllCutTasks = () => {
 }
 
 // ==================== 状态 ====================
-const loading = computed(() => recordsLoading.value)
-
 // 分屏布局
 const gridLayout = ref<GridLayoutType>(6)
 
@@ -279,6 +318,11 @@ const recordingInfoList = ref<ChannelRecordingInfo[]>([])
 // 筛选时间范围
 const filterTimeRange = ref<string[]>([])
 
+// 查询录像中（用于禁用重复查询/避免请求叠加）
+const isSearchingRecordings = ref(false)
+// 搜索请求版本号（用于防止慢响应覆盖新结果）
+let searchSeq = 0
+
 // 当前播放时间（毫秒）
 const currentPlayTime = ref(0)
 
@@ -289,12 +333,30 @@ const playbackSpeed = ref(1)
 const isMuted = ref(true)
 
 // 计算属性：是否有窗格在播放
-const isPlaying = computed(() => panes.value.some((p) => p.isPlaying))
+const isPlaying = computed(() =>
+  playbackMode.value === 'stream'
+    ? streamWindows.value.some((w) => w.playing)
+    : panes.value.some((p) => p.isPlaying)
+)
 
-// 计算属性：当前活动窗格是否暂停
+// 计算属性：当前活动窗格是否暂停（流媒体模式暂不支持暂停，始终 false）
 const isPaused = computed(() => {
+  if (playbackMode.value === 'stream') return false
   const pane = panes.value[activePane.value]
   return pane?.isPaused || false
+})
+
+/** 当前选中窗口的通道 ID，用于时间轴标绿范围：有值时仅标该通道，无值时标所有通道 */
+const activeChannelId = computed<number | string | null>(() => {
+  const idx = activePane.value
+  if (playbackMode.value === 'stream') {
+    const w = streamWindows.value[idx]
+    // 当前窗口无录像时，不按通道过滤时间轴，改为展示“所有通道合并标绿”
+    if (w?.cameraId && w.hasRecording === false) return null
+    return w?.cameraId ?? null
+  }
+  const pane = panes.value[idx]
+  return pane?.channelNo ?? null
 })
 
 // ==================== 初始化 ====================
@@ -320,15 +382,6 @@ const initDefaultTimeRange = () => {
   filterTimeRange.value = [fmt(start), fmt(end)]
 }
 
-// ==================== 事件处理 ====================
-
-// 刷新
-const handleRefresh = () => {
-  if (deviceTreeRef.value) {
-    deviceTreeRef.value.loadBuildingTree?.()
-  }
-}
-
 // 通道选择变化
 const handleChannelsChange = (channels: IbmsChannel[]) => {
   selectedChannels.value = channels
@@ -336,40 +389,83 @@ const handleChannelsChange = (channels: IbmsChannel[]) => {
 }
 
 // 搜索录像
-const handleSearch = async (
-  channels: IbmsChannel[],
-  startTime: string,
-  endTime: string
-) => {
+const handleSearch = async (channels: IbmsChannel[], startTime: string, endTime: string) => {
+  if (isSearchingRecordings.value) {
+    ElMessage.warning('正在查询录像，请稍候…')
+    return
+  }
+  isSearchingRecordings.value = true
+  const mySeq = ++searchSeq
   console.log('[录像回放] 搜索录像:', channels.length, '个通道')
   console.log('[录像回放] 时间范围:', startTime, '~', endTime)
 
-  // 保存时间范围
   filterTimeRange.value = [startTime, endTime]
+  try {
+    await stopAllPanes()
 
-  // 停止所有播放
-  await stopAllPanes()
+    if (playbackMode.value === 'stream') {
+      // 批量查询：一次 HTTP → 后端一次命令 → 网关批量查同一台 NVR 多个通道
+      const cameraIds = channels.map((c) => c.id)
+      const data = await PlaybackApi.queryRecordingsBatch({ cameraIds, startTime, endTime })
+      const list = Array.isArray(data) ? data : (data as any)?.data
 
-  // 提取通道号列表（大华 SDK 使用 NVR 通道号）
-  const channelNos = channels.map((ch) => ch.channelNo || 1)
+      // 若已发起更新的搜索，丢弃本次结果
+      if (mySeq !== searchSeq) return
 
-  // 查询录像
-  const results = await queryMultipleChannelRecords(channelNos, startTime, endTime)
-  recordingInfoList.value = results
+      const results: ChannelRecordingInfo[] = []
+      if (Array.isArray(list)) {
+        list.forEach((vo: any) => {
+          const channelId = vo.channelId
+          const fallback = channels.find((c) => String(c.id) === String(channelId))
+          results.push({
+            channelId,
+            channelName: vo.channelName || fallback?.channelName || `通道${channelId}`,
+            segments: (vo.segments || []).map((s: any) => ({
+              startTime: typeof s.startTime === 'string' ? s.startTime : String(s.startTime),
+              endTime: typeof s.endTime === 'string' ? s.endTime : String(s.endTime),
+              hasRecording: s.hasRecording !== false
+            }))
+          })
+        })
+      }
 
-  // 统计有录像的通道数
-  const channelsWithRecording = results.filter(
-    (r) => r.segments.some((s) => s.hasRecording)
-  ).length
+      recordingInfoList.value = results
+      const channelsWithRecording = results.filter((r) => r.segments.some((s) => s.hasRecording)).length
+      for (let i = 0; i < Math.min(channels.length, streamWindows.value.length); i++) {
+        const ch = channels[i]
+        const win = streamWindows.value[i] || { playing: false }
+        const rec = results.find((r) => String(r.channelId) === String(ch.id))
+        const hasRecording = rec?.segments?.some((s) => s.hasRecording) ?? false
+        streamWindows.value[i] = {
+          ...win,
+          cameraId: ch.id,
+          cameraName: ch.channelName,
+          hasRecording,
+          playing: false,
+          state: getStreamState(i)
+        }
+      }
+      if (channelsWithRecording > 0) {
+        ElMessage.success(`已查询到 ${channelsWithRecording} 个通道有录像，点击时间轴播放`)
+      } else {
+        ElMessage.warning('未找到录像，请确认时间范围和通道是否正确')
+      }
+      return
+    }
+
+    const channelNos = channels.map((ch) => ch.channelNo || 1)
+    const results = await queryMultipleChannelRecords(channelNos, startTime, endTime)
+    recordingInfoList.value = results
+  const channelsWithRecording = results.filter((r) => r.segments.some((s) => s.hasRecording)).length
   console.log('[录像回放] 有录像的通道:', channelsWithRecording, '个')
-
-  // 自动分配通道到窗格
   await autoAssignChannelsToPanes(channels, results)
-
   if (channelsWithRecording > 0) {
     ElMessage.success(`已查询到 ${channelsWithRecording} 个通道有录像，点击时间轴播放`)
   } else {
     ElMessage.warning('未找到录像，请确认时间范围和通道是否正确')
+  }
+  } finally {
+    isSearchingRecordings.value = false
   }
 }
 
@@ -386,9 +482,7 @@ const autoAssignChannelsToPanes = async (
     const channelNo = channel.channelNo
 
     // 查找该通道的录像信息
-    const recordingInfo = recordingResults.find(
-      (r) => String(r.channelId) === String(channelNo)
-    )
+    const recordingInfo = recordingResults.find((r) => String(r.channelId) === String(channelNo))
     const hasRecording = recordingInfo?.segments.some((s) => s.hasRecording) || false
 
     // 绑定通道到窗格
@@ -396,7 +490,9 @@ const autoAssignChannelsToPanes = async (
     pane.channelNo = channelNo
     pane.hasRecording = hasRecording
 
-    console.log(`[录像回放] 窗口 ${i + 1} 绑定通道: ${channel.channelName}, 有录像: ${hasRecording}`)
+    console.log(
+      `[录像回放] 窗口 ${i + 1} 绑定通道: ${channel.channelName}, 有录像: ${hasRecording}`
+    )
   }
 }
 
@@ -414,17 +510,17 @@ const handlePaneDrop = async (event: DragEvent, paneIndex: number) => {
     if (ibmsDataStr) {
       channel = JSON.parse(ibmsDataStr)
     }
-    
+
     if (!channel) {
       ElMessage.warning('无法获取通道信息')
       return
     }
-    
+
     console.log('[录像回放] 放置通道到窗口', paneIndex + 1, ':', channel.channelName)
-    
+
     const pane = panes.value[paneIndex]
     if (!pane) return
-    
+
     // 如果窗格正在播放，先停止
     if (pane.isPlaying) {
       await stopDahuaPlayback(pane)
@@ -461,6 +557,45 @@ const handlePaneRef = (paneIndex: number, el: HTMLElement | null) => {
   }
 }
 
+// 流媒体模式：拖拽通道到窗口
+const handleStreamPaneDrop = (event: DragEvent, paneIndex: number) => {
+  let channel: IbmsChannel | null = null
+  const ibmsDataStr = event.dataTransfer?.getData('ibmsChannel')
+  if (ibmsDataStr) {
+    try {
+      channel = JSON.parse(ibmsDataStr)
+    } catch {}
+  }
+  if (!channel) {
+    ElMessage.warning('无法获取通道信息')
+    return
+  }
+  const rec = recordingInfoList.value.find(
+    (r) => String(r.channelId) === String(channel!.channelNo) || String(r.channelId) === String(channel!.id)
+  )
+  const hasRecording = rec?.segments?.some((s) => s.hasRecording) ?? false
+  const win = streamWindows.value[paneIndex] || { playing: false }
+  streamWindows.value[paneIndex] = {
+    ...win,
+    cameraId: channel.id,
+    cameraName: channel.channelName,
+    hasRecording,
+    playing: false,
+    state: getStreamState(paneIndex)
+  }
+  activePane.value = paneIndex
+  if (hasRecording) {
+    ElMessage.success(`已绑定 ${channel.channelName}，点击时间轴播放`)
+  } else {
+    ElMessage.warning(`${channel.channelName} 在当前时间范围内无录像`)
+  }
+}
+
+// 流媒体模式：双击窗口（仅切换活动窗格）
+const handleStreamCellDblClick = (paneIndex: number) => {
+  activePane.value = paneIndex
+}
+
 // 解析时间字符串为时间戳（毫秒）
 const parseTimeString = (timeStr: string): number => {
   return new Date(timeStr).getTime()
@@ -469,35 +604,56 @@ const parseTimeString = (timeStr: string): number => {
 // 时间轴点击
 const handleTimelineClick = async (clickTime: Date, percent: number) => {
   console.log('[录像回放] 时间轴点击:', clickTime.toISOString(), `(${(percent * 100).toFixed(1)}%)`)
-  
-  // 更新当前播放时间
   currentPlayTime.value = clickTime.getTime()
-  
-  // 获取当前活动窗格
-  const pane = panes.value[activePane.value]
+  const idx = activePane.value
+
+  if (playbackMode.value === 'stream') {
+    const w = streamWindows.value[idx]
+    if (!w?.cameraId) {
+      ElMessage.warning('请先选择通道')
+      return
+    }
+    if (!filterTimeRange.value?.[1]) {
+      ElMessage.warning('请先搜索录像')
+      return
+    }
+    const pane = panes.value[idx]
+    const clickTimestamp = clickTime.getTime()
+    if (isStreamTimeInSegment(idx, clickTimestamp)) {
+      ElMessage.info('当前已在播放该时间段')
+      return
+    }
+    await streamSeekByRestart(
+      pane,
+      idx,
+      w.cameraId,
+      w.cameraName || `通道${w.cameraId}`,
+      clickTimestamp,
+      filterTimeRange.value[1]
+    )
+    streamWindows.value[idx] = { ...w, playing: true, state: getStreamState(idx) }
+    return
+  }
+
+  const pane = panes.value[idx]
   if (!pane) {
     ElMessage.warning('请先选择一个播放窗口')
     return
   }
-  
   if (!pane.channel) {
-    ElMessage.warning(`窗口 ${activePane.value + 1} 未绑定通道，请先拖拽通道到窗口`)
+    ElMessage.warning(`窗口 ${idx + 1} 未绑定通道，请先拖拽通道到窗口`)
     return
   }
-  
   if (!pane.hasRecording) {
     ElMessage.warning(`${pane.channel.name} 在当前时间范围内无录像`)
     return
   }
-  
-  // 计算回放时间范围
+
   const clickTimeStr = formatDateTime(clickTime)
   const endTime = filterTimeRange.value[1]
   const clickTimestamp = clickTime.getTime()
-
   console.log('[录像回放] 开始回放:', pane.channel.name, clickTimeStr, '~', endTime)
 
-  // 如果正在播放，先停止
   if (pane.isPlaying) {
     await stopDahuaPlayback(pane)
   }
@@ -506,7 +662,7 @@ const handleTimelineClick = async (clickTime: Date, percent: number) => {
   const recordingInfo = recordingInfoList.value.find(
     (r) => String(r.channelId) === String(pane.channelNo)
   )
-  
+
   if (!recordingInfo || recordingInfo.segments.length === 0) {
     ElMessage.warning('未找到录像信息')
     pane.isLoading = false
@@ -519,16 +675,23 @@ const handleTimelineClick = async (clickTime: Date, percent: number) => {
 
   for (const segment of recordingInfo.segments) {
     if (!segment.hasRecording || !segment.filePath) continue
-    
+
     const segStart = parseTimeString(segment.startTime)
     const segEnd = parseTimeString(segment.endTime)
-    
+
     // 检查点击时间是否在该录像片段范围内
     if (clickTimestamp >= segStart && clickTimestamp <= segEnd) {
       targetSegment = segment
       // 计算从录像开始到点击时间的秒数偏移
       seekSeconds = Math.floor((clickTimestamp - segStart) / 1000)
-      console.log('[录像回放] 找到匹配的录像片段:', segment.startTime, '~', segment.endTime, '偏移秒数:', seekSeconds)
+      console.log(
+        '[录像回放] 找到匹配的录像片段:',
+        segment.startTime,
+        '~',
+        segment.endTime,
+        '偏移秒数:',
+        seekSeconds
+      )
       break
     }
   }
@@ -537,9 +700,9 @@ const handleTimelineClick = async (clickTime: Date, percent: number) => {
   if (!targetSegment) {
     for (const segment of recordingInfo.segments) {
       if (!segment.hasRecording || !segment.filePath) continue
-      
+
       const segStart = parseTimeString(segment.startTime)
-      
+
       // 找到点击时间之后的第一个录像片段
       if (segStart >= clickTimestamp) {
         targetSegment = segment
@@ -562,7 +725,12 @@ const handleTimelineClick = async (clickTime: Date, percent: number) => {
       } else {
         seekSeconds = 0
       }
-      console.log('[录像回放] 使用第一个有效录像片段:', targetSegment.startTime, '偏移秒数:', seekSeconds)
+      console.log(
+        '[录像回放] 使用第一个有效录像片段:',
+        targetSegment.startTime,
+        '偏移秒数:',
+        seekSeconds
+      )
     }
   }
 
@@ -574,11 +742,11 @@ const handleTimelineClick = async (clickTime: Date, percent: number) => {
 
   // 开始回放（使用大华 SDK）
   const channelNo = pane.channelNo || 1
-  
+
   // 保存录像文件的开始时间，用于后续同步计算
   pane.playbackStartTime = targetSegment.startTime
   pane.playbackEndTime = targetSegment.endTime
-  
+
   const success = await startDahuaPlayback(
     pane,
     activePane.value,
@@ -604,53 +772,139 @@ const handleTimeChange = (time: number) => {
 
 // 播放/暂停切换
 const handleTogglePlay = async () => {
+  if (playbackMode.value === 'stream') {
+    const idx = activePane.value
+    const w = streamWindows.value[idx]
+    if (!w?.cameraId) {
+      ElMessage.warning('请先选择通道')
+      return
+    }
+    if (!filterTimeRange.value?.length || filterTimeRange.value.length < 2) {
+      ElMessage.warning('请选择时间范围并点击「搜索录像」')
+      return
+    }
+    if (w.playing) {
+      ElMessage.info('流媒体模式暂不支持暂停，请使用停止后重新定位')
+      return
+    }
+    const pane = panes.value[idx]
+    const ok = await startStreamPlaybackByCurrentTime(
+      pane,
+      idx,
+      w.cameraId,
+      w.cameraName || `通道${w.cameraId}`,
+      currentPlayTime.value,
+      filterTimeRange.value[1]
+    )
+    if (ok) {
+      const st = getStreamState(idx)
+      streamWindows.value[idx] = { ...w, playing: true, state: st }
+    }
+    return
+  }
+
   const pane = panes.value[activePane.value]
   if (!pane || !pane.isPlaying) {
     ElMessage.warning('当前窗口没有正在播放的视频')
-      return
-    }
-    
-    if (pane.isPaused) {
+    return
+  }
+  if (pane.isPaused) {
     await resumePlayback(pane)
     ElMessage.success('已恢复播放')
-    } else {
+  } else {
     await pausePlayback(pane)
-      ElMessage.success('已暂停')
-    }
+    ElMessage.success('已暂停')
+  }
 }
 
 // 停止播放
 const handleStop = async () => {
-  const pane = panes.value[activePane.value]
+  const idx = activePane.value
+  if (playbackMode.value === 'stream') {
+    const pane = panes.value[idx]
+    await stopStreamPlayback(pane, idx)
+    const w = streamWindows.value[idx]
+    if (w) streamWindows.value[idx] = { ...w, playing: false }
+    ElMessage.success('已停止播放')
+    return
+  }
+  const pane = panes.value[idx]
   if (!pane) {
     ElMessage.warning('请先选择一个窗口')
     return
   }
-  
   await stopDahuaPlayback(pane)
   ElMessage.success('已停止播放')
 }
 
 // 后退 30 秒
-const handleBackward = () => {
+const handleBackward = async () => {
+  if (playbackMode.value === 'stream') {
+    const idx = activePane.value
+    const w = streamWindows.value[idx]
+    if (!w?.playing || !w?.cameraId) {
+      ElMessage.warning('当前窗口没有正在播放的视频')
+      return
+    }
+    const newTime = Math.max(
+      parseTimeString(filterTimeRange.value[0]),
+      currentPlayTime.value - 30_000
+    )
+    currentPlayTime.value = newTime
+    const pane = panes.value[idx]
+    await streamSeekByRestart(
+      pane,
+      idx,
+      w.cameraId,
+      w.cameraName || `通道${w.cameraId}`,
+      newTime,
+      filterTimeRange.value[1]
+    )
+    streamWindows.value[idx] = { ...w, state: getStreamState(idx) }
+    ElMessage.success('后退 30 秒')
+    return
+  }
   const pane = panes.value[activePane.value]
   if (!pane || !pane.isPlaying) {
     ElMessage.warning('当前窗口没有正在播放的视频')
     return
   }
-  
   seekRelative(pane, -30)
   ElMessage.success('后退 30 秒')
 }
 
 // 前进 30 秒
-const handleForward = () => {
+const handleForward = async () => {
+  if (playbackMode.value === 'stream') {
+    const idx = activePane.value
+    const w = streamWindows.value[idx]
+    if (!w?.playing || !w?.cameraId) {
+      ElMessage.warning('当前窗口没有正在播放的视频')
+      return
+    }
+    const newTime = Math.min(
+      parseTimeString(filterTimeRange.value[1]),
+      currentPlayTime.value + 30_000
+    )
+    currentPlayTime.value = newTime
+    const pane = panes.value[idx]
+    await streamSeekByRestart(
+      pane,
+      idx,
+      w.cameraId,
+      w.cameraName || `通道${w.cameraId}`,
+      newTime,
+      filterTimeRange.value[1]
+    )
+    streamWindows.value[idx] = { ...w, state: getStreamState(idx) }
+    ElMessage.success('前进 30 秒')
+    return
+  }
   const pane = panes.value[activePane.value]
   if (!pane || !pane.isPlaying) {
     ElMessage.warning('当前窗口没有正在播放的视频')
     return
   }
-  
   seekRelative(pane, 30)
   ElMessage.success('前进 30 秒')
 }
@@ -674,12 +928,15 @@ const handleToggleMute = () => {
 
 // 截图
 const handleScreenshot = () => {
+  if (playbackMode.value === 'stream') {
+    ElMessage.info('流媒体模式请使用浏览器或播放器自带截图')
+    return
+  }
   const pane = panes.value[activePane.value]
   if (!pane) {
     ElMessage.warning('请先选择一个窗口')
     return
   }
-  
   downloadSnapshot(pane, activePane.value)
 }
 
@@ -704,29 +961,30 @@ const handleSpeedChange = async (speed: number) => {
 
 // 布局变化
 const handleLayoutChange = async (layout: GridLayoutType) => {
-  // 停止所有播放
   await stopAllPanes()
-
-  // 更新布局
   gridLayout.value = layout
   panes.value = createPlaybackPanes(layout)
   activePane.value = 0
-
+  if (playbackMode.value === 'stream') {
+    streamWindows.value = Array.from({ length: layout }, () => ({ playing: false }))
+  }
   console.log(`[录像回放] 布局切换为 ${layout} 窗口`)
 }
 
 // 保存双击最大化前的布局和播放状态，用于恢复
 const previousLayout = ref<GridLayoutType>(6)
-const previousPanesState = ref<Array<{
-  channelNo: number | null
-  channelName: string | null
-  hasRecording: boolean
-  isPlaying: boolean
-  playbackStartTime: string | null
-  playbackEndTime: string | null
-  currentPlaySeconds: number
-  filePath: string | null
-}>>([])
+const previousPanesState = ref<
+  Array<{
+    channelNo: number | null
+    channelName: string | null
+    hasRecording: boolean
+    isPlaying: boolean
+    playbackStartTime: string | null
+    playbackEndTime: string | null
+    currentPlaySeconds: number
+    filePath: string | null
+  }>
+>([])
 const maximizedFromPaneIndex = ref<number>(-1) // 记录从哪个窗口最大化的
 
 // 双击窗口切换最大化
@@ -734,21 +992,21 @@ const handlePaneDblClick = async (paneIndex: number) => {
   if (gridLayout.value === 1 && maximizedFromPaneIndex.value >= 0) {
     // 当前是全屏，恢复到之前的布局
     console.log('[录像回放] 准备恢复布局，之前状态:', previousPanesState.value)
-    
+
     // 停止当前播放
     await stopAllPanes()
-    
+
     // 恢复布局（不调用 handleLayoutChange，避免清空状态）
     gridLayout.value = previousLayout.value
     panes.value = createPlaybackPanes(previousLayout.value)
-    
+
     await nextTick()
-    
+
     // 恢复所有窗格的播放状态
     for (let i = 0; i < previousPanesState.value.length && i < panes.value.length; i++) {
       const savedState = previousPanesState.value[i]
       const pane = panes.value[i]
-      
+
       if (savedState.channelNo && savedState.channelName) {
         // 恢复通道信息
         pane.channel = { name: savedState.channelName, channelNo: savedState.channelNo }
@@ -756,11 +1014,11 @@ const handlePaneDblClick = async (paneIndex: number) => {
         pane.hasRecording = savedState.hasRecording
         pane.playbackStartTime = savedState.playbackStartTime
         pane.playbackEndTime = savedState.playbackEndTime
-        
+
         // 如果之前正在播放且有录像路径，恢复播放
         if (savedState.isPlaying && savedState.filePath) {
           console.log(`[录像回放] 恢复窗口 ${i + 1} 播放:`, savedState.channelName)
-          
+
           // 延迟启动播放，确保 DOM 已就绪
           setTimeout(async () => {
             const success = await startDahuaPlayback(
@@ -778,30 +1036,30 @@ const handlePaneDblClick = async (paneIndex: number) => {
         }
       }
     }
-    
+
     // 恢复后激活之前的窗口
     activePane.value = maximizedFromPaneIndex.value
     maximizedFromPaneIndex.value = -1
-    
+
     console.log(`[录像回放] 已恢复为 ${previousLayout.value} 窗口布局`)
   } else {
     // 保存当前所有窗格的状态
-    previousPanesState.value = panes.value.map(pane => {
+    previousPanesState.value = panes.value.map((pane) => {
       // 查找该通道当前播放的录像文件路径
       let filePath: string | null = null
       if (pane.channelNo && pane.playbackStartTime) {
         const recordingInfo = recordingInfoList.value.find(
-          r => String(r.channelId) === String(pane.channelNo)
+          (r) => String(r.channelId) === String(pane.channelNo)
         )
         if (recordingInfo) {
           // 根据 playbackStartTime 找到正在播放的录像片段
           const segment = recordingInfo.segments.find(
-            s => s.hasRecording && s.filePath && s.startTime === pane.playbackStartTime
+            (s) => s.hasRecording && s.filePath && s.startTime === pane.playbackStartTime
           )
           filePath = segment?.filePath || null
         }
       }
-      
+
       return {
         channelNo: pane.channelNo,
         channelName: pane.channel?.name || null,
@@ -813,25 +1071,25 @@ const handlePaneDblClick = async (paneIndex: number) => {
         filePath
       }
     })
-    
+
     // 保存当前布局和被最大化的窗口索引
     previousLayout.value = gridLayout.value
     maximizedFromPaneIndex.value = paneIndex
-    
+
     // 获取当前点击窗口的状态
     const clickedPaneState = previousPanesState.value[paneIndex]
-    
+
     console.log('[录像回放] 保存状态并最大化窗口', paneIndex + 1, clickedPaneState)
-    
+
     // 停止所有播放
     await stopAllPanes()
-    
+
     // 切换到单窗口布局
     gridLayout.value = 1
     panes.value = createPlaybackPanes(1)
-    
+
     await nextTick()
-    
+
     // 如果点击的窗口有通道，在新的单窗口中恢复
     if (clickedPaneState.channelNo && clickedPaneState.channelName) {
       const pane = panes.value[0]
@@ -840,7 +1098,7 @@ const handlePaneDblClick = async (paneIndex: number) => {
       pane.hasRecording = clickedPaneState.hasRecording
       pane.playbackStartTime = clickedPaneState.playbackStartTime
       pane.playbackEndTime = clickedPaneState.playbackEndTime
-      
+
       // 如果之前在播放，恢复播放
       if (clickedPaneState.isPlaying && clickedPaneState.filePath) {
         setTimeout(async () => {
@@ -858,7 +1116,7 @@ const handlePaneDblClick = async (paneIndex: number) => {
         }, 100)
       }
     }
-    
+
     activePane.value = 0
     console.log(`[录像回放] 双击窗口 ${paneIndex + 1} 最大化`)
   }
@@ -871,9 +1129,52 @@ const clipEndTime = ref<Date | null>(null)
 // 剪切录像
 const handleClipVideo = async () => {
   const paneIndex = activePane.value
+
+  if (playbackMode.value === 'stream') {
+    const w = streamWindows.value[paneIndex]
+    if (!w?.cameraId) {
+      ElMessage.warning('请先选择通道')
+      return
+    }
+    if (!clipStartTime.value) {
+      clipStartTime.value = new Date(currentPlayTime.value)
+      ElMessage.success(
+        `剪切起点已设置: ${formatDateTime(clipStartTime.value)}，再次点击设置终点并开始下载`
+      )
+      return
+    }
+    const end = new Date(currentPlayTime.value)
+    if (end <= clipStartTime.value) {
+      ElMessage.warning('终点时间必须大于起点时间')
+      return
+    }
+    const a = Math.min(clipStartTime.value.getTime(), end.getTime())
+    const b = Math.max(clipStartTime.value.getTime(), end.getTime())
+    try {
+      const resp = await PlaybackApi.clipRecording({
+        cameraId: w.cameraId,
+        startTime: formatDateTime(new Date(a)),
+        endTime: formatDateTime(new Date(b))
+      })
+      clipStartTime.value = null
+      const data = (resp as any)?.data ?? resp
+      const fileUrl = data?.fileUrl
+      if (fileUrl) {
+        const link = document.createElement('a')
+        link.href = fileUrl
+        link.download = ''
+        link.click()
+        ElMessage.success('剪切成功，正在下载录像文件')
+      } else {
+        ElMessage.success('剪切任务已提交')
+      }
+    } catch (e: any) {
+      ElMessage.error(e?.message || '剪切录像失败')
+    }
+    return
+  }
+
   const pane = panes.value[paneIndex]
-  
-  // 如果当前窗口正在裁剪，则取消
   const cutState = getCutTaskState(paneIndex)
   if (cutState.isCutting || (cutState.progress > 0 && cutState.progress < 100)) {
     stopRecordCut(paneIndex)
@@ -891,17 +1192,19 @@ const handleClipVideo = async () => {
   if (!clipStartTime.value) {
     // 设置剪切起点
     clipStartTime.value = new Date(currentPlayTime.value)
-    ElMessage.success(`剪切起点已设置: ${formatDateTime(clipStartTime.value)}，再次点击设置终点并开始下载`)
+    ElMessage.success(
+      `剪切起点已设置: ${formatDateTime(clipStartTime.value)}，再次点击设置终点并开始下载`
+    )
   } else {
     // 设置剪切终点并下载
     clipEndTime.value = new Date(currentPlayTime.value)
-    
+
     if (clipEndTime.value <= clipStartTime.value) {
       ElMessage.warning('终点时间必须大于起点时间')
       clipEndTime.value = null
       return
     }
-    
+
     // 检查时长
     const durationSec = (clipEndTime.value.getTime() - clipStartTime.value.getTime()) / 1000
     if (durationSec < 5) {
@@ -909,20 +1212,20 @@ const handleClipVideo = async () => {
       clipEndTime.value = null
       return
     }
-    
+
     if (durationSec > 3600) {
       const confirm = await ElMessageBox.confirm(
         `裁剪时长约 ${Math.round(durationSec / 60)} 分钟，下载可能需要较长时间，是否继续？`,
         '提示',
         { confirmButtonText: '继续', cancelButtonText: '取消' }
       ).catch(() => false)
-      
+
       if (!confirm) {
         clipEndTime.value = null
         return
       }
     }
-    
+
     // 开始裁剪下载（传入窗口索引，支持多通道同时裁剪）
     await downloadClipVideo(
       paneIndex,
@@ -931,7 +1234,7 @@ const handleClipVideo = async () => {
       formatDateTime(clipEndTime.value),
       pane.channel?.name || '录像'
     )
-    
+
     // 重置剪切状态
     clipStartTime.value = null
     clipEndTime.value = null
@@ -948,31 +1251,31 @@ const downloadClipVideo = async (
 ) => {
   try {
     ElMessage.info(`${channelName} 正在准备下载录像片段...`)
-    
+
     // 查找该时间范围内的录像文件
     const recordingInfo = recordingInfoList.value.find(
       (r) => String(r.channelId) === String(channelNo)
     )
-    
+
     if (!recordingInfo || recordingInfo.segments.length === 0) {
       ElMessage.warning('未找到录像文件')
       return
     }
-    
+
     // 找到包含该时间段的录像文件
     const startTs = new Date(startTime).getTime()
     const endTs = new Date(endTime).getTime()
-    
+
     for (const segment of recordingInfo.segments) {
       if (!segment.hasRecording || !segment.filePath) continue
-      
+
       const segStart = new Date(segment.startTime).getTime()
       const segEnd = new Date(segment.endTime).getTime()
-      
+
       // 检查是否有重叠
       if (segStart <= endTs && segEnd >= startTs) {
         console.log(`[录像回放] 窗口${paneIndex + 1} 找到录像文件:`, segment)
-        
+
         // 使用SDK裁剪功能下载（传入窗口索引）
         const success = await startRecordCut(
           paneIndex,
@@ -990,14 +1293,14 @@ const downloadClipVideo = async (
             console.log(`[录像回放] 窗口${paneIndex + 1} ${channelName} 裁剪完成`)
           }
         )
-        
+
         if (!success) {
           ElMessage.error(`${channelName} 启动裁剪任务失败`)
         }
         return
       }
     }
-    
+
     ElMessage.warning('未找到该时间段的录像文件')
   } catch (error) {
     console.error('[录像回放] 下载剪切录像失败:', error)
@@ -1007,16 +1310,46 @@ const downloadClipVideo = async (
 
 // 同步所有窗口到当前时间点
 const handleSyncAll = async () => {
+  if (playbackMode.value === 'stream') {
+    const targetTime = currentPlayTime.value
+    if (!filterTimeRange.value?.[1]) {
+      ElMessage.warning('请先搜索录像')
+      return
+    }
+    let syncCount = 0
+    for (let i = 0; i < streamWindows.value.length; i++) {
+      const w = streamWindows.value[i]
+      if (!w?.playing || !w?.cameraId) continue
+      const pane = panes.value[i]
+      await streamSeekByRestart(
+        pane,
+        i,
+        w.cameraId,
+        w.cameraName || `通道${w.cameraId}`,
+        targetTime,
+        filterTimeRange.value[1]
+      )
+      streamWindows.value[i] = { ...w, state: getStreamState(i) }
+      syncCount++
+    }
+    if (syncCount > 0) {
+      ElMessage.success(`已同步 ${syncCount} 个窗口到当前时间点`)
+    } else {
+      ElMessage.warning('没有其他正在播放的窗口可同步')
+    }
+    return
+  }
+
   const activeP = panes.value[activePane.value]
   if (!activeP || !activeP.isPlaying) {
     ElMessage.warning('请先在活动窗口播放录像')
     return
   }
-  
+
   // 计算活动窗口的实际播放时间点
   // 使用录像文件开始时间 + 当前播放秒数
   let syncTime: Date
-  
+
   if (activeP.playbackStartTime && activeP.currentPlaySeconds !== undefined) {
     // 根据录像文件开始时间和当前播放位置计算实际时间
     const recordStartTimestamp = parseTimeString(activeP.playbackStartTime)
@@ -1033,59 +1366,59 @@ const handleSyncAll = async () => {
     syncTime = new Date(currentPlayTime.value)
     console.log('[录像回放] 使用全局时间轴时间:', syncTime.toISOString())
   }
-  
+
   const syncTimeStr = formatDateTime(syncTime)
-  
+
   console.log('[录像回放] 同步所有窗口到:', syncTimeStr, '(活动窗口:', activePane.value + 1, ')')
-  
+
   let syncCount = 0
-  
+
   for (let i = 0; i < panes.value.length; i++) {
     const pane = panes.value[i]
-    
+
     // 跳过活动窗口和没有绑定通道的窗口
     if (i === activePane.value || !pane.channel || !pane.hasRecording) continue
-    
+
     // 如果窗口正在播放，先停止
     if (pane.isPlaying) {
       await stopDahuaPlayback(pane)
     }
-    
+
     // 查找该通道的录像信息
     const recordingInfo = recordingInfoList.value.find(
       (r) => String(r.channelId) === String(pane.channelNo)
     )
-    
+
     if (!recordingInfo || recordingInfo.segments.length === 0) continue
-    
+
     // 找到包含同步时间点的录像文件
     const syncTimestamp = syncTime.getTime()
     let targetSegment: any = null
     let seekSeconds = 0
-    
+
     for (const segment of recordingInfo.segments) {
       if (!segment.hasRecording || !segment.filePath) continue
-      
+
       const segStart = new Date(segment.startTime).getTime()
       const segEnd = new Date(segment.endTime).getTime()
-      
+
       if (syncTimestamp >= segStart && syncTimestamp <= segEnd) {
         targetSegment = segment
         seekSeconds = Math.floor((syncTimestamp - segStart) / 1000)
         break
       }
     }
-    
+
     // 如果没有精确匹配，找最近的
     if (!targetSegment) {
       targetSegment = recordingInfo.segments.find((s) => s.hasRecording && s.filePath)
     }
-    
+
     if (targetSegment?.filePath) {
       // 保存录像文件的开始时间
       pane.playbackStartTime = targetSegment.startTime
       pane.playbackEndTime = targetSegment.endTime
-      
+
       // 开始回放
       const success = await startDahuaPlayback(
         pane,
@@ -1095,7 +1428,7 @@ const handleSyncAll = async () => {
         pane.channel?.name,
         seekSeconds
       )
-      
+
       if (success) {
         // 更新当前播放秒数
         pane.currentPlaySeconds = seekSeconds
@@ -1103,7 +1436,7 @@ const handleSyncAll = async () => {
       }
     }
   }
-  
+
   if (syncCount > 0) {
     ElMessage.success(`已同步 ${syncCount} 个窗口到 ${syncTimeStr}`)
   } else {
@@ -1113,6 +1446,15 @@ const handleSyncAll = async () => {
 
 // 停止所有窗格播放
 const stopAllPanes = async () => {
+  if (playbackMode.value === 'stream') {
+    for (let i = 0; i < streamWindows.value.length; i++) {
+      if (streamWindows.value[i].playing) {
+        await stopStreamPlayback(panes.value[i], i)
+        streamWindows.value[i] = { ...streamWindows.value[i], playing: false }
+      }
+    }
+    return
+  }
   for (const pane of panes.value) {
     if (pane.isPlaying) {
       await stopDahuaPlayback(pane)
@@ -1140,176 +1482,174 @@ onMounted(() => {
 onUnmounted(() => {
   stopAllPanes()
 })
+
+// 切换为流媒体模式时同步窗口数量
+watch(playbackMode, (mode) => {
+  if (mode === 'stream' && streamWindows.value.length !== gridLayout.value) {
+    const next = Array.from({ length: gridLayout.value }, (_, i) =>
+      streamWindows.value[i] ? { ...streamWindows.value[i] } : { playing: false }
+    )
+    streamWindows.value = next
+  }
+})
 </script>
 
 <style lang="scss" scoped>
 @use '@/styles/dark-theme.scss';
 
 .video-playback-container {
-  height: 100%;
   display: flex;
+  height: 100%;
   flex-direction: column;
-
-  .top-nav {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    background: rgba(0, 0, 0, 0.3);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-
-    .nav-left {
-      .page-title {
-        font-size: 16px;
-        font-weight: 500;
-        color: rgba(255, 255, 255, 0.9);
-      }
-    }
-  }
 
   .main-layout {
     flex: 1;
-      display: flex;
-      gap: 10px;
-      padding: 10px;
+    display: flex;
+    gap: 10px;
+    padding: 10px;
     overflow: hidden;
 
-      .left-panel {
+    .left-panel {
       width: 260px;
-        background: #1e1e1e;
-        border: 1px solid #3a3a3a;
-        border-radius: 4px;
       overflow: hidden;
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      border-radius: 4px;
+    }
+
+    .center-panel {
+      display: flex;
+      overflow: hidden;
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      border-radius: 4px;
+      flex: 1;
+      flex-direction: column;
+
+      .player-section {
+        flex: 1;
+        min-height: 0;
+        padding: 8px;
       }
 
-      .center-panel {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        background: #1e1e1e;
-        border: 1px solid #3a3a3a;
-        border-radius: 4px;
-      overflow: hidden;
-        
-      .player-section {
-          flex: 1;
-            min-height: 0;
-            padding: 8px;
-      }
-      
       // 裁剪任务进度面板（可折叠）
       .cut-tasks-panel {
-        background: linear-gradient(180deg, rgba(64, 158, 255, 0.1) 0%, rgba(30, 30, 30, 0.95) 100%);
-        border-top: 1px solid rgba(64, 158, 255, 0.3);
+        @keyframes rotating {
+          from {
+            transform: rotate(0deg);
+          }
+
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
         padding: 8px 12px;
+        background: linear-gradient(180deg, rgb(64 158 255 / 10%) 0%, rgb(30 30 30 / 95%) 100%);
+        border-top: 1px solid rgb(64 158 255 / 30%);
         transition: all 0.3s ease;
-        
+
         &.collapsed {
           padding: 6px 12px;
-          background: rgba(64, 158, 255, 0.08);
+          background: rgb(64 158 255 / 8%);
         }
-        
+
         .cut-tasks-header {
           display: flex;
-          align-items: center;
-          gap: 8px;
-          color: #409eff;
           font-size: 13px;
           font-weight: 500;
+          color: #409eff;
           cursor: pointer;
           user-select: none;
-          
+          align-items: center;
+          gap: 8px;
+
           &:hover {
             color: #66b1ff;
           }
-          
+
           .collapsed-summary {
-            color: rgba(255, 255, 255, 0.6);
+            margin-left: 8px;
             font-size: 12px;
             font-weight: normal;
-            margin-left: 8px;
+            color: rgb(255 255 255 / 60%);
           }
-          
+
           .header-actions {
             display: flex;
             align-items: center;
             gap: 8px;
             margin-left: auto;
           }
-          
+
           .collapse-icon {
             font-size: 14px;
             transition: transform 0.3s;
           }
         }
-        
+
         .cut-tasks-list {
           display: flex;
           flex-wrap: wrap;
           gap: 12px;
           margin-top: 8px;
-          
+
           .cut-task-item {
             display: flex;
+            min-width: 220px;
+            padding: 8px 12px;
+            background: rgb(0 0 0 / 30%);
+            border: 1px solid rgb(255 255 255 / 10%);
+            border-radius: 6px;
             align-items: center;
             gap: 12px;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            padding: 8px 12px;
-            min-width: 220px;
-            
+
             .task-info {
               display: flex;
               flex-direction: column;
               gap: 2px;
               min-width: 80px;
-              
+
               .task-channel {
-                color: #fff;
                 font-size: 13px;
                 font-weight: 500;
+                color: #fff;
               }
-              
+
               .task-status {
                 display: flex;
+                font-size: 11px;
+                color: rgb(255 255 255 / 60%);
                 align-items: center;
                 gap: 4px;
-                color: rgba(255, 255, 255, 0.6);
-                font-size: 11px;
               }
             }
-            
+
             .task-progress {
               display: flex;
               align-items: center;
               gap: 8px;
               flex: 1;
               min-width: 100px;
-              
+
               .el-progress {
                 flex: 1;
               }
-              
+
               .progress-text {
-                color: #67c23a;
+                min-width: 36px;
                 font-size: 12px;
                 font-weight: 500;
-                min-width: 36px;
+                color: #67c23a;
                 text-align: right;
               }
             }
           }
         }
-        
+
         // 加载动画
         .is-loading {
           animation: rotating 1.5s linear infinite;
-        }
-        
-        @keyframes rotating {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
         }
       }
     }

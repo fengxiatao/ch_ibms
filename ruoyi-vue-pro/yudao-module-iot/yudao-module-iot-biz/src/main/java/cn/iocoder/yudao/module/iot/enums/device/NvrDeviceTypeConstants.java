@@ -33,6 +33,11 @@ public final class NvrDeviceTypeConstants {
     public static final String COMMAND_SEARCH_RECORDS = "SEARCH_RECORDS";
 
     /**
+     * 批量搜索录像命令（同一台 NVR 一次查询多个通道）
+     */
+    public static final String COMMAND_SEARCH_RECORDS_BATCH = "SEARCH_RECORDS_BATCH";
+
+    /**
      * 开始录像命令
      */
     public static final String COMMAND_START_RECORDING = "START_RECORDING";
@@ -115,6 +120,11 @@ public final class NvrDeviceTypeConstants {
      * 通道号参数
      */
     public static final String PARAM_CHANNEL_NO = "channelNo";
+
+    /**
+     * 通道号列表参数（批量查询）
+     */
+    public static final String PARAM_CHANNEL_NOS = "channelNos";
 
     /**
      * PTZ 方向参数

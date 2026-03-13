@@ -86,7 +86,8 @@
           <!-- 预置位控制 -->
           <div class="preset-controls">
             <el-select v-model="selectedPreset" placeholder="选择预置位" size="small">
-              <el-option v-for="preset in presetList" :key="preset.id" 
+              <el-option
+v-for="preset in presetList" :key="preset.id" 
                          :label="`${preset.presetNo} - ${preset.presetName}`" :value="preset.presetNo" />
             </el-select>
             <el-button size="small" @click="gotoPreset">转到</el-button>

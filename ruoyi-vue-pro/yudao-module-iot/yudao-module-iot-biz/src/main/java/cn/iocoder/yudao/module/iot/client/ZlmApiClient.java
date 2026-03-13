@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.iot.client;
 
 import cn.iocoder.yudao.module.iot.config.ZlmConfig;
+import cn.hutool.core.util.StrUtil;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,17 @@ public class ZlmApiClient {
     private final ZlmConfig config;
     private final RestTemplate restTemplate = new RestTemplate();
 
+    /**
+     * ZLMediaKit secret 参数（可选）。
+     * 部分部署未开启 secret 校验时，可以不传；若传空字符串，ZLM 会认为缺失并返回 -300。
+     */
+    private String secretQueryPrefix() {
+        if (StrUtil.isBlank(config.getSecret())) {
+            return "";
+        }
+        return "secret=" + config.getSecret() + "&";
+    }
+
     // ==================== 流代理管理 ====================
 
     /**
@@ -49,10 +61,10 @@ public class ZlmApiClient {
             
             // 手动拼接 URL
             String url = String.format(
-                "%s/index/api/addStreamProxy?secret=%s&vhost=__defaultVhost__&app=%s&stream=%s&url=%s" +
-                "&enable_hls=1&enable_mp4=0&enable_rtsp=1&enable_rtmp=1&enable_ts=1&enable_fmp4=1" +
-                "&rtp_type=0&timeout_sec=15&retry_count=3",
-                config.getApiUrl(), config.getSecret(), app, stream, safeRtspUrl
+                    "%s/index/api/addStreamProxy?%svhost=__defaultVhost__&app=%s&stream=%s&url=%s" +
+                            "&enable_hls=1&enable_mp4=0&enable_rtsp=1&enable_rtmp=1&enable_ts=1&enable_fmp4=1" +
+                            "&rtp_type=0&timeout_sec=15&retry_count=3",
+                    config.getApiUrl(), secretQueryPrefix(), app, stream, safeRtspUrl
             );
 
             log.info("[ZLM] 添加流代理: app={}, stream={}, rtspUrl={}", app, stream, rtspUrl);
@@ -85,8 +97,8 @@ public class ZlmApiClient {
      * 删除流代理
      */
     public boolean delStreamProxy(String key) {
-        String url = String.format("%s/index/api/delStreamProxy?secret=%s&key=%s",
-                config.getApiUrl(), config.getSecret(), key);
+        String url = String.format("%s/index/api/delStreamProxy?%skey=%s",
+                config.getApiUrl(), secretQueryPrefix(), key);
 
         try {
             ResponseEntity<ZlmResponse> response = restTemplate.getForEntity(url, ZlmResponse.class);
@@ -103,8 +115,8 @@ public class ZlmApiClient {
      * 关闭指定流（强制停止）
      */
     public boolean closeStream(String app, String stream) {
-        String url = String.format("%s/index/api/close_streams?secret=%s&app=%s&stream=%s&force=1",
-                config.getApiUrl(), config.getSecret(), app, stream);
+        String url = String.format("%s/index/api/close_streams?%sapp=%s&stream=%s&force=1",
+                config.getApiUrl(), secretQueryPrefix(), app, stream);
 
         try {
             ResponseEntity<ZlmResponse> response = restTemplate.getForEntity(url, ZlmResponse.class);
@@ -124,11 +136,11 @@ public class ZlmApiClient {
     public int closeAllStreams(String app) {
         String url;
         if (app != null && !app.isEmpty()) {
-            url = String.format("%s/index/api/close_streams?secret=%s&app=%s&force=1",
-                    config.getApiUrl(), config.getSecret(), app);
+            url = String.format("%s/index/api/close_streams?%sapp=%s&force=1",
+                    config.getApiUrl(), secretQueryPrefix(), app);
         } else {
-            url = String.format("%s/index/api/close_streams?secret=%s&force=1",
-                    config.getApiUrl(), config.getSecret());
+            url = String.format("%s/index/api/close_streams?%sforce=1",
+                    config.getApiUrl(), secretQueryPrefix());
         }
 
         try {
@@ -155,8 +167,8 @@ public class ZlmApiClient {
      * 检查流是否在线
      */
     public boolean isStreamOnline(String app, String stream) {
-        String url = String.format("%s/index/api/getMediaList?secret=%s&app=%s&stream=%s",
-                config.getApiUrl(), config.getSecret(), app, stream);
+        String url = String.format("%s/index/api/getMediaList?%sapp=%s&stream=%s",
+                config.getApiUrl(), secretQueryPrefix(), app, stream);
 
         try {
             ResponseEntity<ZlmResponse> response = restTemplate.getForEntity(url, ZlmResponse.class);
@@ -177,8 +189,8 @@ public class ZlmApiClient {
      * 获取媒体列表
      */
     public ZlmResponse getMediaList(String app, String stream) {
-        String url = String.format("%s/index/api/getMediaList?secret=%s&app=%s&stream=%s",
-                config.getApiUrl(), config.getSecret(), app, stream);
+        String url = String.format("%s/index/api/getMediaList?%sapp=%s&stream=%s",
+                config.getApiUrl(), secretQueryPrefix(), app, stream);
 
         try {
             return restTemplate.getForObject(url, ZlmResponse.class);
@@ -195,8 +207,8 @@ public class ZlmApiClient {
      */
     public boolean startRecord(String app, String stream, int maxSeconds) {
         String url = String.format(
-            "%s/index/api/startRecord?secret=%s&type=1&vhost=__defaultVhost__&app=%s&stream=%s&max_second=%d",
-            config.getApiUrl(), config.getSecret(), app, stream, maxSeconds
+            "%s/index/api/startRecord?%stype=1&vhost=__defaultVhost__&app=%s&stream=%s&max_second=%d",
+            config.getApiUrl(), secretQueryPrefix(), app, stream, maxSeconds
         );
 
         try {
@@ -215,8 +227,8 @@ public class ZlmApiClient {
      */
     public boolean stopRecord(String app, String stream) {
         String url = String.format(
-            "%s/index/api/stopRecord?secret=%s&type=1&vhost=__defaultVhost__&app=%s&stream=%s",
-            config.getApiUrl(), config.getSecret(), app, stream
+            "%s/index/api/stopRecord?%stype=1&vhost=__defaultVhost__&app=%s&stream=%s",
+            config.getApiUrl(), secretQueryPrefix(), app, stream
         );
 
         try {
@@ -269,9 +281,16 @@ public class ZlmApiClient {
         // RTMP (需专用播放器)
         urls.setRtmpUrl(String.format("rtmp://%s:%d/%s/%s", serverIp, rtmpPort, app, stream));
         
-        // WebRTC (极低延迟 ~200ms)
-        urls.setWebRtcUrl(String.format("http://%s:%d/index/api/webrtc?app=%s&stream=%s&type=play", 
-                serverIp, httpPort, app, stream));
+        // WebRTC (极低延迟 ~200ms)，外网时使用 publicRtcHost（如 natapp 分配的域名）
+        String rtcHost = config.getRtcServerIp();
+        // 兼容旧版实现：/index/api/webrtc 属于 ZLM 的 HTTP API，通常监听在 httpPort（例如 80）
+        String webrtcUrl = String.format("http://%s:%d/index/api/webrtc?app=%s&stream=%s&type=play",
+                rtcHost, httpPort, app, stream);
+        // 若开启了 secret 校验，WebRTC 信令同样需要带上 secret
+        if (StrUtil.isNotBlank(config.getSecret())) {
+            webrtcUrl += "&secret=" + java.net.URLEncoder.encode(config.getSecret(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+        urls.setWebRtcUrl(webrtcUrl);
 
         urls.setStreamKey(stream);
         

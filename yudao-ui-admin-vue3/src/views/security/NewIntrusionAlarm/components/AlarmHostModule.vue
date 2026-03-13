@@ -188,7 +188,8 @@
                     {{ device.online ? '在线' : '离线' }}
                   </el-tag>
                   <el-button link size="small" @click.stop="toggleFavorite(device)">
-                    <Icon :icon="device.favorite ? 'ep:star-filled' : 'ep:star'" 
+                    <Icon
+:icon="device.favorite ? 'ep:star-filled' : 'ep:star'" 
                           :class="{ 'text-yellow-500': device.favorite }" />
                   </el-button>
                 </div>

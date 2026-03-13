@@ -18,7 +18,7 @@ public class ZlmConfig {
      * ZLMediaKit API 地址
      * 例如：http://192.168.1.246:8080
      */
-    private String apiUrl = "http://192.168.1.246:8080";
+    private String apiUrl = "http://192.168.1.246:80";
 
     /**
      * ZLMediaKit API 密钥
@@ -46,6 +46,12 @@ public class ZlmConfig {
     private Integer rtcPort = 8000;
 
     /**
+     * WebRTC 信令端口（ZLMediaKit 的 /index/api/webrtc 通常监听在 signalingPort）
+     * 默认 3000（与 ZLM config.ini 的 signalingPort 一致）
+     */
+    private Integer signalingPort = 3000;
+
+    /**
      * 公网访问地址（域名或 IP）
      * 如果配置了此项，播放地址会使用公网地址，而非内网 IP
      * 例如：ibms.gzchanghui.cn
@@ -57,6 +63,11 @@ public class ZlmConfig {
      * 如果通过 Nginx 反向代理，可能需要单独配置
      */
     private Integer publicHttpPort;
+
+    /**
+     * 公网 WebRTC 信令端口（默认与 signalingPort 相同）
+     */
+    private Integer publicSignalingPort;
 
     /**
      * WebRTC 公网 UDP 端口（通过 natapp UDP 隧道映射）
@@ -96,6 +107,16 @@ public class ZlmConfig {
             return publicHttpPort;
         }
         return httpPort;
+    }
+
+    /**
+     * 获取公网 WebRTC 信令端口
+     */
+    public Integer getPublicSignalingPort() {
+        if (publicSignalingPort != null && publicSignalingPort > 0) {
+            return publicSignalingPort;
+        }
+        return signalingPort;
     }
 
     /**

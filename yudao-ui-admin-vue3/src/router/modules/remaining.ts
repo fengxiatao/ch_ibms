@@ -798,6 +798,27 @@ const remainingRouter: AppRouteRecordRaw[] = [
       }
     ]
   },
+  // 绝对路径兜底：实时预览页面（避免动态路由/扁平化导致嵌套路由匹配异常时落到 404）
+  {
+    path: '/security/video-surveillance/real-time-preview',
+    component: Layout,
+    name: 'RealTimePreviewAbsParent',
+    meta: { hidden: true },
+    children: [
+      {
+        path: '',
+        name: 'RealTimePreviewAbs',
+        meta: {
+          title: '实时预览(大华)',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          activeMenu: '/security/video-surveillance/real-time-preview'
+        },
+        component: () => import('@/views/security/VideoSurveillance/RealTimePreview/index.vue')
+      }
+    ]
+  },
   {
     path: '/building/visual-dashboard',
     component: Layout,
@@ -828,6 +849,17 @@ const remainingRouter: AppRouteRecordRaw[] = [
       hidden: true
     },
     children: [
+      // 兼容旧路径：/security/video-surveillance/realtime-preview -> /security/video-surveillance/real-time-preview
+      {
+        path: 'video-surveillance/realtime-preview',
+        redirect: '/security/video-surveillance/real-time-preview',
+        name: 'RealTimePreviewRedirect',
+        meta: {
+          hidden: true,
+          noTagsView: true,
+          breadcrumb: false
+        }
+      },
       {
         path: 'video-surveillance/real-time-preview',
         name: 'RealTimePreviewNew',

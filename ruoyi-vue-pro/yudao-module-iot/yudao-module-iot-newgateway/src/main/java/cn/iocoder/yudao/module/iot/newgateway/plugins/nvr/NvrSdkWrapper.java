@@ -13,6 +13,9 @@ import org.springframework.util.StringUtils;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -594,13 +597,102 @@ public class NvrSdkWrapper {
         if (loginHandle <= 0) {
             return NvrOperationResult.failure("无效的登录句柄");
         }
-        
+
+        if (!sdkInitialized) {
+            return NvrOperationResult.failure("SDK 未初始化");
+        }
+
         try {
-            log.info("{} 查询录像文件: handle={}, channel={}, start={}, end={}", 
-                    LOG_PREFIX, loginHandle, channelNo, startTime, endTime);
-            log.warn("{} {}", LOG_PREFIX, UNSUPPORTED_MSG);
-            return NvrOperationResult.failure(UNSUPPORTED_MSG);
-            
+            log.info("{} 查询录像文件: handle={}, channel={}, start={}, end={}, recordType={}",
+                    LOG_PREFIX, loginHandle, channelNo, startTime, endTime, recordType);
+
+            // 1. 解析时间字符串（业务层采用 yyyy-MM-dd HH:mm:ss）
+            if (startTime == null || endTime == null) {
+                return NvrOperationResult.failure("开始时间或结束时间不能为空");
+            }
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            LocalDateTime start;
+            LocalDateTime end;
+            try {
+                start = LocalDateTime.parse(startTime, formatter);
+                end = LocalDateTime.parse(endTime, formatter);
+            } catch (Exception e) {
+                log.warn("{} 时间格式解析失败: start={}, end={}", LOG_PREFIX, startTime, endTime, e);
+                return NvrOperationResult.failure("时间格式错误，应为 yyyy-MM-dd HH:mm:ss");
+            }
+            if (!end.isAfter(start)) {
+                return NvrOperationResult.failure("结束时间必须晚于开始时间");
+            }
+
+            // 2. 构造 SDK 查询参数
+            NetSDKLib.NET_TIME stTimeStart = toNetTime(start);
+            NetSDKLib.NET_TIME stTimeEnd = toNetTime(end);
+
+            int maxCount = 1024;
+            NetSDKLib.NET_RECORDFILE_INFO[] fileInfos =
+                    (NetSDKLib.NET_RECORDFILE_INFO[]) new NetSDKLib.NET_RECORDFILE_INFO().toArray(maxCount);
+            com.sun.jna.ptr.IntByReference findCount = new com.sun.jna.ptr.IntByReference(0);
+
+            int sdkRecordType = recordType != null ? recordType : 0; // 0-所有录像
+
+            boolean ok = getNetSdk().CLIENT_QueryRecordFile(
+                    new LLong(loginHandle),
+                    channelNo,
+                    sdkRecordType,
+                    stTimeStart,
+                    stTimeEnd,
+                    null,
+                    fileInfos,
+                    maxCount * fileInfos[0].size(),
+                    findCount,
+                    TIMEOUT_MS,
+                    false
+            );
+
+            if (!ok) {
+                String errorMsg = ToolKits.getErrorCodePrint();
+                log.warn("{} 查询录像文件失败: handle={}, channel={}, error={}",
+                        LOG_PREFIX, loginHandle, channelNo, errorMsg);
+                return NvrOperationResult.failure("查询录像文件失败: " + errorMsg);
+            }
+
+            int count = Math.min(findCount.getValue(), maxCount);
+            log.info("{} 查询录像文件成功: handle={}, channel={}, count={}",
+                    LOG_PREFIX, loginHandle, channelNo, count);
+
+            // 3. 转换为统一的返回结构（兼容 biz 层 SEARCH_RECORDS 返回格式）
+            java.util.List<Map<String, Object>> files = new java.util.ArrayList<>();
+            for (int i = 0; i < count; i++) {
+                NetSDKLib.NET_RECORDFILE_INFO fi = fileInfos[i];
+                LocalDateTime st = fromNetTime(fi.starttime);
+                LocalDateTime et = fromNetTime(fi.endtime);
+                if (st == null || et == null || !et.isAfter(st)) {
+                    continue;
+                }
+
+                long duration = Duration.between(st, et).getSeconds();
+
+                Map<String, Object> file = new HashMap<>();
+                file.put("channelNo", fi.ch);                         // 通道号
+                file.put("fileName", new String(fi.filename).trim()); // 文件名
+                file.put("fileSize", (long) fi.size);                 // 文件大小（字节）
+                file.put("startTime", st.format(formatter));          // 开始时间（yyyy-MM-dd HH:mm:ss）
+                file.put("endTime", et.format(formatter));            // 结束时间（yyyy-MM-dd HH:mm:ss）
+                file.put("duration", duration);                       // 时长（秒）
+                file.put("recordType", fi.driveno);                   // 录像类型/驱动号（兼容旧实现）
+
+                files.add(file);
+            }
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("channelNo", channelNo);
+            data.put("startTime", start);
+            data.put("endTime", end);
+            data.put("totalCount", files.size());
+            data.put("files", files);
+
+            return NvrOperationResult.success("查询录像文件成功", data);
+
         } catch (Exception e) {
             log.error("{} 查询录像文件异常: channel={}, error={}", LOG_PREFIX, channelNo, e.getMessage(), e);
             return NvrOperationResult.failure("查询录像文件异常: " + e.getMessage());
@@ -1619,6 +1711,45 @@ public class NvrSdkWrapper {
     }
 
     // ==================== 辅助方法 ====================
+
+    /**
+     * 将 LocalDateTime 转换为大华 SDK 的 NET_TIME 结构
+     */
+    private NetSDKLib.NET_TIME toNetTime(LocalDateTime time) {
+        NetSDKLib.NET_TIME netTime = new NetSDKLib.NET_TIME();
+        if (time == null) {
+            return netTime;
+        }
+        netTime.dwYear = time.getYear();
+        netTime.dwMonth = time.getMonthValue();
+        netTime.dwDay = time.getDayOfMonth();
+        netTime.dwHour = time.getHour();
+        netTime.dwMinute = time.getMinute();
+        netTime.dwSecond = time.getSecond();
+        return netTime;
+    }
+
+    /**
+     * 将大华 SDK 的 NET_TIME 结构转换为 LocalDateTime
+     */
+    private LocalDateTime fromNetTime(NetSDKLib.NET_TIME netTime) {
+        if (netTime == null || netTime.dwYear <= 0) {
+            return null;
+        }
+        try {
+            return LocalDateTime.of(
+                    netTime.dwYear,
+                    netTime.dwMonth,
+                    netTime.dwDay,
+                    netTime.dwHour,
+                    netTime.dwMinute,
+                    netTime.dwSecond
+            );
+        } catch (Exception e) {
+            log.debug("{} 转换 NET_TIME 失败: {}", LOG_PREFIX, e.getMessage());
+            return null;
+        }
+    }
 
     private void fillBytes(byte[] dest, String src) {
         if (src == null || dest == null) {

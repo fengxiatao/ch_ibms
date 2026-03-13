@@ -1,0 +1,55 @@
+本文件为“项目历史会话中 WebRTC/ZLMediaKit 相关信息”整理（未脱敏）。
+
+==== 1) 命中的历史会话文件 ====
+
+- c8c4cd1f-8811-49e7-80a0-46e8adec10d5.txt
+  - 主题：实时预览 WebRTC/FLV 报 stream not found、ZLMediaKit getMediaList 为空、定位后端 security.media.server-url 配置未生效、修复 local 配置与前后端重试/等待就绪。
+
+- bf611645-f4da-4a79-b7da-81b286623eb9.txt
+  - 主题：录像回放倍速/剪切下载、回放 RTSP 生成与 ZLMediaKit 拉流、回放 FLV H.265 CodecUnsupported、改为回放也走 WebRTC（app=playback）。
+
+- 其它命中（若需要可继续扩展读取）：75767be0-4d66-41a3-adaa-0f95d0ff83ca.txt、ba7c1448-f521-481c-80d2-17a201647958.txt、628aa671-a2e3-498f-8507-03b8ff81ec42.txt、0e83cba3-9d4a-4de9-abb6-10ec6adc5522.txt、39ed5b13-0b00-4f33-8efd-173ed5026541.txt、e8aacaad-28e1-4ec4-87ef-72e8c2780627.txt、32736fdb-75bc-4021-96b9-bbabe02333da.txt
+
+==== 2) 高价值要点汇总（可直接复用） ====
+
+### 2.1 WebRTC “stream not found” 的含义
+- ZLMediaKit `/index/api/webrtc?...` 返回：
+  - `{"code":-400,"msg":"stream not found"}`
+  - 表示 **HTTP/信令已到 ZLMediaKit**，但 **ZL 内不存在该 app/stream 媒体流**（未推流/未拉流/流名不匹配）。
+
+### 2.2 FLV 404 的含义
+- `GET http://<zlm>/<app>/<stream>.live.flv?...` 返回 404：
+  - 表示 **HTTP 到达 ZLMediaKit**，但 **该 app/stream 对应的 FLV 资源不存在**（流未注册/拉流失败/路径不匹配）。
+
+### 2.3 为什么 getMediaList 只有 {"code":0}
+- `curl http://127.0.0.1/index/api/getMediaList?secret=...` 返回仅 `{"code":0}`（无 data）：
+  - 表示 **当前无任何在线流**。
+  - 前端此时无论 WebRTC/FLV 都会失败（stream not found / 404）。
+
+### 2.4 关键配置：后端必须把 addStreamProxy 请求打到 ZL 所在机器
+- 后端的拉流触发链路：
+  - `getPreviewUrl` / `getPlaybackUrl` → `StreamManagerService.startStream/addStreamProxy` → 调用 `security.media.server-url + /index/api/addStreamProxy`
+- 如果 `security.media.server-url` 没生效（默认 `http://127.0.0.1`），会导致：
+  - 拉流请求打到错误的地址 → ZL 不会创建流 → 前端持续 stream not found/404。
+- 已定位到一个常见坑：`spring.profiles.active=local` 时不会自动加载 `application-security.yaml`，需在 `application-local.yaml` 中显式配置 `security.media.*` 或激活对应 profile。
+
+### 2.5 拉流就绪时序问题：刚发起 addStreamProxy 前端立刻请求可能失败
+- 现象：某些 camera 的 WebRTC 先失败（stream not found），过几秒又成功。
+- 处理策略（会话内已实现过的方案）：
+  - 后端：发起拉流后轮询等待流上线再返回 URL（最多等待 10~15 秒）。
+  - 前端：WebRTC/FLV 遇 “stream not found/404” 短时重试（例如 2~3 次，每次间隔 2~3 秒）。
+
+### 2.6 回放走 FLV 刷屏 CodecUnsupported（H.265）
+- flv.js 报：
+  - `DemuxException: CodecUnsupported ... Unsupported codec in video frame: 0/1`
+  - 常见原因：回放/录像码流为 H.265，浏览器侧 flv.js 无法播放。
+- 解决思路之一：回放不走 FLV，统一走 WebRTC（复用实时预览的 WebRTC 播放封装），只需切换 `app/stream`（例如 `app=playback`）。
+
+==== 3) 文件路径参考 ====
+- 当前仓库前端组件：`ibms-ui-admin/src/views/security/video/realtime/components/VideoPlayer.vue`
+- 实时预览页面：`ibms-ui-admin/src/views/security/video/realtime/index.vue`
+- 回放页面：`ibms-ui-admin/src/views/security/video/playback/index.vue`
+- 后端预览：`ibms-server/yudao-module-security/.../service/preview/*`
+- 后端回放：`ibms-server/yudao-module-security/.../service/playback/*`
+- ZLMediaKit hook：`ibms-server/yudao-module-security/.../controller/admin/hook/ZLMediaKitHookController.java`
+

@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IBMS智慧物联管理平台 - 字典管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        /* 玻璃拟态效果 */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .glass-card {
+            background: rgba(51, 65, 85, 0.4);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            background: rgba(51, 65, 85, 0.6);
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        /* 侧边栏样式 */
+        .sidebar-item {
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), transparent);
+            transition: width 0.3s;
+        }
+
+        .sidebar-item:hover::before, .sidebar-item.active::before {
+            width: 100%;
+        }
+
+        .sidebar-item:hover, .sidebar-item.active {
+            border-left-color: #3b82f6;
+            color: #60a5fa;
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        /* 编码高亮 */
+        .code-part {
+            display: inline-flex;
+            border-radius: 0.25rem;
+            padding: 0.1rem 0.5rem;
+            font-family: monospace;
+            font-weight: 500;
+            margin: 0 0.1rem;
+        }
+        .region-part { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+        .system-part { background: rgba(168, 85, 247, 0.2); color: #d8b4fe; }
+        .model-part { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+        .device-part { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+        .point-part { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+
+        /* 专业分组标签 */
+        .group-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .group-sa { background: rgba(59, 130, 246, 0.15); color: #93c5fd; }
+        .group-st { background: rgba(168, 85, 247, 0.15); color: #d8b4fe; }
+        .group-sb { background: rgba(6, 182, 212, 0.15); color: #a5f3fc; }
+        .group-se { background: rgba(245, 158, 11, 0.15); color: #fcd34d; }
+        .group-sf { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+
+        /* 专业分组卡片 - 新样式 */
+        .group-cards-container {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .group-stat-card {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .group-stat-card:hover {
+            background: rgba(30, 41, 59, 0.6);
+            transform: translateY(-2px);
+            border-color: currentColor;
+        }
+
+        .group-stat-card.selected {
+            border-width: 2px;
+            border-color: currentColor;
+        }
+
+        .group-icon-wrapper {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        /* 字典卡片网格 */
+        .dict-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 1rem;
+        }
+
+        .dict-card {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .dict-card:hover {
+            background: rgba(30, 41, 59, 0.6);
+            border-color: rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .dict-card .card-actions {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            display: none;
+            gap: 0.25rem;
+        }
+
+        .dict-card:hover .card-actions {
+            display: flex;
+        }
+
+        .action-btn {
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 0.375rem;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+
+        .action-btn.delete:hover {
+            background: #ef4444;
+            border-color: #ef4444;
+        }
+
+        /* 标签页切换 */
+        .tab-btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            color: #94a3b8;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover {
+            color: #e2e8f0;
+        }
+        .tab-btn.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        /* 搜索框 */
+        .search-input {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+
+        /* 按钮样式 */
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px -5px rgba(59, 130, 246, 0.4);
+        }
+
+        /* 编辑框样式 - 改为深色底色 */
+        .form-input, .form-select {
+            background: rgba(15, 23, 42, 0.8) !important;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: white;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus, .form-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            outline: none;
+            background: rgba(15, 23, 42, 0.95) !important;
+        }
+
+        .form-input:hover, .form-select:hover {
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            color: #94a3b8;
+            margin-bottom: 0.25rem;
+        }
+
+        /* 模态框背景 */
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-enter {
+            animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes modalSlideIn {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex">
+
+    <!-- 左侧导航栏 -->
+    <aside class="w-64 glass-panel flex flex-col border-r border-slate-700/30 z-20">
+        <div class="p-6 border-b border-slate-700/30">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <i class="fas fa-code text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white tracking-tight">IBMS平台</h1>
+                    <p class="text-xs text-slate-400">字典管理</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto py-4">
+            <div class="px-4 mb-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">核心功能</div>
+            <a href="#" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300">
+                <i class="fas fa-th-large w-5 text-center"></i><span>系统总览</span>
+            </a>
+            <a href="#" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300">
+                <i class="fas fa-microchip w-5 text-center"></i><span>设备管理</span>
+            </a>
+            <a href="#" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300">
+                <i class="fas fa-map-marked-alt w-5 text-center"></i><span>空间管理</span>
+            </a>
+            <a href="#" class="sidebar-item active flex items-center gap-3 px-6 py-3 text-slate-300">
+                <i class="fas fa-code w-5 text-center"></i>
+                <span>字典管理</span>
+                <span class="ml-auto bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded-full">v2.0</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 flex flex-col overflow-hidden relative bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800">
+
+        <!-- 顶部栏 -->
+        <header class="h-16 glass-panel border-b border-slate-700/30 flex items-center justify-between px-6 z-10">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 text-sm text-slate-400">
+                    <span>IBMS平台</span>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span>字典管理</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <button onclick="openImportModal()" class="px-3 py-1.5 glass-card rounded-lg text-sm text-slate-300 hover:text-white">
+                    <i class="fas fa-upload mr-1"></i>导入
+                </button>
+                <button onclick="exportData()" class="px-3 py-1.5 glass-card rounded-lg text-sm text-slate-300 hover:text-white">
+                    <i class="fas fa-download mr-1"></i>导出
+                </button>
+            </div>
+        </header>
+
+        <!-- 内容区 -->
+        <div class="flex-1 overflow-y-auto p-6">
+            <!-- 专业分组卡片 - 移动到区域码表上方 -->
+            <div class="group-cards-container mb-6">
+                <div class="group-stat-card group-sa" onclick="filterByGroup('SA')" id="card-sa">
+                    <div class="group-icon-wrapper" style="background: rgba(59, 130, 246, 0.2);">
+                        <i class="fas fa-shield-alt text-blue-400"></i>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium text-white">智慧安防</div>
+                        <div class="text-xs text-slate-400 mt-1" id="stat-sa">12个系统</div>
+                    </div>
+                </div>
+                <div class="group-stat-card group-st" onclick="filterByGroup('ST')" id="card-st">
+                    <div class="group-icon-wrapper" style="background: rgba(168, 85, 247, 0.2);">
+                        <i class="fas fa-door-open text-purple-400"></i>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium text-white">智慧通行</div>
+                        <div class="text-xs text-slate-400 mt-1" id="stat-st">8个系统</div>
+                    </div>
+                </div>
+                <div class="group-stat-card group-sb" onclick="filterByGroup('SB')" id="card-sb">
+                    <div class="group-icon-wrapper" style="background: rgba(6, 182, 212, 0.2);">
+                        <i class="fas fa-building text-cyan-400"></i>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium text-white">智慧建筑</div>
+                        <div class="text-xs text-slate-400 mt-1" id="stat-sb">10个系统</div>
+                    </div>
+                </div>
+                <div class="group-stat-card group-se" onclick="filterByGroup('SE')" id="card-se">
+                    <div class="group-icon-wrapper" style="background: rgba(245, 158, 11, 0.2);">
+                        <i class="fas fa-bolt text-amber-400"></i>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium text-white">智慧能源</div>
+                        <div class="text-xs text-slate-400 mt-1" id="stat-se">5个系统</div>
+                    </div>
+                </div>
+                <div class="group-stat-card group-sf" onclick="filterByGroup('SF')" id="card-sf">
+                    <div class="group-icon-wrapper" style="background: rgba(239, 68, 68, 0.2);">
+                        <i class="fas fa-fire-extinguisher text-rose-400"></i>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium text-white">消防安全</div>
+                        <div class="text-xs text-slate-400 mt-1" id="stat-sf">6个系统</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 标签页：编码字典 -->
+            <div class="mb-4 border-b border-slate-700/30">
+                <button class="tab-btn active" onclick="switchTab('region-codes')">📌 区域码表</button>
+                <button class="tab-btn" onclick="switchTab('system-codes')">🔧 系统码表</button>
+                <button class="tab-btn" onclick="switchTab('pointtype-codes')">📍 点位类型码表</button>
+                <button class="tab-btn" onclick="switchTab('model-codes')">📱 设备型号码表</button>
+                <button class="tab-btn" onclick="switchTab('group-codes')">📊 专业分组码表</button>
+            </div>
+
+            <!-- 区域码表 -->
+            <div id="region-codes" class="tab-content active">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="font-semibold text-white">📌 区域码表</h3>
+                        <p class="text-xs text-slate-500 mt-1">符合IBMS规范：B01(地下一层)、F01(地上1层)、PK(停车场)等</p>
+                    </div>
+                    <button onclick="openDictModal('region')" class="btn-primary px-3 py-1.5 rounded-lg text-sm">
+                        <i class="fas fa-plus mr-1"></i>新增区域码
+                    </button>
+                </div>
+                <div class="mb-3">
+                    <input type="text" id="search-region" placeholder="搜索区域码..." class="search-input rounded-lg px-3 py-1.5 text-sm w-64" oninput="searchDict('region')">
+                </div>
+                <div class="dict-grid" id="region-codes-grid"></div>
+            </div>
+
+            <!-- 系统码表 -->
+            <div id="system-codes" class="tab-content">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="font-semibold text-white">🔧 系统码表</h3>
+                        <p class="text-xs text-slate-500 mt-1">IBMS标准13个系统：VI(视频监控)、AC(门禁)、BA(楼控)等</p>
+                    </div>
+                    <button onclick="openDictModal('system')" class="btn-primary px-3 py-1.5 rounded-lg text-sm">
+                        <i class="fas fa-plus mr-1"></i>新增系统码
+                    </button>
+                </div>
+                <div class="mb-3">
+                    <input type="text" id="search-system" placeholder="搜索系统码..." class="search-input rounded-lg px-3 py-1.5 text-sm w-64" oninput="searchDict('system')">
+                </div>
+                <div class="dict-grid" id="system-codes-grid"></div>
+            </div>
+
+            <!-- 点位类型码表 -->
+            <div id="pointtype-codes" class="tab-content">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="font-semibold text-white">📍 点位类型码表</h3>
+                        <p class="text-xs text-slate-500 mt-1">IBMS标准16种点位类型：VT(视频通道)、DR(门禁点)、AI(模拟输入)等</p>
+                    </div>
+                    <button onclick="openDictModal('pointtype')" class="btn-primary px-3 py-1.5 rounded-lg text-sm">
+                        <i class="fas fa-plus mr-1"></i>新增点位类型
+                    </button>
+                </div>
+                <div class="mb-3">
+                    <input type="text" id="search-pointtype" placeholder="搜索点位类型..." class="search-input rounded-lg px-3 py-1.5 text-sm w-64" oninput="searchDict('pointtype')">
+                </div>
+                <div class="dict-grid" id="pointtype-codes-grid"></div>
+            </div>
+
+            <!-- 设备型号码表 -->
+            <div id="model-codes" class="tab-content">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="font-semibold text-white">📱 设备型号码表</h3>
+                        <p class="text-xs text-slate-500 mt-1">扩展字段：DS(枪机)、DP(球机)、CR(读卡器)等</p>
+                    </div>
+                    <button onclick="openDictModal('model')" class="btn-primary px-3 py-1.5 rounded-lg text-sm">
+                        <i class="fas fa-plus mr-1"></i>新增型号码
+                    </button>
+                </div>
+                <div class="mb-3">
+                    <input type="text" id="search-model" placeholder="搜索型号码..." class="search-input rounded-lg px-3 py-1.5 text-sm w-64" oninput="searchDict('model')">
+                </div>
+                <div class="dict-grid" id="model-codes-grid"></div>
+            </div>
+
+            <!-- 专业分组码表 -->
+            <div id="group-codes" class="tab-content">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="font-semibold text-white">📊 专业分组码表</h3>
+                        <p class="text-xs text-slate-500 mt-1">业务分组：SA(智慧安防)、ST(智慧通行)、SB(智慧建筑)等</p>
+                    </div>
+                    <button onclick="openDictModal('group')" class="btn-primary px-3 py-1.5 rounded-lg text-sm">
+                        <i class="fas fa-plus mr-1"></i>新增分组
+                    </button>
+                </div>
+                <div class="mb-3">
+                    <input type="text" id="search-group" placeholder="搜索分组..." class="search-input rounded-lg px-3 py-1.5 text-sm w-64" oninput="searchDict('group')">
+                </div>
+                <div class="dict-grid" id="group-codes-grid"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 字典编辑模态框 - 修改为深色底色 -->
+    <div id="modal-dict" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50">
+        <div class="glass-panel rounded-xl w-full max-w-lg modal-enter">
+            <div class="p-6 border-b border-slate-700/30 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white" id="dict-modal-title">新增字典项</h3>
+                <button onclick="closeModal('modal-dict')" class="text-slate-400 hover:text-white">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="form-label">字典类型</label>
+                    <input type="text" id="dict-type-display" class="form-input" readonly>
+                </div>
+                <div>
+                    <label class="form-label">编码 <span class="text-xs text-red-400">*</span></label>
+                    <input type="text" id="dict-code" class="form-input" placeholder="如: F01, VI, VT, DS, SA" maxlength="6">
+                </div>
+                <div>
+                    <label class="form-label">名称 <span class="text-xs text-red-400">*</span></label>
+                    <input type="text" id="dict-name" class="form-input" placeholder="如: 1楼, 视频监控, 视频通道, 枪机">
+                </div>
+                <div id="dict-group-field" class="hidden">
+                    <label class="form-label">所属分组 <span class="text-xs text-red-400">*</span></label>
+                    <select id="dict-group" class="form-input">
+                        <option value="SA">SA - 智慧安防</option>
+                        <option value="ST">ST - 智慧通行</option>
+                        <option value="SB">SB - 智慧建筑</option>
+                        <option value="SE">SE - 智慧能源</option>
+                        <option value="SF">SF - 消防安全</option>
+                    </select>
+                </div>
+                <div id="dict-system-field" class="hidden">
+                    <label class="form-label">所属系统 <span class="text-xs text-red-400">*</span></label>
+                    <select id="dict-system" class="form-input">
+                        <!-- 动态生成 -->
+                    </select>
+                </div>
+                <div id="dict-datatype-field" class="hidden">
+                    <label class="form-label">数据类型</label>
+                    <input type="text" id="dict-datatype" class="form-input" placeholder="如: DI, AI, DO, AO, 视频流">
+                </div>
+                <div>
+                    <label class="form-label">描述</label>
+                    <textarea id="dict-desc" rows="2" class="form-input" placeholder="请输入描述..."></textarea>
+                </div>
+            </div>
+            <div class="p-6 border-t border-slate-700/30 flex justify-end gap-3">
+                <button onclick="closeModal('modal-dict')" class="px-4 py-2 glass-card rounded-lg text-slate-300 hover:text-white">取消</button>
+                <button onclick="saveDict()" class="btn-primary px-4 py-2 rounded-lg text-white">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除确认模态框 -->
+    <div id="modal-delete" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50">
+        <div class="glass-panel rounded-xl w-full max-w-md modal-enter">
+            <div class="p-6 border-b border-slate-700/30 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white">确认删除</h3>
+                <button onclick="closeModal('modal-delete')" class="text-slate-400 hover:text-white">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <p class="text-slate-300">确定要删除 <span id="delete-item-name" class="font-bold text-white"></span> 吗？</p>
+                <p class="text-xs text-slate-500 mt-2">此操作不可恢复，请谨慎操作。</p>
+            </div>
+            <div class="p-6 border-t border-slate-700/30 flex justify-end gap-3">
+                <button onclick="closeModal('modal-delete')" class="px-4 py-2 glass-card rounded-lg text-slate-300 hover:text-white">取消</button>
+                <button onclick="confirmDelete()" class="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导入模态框 -->
+    <div id="modal-import" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50">
+        <div class="glass-panel rounded-xl w-full max-w-md modal-enter">
+            <div class="p-6 border-b border-slate-700/30 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white">导入数据</h3>
+                <button onclick="closeModal('modal-import')" class="text-slate-400 hover:text-white">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <p class="text-sm text-slate-300 mb-4">请选择要导入的JSON文件</p>
+                <input type="file" id="import-file" accept=".json" class="form-input">
+                <p class="text-xs text-slate-500 mt-2">支持JSON格式，将覆盖现有数据</p>
+            </div>
+            <div class="p-6 border-t border-slate-700/30 flex justify-end gap-3">
+                <button onclick="closeModal('modal-import')" class="px-4 py-2 glass-card rounded-lg text-slate-300 hover:text-white">取消</button>
+                <button onclick="importData()" class="btn-primary px-4 py-2 rounded-lg text-white">导入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <script>
+        // ==================== IBMS标准数据字典 ====================
+        let dictionaries = {
+            // 区域码表
+            regions: {
+                floors: [
+                    { code: 'F01', name: '地上1层', type: 'floor', desc: '大堂/商铺' },
+                    { code: 'F02', name: '地上2层', type: 'floor', desc: '办公室/会议室' },
+                    { code: 'F03', name: '地上3层', type: 'floor', desc: '办公室/会议室' },
+                    { code: 'F04', name: '地上4层', type: 'floor', desc: '办公室/会议室' },
+                    { code: 'F05', name: '地上5层', type: 'floor', desc: '办公室/会议室' },
+                    { code: 'F06', name: '6-10层', type: 'floor', desc: '标准层' },
+                    { code: 'F11', name: '11-20层', type: 'floor', desc: '标准层' },
+                    { code: 'F21', name: '21-30层', type: 'floor', desc: '标准层' },
+                    { code: 'F31', name: '31-40层', type: 'floor', desc: '标准层' },
+                    { code: 'B01', name: '地下1层', type: 'floor', desc: '停车场/设备房' },
+                    { code: 'B02', name: '地下2层', type: 'floor', desc: '停车场/设备房' },
+                    { code: 'B03', name: '地下3层', type: 'floor', desc: '停车场/设备房' }
+                ],
+                areas: [
+                    { code: 'PK', name: '停车场', type: 'area', desc: '车库区域' },
+                    { code: 'LB', name: '大堂', type: 'area', desc: '建筑大堂' },
+                    { code: 'FM', name: '机房', type: 'area', desc: '设备机房' },
+                    { code: 'RO', name: '屋面', type: 'area', desc: '屋顶区域' },
+                    { code: 'OUT', name: '室外', type: 'area', desc: '园区/周界' },
+                    { code: 'AT', name: '附属楼', type: 'area', desc: '辅助建筑' }
+                ]
+            },
+
+            // 专业分组字典
+            groups: [
+                { code: 'SA', name: '智慧安防', icon: 'fa-shield-alt', color: 'blue', desc: '视频监控、入侵报警、电子巡更', systemCount: 12 },
+                { code: 'ST', name: '智慧通行', icon: 'fa-door-open', color: 'purple', desc: '门禁、停车场、对讲', systemCount: 8 },
+                { code: 'SB', name: '智慧建筑', icon: 'fa-building', color: 'cyan', desc: '楼宇自控、照明、电梯', systemCount: 10 },
+                { code: 'SE', name: '智慧能源', icon: 'fa-bolt', color: 'amber', desc: '电力监测、能源管理', systemCount: 5 },
+                { code: 'SF', name: '消防安全', icon: 'fa-fire-extinguisher', color: 'rose', desc: '火灾报警、广播', systemCount: 6 }
+            ],
+
+            // 系统码表
+            systems: [
+                { code: 'VI', name: '视频监控', group: 'SA', desc: '摄像机/NVR/DVR' },
+                { code: 'AC', name: '门禁系统', group: 'ST', desc: '门禁控制器/读卡器' },
+                { code: 'AL', name: '防盗报警', group: 'SA', desc: '报警主机/探测器' },
+                { code: 'BA', name: '楼宇自控', group: 'SB', desc: 'DDC/传感器/执行器' },
+                { code: 'FD', name: '火灾报警', group: 'SF', desc: '火灾报警主机/探测器' },
+                { code: 'LI', name: '智能照明', group: 'SB', desc: '照明控制箱/灯具' },
+                { code: 'EP', name: '变配电', group: 'SE', desc: '电力仪表/断路器' },
+                { code: 'IC', name: '智能对讲', group: 'ST', desc: '门口机/管理机' },
+                { code: 'EL', name: '电梯控制', group: 'SB', desc: '电梯主控器' },
+                { code: 'EN', name: '能源管理', group: 'SE', desc: '电能表/能耗监测' },
+                { code: 'PA', name: '公共广播', group: 'SF', desc: '功放/喇叭' },
+                { code: 'CA', name: '停车场', group: 'ST', desc: '道闸/摄像机/检测器' },
+                { code: 'GR', name: '巡更系统', group: 'SA', desc: '巡更棒/巡更点' }
+            ],
+
+            // 点位类型码表
+            pointTypes: [
+                { code: 'VT', name: '视频通道', dataType: '视频流', desc: '一路摄像机' },
+                { code: 'AI', name: '报警输入', dataType: 'DI', desc: '开关量输入' },
+                { code: 'AO', name: '报警输出', dataType: 'DO', desc: '继电器输出' },
+                { code: 'DR', name: '门禁点', dataType: '逻辑点', desc: '一扇门' },
+                { code: 'DI', name: '数字输入', dataType: 'DI', desc: '状态信号' },
+                { code: 'DO', name: '数字输出', dataType: 'DO', desc: '控制信号' },
+                { code: 'AI', name: '模拟输入', dataType: 'AI', desc: '连续量采集' },
+                { code: 'AO', name: '模拟输出', dataType: 'AO', desc: '连续量控制' },
+                { code: 'IT', name: '对讲终端', dataType: '音视频', desc: '门口机/分机' },
+                { code: 'FP', name: '消防点位', dataType: '火警/故障', desc: '探测器/模块' },
+                { code: 'LT', name: '照明回路', dataType: 'DO/AO', desc: '回路/调光' },
+                { code: 'PM', name: '电能监测', dataType: 'AI', desc: '电能计量' },
+                { code: 'EC', name: '电梯通道', dataType: 'DI/AI', desc: '状态/报警' },
+                { code: 'BC', name: '广播通道', dataType: '音频', desc: '广播分区' },
+                { code: 'GP', name: '巡更点', dataType: 'DI', desc: '巡更签到点' },
+                { code: 'CP', name: '停车场点', dataType: 'DI/DO/AI', desc: '车道/车位' }
+            ],
+
+            // 设备型号码表
+            models: [
+                { code: 'DS', name: '枪机', system: 'VI', desc: '枪式摄像机' },
+                { code: 'DP', name: '球机', system: 'VI', desc: '球型摄像机' },
+                { code: 'HP', name: '半球摄像机', system: 'VI', desc: '吸顶安装' },
+                { code: 'NV', name: 'NVR', system: 'VI', desc: '网络录像机' },
+                { code: 'CR', name: 'IC卡读卡器', system: 'AC', desc: '读取M1/CPU卡' },
+                { code: 'FR', name: '指纹读卡器', system: 'AC', desc: '指纹识别' },
+                { code: 'LR', name: '人脸识别终端', system: 'AC', desc: '人脸识别' },
+                { code: 'CC', name: '单门控制器', system: 'AC', desc: '控制1道门' },
+                { code: 'DC', name: '双门控制器', system: 'AC', desc: '控制2道门' },
+                { code: 'TS', name: '房间温控器', system: 'BA', desc: '温度设定控制' },
+                { code: 'DD', name: 'DDC控制器', system: 'BA', desc: '可编程控制器' }
+            ]
+        };
+
+        // ==================== 全局变量 ====================
+        let currentTab = 'region-codes';
+        let currentEditDict = null;
+        let currentDeleteItem = null;
+        let currentGroupFilter = null;
+        let searchTerms = {
+            region: '',
+            system: '',
+            pointtype: '',
+            model: '',
+            group: ''
+        };
+
+        // ==================== 初始化 ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            renderAllDicts();
+            updateGroupStats();
+        });
+
+        // ==================== 更新分组统计 ====================
+        function updateGroupStats() {
+            const groupCounts = {
+                SA: dictionaries.systems.filter(s => s.group === 'SA').length,
+                ST: dictionaries.systems.filter(s => s.group === 'ST').length,
+                SB: dictionaries.systems.filter(s => s.group === 'SB').length,
+                SE: dictionaries.systems.filter(s => s.group === 'SE').length,
+                SF: dictionaries.systems.filter(s => s.group === 'SF').length
+            };
+
+            document.getElementById('stat-sa').textContent = `${groupCounts.SA}个系统`;
+            document.getElementById('stat-st').textContent = `${groupCounts.ST}个系统`;
+            document.getElementById('stat-sb').textContent = `${groupCounts.SB}个系统`;
+            document.getElementById('stat-se').textContent = `${groupCounts.SE}个系统`;
+            document.getElementById('stat-sf').textContent = `${groupCounts.SF}个系统`;
+        }
+
+        // ==================== 字典渲染 ====================
+        function renderAllDicts() {
+            renderRegionDict();
+            renderSystemDict();
+            renderPointTypeDict();
+            renderModelDict();
+            renderGroupDict();
+        }
+
+        function renderRegionDict() {
+            const container = document.getElementById('region-codes-grid');
+            const searchTerm = searchTerms.region.toLowerCase();
+            let html = '';
+
+            // 渲染楼层区域
+            dictionaries.regions.floors
+                .filter(item => item.code.toLowerCase().includes(searchTerm) || item.name.toLowerCase().includes(searchTerm))
+                .forEach(item => {
+                    html += renderDictCard('region-floor', item, 'blue', '楼层');
+                });
+
+            // 渲染子区域
+            dictionaries.regions.areas
+                .filter(item => item.code.toLowerCase().includes(searchTerm) || item.name.toLowerCase().includes(searchTerm))
+                .forEach(item => {
+                    html += renderDictCard('region-area', item, 'emerald', '区域');
+                });
+
+            container.innerHTML = html || '<div class="col-span-full text-center text-slate-500 py-8">暂无数据</div>';
+        }
+
+        function renderDictCard(type, item, color, typeLabel) {
+            return `
+            <div class="dict-card" data-code="${item.code}">
+                <div class="card-actions">
+                    <button class="action-btn" onclick="editDictItem('${type}', '${item.code}')" title="编辑">
+                        <i class="fas fa-edit text-xs"></i>
+                    </button>
+                    <button class="action-btn delete" onclick="deleteDictItem('${type}', '${item.code}', '${item.name}')" title="删除">
+                        <i class="fas fa-trash text-xs"></i>
+                    </button>
+                </div>
+                <div class="flex items-start justify-between">
+                    <div>
+                        <span class="font-mono font-bold text-${color}-400 text-lg">${item.code}</span>
+                        <span class="ml-2 text-sm text-white">${item.name}</span>
+                    </div>
+                </div>
+                <div class="text-xs text-slate-500 mt-2">${item.desc || ''}</div>
+                <div class="mt-3 flex items-center justify-between">
+                    <span class="text-xs text-slate-400">${typeLabel}</span>
+                    <span class="text-xs text-slate-400">区域码</span>
+                </div>
+            </div>
+        `;
+        }
+
+        function renderSystemDict() {
+            const container = document.getElementById('system-codes-grid');
+            const searchTerm = searchTerms.system.toLowerCase();
+            
+            container.innerHTML = dictionaries.systems
+                .filter(item => item.code.toLowerCase().includes(searchTerm) || item.name.toLowerCase().includes(searchTerm))
+                .map(item => {
+                    const group = dictionaries.groups.find(g => g.code === item.group);
+                    return `
+                    <div class="dict-card" data-code="${item.code}">
+                        <div class="card-actions">
+                            <button class="action-btn" onclick="editDictItem('system', '${item.code}')" title="编辑">
+                                <i class="fas fa-edit text-xs"></i>
+                            </button>
+                            <button class="action-btn delete" onclick="deleteDictItem('system', '${item.code}', '${item.name}')" title="删除">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <span class="font-mono font-bold text-purple-400 text-lg">${item.code}</span>
+                                <span class="ml-2 text-sm text-white">${item.name}</span>
+                            </div>
+                        </div>
+                        <div class="text-xs text-slate-500 mt-2">${item.desc || ''}</div>
+                        <div class="mt-3 flex items-center justify-between">
+                            <span class="group-badge group-${item.group.toLowerCase()} text-xs">${group?.name || item.group}</span>
+                            <span class="text-xs text-slate-400">系统码</span>
+                        </div>
+                    </div>
+                `}).join('') || '<div class="col-span-full text-center text-slate-500 py-8">暂无数据</div>';
+        }
+
+        function renderPointTypeDict() {
+            const container = document.getElementById('pointtype-codes-grid');
+            const searchTerm = searchTerms.pointtype.toLowerCase();
+            
+            container.innerHTML = dictionaries.pointTypes
+                .filter(item => item.code.toLowerCase().includes(searchTerm) || item.name.toLowerCase().includes(searchTerm))
+                .map(item => `
+                <div class="dict-card" data-code="${item.code}">
+                    <div class="card-actions">
+                        <button class="action-btn" onclick="editDictItem('pointtype', '${item.code}')" title="编辑">
+                            <i class="fas fa-edit text-xs"></i>
+                        </button>
+                        <button class="action-btn delete" onclick="deleteDictItem('pointtype', '${item.code}', '${item.name}')" title="删除">
+                            <i class="fas fa-trash text-xs"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <span class="font-mono font-bold text-rose-400 text-lg">${item.code}</span>
+                            <span class="ml-2 text-sm text-white">${item.name}</span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500 mt-2">${item.desc || ''}</div>
+                    <div class="mt-3 flex items-center justify-between">
+                        <span class="text-xs text-slate-400">数据类型: ${item.dataType}</span>
+                        <span class="text-xs text-slate-400">点位类型</span>
+                    </div>
+                </div>
+            `).join('') || '<div class="col-span-full text-center text-slate-500 py-8">暂无数据</div>';
+        }
+
+        function renderModelDict() {
+            const container = document.getElementById('model-codes-grid');
+            const searchTerm = searchTerms.model.toLowerCase();
+            
+            container.innerHTML = dictionaries.models
+                .filter(item => item.code.toLowerCase().includes(searchTerm) || item.name.toLowerCase().includes(searchTerm))
+                .map(item => {
+                    const system = dictionaries.systems.find(s => s.code === item.system);
+                    return `
+                    <div class="dict-card" data-code="${item.code}">
+                        <div class="card-actions">
+                            <button class="action-btn" onclick="editDictItem('model', '${item.code}')" title="编辑">
+                                <i class="fas fa-edit text-xs"></i>
+                            </button>
+                            <button class="action-btn delete" onclick="deleteDictItem('model', '${item.code}', '${item.name}')" title="删除">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <span class="font-mono font-bold text-emerald-400 text-lg">${item.code}</span>
+                                <span class="ml-2 text-sm text-white">${item.name}</span>
+                            </div>
+                        </div>
+                        <div class="text-xs text-slate-500 mt-2">${item.desc || ''}</div>
+                        <div class="mt-3 flex items-center justify-between">
+                            <span class="text-xs text-slate-400">${system?.name || item.system}</span>
+                            <span class="text-xs text-slate-400">型号码</span>
+                        </div>
+                    </div>
+                `}).join('') || '<div class="col-span-full text-center text-slate-500 py-8">暂无数据</div>';
+        }
+
+        function renderGroupDict() {
+            const container = document.getElementById('group-codes-grid');
+            const searchTerm = searchTerms.group.toLowerCase();
+            
+            container.innerHTML = dictionaries.groups
+                .filter(item => item.code.toLowerCase().includes(searchTerm) || item.name.toLowerCase().includes(searchTerm))
+                .map(item => `
+                <div class="dict-card" data-code="${item.code}">
+                    <div class="card-actions">
+                        <button class="action-btn" onclick="editDictItem('group', '${item.code}')" title="编辑">
+                            <i class="fas fa-edit text-xs"></i>
+                        </button>
+                        <button class="action-btn delete" onclick="deleteDictItem('group', '${item.code}', '${item.name}')" title="删除">
+                            <i class="fas fa-trash text-xs"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <span class="font-mono font-bold text-white text-lg">${item.code}</span>
+                            <span class="ml-2 text-sm text-white">${item.name}</span>
+                        </div>
+                        <i class="fas ${item.icon} text-${item.color}-400 text-xl"></i>
+                    </div>
+                    <div class="text-xs text-slate-500 mt-2">${item.desc || ''}</div>
+                    <div class="mt-3 flex items-center justify-between">
+                        <span class="group-badge group-${item.code.toLowerCase()} text-xs">${item.name}</span>
+                        <span class="text-xs text-slate-400">${item.systemCount || 0}个系统</span>
+                    </div>
+                </div>
+            `).join('') || '<div class="col-span-full text-center text-slate-500 py-8">暂无数据</div>';
+        }
+
+        // ==================== 搜索功能 ====================
+        function searchDict(type) {
+            const searchInput = document.getElementById(`search-${type}`);
+            searchTerms[type] = searchInput.value;
+            
+            switch(type) {
+                case 'region': renderRegionDict(); break;
+                case 'system': renderSystemDict(); break;
+                case 'pointtype': renderPointTypeDict(); break;
+                case 'model': renderModelDict(); break;
+                case 'group': renderGroupDict(); break;
+            }
+        }
+
+        // ==================== 分组过滤 ====================
+        function filterByGroup(groupCode) {
+            // 移除其他卡片的选中状态
+            document.querySelectorAll('.group-stat-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+
+            if (currentGroupFilter === groupCode) {
+                currentGroupFilter = null;
+            } else {
+                document.getElementById(`card-${groupCode.toLowerCase()}`).classList.add('selected');
+                currentGroupFilter = groupCode;
+                switchTab('system-codes');
+                // 触发系统码表刷新并过滤
+                setTimeout(() => {
+                    searchTerms.system = '';
+                    document.getElementById('search-system').value = '';
+                    renderSystemDict();
+                }, 100);
+            }
+        }
+
+        // ==================== 字典编辑功能 ====================
+        function openDictModal(type) {
+            currentEditDict = null;
+            document.getElementById('dict-modal-title').textContent = `新增${getDictTypeName(type)}`;
+            document.getElementById('dict-type-display').value = getDictTypeName(type);
+            document.getElementById('dict-code').value = '';
+            document.getElementById('dict-name').value = '';
+            document.getElementById('dict-desc').value = '';
+
+            // 隐藏所有条件字段
+            document.getElementById('dict-group-field').classList.add('hidden');
+            document.getElementById('dict-system-field').classList.add('hidden');
+            document.getElementById('dict-datatype-field').classList.add('hidden');
+
+            if (type === 'system') {
+                document.getElementById('dict-group-field').classList.remove('hidden');
+                const groupSelect = document.getElementById('dict-group');
+                groupSelect.innerHTML = dictionaries.groups.map(g => 
+                    `<option value="${g.code}">${g.code} - ${g.name}</option>`
+                ).join('');
+            } else if (type === 'pointtype') {
+                document.getElementById('dict-datatype-field').classList.remove('hidden');
+            } else if (type === 'model') {
+                document.getElementById('dict-system-field').classList.remove('hidden');
+                const systemSelect = document.getElementById('dict-system');
+                systemSelect.innerHTML = dictionaries.systems.map(s => 
+                    `<option value="${s.code}">${s.code} - ${s.name}</option>`
+                ).join('');
+            }
+
+            openModal('modal-dict');
+        }
+
+        function editDictItem(type, code) {
+            currentEditDict = { type, code };
+            let item = null;
+
+            // 根据类型查找对应字典项
+            if (type === 'region-floor') {
+                item = dictionaries.regions.floors.find(i => i.code === code);
+            } else if (type === 'region-area') {
+                item = dictionaries.regions.areas.find(i => i.code === code);
+            } else if (type === 'system') {
+                item = dictionaries.systems.find(i => i.code === code);
+            } else if (type === 'pointtype') {
+                item = dictionaries.pointTypes.find(i => i.code === code);
+            } else if (type === 'model') {
+                item = dictionaries.models.find(i => i.code === code);
+            } else if (type === 'group') {
+                item = dictionaries.groups.find(i => i.code === code);
+            }
+
+            if (!item) return;
+
+            document.getElementById('dict-modal-title').textContent = `编辑${getDictTypeName(type)}`;
+            document.getElementById('dict-type-display').value = getDictTypeName(type);
+            document.getElementById('dict-code').value = item.code;
+            document.getElementById('dict-name').value = item.name;
+            document.getElementById('dict-desc').value = item.desc || '';
+
+            // 隐藏所有条件字段
+            document.getElementById('dict-group-field').classList.add('hidden');
+            document.getElementById('dict-system-field').classList.add('hidden');
+            document.getElementById('dict-datatype-field').classList.add('hidden');
+
+            if (type === 'system') {
+                document.getElementById('dict-group-field').classList.remove('hidden');
+                const groupSelect = document.getElementById('dict-group');
+                groupSelect.innerHTML = dictionaries.groups.map(g => 
+                    `<option value="${g.code}" ${g.code === item.group ? 'selected' : ''}>${g.code} - ${g.name}</option>`
+                ).join('');
+            } else if (type === 'pointtype') {
+                document.getElementById('dict-datatype-field').classList.remove('hidden');
+                document.getElementById('dict-datatype').value = item.dataType || '';
+            } else if (type === 'model') {
+                document.getElementById('dict-system-field').classList.remove('hidden');
+                const systemSelect = document.getElementById('dict-system');
+                systemSelect.innerHTML = dictionaries.systems.map(s => 
+                    `<option value="${s.code}" ${s.code === item.system ? 'selected' : ''}>${s.code} - ${s.name}</option>`
+                ).join('');
+            }
+
+            openModal('modal-dict');
+        }
+
+        function saveDict() {
+            const type = document.getElementById('dict-type-display').value;
+            const code = document.getElementById('dict-code').value;
+            const name = document.getElementById('dict-name').value;
+            const desc = document.getElementById('dict-desc').value;
+
+            if (!code || !name) {
+                showToast('请填写编码和名称', 'error');
+                return;
+            }
+
+            // 编码格式验证
+            if (type.includes('区域') && !/^[A-Z0-9]{2,3}$/.test(code)) {
+                showToast('区域码应为2-3位大写字母或数字', 'error');
+                return;
+            }
+            if (type.includes('系统') && !/^[A-Z]{2}$/.test(code)) {
+                showToast('系统码应为2位大写字母', 'error');
+                return;
+            }
+            if (type.includes('点位') && !/^[A-Z]{2}$/.test(code)) {
+                showToast('点位类型码应为2位大写字母', 'error');
+                return;
+            }
+
+            if (currentEditDict) {
+                // 更新现有字典项
+                const { type: itemType, code: oldCode } = currentEditDict;
+                
+                if (itemType === 'region-floor') {
+                    const index = dictionaries.regions.floors.findIndex(i => i.code === oldCode);
+                    if (index !== -1) {
+                        dictionaries.regions.floors[index] = { 
+                            ...dictionaries.regions.floors[index], 
+                            code, name, desc,
+                            type: 'floor'
+                        };
+                    }
+                } else if (itemType === 'region-area') {
+                    const index = dictionaries.regions.areas.findIndex(i => i.code === oldCode);
+                    if (index !== -1) {
+                        dictionaries.regions.areas[index] = { 
+                            ...dictionaries.regions.areas[index], 
+                            code, name, desc,
+                            type: 'area'
+                        };
+                    }
+                } else if (itemType === 'system') {
+                    const group = document.getElementById('dict-group').value;
+                    const index = dictionaries.systems.findIndex(i => i.code === oldCode);
+                    if (index !== -1) {
+                        dictionaries.systems[index] = { 
+                            ...dictionaries.systems[index], 
+                            code, name, desc, group 
+                        };
+                    }
+                } else if (itemType === 'pointtype') {
+                    const dataType = document.getElementById('dict-datatype').value;
+                    const index = dictionaries.pointTypes.findIndex(i => i.code === oldCode);
+                    if (index !== -1) {
+                        dictionaries.pointTypes[index] = { 
+                            ...dictionaries.pointTypes[index], 
+                            code, name, desc, dataType 
+                        };
+                    }
+                } else if (itemType === 'model') {
+                    const system = document.getElementById('dict-system').value;
+                    const index = dictionaries.models.findIndex(i => i.code === oldCode);
+                    if (index !== -1) {
+                        dictionaries.models[index] = { 
+                            ...dictionaries.models[index], 
+                            code, name, desc, system 
+                        };
+                    }
+                } else if (itemType === 'group') {
+                    const index = dictionaries.groups.findIndex(i => i.code === oldCode);
+                    if (index !== -1) {
+                        dictionaries.groups[index] = { 
+                            ...dictionaries.groups[index], 
+                            code, name, desc 
+                        };
+                    }
+                }
+
+                showToast('更新成功', 'success');
+            } else {
+                // 新增字典项
+                const newItem = { code, name, desc };
+                
+                if (type.includes('区域')) {
+                    if (code.match(/^F\d{2}$|^B\d{2}$|^ROOF$|^OUT$/)) {
+                        dictionaries.regions.floors.push({ ...newItem, type: 'floor' });
+                    } else {
+                        dictionaries.regions.areas.push({ ...newItem, type: 'area' });
+                    }
+                } else if (type.includes('系统')) {
+                    const group = document.getElementById('dict-group').value;
+                    dictionaries.systems.push({ ...newItem, group });
+                } else if (type.includes('点位')) {
+                    const dataType = document.getElementById('dict-datatype').value;
+                    dictionaries.pointTypes.push({ ...newItem, dataType });
+                } else if (type.includes('型号')) {
+                    const system = document.getElementById('dict-system').value;
+                    dictionaries.models.push({ ...newItem, system });
+                } else if (type.includes('分组')) {
+                    dictionaries.groups.push({ 
+                        ...newItem, 
+                        icon: 'fa-tag', 
+                        color: 'blue',
+                        systemCount: 0
+                    });
+                }
+
+                showToast('添加成功', 'success');
+            }
+
+            closeModal('modal-dict');
+            renderAllDicts();
+            updateGroupStats();
+        }
+
+        function deleteDictItem(type, code, name) {
+            currentDeleteItem = { type, code, name };
+            document.getElementById('delete-item-name').textContent = name;
+            openModal('modal-delete');
+        }
+
+        function confirmDelete() {
+            if (!currentDeleteItem) return;
+
+            const { type, code } = currentDeleteItem;
+
+            if (type === 'region-floor') {
+                dictionaries.regions.floors = dictionaries.regions.floors.filter(i => i.code !== code);
+            } else if (type === 'region-area') {
+                dictionaries.regions.areas = dictionaries.regions.areas.filter(i => i.code !== code);
+            } else if (type === 'system') {
+                dictionaries.systems = dictionaries.systems.filter(i => i.code !== code);
+            } else if (type === 'pointtype') {
+                dictionaries.pointTypes = dictionaries.pointTypes.filter(i => i.code !== code);
+            } else if (type === 'model') {
+                dictionaries.models = dictionaries.models.filter(i => i.code !== code);
+            } else if (type === 'group') {
+                dictionaries.groups = dictionaries.groups.filter(i => i.code !== code);
+            }
+
+            closeModal('modal-delete');
+            renderAllDicts();
+            updateGroupStats();
+            showToast('删除成功', 'success');
+        }
+
+        // ==================== 导入导出功能 ====================
+        function openImportModal() {
+            document.getElementById('import-file').value = '';
+            openModal('modal-import');
+        }
+
+        function importData() {
+            const file = document.getElementById('import-file').files[0];
+            if (!file) {
+                showToast('请选择文件', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    dictionaries = data;
+                    renderAllDicts();
+                    updateGroupStats();
+                    closeModal('modal-import');
+                    showToast('导入成功', 'success');
+                } catch (error) {
+                    showToast('文件格式错误', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function exportData() {
+            const dataStr = JSON.stringify(dictionaries, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ibms-codes-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('导出成功', 'success');
+        }
+
+        // ==================== 通用函数 ====================
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+            currentTab = tabId;
+        }
+
+        function getDictTypeName(type) {
+            const names = {
+                'region': '区域码',
+                'region-floor': '区域码-楼层',
+                'region-area': '区域码-子区域',
+                'system': '系统码',
+                'pointtype': '点位类型码',
+                'model': '设备型号码',
+                'group': '专业分组码'
+            };
+            return names[type] || type;
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+            document.getElementById(modalId).classList.add('flex');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+            document.getElementById(modalId).classList.remove('flex');
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const types = {
+                success: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                error: 'bg-red-500/20 text-red-400 border-red-500/30',
+                info: 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `flex items-center gap-3 px-4 py-3 rounded-lg border ${types[type]} glass-panel animate-fadeIn`;
+            toast.innerHTML = `
+                <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
+                <span class="text-sm">${message}</span>
+            `;
+
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // 导出全局函数
+        window.switchTab = switchTab;
+        window.openDictModal = openDictModal;
+        window.editDictItem = editDictItem;
+        window.deleteDictItem = deleteDictItem;
+        window.confirmDelete = confirmDelete;
+        window.saveDict = saveDict;
+        window.searchDict = searchDict;
+        window.filterByGroup = filterByGroup;
+        window.openImportModal = openImportModal;
+        window.exportData = exportData;
+        window.importData = importData;
+        window.closeModal = closeModal;
+    </script>
+</body>
+</html>
