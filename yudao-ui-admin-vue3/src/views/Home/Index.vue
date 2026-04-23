@@ -1,34 +1,5 @@
 <template>
   <div class="ibms-screen">
-    <!-- 顶部 Header -->
-    <header class="ibms-screen__header glass-panel">
-      <div class="header-left">
-        <div class="logo-wrap">
-          <img src="@/assets/imgs/logo.png" alt="Logo" class="logo-img" />
-        </div>
-        <div class="title-wrap">
-          <h1 class="main-title">长辉科技IBMS管理平台</h1>
-          <p class="sub-title">CHANGHUI TECH IBMS MANAGEMENT SYSTEM</p>
-        </div>
-      </div>
-
-      <div class="header-right">
-        <div class="weather-info">
-          <Icon icon="ep:sunny" :size="20" color="#facc15" />
-          <div class="weather-text">
-            <div class="weather-temp"
-              >{{ weatherData.temperature }}°C {{ weatherData.description }}</div
-            >
-            <div class="weather-extra">PM2.5: {{ screenData?.buildingEnvData?.pm25 || 35 }}</div>
-          </div>
-        </div>
-        <div class="datetime-info">
-          <div class="time-text">{{ currentTime }}</div>
-          <div class="date-text">{{ currentDate }}</div>
-        </div>
-      </div>
-    </header>
-
     <!-- 主体内容 -->
     <main class="ibms-screen__main">
       <!-- 左侧：智慧安防 -->
@@ -44,127 +15,17 @@
             <Icon icon="ep:arrow-right" :size="14" class="module-arrow" />
           </div>
           <div class="panel-content">
-            <!-- 通道总览 -->
-            <div class="data-card">
-              <div class="card-header">
-                <Icon icon="mdi:rhombus" :size="12" color="#00d4ff" />
-                <span>通道总览</span>
-              </div>
-              <div class="channel-overview">
-                <div class="channel-gauge">
-                  <div ref="channelGaugeRef" class="chart-container"></div>
-                  <div class="gauge-value"
-                    >{{ screenData?.securityData?.channelOnlineRate || 0 }}%</div
-                  >
-                </div>
-                <div class="channel-stats">
-                  <div class="stat-item online">
-                    <span class="stat-label"> <span class="dot green"></span>在线数量 </span>
-                    <span class="stat-value green">{{
-                      screenData?.securityData?.channelOnline || 0
-                    }}</span>
-                  </div>
-                  <div class="stat-item offline">
-                    <span class="stat-label"> <span class="dot red"></span>离线数量 </span>
-                    <span class="stat-value red">{{
-                      screenData?.securityData?.channelOffline || 0
-                    }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 在线率统计 -->
-            <div class="data-card">
-              <div class="card-header">
-                <Icon icon="mdi:rhombus" :size="12" color="#00d4ff" />
-                <span>在线率统计</span>
-                <div class="legend">
-                  <span><span class="dot green"></span>在线</span>
-                  <span><span class="dot red"></span>离线</span>
-                </div>
-              </div>
-              <div class="rate-stat">
-                <div class="rate-header">
-                  <span>存储设备</span>
-                  <span class="rate-value"
-                    >{{ screenData?.securityData?.storageOnlineRate || 100 }}%</span
-                  >
-                </div>
-                <div class="rate-bar">
-                  <div
-                    class="rate-fill"
-                    :style="{ width: (screenData?.securityData?.storageOnlineRate || 100) + '%' }"
-                  ></div>
-                </div>
-                <div class="rate-count">
-                  <span class="green">{{ screenData?.securityData?.storageOnline || 0 }}</span>
-                  <span class="red">{{ screenData?.securityData?.storageOffline || 0 }}</span>
-                </div>
-              </div>
-              <div class="rate-stat">
-                <div class="rate-header">
-                  <span>服务器</span>
-                  <span class="rate-value muted">{{
-                    screenData?.securityData?.serverOnlineRate ?? '--'
-                  }}</span>
-                </div>
-                <div class="rate-bar">
-                  <div
-                    class="rate-fill"
-                    :style="{ width: (screenData?.securityData?.serverOnlineRate || 0) + '%' }"
-                  ></div>
-                </div>
-                <div class="rate-count">
-                  <span class="green">{{ screenData?.securityData?.serverOnline || 0 }}</span>
-                  <span class="red">{{ screenData?.securityData?.serverOffline || 0 }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- 入侵报警 -->
-            <div class="data-card">
-              <div class="card-header">
-                <Icon icon="mdi:alert-circle-outline" :size="14" />
-                <span>入侵报警</span>
-                <span v-if="screenData?.securityData?.unhandledAlarms" class="badge danger">
-                  {{ screenData.securityData.unhandledAlarms }} 条未处理
-                </span>
-              </div>
-              <div ref="alarmChartRef" class="chart-small"></div>
-              <div class="alarm-list">
-                <div
-                  v-for="(alarm, index) in screenData?.securityData?.recentAlarms || []"
-                  :key="index"
-                  class="alarm-item"
-                  :class="alarm.level"
-                >
-                  <div class="alarm-title">{{ alarm.title }}</div>
-                  <div class="alarm-meta">
-                    <span>{{ alarm.location }}</span>
-                    <span>{{ alarm.time }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 电子巡更 -->
-            <div class="data-card">
-              <div class="card-header">
-                <Icon icon="mdi:map-marker-path" :size="14" />
-                <span>电子巡更</span>
-                <span class="rate-badge">{{ screenData?.securityData?.patrolRate || 0 }}%</span>
-              </div>
-              <div class="patrol-content">
-                <div class="patrol-ring">
-                  <svg class="ring-svg" viewBox="0 0 56 56">
+            <div class="data-card security-overview">
+              <div class="security-rates">
+                <div class="rate-ring">
+                  <svg class="rate-ring__svg" viewBox="0 0 56 56">
                     <circle
                       cx="28"
                       cy="28"
                       r="24"
                       fill="none"
-                      stroke="rgba(0,212,255,0.2)"
-                      stroke-width="3"
+                      stroke="rgba(255,255,255,0.10)"
+                      stroke-width="4"
                     />
                     <circle
                       cx="28"
@@ -172,31 +33,136 @@
                       r="24"
                       fill="none"
                       stroke="#00d4ff"
-                      stroke-width="3"
+                      stroke-width="4"
                       :stroke-dasharray="150.8"
-                      :stroke-dashoffset="
-                        150.8 * (1 - (screenData?.securityData?.patrolRate || 0) / 100)
-                      "
+                      :stroke-dashoffset="150.8 * (1 - getSecurityDeviceOnlineRate() / 100)"
                       transform="rotate(-90 28 28)"
+                      stroke-linecap="round"
                     />
                   </svg>
-                  <div class="ring-text">
-                    {{ screenData?.securityData?.patrolCompleted || 0 }}/{{
-                      screenData?.securityData?.patrolTotal || 0
-                    }}
+                  <div class="rate-ring__value">{{ getSecurityDeviceOnlineRate() }}%</div>
+                  <div class="rate-ring__label">设备在线率</div>
+                </div>
+                <div class="rate-ring">
+                  <svg class="rate-ring__svg" viewBox="0 0 56 56">
+                    <circle
+                      cx="28"
+                      cy="28"
+                      r="24"
+                      fill="none"
+                      stroke="rgba(255,255,255,0.10)"
+                      stroke-width="4"
+                    />
+                    <circle
+                      cx="28"
+                      cy="28"
+                      r="24"
+                      fill="none"
+                      stroke="#52c41a"
+                      stroke-width="4"
+                      :stroke-dasharray="150.8"
+                      :stroke-dashoffset="150.8 * (1 - getSecurityChannelOnlineRate() / 100)"
+                      transform="rotate(-90 28 28)"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                  <div class="rate-ring__value green">{{ getSecurityChannelOnlineRate() }}%</div>
+                  <div class="rate-ring__label">通道在线率</div>
+                </div>
+              </div>
+
+              <div class="security-grid">
+                <div class="security-item">
+                  <div class="security-item__head">
+                    <div class="security-item__title">
+                      <Icon icon="mdi:cctv" :size="14" />
+                      <span>IPC摄像头</span>
+                    </div>
+                    <div class="security-item__total">{{ getIpcTotal() }}</div>
+                  </div>
+                  <div class="security-item__foot">
+                    <div class="security-item__status green">{{ getIpcOnline() }} 在线</div>
+                    <div class="security-item__status red">{{ getIpcOffline() }} 离线</div>
                   </div>
                 </div>
-                <div class="patrol-grid">
-                  <div class="patrol-stat green"
-                    >已完成 {{ screenData?.securityData?.patrolCompleted || 0 }}</div
-                  >
-                  <div class="patrol-stat yellow"
-                    >异常 {{ screenData?.securityData?.patrolAbnormal || 0 }}</div
-                  >
-                  <div class="patrol-stat red"
-                    >漏检 {{ screenData?.securityData?.patrolMissed || 0 }}</div
-                  >
-                  <div class="patrol-stat cyan">进行中</div>
+                <div class="security-item">
+                  <div class="security-item__head">
+                    <div class="security-item__title">
+                      <Icon icon="mdi:server" :size="14" />
+                      <span>视频服务器</span>
+                    </div>
+                    <div class="security-item__total">{{ getVideoServerTotal() }}</div>
+                  </div>
+                  <div class="security-item__foot">
+                    <div class="security-item__status green">{{ getVideoServerOnline() }} 在线</div>
+                    <div class="security-item__status red">{{ getVideoServerOffline() }} 离线</div>
+                  </div>
+                </div>
+                <div class="security-item">
+                  <div class="security-item__head">
+                    <div class="security-item__title">
+                      <Icon icon="mdi:database" :size="14" />
+                      <span>存储设备</span>
+                    </div>
+                    <div class="security-item__total">{{ getStorageTotal() }}</div>
+                  </div>
+                  <div class="security-item__foot">
+                    <div class="security-item__status green">{{ getStorageOnline() }} 在线</div>
+                    <div class="security-item__status red">{{ getStorageOffline() }} 离线</div>
+                  </div>
+                </div>
+                <div class="security-item">
+                  <div class="security-item__head">
+                    <div class="security-item__title">
+                      <Icon icon="mdi:video-outline" :size="14" />
+                      <span>视频通道</span>
+                    </div>
+                    <div class="security-item__total">{{ getVideoChannelTotal() }}</div>
+                  </div>
+                  <div class="security-item__foot">
+                    <div class="security-item__status green">{{ getVideoChannelOnline() }} 正常</div>
+                    <div class="security-item__status red">{{ getVideoChannelOffline() }} 异常</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="data-card alarm-type">
+              <div
+                class="card-header card-header--link"
+                role="button"
+                tabindex="0"
+                @click.stop="navigateToSubModule('alarmType')"
+                @keydown.enter.stop.prevent="navigateToSubModule('alarmType')"
+                @keydown.space.stop.prevent="navigateToSubModule('alarmType')"
+              >
+                <Icon icon="mdi:alarm-light-outline" :size="14" />
+                <span>报警类型分布（今日）</span>
+              </div>
+              <div ref="alarmTypeChartRef" class="chart-alarm-type"></div>
+            </div>
+
+            <div class="data-card access-kpi">
+              <div
+                class="card-header card-header--link"
+                role="button"
+                tabindex="0"
+                @click.stop="navigateToSubModule('ePatrol')"
+                @keydown.enter.stop.prevent="navigateToSubModule('ePatrol')"
+                @keydown.space.stop.prevent="navigateToSubModule('ePatrol')"
+              >
+                <Icon icon="mdi:walk" :size="14" />
+                <span>电子巡更</span>
+                <span class="badge" :class="getPatrolStatus().type">{{ getPatrolStatus().label }}</span>
+              </div>
+              <div class="access-kpi__grid">
+                <div class="access-kpi__item">
+                  <div class="access-kpi__label">今日巡更点位</div>
+                  <div class="access-kpi__value">{{ formatNumber(patrolKpi.totalPoints) }}</div>
+                </div>
+                <div class="access-kpi__item">
+                  <div class="access-kpi__label">打卡完成率</div>
+                  <div class="access-kpi__value">{{ patrolKpi.completionRate }}%</div>
                 </div>
               </div>
             </div>
@@ -308,12 +274,12 @@
           </div>
         </div>
 
-        <!-- 中间视图区域 -->
-        <div class="map-view glass-panel">
-          <img src="@/assets/imgs/school.jpg" alt="校园全景鸟瞰" class="campus-panorama" />
+        <!-- 中间视图区域：园区三维孪生（Three.js，资源见 public/park-twin） -->
+        <div class="map-view glass-panel map-view--twin">
+          <ParkDigitalTwin class="map-park-twin" />
           <div class="map-info-tag">
             <div class="info-label">当前视角</div>
-            <div class="info-value">校园全景鸟瞰</div>
+            <div class="info-value">园区数字孪生</div>
           </div>
           <div class="map-status-tags">
             <div class="status-tag green">
@@ -420,7 +386,14 @@
           <div class="panel-content">
             <!-- 门禁管理 -->
             <div class="data-card">
-              <div class="card-header">
+              <div
+                class="card-header card-header--link"
+                role="button"
+                tabindex="0"
+                @click.stop="navigateToSubModule('door')"
+                @keydown.enter.stop.prevent="navigateToSubModule('door')"
+                @keydown.space.stop.prevent="navigateToSubModule('door')"
+              >
                 <Icon icon="mdi:door-open" :size="14" />
                 <span>门禁管理</span>
                 <span class="badge success">{{
@@ -446,7 +419,14 @@
 
             <!-- 访客预约 -->
             <div class="data-card">
-              <div class="card-header">
+              <div
+                class="card-header card-header--link"
+                role="button"
+                tabindex="0"
+                @click.stop="navigateToSubModule('visitor')"
+                @keydown.enter.stop.prevent="navigateToSubModule('visitor')"
+                @keydown.space.stop.prevent="navigateToSubModule('visitor')"
+              >
                 <Icon icon="mdi:account-clock" :size="14" />
                 <span>访客预约</span>
               </div>
@@ -504,7 +484,14 @@
           <div class="corner-accent corner-tr"></div>
           <div class="corner-accent corner-bl"></div>
           <div class="corner-accent corner-br"></div>
-          <div class="module-title">
+          <div
+            class="module-title module-title--link"
+            role="button"
+            tabindex="0"
+            @click.stop="navigateToSubModule('energy')"
+            @keydown.enter.stop.prevent="navigateToSubModule('energy')"
+            @keydown.space.stop.prevent="navigateToSubModule('energy')"
+          >
             <Icon icon="mdi:lightning-bolt" :size="18" />
             <span>智慧能源</span>
             <Icon icon="ep:arrow-right" :size="14" class="module-arrow" />
@@ -598,9 +585,10 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
-import * as echarts from 'echarts'
+import echarts from '@/plugins/echarts'
 import { ElMessage } from 'element-plus'
 import { Icon } from '@/components/Icon'
+import ParkDigitalTwin from '@/components/parkDigitalTwin/ParkDigitalTwin.vue'
 import { getHomeScreenData, type HomeScreenVO } from '@/api/iot/dashboard'
 
 dayjs.locale('zh-cn')
@@ -629,14 +617,12 @@ const lastUpdateTime = ref(dayjs().format('HH:mm:ss'))
 const isFullscreen = ref(false)
 
 // 图表refs
-const channelGaugeRef = ref<HTMLElement>()
-const alarmChartRef = ref<HTMLElement>()
+const alarmTypeChartRef = ref<HTMLElement>()
 const accessChartRef = ref<HTMLElement>()
 const electricChartRef = ref<HTMLElement>()
 
 // 图表实例
-let channelGaugeChart: echarts.ECharts | null = null
-let alarmChart: echarts.ECharts | null = null
+let alarmTypeChart: echarts.ECharts | null = null
 let accessChart: echarts.ECharts | null = null
 let electricChart: echarts.ECharts | null = null
 
@@ -647,6 +633,162 @@ const formatNumber = (num: number) => {
     return num.toLocaleString()
   }
   return num
+}
+
+const clampPercent = (value: number) => {
+  const num = Number.isFinite(value) ? value : 0
+  return Math.max(0, Math.min(100, Math.round(num)))
+}
+
+type PatrolKpi = {
+  totalTasks: number
+  completedTasks: number
+  pendingTasks: number
+  totalPoints: number
+  checkedPoints: number
+  missedPoints: number
+  completionRate: number
+}
+
+const patrolKpi = ref<PatrolKpi>({
+  totalTasks: 0,
+  completedTasks: 0,
+  pendingTasks: 0,
+  totalPoints: 0,
+  checkedPoints: 0,
+  missedPoints: 0,
+  completionRate: 0
+})
+
+const normalizeToDayStart = (d: Date) => {
+  const nd = new Date(d)
+  nd.setHours(0, 0, 0, 0)
+  return nd
+}
+
+const generatePatrolKpiByRange = (start: Date, end: Date): PatrolKpi => {
+  const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1
+  let factor = days / 3.5
+  if (factor < 0.6) factor = 0.6
+  if (factor > 3.2) factor = 3.2
+
+  const baseTasks = 10
+  const baseCompleted = 3
+  const baseTotalPoints = 56
+  const baseChecked = 32
+
+  const totalTasks = Math.round(baseTasks * factor * 0.7)
+  const completedTasks = Math.round(baseCompleted * Math.sqrt(factor) * 0.9)
+  const pendingTasks = totalTasks - completedTasks
+
+  const totalPoints = Math.round(baseTotalPoints * factor * 0.8)
+  const checkedPoints = Math.round(baseChecked * Math.pow(factor, 0.7) * 0.9)
+  const missedPoints = totalPoints - checkedPoints
+
+  const completionRate = Number(((checkedPoints / Math.max(1, totalPoints)) * 100).toFixed(1))
+
+  return {
+    totalTasks,
+    completedTasks,
+    pendingTasks,
+    totalPoints,
+    checkedPoints,
+    missedPoints,
+    completionRate
+  }
+}
+
+const refreshPatrolKpi = () => {
+  const end = normalizeToDayStart(new Date())
+  const start = new Date(end)
+  patrolKpi.value = generatePatrolKpiByRange(start, end)
+}
+
+const getPatrolStatus = () => {
+  const rate = patrolKpi.value.completionRate
+  if (rate >= 70) return { label: '正常', type: 'success' as const }
+  return { label: '异常', type: 'danger' as const }
+}
+
+const getSecurityDeviceOnlineRate = () => {
+  const rate = screenData.value?.deviceStatusStats?.onlineRate
+  if (typeof rate === 'number') return clampPercent(rate)
+  const total = screenData.value?.deviceStatusStats?.total || 0
+  const online = screenData.value?.deviceStatusStats?.online || 0
+  if (!total) return 0
+  return clampPercent((online / total) * 100)
+}
+
+const getSecurityChannelOnlineRate = () => {
+  return clampPercent(screenData.value?.securityData?.channelOnlineRate || 0)
+}
+
+const getIpcOnline = () => {
+  return screenData.value?.securityData?.ipcOnline || 0
+}
+
+const getIpcOffline = () => {
+  return screenData.value?.securityData?.ipcOffline || 0
+}
+
+const getIpcTotal = () => {
+  const total = screenData.value?.securityData?.ipcTotal
+  if (typeof total === 'number') return total
+  return getIpcOnline() + getIpcOffline()
+}
+
+const getVideoServerOnline = () => {
+  return screenData.value?.securityData?.serverOnline || 0
+}
+
+const getVideoServerOffline = () => {
+  return screenData.value?.securityData?.serverOffline || 0
+}
+
+const getVideoServerTotal = () => {
+  return getVideoServerOnline() + getVideoServerOffline()
+}
+
+const getStorageOnline = () => {
+  return screenData.value?.securityData?.storageOnline || 0
+}
+
+const getStorageOffline = () => {
+  return screenData.value?.securityData?.storageOffline || 0
+}
+
+const getStorageTotal = () => {
+  return getStorageOnline() + getStorageOffline()
+}
+
+const getVideoChannelOnline = () => {
+  return screenData.value?.securityData?.channelOnline || 0
+}
+
+const getVideoChannelOffline = () => {
+  return screenData.value?.securityData?.channelOffline || 0
+}
+
+const getVideoChannelTotal = () => {
+  return getVideoChannelOnline() + getVideoChannelOffline()
+}
+
+const getAlarmTypeDistribution = () => {
+  const dist = screenData.value?.securityData?.alarmTypeDistribution
+  if (Array.isArray(dist) && dist.length) {
+    return dist
+  }
+  const total = screenData.value?.todayAlerts || screenData.value?.securityData?.unhandledAlarms || 0
+  const a = Math.max(0, Math.round(total * 0.35))
+  const b = Math.max(0, Math.round(total * 0.25))
+  const c = Math.max(0, Math.round(total * 0.2))
+  const d = Math.max(0, total - a - b - c)
+  return [
+    { name: '紧急报警', value: a },
+    { name: '设备报警', value: b },
+    { name: '防拆报警', value: c },
+    { name: '位移报警', value: d }
+  ]
 }
 
 // ==================== 方法 ====================
@@ -662,6 +804,7 @@ const fetchData = async () => {
     const data = await getHomeScreenData()
     screenData.value = data
     lastUpdateTime.value = dayjs().format('HH:mm:ss')
+    refreshPatrolKpi()
 
     // 更新图表
     nextTick(() => {
@@ -694,40 +837,127 @@ const handleFullscreenChange = () => {
 
 // ==================== 模块点击跳转 ====================
 
-// 模块路由配置
-// 模块路由配置
-const moduleRoutes = {
-  security: '/security/video-surveillance/realtime-preview', // 智慧安防 - 实时预览
-  access: '/smart-access/door/management', // 智慧通行 - 门禁管理
-  energy: '/energy', // 智慧能源 - 数据总览
-  building: '/building/bac/monitor' // 智慧楼宇 - 建筑设备监控
+const moduleRoutes: Record<string, { paths: string[]; name?: string; reloadIfNotMatched?: boolean }> =
+  {
+    security: {
+      paths: ['/security/video-surveillance/realtime-preview', '/security/video-surveillance/patrol-config']
+    },
+    access: {
+      paths: ['/smart-access/door/management', '/iot/access/management']
+    },
+    energy: {
+      paths: ['/building/newlight/overview', '/building/newlight/control']
+    },
+    building: {
+      paths: ['/iot/building/visual-dashboard', '/building/bac/monitor']
+    }
+  }
+
+type SubModuleKey = 'alarmType' | 'ePatrol' | 'door' | 'visitor' | 'energy'
+
+const subModuleRoutes: Record<
+  SubModuleKey,
+  { name?: string; paths: string[]; reloadIfNotMatched?: boolean }
+> = {
+  alarmType: {
+    paths: ['/security/perimeter-intrusion/intrusionalarm'],
+    reloadIfNotMatched: true
+  },
+  ePatrol: {
+    paths: ['/security/electronic-patrol/visualization-board']
+  },
+  door: {
+    name: 'AccessManagement',
+    paths: ['/smart-access/door/management', '/iot/access/management']
+  },
+  visitor: {
+    paths: ['/smart-access/visitor-management/home'],
+    reloadIfNotMatched: true
+  },
+  energy: {
+    paths: ['/building/newlight/overview', '/building/newlight/control']
+  }
 }
 
-// 跳转到对应模块
-const navigateToModule = (module: keyof typeof moduleRoutes) => {
-  const route = moduleRoutes[module]
-  
-  // 智慧能源模块暂未开发
-  if (!route) {
+const resolveAndPush = async (candidates: {
+  name?: string
+  paths: string[]
+  reloadIfNotMatched?: boolean
+}) => {
+  const isFallback404Record = (record: any) => {
+    if (!record) return true
+    const recordName = String(record.name || '')
+    if (
+      record.path === '/:pathMatch(.*)*' ||
+      record.path === '/:path(.*)*' ||
+      recordName === '404Page' ||
+      recordName === 'NoFound'
+    ) {
+      return true
+    }
+    const routeComponent = record.components?.default || record.component
+    const componentText = typeof routeComponent === 'function' ? routeComponent.toString() : ''
+    return componentText.includes('Error/404.vue')
+  }
+
+  const hasRealMatch = (path: string) => {
+    const resolved = router.resolve(path)
+    if (!resolved.matched.length) return false
+    const lastMatched = resolved.matched[resolved.matched.length - 1]
+    return !isFallback404Record(lastMatched)
+  }
+
+  if (candidates.name) {
+    try {
+      await router.push({ name: candidates.name as any })
+      return
+    } catch {
+    }
+  }
+
+  for (const path of candidates.paths) {
+    if (hasRealMatch(path)) {
+      await router.push(path)
+      return
+    }
+
+    if (candidates.reloadIfNotMatched) {
+      const resolvedByPath = router.resolve(path)
+      window.location.href = resolvedByPath.href
+      return
+    }
+
+    try {
+      const before = router.currentRoute.value.fullPath
+      await router.push(path)
+      if (router.currentRoute.value.fullPath !== before) {
+        return
+      }
+    } catch {
+    }
+  }
+
+  ElMessage.info('该模块正在开发中，敬请期待！')
+}
+
+const navigateToSubModule = async (key: SubModuleKey) => {
+  await resolveAndPush(subModuleRoutes[key])
+}
+
+const navigateToModule = async (module: keyof typeof moduleRoutes) => {
+  const candidates = moduleRoutes[module]
+  if (!candidates) {
     ElMessage.info('该模块正在开发中，敬请期待！')
     return
   }
-  
-  // 跳转到对应路由（全屏模式会在路由守卫中自动关闭）
-  router.push(route)
+  await resolveAndPush(candidates)
 }
 
 // ==================== 图表初始化 ====================
 
 const initCharts = () => {
-  // 通道仪表盘
-  if (channelGaugeRef.value) {
-    channelGaugeChart = echarts.init(channelGaugeRef.value)
-  }
-
-  // 报警趋势
-  if (alarmChartRef.value) {
-    alarmChart = echarts.init(alarmChartRef.value)
+  if (alarmTypeChartRef.value) {
+    alarmTypeChart = echarts.init(alarmTypeChartRef.value)
   }
 
   // 进出趋势
@@ -744,62 +974,24 @@ const initCharts = () => {
 }
 
 const updateCharts = () => {
-  const rate = screenData.value?.securityData?.channelOnlineRate || 98
-
-  // 通道仪表盘
-  if (channelGaugeChart) {
-    channelGaugeChart.setOption({
+  if (alarmTypeChart) {
+    const dist = getAlarmTypeDistribution()
+    alarmTypeChart.setOption({
+      tooltip: { trigger: 'item' },
       series: [
         {
-          type: 'gauge',
-          startAngle: 180,
-          endAngle: 0,
-          min: 0,
-          max: 100,
-          radius: '100%',
-          center: ['50%', '70%'],
-          itemStyle: { color: '#52c41a', shadowColor: 'rgba(82,196,26,0.45)', shadowBlur: 10 },
-          progress: { show: true, roundCap: true, width: 8 },
-          pointer: { show: false },
-          axisLine: {
-            roundCap: true,
-            lineStyle: { width: 8, color: [[1, 'rgba(255,255,255,0.1)']] }
-          },
-          axisTick: { show: false },
-          splitLine: { show: false },
-          axisLabel: { show: false },
-          title: { show: false },
-          detail: { show: false },
-          data: [{ value: rate }]
+          type: 'pie',
+          radius: ['48%', '72%'],
+          center: ['50%', '56%'],
+          avoidLabelOverlap: true,
+          label: { color: 'rgba(255,255,255,0.75)', fontSize: 10, formatter: '{b}' },
+          labelLine: { lineStyle: { color: 'rgba(255,255,255,0.25)' }, length: 10, length2: 8 },
+          itemStyle: { borderColor: 'rgba(0,0,0,0.2)', borderWidth: 2 },
+          emphasis: { scale: true, scaleSize: 6 },
+          data: dist
         }
-      ]
-    })
-  }
-
-  // 报警趋势柱状图
-  if (alarmChart) {
-    const trend = screenData.value?.securityData?.alarmTrend || [0, 0, 1, 0, 2, 1]
-    alarmChart.setOption({
-      grid: { top: 5, bottom: 5, left: 0, right: 0 },
-      xAxis: {
-        type: 'category',
-        data: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
-        show: false
-      },
-      yAxis: { type: 'value', show: false },
-      series: [
-        {
-          data: trend,
-          type: 'bar',
-          itemStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: '#ff4d4f' },
-              { offset: 1, color: 'rgba(255,77,79,0.1)' }
-            ])
-          },
-          barWidth: '50%'
-        }
-      ]
+      ],
+      color: ['#ff4d4f', '#faad14', '#00d4ff', '#52c41a']
     })
   }
 
@@ -857,8 +1049,7 @@ const updateCharts = () => {
 }
 
 const handleResize = () => {
-  channelGaugeChart?.resize()
-  alarmChart?.resize()
+  alarmTypeChart?.resize()
   accessChart?.resize()
   electricChart?.resize()
 }
@@ -895,8 +1086,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
 
   // 销毁图表
-  channelGaugeChart?.dispose()
-  alarmChart?.dispose()
+  alarmTypeChart?.dispose()
   accessChart?.dispose()
   electricChart?.dispose()
 
@@ -1002,6 +1192,11 @@ $warning-gold: #faad14;
   }
 }
 
+.module-title--link {
+  cursor: pointer;
+  user-select: none;
+}
+
 // 可点击模块样式
 .clickable-module {
   cursor: pointer;
@@ -1056,6 +1251,22 @@ $warning-gold: #faad14;
     gap: 12px;
     font-size: 10px;
     color: rgba(255, 255, 255, 0.6);
+  }
+}
+
+.card-header--link {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: rgba(255, 255, 255, 0.95);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(0, 212, 255, 0.6);
+    outline-offset: 2px;
+    border-radius: 6px;
   }
 }
 
@@ -1249,6 +1460,144 @@ $warning-gold: #faad14;
   flex: 1;
   padding: 12px;
   overflow-y: auto;
+}
+
+.security-overview {
+  padding: 10px;
+}
+
+.security-rates {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.rate-ring {
+  flex: 1;
+  position: relative;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 212, 255, 0.12);
+  border-radius: 10px;
+  padding: 10px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 92px;
+}
+
+.rate-ring__svg {
+  width: 56px;
+  height: 56px;
+}
+
+.rate-ring__value {
+  position: absolute;
+  top: 38px;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 16px;
+  font-weight: 800;
+  font-family: 'Orbitron', monospace;
+  color: $primary-blue;
+  letter-spacing: 0.5px;
+
+  &.green {
+    color: $success-green;
+  }
+}
+
+.rate-ring__label {
+  margin-top: 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.security-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.security-item {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 212, 255, 0.12);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.security-item__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.security-item__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.security-item__total {
+  font-size: 18px;
+  font-weight: 800;
+  font-family: 'Orbitron', monospace;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.security-item__foot {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.security-item__status {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+
+  &.green {
+    color: $success-green;
+  }
+  &.red {
+    color: $alert-red;
+  }
+}
+
+.chart-alarm-type {
+  height: 150px;
+}
+
+.access-kpi__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.access-kpi__item {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 212, 255, 0.12);
+  border-radius: 10px;
+  padding: 14px 12px;
+}
+
+.access-kpi__label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+  margin-bottom: 8px;
+}
+
+.access-kpi__value {
+  font-size: 22px;
+  font-weight: 800;
+  font-family: 'Orbitron', monospace;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 // 通道总览
@@ -1654,13 +2003,18 @@ $warning-gold: #faad14;
   overflow: hidden;
 }
 
-.campus-panorama {
+.map-view--twin {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.map-park-twin {
+  flex: 1;
+  min-height: 0;
   width: 100%;
-  height: 100%;
-  object-fit: contain;
-  position: absolute;
-  top: 0;
-  left: 0;
+  position: relative;
+  background: #0b1220;
 }
 
 .map-placeholder {

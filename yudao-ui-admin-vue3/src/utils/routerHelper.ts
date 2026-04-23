@@ -5,6 +5,26 @@ import { cloneDeep, omit } from 'lodash-es'
 import qs from 'qs'
 
 const modules = import.meta.glob('../views/**/*.{vue,tsx}')
+const normalizeViewPath = (val: string) => {
+  return val
+    .replace(/\\/g, '/')
+    .replace(/^@?\//, '')
+    .replace(/^\.?\.?\/?views\//, '')
+    .replace(/^src\/views\//, '')
+    .replace(/^\/+/, '')
+    .replace(/\.vue$/i, '')
+    .toLowerCase()
+}
+
+const findViewModuleIndex = (modulesRoutesKeys: string[], component?: string, path?: string) => {
+  const candidates = [component, path].filter(Boolean) as string[]
+  for (const c of candidates) {
+    const needle = normalizeViewPath(c)
+    const idx = modulesRoutesKeys.findIndex((ev) => normalizeViewPath(ev).includes(needle))
+    if (idx > -1) return idx
+  }
+  return -1
+}
 /**
  * 注册一个异步组件
  * @param componentPath 例:/bpm/oa/leave/detail
@@ -60,6 +80,29 @@ export const getRawRoute = (route: RouteLocationNormalized): RouteLocationNormal
   }
 }
 
+export const getRouteIdentityKey = (
+  route: Pick<RouteLocationNormalized, 'path' | 'fullPath' | 'meta'>
+) => {
+  return route.meta?.pathKey || route.path.startsWith('/factory/video-fusion')
+    ? route.path
+    : route.fullPath
+}
+
+export const isSameRouteIdentity = (
+  sourceRoute: Pick<RouteLocationNormalized, 'path' | 'fullPath' | 'meta'>,
+  targetRoute: Pick<RouteLocationNormalized, 'path' | 'fullPath' | 'meta'>
+) => {
+  if (
+    sourceRoute.meta?.pathKey ||
+    targetRoute.meta?.pathKey ||
+    sourceRoute.path.startsWith('/factory/video-fusion') ||
+    targetRoute.path.startsWith('/factory/video-fusion')
+  ) {
+    return sourceRoute.path === targetRoute.path
+  }
+  return sourceRoute.fullPath === targetRoute.fullPath
+}
+
 // 后端控制路由生成
 export const generateRoute = (routes: AppCustomRouteRecordRaw[]): AppRouteRecordRaw[] => {
   const res: AppRouteRecordRaw[] = []
@@ -71,6 +114,7 @@ export const generateRoute = (routes: AppCustomRouteRecordRaw[]): AppRouteRecord
       icon: route.icon,
       hidden: !route.visible,
       noCache: !route.keepAlive,
+      pathKey: route.path === '/factory/video-fusion',
       alwaysShow:
         route.children &&
         route.children.length > 0 &&
@@ -115,14 +159,13 @@ export const generateRoute = (routes: AppCustomRouteRecordRaw[]): AppRouteRecord
         redirect: route.redirect,
         meta: meta
       }
-      const index = route?.component
-        ? modulesRoutesKeys.findIndex((ev) => ev.includes(route.component))
-        : modulesRoutesKeys.findIndex((ev) => ev.includes(route.path))
+      const index = findViewModuleIndex(modulesRoutesKeys, route?.component, route?.path)
       if (index > -1) {
         childrenData.component = modules[modulesRoutesKeys[index]]
       } else {
-        childrenData.component = () => import('@/views/Error/404.vue')
         console.warn('[routerHelper] missing view component:', route.component || route.path)
+        // 后端菜单配置了不存在的组件时，跳过该路由，避免同路径路由被错误降级成 404 页面
+        continue
       }
       data.children = [childrenData]
     } else {
@@ -143,14 +186,13 @@ export const generateRoute = (routes: AppCustomRouteRecordRaw[]): AppRouteRecord
         // 菜单
       } else {
         // 对后端传component组件路径和不传做兼容（如果后端传component组件路径，那么path可以随便写，如果不传，component组件路径会根path保持一致）
-        const index = route?.component
-          ? modulesRoutesKeys.findIndex((ev) => ev.includes(route.component))
-          : modulesRoutesKeys.findIndex((ev) => ev.includes(route.path))
+        const index = findViewModuleIndex(modulesRoutesKeys, route?.component, route?.path)
         if (index > -1) {
           data.component = modules[modulesRoutesKeys[index]]
         } else {
-          data.component = () => import('@/views/Error/404.vue')
           console.warn('[routerHelper] missing view component:', route.component || route.path)
+          // 跳过无效菜单路由，避免覆盖静态兜底或有效业务路由
+          continue
         }
       }
       if (route.children) {
