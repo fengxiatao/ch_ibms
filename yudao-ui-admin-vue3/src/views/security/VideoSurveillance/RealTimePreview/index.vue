@@ -24,6 +24,7 @@
                 ref="viewManagerRef" 
                 @load-view="handleLoadView"
                 @save-view="handleSaveViewSubmit"
+                @current-view-cleared="handleCurrentViewCleared"
               />
             </template>
 
@@ -120,27 +121,31 @@ import CruiseManager from '@/views/security/VideoSurveillance/components/CruiseM
 import {
   useDahuaPlayer,
   DEFAULT_NVR_CONFIG,
-  type DahuaPlayerConfig,
   type DahuaPlayerPane
 } from '@/composables/useDahuaPlayer'
 
-// ZLMediaKit 播放封装
-import useZlmPlayer, { type ZlmPlayerInstance } from '@/composables/useZlmPlayer'
-
 // API 导入
 import { uploadCameraSnapshot } from '@/api/iot/video'
-import { getLivePlayUrl, stopStream, type PlayUrlRespVO } from '@/api/iot/video/zlm'
 import { nvrPresetControl, nvrPtzControl, nvrAreaZoom } from '@/api/iot/video/nvr'
 
 // 类型导入
-import type { GridLayoutType, VideoView, PatrolScene, PatrolSceneChannel, IbmsChannel } from './types'
+import type { GridLayoutType, VideoView, PatrolScene, IbmsChannel } from './types'
+import type { ViewManagerProtocol, ViewSaveDialogPayload } from './viewProtocol'
 import { createVideoView, updateVideoView } from '@/api/iot/video/videoView'
+import {
+  isForceWebrtcEnabled,
+  isIntranetAccess
+} from '@/composables/video/streamPlayUtils'
+import { useZlmPanePlayback } from '@/composables/video/useZlmPanePlayback'
+import { useDahuaPanePlayback } from '@/composables/video/useDahuaPanePlayback'
+import { useRealtimePaneOrchestrator } from '@/composables/video/useRealtimePaneOrchestrator'
+import type { ZlmPlayerInstance } from '@/composables/useZlmPlayer'
 
 defineOptions({ name: 'RealTimePreview' })
 
 // ==================== 组件引用 ====================
 const deviceTreeRef = ref()
-const viewManagerRef = ref()
+const viewManagerRef = ref<{ protocol?: ViewManagerProtocol } | undefined>()
 const patrolManagerRef = ref()
 const cruiseManagerRef = ref()
 
@@ -165,30 +170,32 @@ const {
   ptzReset
 } = useDahuaPlayer()
 
-const { playLive: playZlmLive, stopInstance: stopZlmInstance } = useZlmPlayer()
+const {
+  stopPanePlayback: stopZlmPanePlayback,
+  stopAllPanes: stopAllZlmPanes,
+  replacePanePlayback,
+  retryPanePlayback,
+  switchPaneStream: switchZlmPaneStream
+} = useZlmPanePlayback()
+const {
+  stopPanePlayback: stopDahuaPanePlayback,
+  stopAllPanes: stopAllDahuaPanes,
+  playPaneSource,
+  retryPanePlayback: retryDahuaPanePlayback,
+  switchPaneStream: switchDahuaPaneStream
+} = useDahuaPanePlayback()
+const {
+  buildViewPayload,
+  buildCurrentViewState,
+  syncCurrentViewState,
+  clearCurrentViewState,
+  resetPaneLayout,
+  restoreView,
+  executeScene,
+  stopPatrol
+} = useRealtimePaneOrchestrator()
 
-// 判断是否内网访问（与其他页面保持一致规则）
-const isIntranetAccess = (): boolean => {
-  const hostname = window.location.hostname
-  if (hostname === 'localhost' || hostname === '127.0.0.1') return true
-  if (hostname.startsWith('192.168.')) return true
-  if (hostname.startsWith('10.')) return true
-  if (hostname.startsWith('172.')) {
-    const secondOctet = parseInt(hostname.split('.')[1])
-    if (secondOctet >= 16 && secondOctet <= 31) return true
-  }
-  return false
-}
-
-// 强制 WebRTC 测试开关：内网访问也走 ZLM(WebRTC 优先)
-// 用法示例：在地址栏追加 ?forceWebrtc=1
-const forceWebrtc = (() => {
-  try {
-    return new URLSearchParams(window.location.search).get('forceWebrtc') === '1'
-  } catch {
-    return false
-  }
-})()
+const forceWebrtc = isForceWebrtcEnabled()
 
 const isIntranet = isIntranetAccess() && !forceWebrtc
 
@@ -205,94 +212,6 @@ const toggleForceWebrtc = () => {
   } catch {
     // ignore
   }
-}
-
-// 内网 IP 正则（192.168.x.x、10.x.x.x、172.16-31.x.x）
-const INTRANET_HOST_REG = /(?:192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+)(?::\d+)?/g
-
-// 适配播放地址（外网时将内网 IP 替换为公网可访问地址）
-// - ws-flv：通常跟随站点域名/IP（同源或反代）
-// - webrtc：很多部署会走独立的 rtcHost/rtcPort（参考旧版实现），因此允许通过 env 覆盖
-const adaptPlayUrls = (urls: PlayUrlRespVO | undefined | null): PlayUrlRespVO | null => {
-  if (!urls) return null
-  if (isIntranet) return urls
-
-  const adapted: PlayUrlRespVO = { ...urls }
-  const publicHost = window.location.hostname
-  // 本地开发环境（localhost/127.0.0.1）不应把内网流媒体地址改写到本机端口，否则会出现
-  // webrtcUrl/wsFlvUrl 指向 http://localhost:3000/... 导致 404。
-  if (publicHost === 'localhost' || publicHost === '127.0.0.1') {
-    return urls
-  }
-  const publicPort = window.location.port ? parseInt(window.location.port) : 80
-  const publicAddr = publicPort === 80 || publicPort === 443 ? publicHost : `${publicHost}:${publicPort}`
-  const isHttps = window.location.protocol === 'https:'
-  const httpProtocol = isHttps ? 'https' : 'http'
-  const wsProtocol = isHttps ? 'wss' : 'ws'
-
-  const envRtcHost = (import.meta as any).env?.VITE_ZLM_RTC_HOST as string | undefined
-  const envRtcPortRaw = (import.meta as any).env?.VITE_ZLM_RTC_PORT as string | undefined
-  const envRtcPort = envRtcPortRaw ? parseInt(envRtcPortRaw) : undefined
-
-  /** 将 URL 中的内网 host:port 替换为公网，并统一协议 */
-  const replaceHttpUrl = (url?: string): string | undefined => {
-    if (!url) return url
-    let newUrl = url.replace(INTRANET_HOST_REG, publicAddr)
-    newUrl = newUrl.replace(/^http:/, `${httpProtocol}:`)
-    return newUrl
-  }
-
-  const replaceWsUrl = (url?: string): string | undefined => {
-    if (!url) return url
-    let newUrl = url.replace(INTRANET_HOST_REG, publicAddr)
-    newUrl = newUrl.replace(/^ws:/, `${wsProtocol}:`)
-    return newUrl
-  }
-
-  const replaceWebrtcUrl = (url?: string): string | undefined => {
-    if (!url) return url
-    let newUrl = replaceHttpUrl(url) || url
-    // 如果部署把 WebRTC 信令单独暴露到公网（旧版实现常见），允许用 env 覆盖 host/port
-    if (envRtcHost) {
-      try {
-        const u = new URL(newUrl)
-        u.hostname = envRtcHost
-        if (envRtcPort && !Number.isNaN(envRtcPort)) {
-          u.port = String(envRtcPort)
-        }
-        const envSecret = (import.meta as any).env?.VITE_ZLM_SECRET as string | undefined
-        if (envSecret && !u.searchParams.get('secret')) {
-          u.searchParams.set('secret', envSecret)
-        }
-        newUrl = u.toString()
-      } catch {
-        // ignore
-      }
-    } else {
-      // 即使不覆盖 host/port，也允许注入 secret（ZLM 若开启鉴权，需要带 secret）
-      try {
-        const u = new URL(newUrl)
-        const envSecret = (import.meta as any).env?.VITE_ZLM_SECRET as string | undefined
-        if (envSecret && !u.searchParams.get('secret')) {
-          u.searchParams.set('secret', envSecret)
-          newUrl = u.toString()
-        }
-      } catch {
-        // ignore
-      }
-    }
-    return newUrl
-  }
-
-  adapted.wsFlvUrl = replaceWsUrl(urls.wsFlvUrl)
-  // ZLMediaKit WebRTC：外网使用公网地址，格式为 http(s)://host:port/index/api/webrtc?app=live&stream=xxx&type=play
-  adapted.webrtcUrl = replaceWebrtcUrl(urls.webrtcUrl)
-  adapted.wsFmp4Url = replaceWsUrl(urls.wsFmp4Url)
-  adapted.flvUrl = replaceHttpUrl(urls.flvUrl)
-  adapted.fmp4Url = replaceHttpUrl(urls.fmp4Url)
-  adapted.hlsUrl = replaceHttpUrl(urls.hlsUrl)
-  adapted.rtmpUrl = replaceHttpUrl(urls.rtmpUrl)
-  return adapted
 }
 
 // 播放器扩展状态（在 Dahua 窗格上附加 ZLM 播放信息）
@@ -391,13 +310,22 @@ const ptzDisabledReason = computed<'no-playing' | 'no-ptz' | null>(() => {
 // ==================== 布局管理 ====================
 
 const handleLayoutChange = async (newLayout: GridLayoutType) => {
-  // 停止所有播放
-  await stopAllPanes()
-
-  // 更新布局
-  gridLayout.value = newLayout
-  panes.value = createPanes(newLayout) as ExtendedPane[]
-  activePane.value = 0
+  await resetPaneLayout({
+    layout: newLayout,
+    stopAllPanes,
+    createPanes: (layout) => createPanes(layout) as ExtendedPane[],
+    panesRef: panes as any,
+    gridLayoutRef: gridLayout,
+    activePaneRef: activePane,
+    clearCurrentView: () =>
+      clearCurrentViewState({
+        currentViewRef: currentView,
+        syncCurrentViewSelection: syncViewManagerSelection
+      }),
+    syncCurrentViewSelection: (viewId) => {
+      syncViewManagerSelection(viewId)
+    }
+  })
 }
 
 // 设置窗格容器元素引用
@@ -407,48 +335,40 @@ const handlePaneRef = (paneIndex: number, el: HTMLElement | null) => {
   }
 }
 
+const resolvePaneContainer = async (paneIndex: number, pane: ExtendedPane) => {
+  if (pane.container) {
+    return pane.container
+  }
+  await nextTick()
+  const el = document.querySelector(
+    `.player-pane[data-index="${paneIndex}"] .player-container`
+  ) as HTMLElement | null
+  if (el) {
+    pane.container = el
+  }
+  return pane.container
+}
+
 // ==================== 通用停止逻辑 ====================
 
 const stopPanePlayback = async (pane: ExtendedPane) => {
   if (!pane) return
 
   if (isIntranet) {
-    await stopPlayer(pane)
+    await stopDahuaPanePlayback(pane, stopPlayer)
     return
   }
 
-  // 外网模式：通过 ZLM 停止
-  if (pane.zlmInstance) {
-    stopZlmInstance(pane.zlmInstance)
-    pane.zlmInstance = null
-  }
-
-  if (pane.container) {
-    pane.container.innerHTML = ''
-  }
-
-  if (pane.zlmChannelId) {
-    // 通知后端停止拉流
-    stopStream(pane.zlmChannelId).catch(() => {})
-  }
-
-  pane.isPlaying = false
-  pane.isLoading = false
-  pane.isRecording = false
-  pane.error = null
+  await stopZlmPanePlayback(pane)
 }
 
 const stopAllPanes = async () => {
   if (isIntranet) {
-    await stopAllPlayers(panes.value)
+    await stopAllDahuaPanes(panes.value, stopAllPlayers)
     return
   }
 
-  const list = panes.value.slice()
-  for (const pane of list) {
-    // eslint-disable-next-line no-await-in-loop
-    await stopPanePlayback(pane)
-  }
+  await stopAllZlmPanes(panes.value)
 }
 
 // ==================== 通道播放 ====================
@@ -506,103 +426,49 @@ const playChannelInPane = async (ibmsChannel: IbmsChannel, paneIndex: number) =>
   const pane = panes.value[paneIndex]
   if (!pane) return
 
-  // 如果当前窗格正在播放，先停止
-  if (pane.isPlaying || pane.player || pane.zlmInstance) {
-    await stopPanePlayback(pane)
-  }
-
   // 切换到该窗格
   activePane.value = paneIndex
-
-  // 等待容器就绪
-  await nextTick()
-  if (!pane.container) {
-    const el = document.querySelector(
-      `.player-pane[data-index="${paneIndex}"] .player-container`
-    ) as HTMLElement
-    if (el) {
-      pane.container = el
-    }
-  }
 
   // 保存 IBMS 通道信息（用于截图上传等功能）
   pane.ibmsChannel = ibmsChannel
 
   // 内网：大华直连
   if (isIntranet) {
-    // 构建播放配置，使用 NVR 作为 WebSocket 连接点（IPC 不支持 WebSocket）
-    const config: DahuaPlayerConfig = {
-      ip: DEFAULT_NVR_CONFIG.ip,
-      port: DEFAULT_NVR_CONFIG.port,
-      rtspPort: DEFAULT_NVR_CONFIG.rtspPort, // RTSP 端口
-      username: ibmsChannel.username || DEFAULT_NVR_CONFIG.username,
-      password: ibmsChannel.password || DEFAULT_NVR_CONFIG.password,
-      channelNo: ibmsChannel.channelNo,
-      subtype: pane.streamType === 'sub' ? 1 : 0
+    try {
+      await playPaneSource({
+        pane,
+        paneIndex,
+        source: {
+          channelNo: ibmsChannel.channelNo,
+          channelName: ibmsChannel.channelName,
+          username: ibmsChannel.username,
+          password: ibmsChannel.password,
+          ibmsChannel
+        },
+        resolvePaneContainer,
+        startPreview,
+        stopPlayer
+      })
+      ElMessage.success(`正在播放: ${ibmsChannel.channelName || `通道${ibmsChannel.channelNo}`}`)
+      return
+    } catch (error: any) {
+      console.error('[大华] 播放失败:', error)
+      ElMessage.warning(error?.message || '播放失败，请稍后重试')
+      return
     }
-
-    // 开始播放
-    const success = await startPreview(pane, config, ibmsChannel.channelName)
-
-    if (success) {
-      ElMessage.success(`正在播放: ${ibmsChannel.channelName || `通道${config.channelNo}`}`)
-    }
-    return
-  }
-
-  // 外网：通过后端 ZLM 拉流播放
-  const channelId = ibmsChannel.id
-  if (!channelId) {
-    ElMessage.warning('通道ID缺失，无法通过流媒体播放')
-    return
   }
 
   try {
-    pane.isLoading = true
-    pane.isPlaying = false
-    pane.error = null
-
-    const rawUrls = await getLivePlayUrl(channelId, pane.streamType === 'sub' ? 1 : 0)
-    const playUrls = adaptPlayUrls(rawUrls)
-
-    if (!playUrls || (!playUrls.wsFlvUrl && !playUrls.webrtcUrl)) {
-      throw new Error('未获取到可用的播放地址')
-    }
-
-    if (!pane.container) {
-      const el = document.querySelector(
-        `.player-pane[data-index="${paneIndex}"] .player-container`
-      ) as HTMLElement
-      if (el) {
-        pane.container = el
-      }
-    }
-
-    if (!pane.container) {
-      throw new Error('播放器容器不存在')
-    }
-
-    const instance = await playZlmLive({
-      container: pane.container,
-      urls: {
-        wsFlvUrl: playUrls.wsFlvUrl,
-        webrtcUrl: playUrls.webrtcUrl
-      },
-      preferWebrtc: true
+    await replacePanePlayback({
+      pane,
+      paneIndex,
+      ibmsChannel,
+      resolvePaneContainer
     })
-
-    pane.zlmInstance = instance
-    pane.zlmChannelId = channelId
-    pane.isPlaying = true
-    pane.isLoading = false
-    pane.error = null
 
     ElMessage.success(`正在播放: ${ibmsChannel.channelName || `通道${ibmsChannel.channelNo}`}`)
   } catch (e: any) {
     console.error('[ZLM] 播放失败:', e)
-    pane.isLoading = false
-    pane.isPlaying = false
-    pane.error = e?.message || '播放失败，请稍后重试'
   }
 }
 
@@ -648,20 +514,30 @@ const handleRetry = async (paneIndex: number) => {
   if (!pane) return
 
   if (isIntranet) {
-    if (!pane.config) return
-    // 重新播放（大华直连）
-    await stopPlayer(pane)
-    await startPreview(pane, pane.config, pane.channelName)
+    try {
+      await retryDahuaPanePlayback({
+        pane,
+        paneIndex,
+        resolvePaneContainer,
+        startPreview,
+        stopPlayer
+      })
+    } catch (error: any) {
+      ElMessage.warning(error?.message || '当前窗口缺少通道信息，无法重试播放')
+    }
     return
   }
 
   // 外网模式：按当前 ibmsChannel 重新通过 ZLM 播放
-  const ibmsChannel = pane.ibmsChannel as IbmsChannel | undefined
-  if (!ibmsChannel) {
-    ElMessage.warning('当前窗口缺少通道信息，无法重试播放')
-    return
+  try {
+    await retryPanePlayback({
+      pane,
+      paneIndex,
+      resolvePaneContainer
+    })
+  } catch (error: any) {
+    ElMessage.warning(error?.message || '当前窗口缺少通道信息，无法重试播放')
   }
-  await playChannelInPane(ibmsChannel, paneIndex)
 }
 
 // 拖拽开始（透传）
@@ -744,23 +620,33 @@ const handleStreamSwitch = async (paneIndex: number, streamType: string) => {
   pane.streamType = streamType as 'main' | 'sub'
 
   if (isIntranet) {
-    if (!pane.config) return
-    // 切换大华码流
-    const success = await switchStream(pane, streamType as 'main' | 'sub')
-    if (success) {
+    try {
+      await switchDahuaPaneStream({
+        pane,
+        paneIndex,
+        streamType: streamType as 'main' | 'sub',
+        resolvePaneContainer,
+        startPreview,
+        stopPlayer,
+        switchStream
+      })
       ElMessage.success(`已切换到${streamType === 'main' ? '主' : '子'}码流`)
+    } catch (error: any) {
+      ElMessage.warning(error?.message || '当前窗口缺少通道信息，无法切换码流')
     }
     return
   }
 
-  // 外网模式：重新获取播放地址并通过 ZLM 重播
-  const ibmsChannel = pane.ibmsChannel as IbmsChannel | undefined
-  if (!ibmsChannel) {
-    ElMessage.warning('当前窗口缺少通道信息，无法切换码流')
-    return
+  try {
+    await switchZlmPaneStream({
+      pane,
+      paneIndex,
+      streamType: streamType as 'main' | 'sub',
+      resolvePaneContainer
+    })
+  } catch (error: any) {
+    ElMessage.warning(error?.message || '当前窗口缺少通道信息，无法切换码流')
   }
-
-  await playChannelInPane(ibmsChannel, paneIndex)
 }
 
 // ==================== 云台控制 ====================
@@ -1084,10 +970,29 @@ const handleOpenCruiseManager = () => {
 
 // ==================== 视图管理 ====================
 
+const getViewManagerProtocol = (): ViewManagerProtocol => ({
+  syncCurrentView: (viewId) => viewManagerRef.value?.protocol?.syncCurrentView(viewId),
+  reloadViews: async () => {
+    await viewManagerRef.value?.protocol?.reloadViews()
+  },
+  openViewSaveDialog: (payload) => viewManagerRef.value?.protocol?.openViewSaveDialog(payload)
+})
+
+const syncViewManagerSelection = (viewId: number | null) => {
+  getViewManagerProtocol().syncCurrentView(viewId)
+}
+
+const reloadViewManager = async () => {
+  await getViewManagerProtocol().reloadViews()
+}
+
+const openViewSaveDialog = (payload?: ViewSaveDialogPayload) => {
+  getViewManagerProtocol().openViewSaveDialog(payload)
+}
+
 // 保存为新视图（弹出对话框）
 const handleViewSaveAs = async () => {
-  // 打开保存对话框，不传 id 表示新建
-  viewManagerRef.value?.openSaveDialog(undefined, '', [1])
+  openViewSaveDialog({ groupIds: [1] })
 }
 
 // 更新当前视图
@@ -1098,24 +1003,11 @@ const handleViewUpdate = async () => {
   }
 
   try {
-    // 收集当前窗格配置
-    const viewData = {
-      id: currentView.value.id,
-      name: currentView.value.name,
-      groupIds: currentView.value.groupIds,
-      gridLayout: gridLayout.value,
-      panes: panes.value
-        .map((pane, index) => ({
-          paneIndex: index,
-          channelId: pane.config?.channelNo,
-          channelName: pane.channelName
-        }))
-        .filter((p) => p.channelId)
-    }
+    const viewData = buildViewPayload(currentView.value, panes.value, gridLayout.value)
 
     await updateVideoView(viewData)
     ElMessage.success(`视图 "${currentView.value.name}" 已更新`)
-    viewManagerRef.value?.loadViewGroups()
+    await reloadViewManager()
   } catch (error) {
     console.error('[视图] 更新失败:', error)
     ElMessage.error('更新视图失败')
@@ -1125,91 +1017,93 @@ const handleViewUpdate = async () => {
 // 保存视图提交（从 ViewManager 对话框触发）
 const handleSaveViewSubmit = async (viewInfo: { id?: number; name: string; groupIds: number[] }) => {
   try {
-    // 收集当前窗格配置
-    const viewData = {
-      id: viewInfo.id,
-      name: viewInfo.name,
-      groupIds: viewInfo.groupIds,
-      gridLayout: gridLayout.value,
-      panes: panes.value
-        .map((pane, index) => ({
-          paneIndex: index,
-          channelId: pane.config?.channelNo,
-          channelName: pane.channelName
-        }))
-        .filter((p) => p.channelId)
-    }
+    const viewData = buildViewPayload(viewInfo, panes.value, gridLayout.value)
 
     if (viewInfo.id) {
       // 更新现有视图
       await updateVideoView(viewData)
+      syncCurrentViewState(
+        buildCurrentViewState(
+          {
+            id: viewInfo.id,
+            name: viewInfo.name,
+            groupIds: viewInfo.groupIds
+          },
+          viewData
+        ),
+        {
+          currentViewRef: currentView,
+          syncCurrentViewSelection: syncViewManagerSelection
+        }
+      )
       ElMessage.success(`视图 "${viewInfo.name}" 已更新`)
     } else {
       // 创建新视图
       const newId = await createVideoView(viewData)
-      // 设置为当前视图
-      currentView.value = {
-        id: newId as number,
-        name: viewInfo.name,
-        groupIds: viewInfo.groupIds,
-        gridLayout: gridLayout.value,
-        panes: viewData.panes
-      } as VideoView
+      syncCurrentViewState(
+        buildCurrentViewState(
+          {
+            id: newId as number,
+            name: viewInfo.name,
+            groupIds: viewInfo.groupIds
+          },
+          viewData
+        ),
+        {
+          currentViewRef: currentView,
+          syncCurrentViewSelection: syncViewManagerSelection
+        }
+      )
       ElMessage.success(`视图 "${viewInfo.name}" 已保存`)
     }
 
-    viewManagerRef.value?.loadViewGroups()
-    // 更新 ViewManager 中的当前视图选中状态
-    if (currentView.value?.id) {
-      viewManagerRef.value?.setCurrentView(currentView.value.id)
-    }
+    await reloadViewManager()
   } catch (error) {
     console.error('[视图] 保存失败:', error)
     ElMessage.error('保存视图失败')
   }
 }
 
+const handleCurrentViewCleared = (viewId: number) => {
+  clearCurrentViewState(
+    {
+      currentViewRef: currentView,
+      syncCurrentViewSelection: syncViewManagerSelection
+    },
+    viewId
+  )
+}
+
 const handleLoadView = async (view: VideoView) => {
   try {
-    // 加载视图
     console.log('[视图] 加载:', view.name, view)
-
-    // 先停止所有播放
-    await stopAllPanes()
-
-    // 设置布局
-    const layoutValue = (view.layout || view.gridLayout || 4) as GridLayoutType
-    gridLayout.value = layoutValue
-    panes.value = createPanes(layoutValue)
-
-    await nextTick()
-    await new Promise((r) => setTimeout(r, 300))
-
-    currentView.value = view
-
-    // 恢复窗格通道
-    if (view.panes && view.panes.length > 0) {
-      for (let i = 0; i < view.panes.length; i++) {
-        const paneData = view.panes[i]
-        const channelNo = paneData.channelId
-
-        if (channelNo && paneData.paneIndex < panes.value.length) {
-          // 查找 IBMS 通道
-          const ibmsChannel = await deviceTreeRef.value?.findIbmsChannelByChannelNo(channelNo)
-          if (ibmsChannel) {
-            console.log('[视图] 恢复窗格:', paneData.paneIndex + 1, ibmsChannel.channelName)
-            setTimeout(() => {
-              playChannelInPane(ibmsChannel, paneData.paneIndex)
-            }, i * 500)
-          }
-        }
+    await restoreView({
+      view,
+      stopAllPanes,
+      createPanes,
+      panesRef: panes as any,
+      gridLayoutRef: gridLayout,
+      activePaneRef: activePane,
+      isPatrollingRef: isPatrolling,
+      setCurrentView: (nextView) => {
+        syncCurrentViewState(nextView, {
+          currentViewRef: currentView,
+          syncCurrentViewSelection: syncViewManagerSelection
+        })
+      },
+      clearCurrentView: () =>
+        clearCurrentViewState({
+          currentViewRef: currentView,
+          syncCurrentViewSelection: syncViewManagerSelection
+        }),
+      findIbmsChannelByChannelNo: async (channelNo) => {
+        return deviceTreeRef.value?.findIbmsChannelByChannelNo(channelNo)
+      },
+      playChannelInPane,
+      syncCurrentViewSelection: (viewId) => {
+        syncViewManagerSelection(viewId)
       }
-    }
-
-    // 更新 ViewManager 中的当前视图选中状态
-    if (view.id) {
-      viewManagerRef.value?.setCurrentView(view.id)
-    }
+    })
   } catch (error) {
     console.error('[视图] 加载失败:', error)
     ElMessage.error('加载视图失败')
@@ -1224,151 +1118,61 @@ const handlePatrolStart = (plan: any, _tasks: any[], _scenesMap: Map<number, Pat
 }
 
 const handlePatrolStop = () => {
-  isPatrolling.value = false
-  stopAllPlayers(panes.value)
+  stopPatrol(isPatrolling, stopAllPanes)
   ElMessage.info('轮巡已停止')
 }
 
-// 轮巡场景的轮播定时器（按格子分组）
-const sceneRotationTimers = ref<Map<number, number>>(new Map())
-
 const handleExecuteScene = async (scene: PatrolScene) => {
   console.log('[轮巡] 执行场景:', scene.sceneName, '通道数据:', scene.channels)
-
-  // 清除之前的轮播定时器
-  sceneRotationTimers.value.forEach((timer) => clearTimeout(timer))
-  sceneRotationTimers.value.clear()
-
-  // 停止当前所有播放
-  await stopAllPanes()
-
-  // 解析分屏布局
-  let layoutValue: GridLayoutType = 6
-  if (typeof scene.gridLayout === 'string' && scene.gridLayout.includes('x')) {
-    const [cols, rows] = scene.gridLayout.split('x').map(Number)
-    layoutValue = (cols * rows) as GridLayoutType
-  } else {
-    layoutValue = (parseInt(String(scene.gridLayout)) || scene.gridCount || 6) as GridLayoutType
-  }
-
-  // 设置布局
-  gridLayout.value = layoutValue
-  panes.value = createPanes(layoutValue)
-
-  await nextTick()
-  await new Promise((r) => setTimeout(r, 100))
-
-  // 播放场景中的通道
-  if (scene.channels && scene.channels.length > 0) {
-    // 按格子位置分组通道
-    const channelsByGrid = new Map<number, typeof scene.channels>()
-    for (const channel of scene.channels) {
-      const gridPos = channel.gridPosition || 1
-      if (!channelsByGrid.has(gridPos)) {
-        channelsByGrid.set(gridPos, [])
+  await executeScene({
+    scene,
+    isPatrollingRef: isPatrolling,
+    panesRef: panes as any,
+    gridLayoutRef: gridLayout,
+    activePaneRef: activePane,
+    createPanes,
+    stopAllPanes,
+    clearCurrentView: () =>
+      clearCurrentViewState({
+        currentViewRef: currentView,
+        syncCurrentViewSelection: syncViewManagerSelection
+      }),
+    syncCurrentViewSelection: (viewId) => {
+      syncViewManagerSelection(viewId)
+    },
+    playChannelByNo: async (paneIndex, channel) => {
+      const channelNo = channel.channelNo
+      const channelName = channel.channelName || `通道${channelNo}`
+      if (!channelNo || channelNo <= 0) {
+        console.warn('[轮巡] 通道号无效，跳过:', channel)
+        return false
       }
-      channelsByGrid.get(gridPos)!.push(channel)
+
+      console.log('[轮巡] 格子', paneIndex + 1, '播放通道:', channelName)
+      const pane = panes.value[paneIndex]
+      if (!pane) {
+        return false
+      }
+
+      try {
+        await playPaneSource({
+          pane,
+          paneIndex,
+          source: {
+            channelNo,
+            channelName
+          },
+          resolvePaneContainer,
+          startPreview,
+          stopPlayer
+        })
+        return true
+      } catch (error) {
+        console.warn('[轮巡] 格子播放失败:', error)
+        return false
+      }
     }
-
-    console.log('[轮巡] 按格子分组:', Array.from(channelsByGrid.entries()).map(([k, v]) => 
-      `格子${k}: ${v.map(c => c.channelName).join(', ')}`
-    ))
-
-    // 为每个格子启动轮播
-    channelsByGrid.forEach((channels, gridPos) => {
-      const paneIndex = gridPos - 1
-      if (paneIndex >= 0 && paneIndex < panes.value.length) {
-        // 启动该格子的通道轮播
-        startGridRotation(paneIndex, channels, 0)
-      }
-    })
-  }
-}
-
-// 格子内通道轮播播放
-const startGridRotation = async (
-  paneIndex: number, 
-  channels: PatrolSceneChannel[], 
-  currentIndex: number
-) => {
-  if (!isPatrolling.value || currentIndex >= channels.length) {
-    // 如果还在轮巡中，循环播放该格子的通道
-    if (isPatrolling.value && channels.length > 0) {
-      startGridRotation(paneIndex, channels, 0)
-    }
-    return
-  }
-
-  const channelData = channels[currentIndex]
-  const channelNo = channelData.channelNo
-  const channelName = channelData.channelName || `通道${channelNo}`
-  const duration = channelData.duration || 15  // 默认15秒
-
-  if (!channelNo || channelNo <= 0) {
-    console.warn('[轮巡] 通道号无效，跳过:', channelData)
-    // 跳过无效通道，立即播放下一个
-    startGridRotation(paneIndex, channels, currentIndex + 1)
-    return
-  }
-
-  console.log('[轮巡] 格子', paneIndex + 1, '播放通道:', channelName, 
-    `(${currentIndex + 1}/${channels.length})`, '时长:', duration, '秒')
-
-  const pane = panes.value[paneIndex]
-  if (!pane) return
-
-  // 先停止该格子当前播放
-  if (pane.isPlaying) {
-    await stopPlayer(pane)
-  }
-
-  // 确保容器存在
-  await nextTick()
-  if (!pane.container) {
-    const el = document.querySelector(
-      `.player-pane[data-index="${paneIndex}"] .player-container`
-    ) as HTMLElement
-    if (el) pane.container = el
-  }
-
-  // 使用 NVR 配置播放
-  const config: DahuaPlayerConfig = {
-    ip: DEFAULT_NVR_CONFIG.ip,
-    port: DEFAULT_NVR_CONFIG.port,
-    rtspPort: DEFAULT_NVR_CONFIG.rtspPort,
-    username: DEFAULT_NVR_CONFIG.username,
-    password: DEFAULT_NVR_CONFIG.password,
-    channelNo: channelNo,
-    subtype: pane.streamType === 'sub' ? 1 : 0
-  }
-
-  // 等待视频真正开始播放后才开始计时
-  const success = await startPreview(pane, config, channelName)
-
-  if (!isPatrolling.value) return  // 轮巡已停止
-
-  if (success) {
-    // 播放成功，从视频打开后开始计时
-    console.log('[轮巡] 格子', paneIndex + 1, '视频已打开，开始计时', duration, '秒')
-    
-    const timer = window.setTimeout(() => {
-      if (isPatrolling.value) {
-        startGridRotation(paneIndex, channels, currentIndex + 1)
-      }
-    }, duration * 1000)
-
-    // 保存定时器以便清理
-    sceneRotationTimers.value.set(paneIndex, timer)
-  } else {
-    // 播放失败，跳过该通道，立即播放下一个
-    console.warn('[轮巡] 格子', paneIndex + 1, '播放失败，跳过:', channelName)
-    // 短暂延迟后播放下一个，避免快速连续失败
-    setTimeout(() => {
-      if (isPatrolling.value) {
-        startGridRotation(paneIndex, channels, currentIndex + 1)
-      }
-    }, 500)
-  }
+  })
 }
 
 // ==================== 生命周期 ====================

@@ -29,7 +29,7 @@ public class ParkingRechargeRecordController {
 
     @GetMapping("/page")
     @Operation(summary = "获得月卡充值记录分页")
-    @PreAuthorize("@ss.hasPermission('iot:parking:recharge-record:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:recharge-record:query-btn')")
     public CommonResult<PageResult<ParkingRechargeRecordRespVO>> getRechargeRecordPage(@Valid ParkingRechargeRecordPageReqVO pageReqVO) {
         PageResult<ParkingRechargeRecordDO> pageResult = parkingRechargeRecordService.getRechargeRecordPage(pageReqVO);
         return success(BeanUtils.toBean(pageResult, ParkingRechargeRecordRespVO.class));
@@ -37,7 +37,7 @@ public class ParkingRechargeRecordController {
 
     @GetMapping("/statistics")
     @Operation(summary = "获得充值统计")
-    @PreAuthorize("@ss.hasPermission('iot:parking:recharge-record:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:recharge-record:query-btn')")
     public CommonResult<ParkingRechargeStatisticsVO> getRechargeStatistics() {
         return success(parkingRechargeRecordService.getRechargeStatistics());
     }

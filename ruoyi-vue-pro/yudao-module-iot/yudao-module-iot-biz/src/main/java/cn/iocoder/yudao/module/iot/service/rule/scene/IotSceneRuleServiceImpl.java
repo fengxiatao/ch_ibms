@@ -18,8 +18,7 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.rule.IotSceneRuleDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.rule.IotSceneRuleMapper;
 import cn.iocoder.yudao.module.iot.dal.redis.RedisKeyConstants;
 import cn.iocoder.yudao.module.iot.enums.rule.IotSceneRuleTriggerTypeEnum;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
-import cn.iocoder.yudao.module.iot.service.product.IotProductService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsIotDualTrackDeviceResolver;
 import cn.iocoder.yudao.module.iot.service.rule.scene.action.IotSceneRuleAction;
 import cn.iocoder.yudao.module.iot.service.rule.scene.matcher.IotSceneRuleMatcherManager;
 import cn.iocoder.yudao.module.iot.service.rule.scene.timer.IotSceneRuleTimerHandler;
@@ -51,9 +50,7 @@ public class IotSceneRuleServiceImpl implements IotSceneRuleService {
     private IotSceneRuleMapper sceneRuleMapper;
 
     @Resource
-    private IotProductService productService;
-    @Resource
-    private IotDeviceService deviceService;
+    private IbmsIotDualTrackDeviceResolver dualTrackDeviceResolver;
 
     @Resource
     private IotSceneRuleMatcherManager sceneRuleMatcherManager;
@@ -195,7 +192,11 @@ public class IotSceneRuleServiceImpl implements IotSceneRuleService {
     @Override
     public void executeSceneRuleByDevice(IotDeviceMessage message) {
         // 1.1 这里的 tenantId，通过设备获取；
-        IotDeviceDO device = deviceService.getDeviceFromCache(message.getDeviceId());
+        IotDeviceDO device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(message.getDeviceId());
+        if (device == null || device.getTenantId() == null) {
+            log.warn("[executeSceneRuleByDevice][设备({}) 不存在或缺少租户]", message.getDeviceId());
+            return;
+        }
         TenantUtils.execute(device.getTenantId(), () -> {
             // 1.2 获得设备匹配的规则场景
             List<IotSceneRuleDO> sceneRules = getMatchedSceneRuleListByMessage(message);
@@ -243,14 +244,14 @@ public class IotSceneRuleServiceImpl implements IotSceneRuleService {
         // 1. 匹配设备
         // TODO 缓存 @puhui999：可能需要 getSelf()
         // 1.1 通过 deviceId 获取设备信息
-        IotDeviceDO device = getSelf().deviceService.getDeviceFromCache(message.getDeviceId());
+        IotDeviceDO device = getSelf().dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(message.getDeviceId());
         if (device == null) {
             log.warn("[getMatchedSceneRuleListByMessage][设备({}) 不存在]", message.getDeviceId());
             return List.of();
         }
 
         // 1.2 通过 productId 获取产品信息
-        IotProductDO product = getSelf().productService.getProductFromCache(device.getProductId());
+        IotProductDO product = getSelf().dualTrackDeviceResolver.getProductShellPreferIotThenIbms(device.getProductId());
         if (product == null) {
             log.warn("[getMatchedSceneRuleListByMessage][产品({}) 不存在]", device.getProductId());
             return List.of();

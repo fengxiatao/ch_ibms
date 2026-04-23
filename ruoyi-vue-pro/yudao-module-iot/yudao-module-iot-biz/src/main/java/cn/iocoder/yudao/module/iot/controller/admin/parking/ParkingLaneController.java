@@ -57,7 +57,7 @@ public class ParkingLaneController {
     @GetMapping("/get")
     @Operation(summary = "获得车道")
     @Parameter(name = "id", description = "编号", required = true)
-    @PreAuthorize("@ss.hasPermission('iot:parking:lane:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:lane:query-btn')")
     public CommonResult<ParkingLaneRespVO> getParkingLane(@RequestParam("id") Long id) {
         ParkingLaneDO parkingLane = parkingLaneService.getParkingLane(id);
         return success(BeanUtils.toBean(parkingLane, ParkingLaneRespVO.class));
@@ -65,7 +65,7 @@ public class ParkingLaneController {
 
     @GetMapping("/page")
     @Operation(summary = "获得车道分页")
-    @PreAuthorize("@ss.hasPermission('iot:parking:lane:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:lane:query-btn')")
     public CommonResult<PageResult<ParkingLaneRespVO>> getParkingLanePage(@Valid ParkingLanePageReqVO pageReqVO) {
         PageResult<ParkingLaneDO> pageResult = parkingLaneService.getParkingLanePage(pageReqVO);
         return success(BeanUtils.toBean(pageResult, ParkingLaneRespVO.class));
@@ -74,7 +74,7 @@ public class ParkingLaneController {
     @GetMapping("/list-by-lot")
     @Operation(summary = "获得车场的车道列表")
     @Parameter(name = "lotId", description = "车场ID", required = true)
-    @PreAuthorize("@ss.hasPermission('iot:parking:lane:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:lane:query-btn')")
     public CommonResult<List<ParkingLaneRespVO>> getParkingLaneListByLotId(@RequestParam("lotId") Long lotId) {
         List<ParkingLaneDO> list = parkingLaneService.getParkingLaneListByLotId(lotId);
         return success(BeanUtils.toBean(list, ParkingLaneRespVO.class));

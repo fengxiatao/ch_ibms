@@ -1,0 +1,13 @@
+{
+  "comment": "将 x,y,w,h 改成你视频里「寓」「信」各自的大致矩形（像素）。可运行: python replace_video_text.py --input ../public/bi.mp4 --dump-frame 0 得到首帧再量。",
+  "font_path": null,
+  "font_size": null,
+  "text_color": [255, 255, 255],
+  "outline_color": [0, 0, 0],
+  "outline_width": 1,
+  "inpaint_radius": 5,
+  "regions": [
+    { "x": 400, "y": 520, "w": 42, "h": 46, "replace_with": "长" },
+    { "x": 448, "y": 520, "w": 42, "h": 46, "replace_with": "辉" }
+  ]
+}

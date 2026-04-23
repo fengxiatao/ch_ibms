@@ -9,7 +9,10 @@ import cn.iocoder.yudao.module.system.controller.admin.tenant.vo.packages.Tenant
 import cn.iocoder.yudao.module.system.controller.admin.tenant.vo.packages.TenantPackageSaveReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.tenant.TenantDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.tenant.TenantPackageDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.permission.MenuDO;
 import cn.iocoder.yudao.module.system.dal.mysql.tenant.TenantPackageMapper;
+import cn.iocoder.yudao.module.system.enums.permission.MenuTypeEnum;
+import cn.iocoder.yudao.module.system.service.permission.MenuService;
 import com.baomidou.dynamic.datasource.annotation.DSTransactional;
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Resource;
@@ -17,7 +20,9 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.*;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.*;
@@ -35,6 +40,9 @@ public class TenantPackageServiceImpl implements TenantPackageService {
     private TenantPackageMapper tenantPackageMapper;
 
     @Resource
+    private MenuService menuService;
+
+    @Resource
     @Lazy // 避免循环依赖的报错
     private TenantService tenantService;
 
@@ -44,6 +52,7 @@ public class TenantPackageServiceImpl implements TenantPackageService {
         validateTenantPackageNameUnique(null, createReqVO.getName());
         // 插入
         TenantPackageDO tenantPackage = BeanUtils.toBean(createReqVO, TenantPackageDO.class);
+        tenantPackage.setMenuIds(normalizeTenantPackageMenuIds(createReqVO.getMenuIds()));
         tenantPackageMapper.insert(tenantPackage);
         // 返回
         return tenantPackage.getId();
@@ -56,14 +65,79 @@ public class TenantPackageServiceImpl implements TenantPackageService {
         TenantPackageDO tenantPackage = validateTenantPackageExists(updateReqVO.getId());
         // 校验套餐名是否重复
         validateTenantPackageNameUnique(updateReqVO.getId(), updateReqVO.getName());
+        // 将套餐菜单固化为「按钮权限(type=3)且 permission 非空」+「其父级目录链」
+        // 目的：权限来源仍以按钮为准，同时保证前端可构建菜单树，避免左侧菜单为空
+        Set<Long> normalizedMenuIds = normalizeTenantPackageMenuIds(updateReqVO.getMenuIds());
         // 更新
         TenantPackageDO updateObj = BeanUtils.toBean(updateReqVO, TenantPackageDO.class);
+        updateObj.setMenuIds(normalizedMenuIds);
         tenantPackageMapper.updateById(updateObj);
-        // 如果菜单发生变化，则修改每个租户的菜单
-        if (!CollUtil.isEqualList(tenantPackage.getMenuIds(), updateReqVO.getMenuIds())) {
-            List<TenantDO> tenants = tenantService.getTenantListByPackageId(tenantPackage.getId());
-            tenants.forEach(tenant -> tenantService.updateTenantRoleMenu(tenant.getId(), updateReqVO.getMenuIds()));
+        // 固化策略：每次保存套餐后，都立即重算该套餐下租户的角色菜单
+        // 这样可以确保「租户管理员 = 套餐权限」及时生效，并触发权限缓存刷新
+        List<TenantDO> tenants = tenantService.getTenantListByPackageId(tenantPackage.getId());
+        tenants.forEach(tenant -> tenantService.updateTenantRoleMenu(tenant.getId(), normalizedMenuIds));
+    }
+
+    private Set<Long> normalizeTenantPackageMenuIds(Set<Long> menuIds) {
+        if (CollUtil.isEmpty(menuIds)) {
+            return Collections.emptySet();
         }
+
+        // 全量菜单用于构建父子树
+        List<MenuDO> allMenus = menuService.getMenuList();
+        if (CollUtil.isEmpty(allMenus)) {
+            return Collections.emptySet();
+        }
+
+        Map<Long, MenuDO> menuById = allMenus.stream()
+                .collect(Collectors.toMap(MenuDO::getId, m -> m, (a, b) -> a));
+        Map<Long, List<Long>> childrenIdsByParentId = new HashMap<>();
+        for (MenuDO menu : allMenus) {
+            childrenIdsByParentId.computeIfAbsent(menu.getParentId(), k -> new ArrayList<>()).add(menu.getId());
+        }
+
+        // 1) 从选择的节点出发，递归展开子树
+        Set<Long> expandedIds = new HashSet<>();
+        Deque<Long> queue = new ArrayDeque<>(menuIds);
+        while (!queue.isEmpty()) {
+            Long id = queue.pollFirst();
+            if (id == null || !expandedIds.add(id)) {
+                continue;
+            }
+            List<Long> children = childrenIdsByParentId.get(id);
+            if (CollUtil.isNotEmpty(children)) {
+                children.forEach(queue::addLast);
+            }
+        }
+
+        // 2) 按钮权限作为授权来源（type=3 且 permission 非空）
+        Set<Long> buttonIds = expandedIds.stream()
+                .map(menuById::get)
+                .filter(Objects::nonNull)
+                .filter(m -> Objects.equals(m.getType(), MenuTypeEnum.BUTTON.getType()))
+                .filter(m -> StrUtil.isNotBlank(m.getPermission()))
+                .map(MenuDO::getId)
+                .collect(Collectors.toSet());
+
+        if (CollUtil.isEmpty(buttonIds)) {
+            return Collections.emptySet();
+        }
+
+        // 3) 为每个按钮补齐父级目录链（type=1/2），否则前端菜单树无法构建
+        Set<Long> normalizedIds = new HashSet<>(buttonIds);
+        for (Long buttonId : buttonIds) {
+            MenuDO current = menuById.get(buttonId);
+            Set<Long> visited = new HashSet<>();
+            while (current != null
+                    && current.getParentId() != null
+                    && !Objects.equals(current.getParentId(), MenuDO.ID_ROOT)
+                    && visited.add(current.getParentId())) {
+                Long parentId = current.getParentId();
+                normalizedIds.add(parentId);
+                current = menuById.get(parentId);
+            }
+        }
+        return normalizedIds;
     }
 
     @Override

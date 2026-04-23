@@ -1,13 +1,8 @@
 package cn.iocoder.yudao.module.iot.service.subsystem;
 
-import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.iot.controller.admin.subsystem.vo.SubsystemRespVO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.subsystem.SubsystemDO;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.product.IotProductMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.subsystem.SubsystemMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
@@ -35,12 +30,6 @@ public class SubsystemServiceImpl implements SubsystemService {
     @Resource
     private SubsystemMapper subsystemMapper;
 
-    @Resource
-    private IotProductMapper productMapper;
-
-    @Resource
-    private IotDeviceMapper deviceMapper;
-
     @Override
     @TenantIgnore // 子系统是全局共享的，忽略租户过滤
     public List<SubsystemRespVO> getSubsystemList() {
@@ -64,8 +53,8 @@ public class SubsystemServiceImpl implements SubsystemService {
                .eq(SubsystemDO::getEnabled, true)
                .orderByAsc(SubsystemDO::getSort)
         );
-        
-        log.info("[子系统查询] 查询结果: 共 {} 条记录", allSubsystems == null ? 0 : allSubsystems.size());
+        allSubsystems = allSubsystems == null ? List.of() : allSubsystems;
+        log.info("[子系统查询] 查询结果: 共 {} 条记录", allSubsystems.size());
 
         // 转换为VO
         List<SubsystemRespVO> allVOs = allSubsystems.stream()

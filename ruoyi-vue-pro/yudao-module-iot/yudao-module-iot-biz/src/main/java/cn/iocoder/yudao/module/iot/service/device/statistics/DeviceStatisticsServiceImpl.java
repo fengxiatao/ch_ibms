@@ -5,7 +5,9 @@ import cn.iocoder.yudao.module.iot.controller.admin.device.vo.statistics.DeviceT
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.statistics.DeviceTrendRespVO;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.statistics.DeviceTypeStatisticsRespVO;
 import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceRuntimeMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,19 +32,35 @@ import java.util.Map;
 public class DeviceStatisticsServiceImpl implements DeviceStatisticsService {
 
     @Resource
-    private IotDeviceMapper deviceMapper;
+    private IbmsDeviceMapper deviceMapper;
+    @Resource
+    private IbmsDeviceRuntimeMapper deviceRuntimeMapper;
 
     @Override
     public DeviceOnlineStatisticsRespVO getOnlineStatistics() {
-        // 按状态分组统计设备数量
-        Map<Integer, Long> stateCountMap = deviceMapper.selectDeviceCountGroupByState();
-        
-        // 提取各状态数量
-        int onlineCount = getCountForState(stateCountMap, IotDeviceStateEnum.ONLINE.getState());
-        int offlineCount = getCountForState(stateCountMap, IotDeviceStateEnum.OFFLINE.getState());
-        int inactiveCount = getCountForState(stateCountMap, IotDeviceStateEnum.INACTIVE.getState());
-        
-        // 计算总数
+        // 单台账：state 来自 ibms_device_runtime（缺失时视为 INACTIVE）
+        List<IbmsDeviceDO> devices = deviceMapper.selectList();
+        if (devices == null) {
+            devices = List.of();
+        }
+
+        List<Long> ids = devices.stream().map(IbmsDeviceDO::getId).toList();
+        Map<Long, Integer> stateMap = deviceRuntimeMapper.selectStateMapByDeviceIds(ids);
+
+        int onlineCount = 0;
+        int offlineCount = 0;
+        int inactiveCount = 0;
+        for (IbmsDeviceDO d : devices) {
+            Integer state = stateMap.getOrDefault(d.getId(), IotDeviceStateEnum.INACTIVE.getState());
+            if (IotDeviceStateEnum.ONLINE.getState().equals(state)) {
+                onlineCount++;
+            } else if (IotDeviceStateEnum.OFFLINE.getState().equals(state)) {
+                offlineCount++;
+            } else {
+                inactiveCount++;
+            }
+        }
+
         int totalCount = onlineCount + offlineCount + inactiveCount;
         
         // 计算离线率
@@ -59,26 +77,41 @@ public class DeviceStatisticsServiceImpl implements DeviceStatisticsService {
 
     @Override
     public List<DeviceTypeStatisticsRespVO> getStatisticsByType() {
-        // 按设备类型和状态分组统计
-        Map<Integer, Map<Integer, Long>> typeStateCountMap = deviceMapper.selectDeviceCountGroupByTypeAndState();
-        
-        if (typeStateCountMap == null || typeStateCountMap.isEmpty()) {
+        // 单台账：以 ibms_device.deviceType 分组，state 来自 ibms_device_runtime（缺失时视为 INACTIVE）
+        List<IbmsDeviceDO> devices = deviceMapper.selectList();
+        if (devices == null) {
+            devices = List.of();
+        }
+        List<Long> ids = devices.stream().map(IbmsDeviceDO::getId).toList();
+        Map<Long, Integer> stateMap = deviceRuntimeMapper.selectStateMapByDeviceIds(ids);
+
+        Map<Integer, Map<Integer, Integer>> typeStateCountMap = new java.util.HashMap<>();
+        for (IbmsDeviceDO d : devices) {
+            Integer deviceType = d.getDeviceType();
+            if (deviceType == null) {
+                deviceType = -1;
+            }
+            Integer state = stateMap.getOrDefault(d.getId(), IotDeviceStateEnum.INACTIVE.getState());
+            typeStateCountMap
+                    .computeIfAbsent(deviceType, k -> new java.util.HashMap<>())
+                    .merge(state, 1, Integer::sum);
+        }
+
+        if (typeStateCountMap.isEmpty()) {
             return Collections.emptyList();
         }
-        
+
         List<DeviceTypeStatisticsRespVO> result = new ArrayList<>();
-        
-        for (Map.Entry<Integer, Map<Integer, Long>> entry : typeStateCountMap.entrySet()) {
+        for (Map.Entry<Integer, Map<Integer, Integer>> entry : typeStateCountMap.entrySet()) {
             Integer deviceType = entry.getKey();
-            Map<Integer, Long> stateCountMap = entry.getValue();
-            
-            int onlineCount = getCountForState(stateCountMap, IotDeviceStateEnum.ONLINE.getState());
-            int offlineCount = getCountForState(stateCountMap, IotDeviceStateEnum.OFFLINE.getState());
-            int inactiveCount = getCountForState(stateCountMap, IotDeviceStateEnum.INACTIVE.getState());
+            Map<Integer, Integer> stateCountMap = entry.getValue();
+
+            int onlineCount = stateCountMap.getOrDefault(IotDeviceStateEnum.ONLINE.getState(), 0);
+            int offlineCount = stateCountMap.getOrDefault(IotDeviceStateEnum.OFFLINE.getState(), 0);
+            int inactiveCount = stateCountMap.getOrDefault(IotDeviceStateEnum.INACTIVE.getState(), 0);
             int totalCount = onlineCount + offlineCount + inactiveCount;
-            
             BigDecimal offlineRate = calculateOfflineRate(offlineCount, totalCount);
-            
+
             result.add(DeviceTypeStatisticsRespVO.builder()
                     .deviceType(deviceType)
                     .deviceTypeName(getDeviceTypeName(deviceType))
@@ -89,7 +122,7 @@ public class DeviceStatisticsServiceImpl implements DeviceStatisticsService {
                     .offlineRate(offlineRate)
                     .build());
         }
-        
+
         return result;
     }
 
@@ -125,14 +158,6 @@ public class DeviceStatisticsServiceImpl implements DeviceStatisticsService {
      * @param state 状态值
      * @return 数量，如果不存在则返回 0
      */
-    private int getCountForState(Map<Integer, Long> stateCountMap, Integer state) {
-        if (stateCountMap == null || state == null) {
-            return 0;
-        }
-        Long count = stateCountMap.get(state);
-        return count != null ? count.intValue() : 0;
-    }
-
     /**
      * 计算离线率
      * 

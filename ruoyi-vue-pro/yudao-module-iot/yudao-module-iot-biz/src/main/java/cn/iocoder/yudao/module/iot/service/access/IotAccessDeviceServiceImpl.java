@@ -7,10 +7,16 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsProductMapper;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
 import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.mq.producer.DeviceCommandPublisher;
 import cn.iocoder.yudao.module.iot.websocket.DeviceMessagePushService;
+import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -19,6 +25,8 @@ import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.mq.manager.DeviceCommandResponseManager;
 import jakarta.annotation.Resource;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,7 +71,7 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
     private DeviceCommandResponseManager responseManager;
 
     @Resource
-    private IotDeviceMapper deviceMapper;
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @Resource
     private DeviceCommandPublisher deviceCommandPublisher;
@@ -78,10 +86,13 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
     private IotAccessDeviceCapabilityService capabilityService;
 
     @Resource
-    private cn.iocoder.yudao.module.iot.dal.mysql.product.IotProductMapper productMapper;
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
 
     @Resource
-    private cn.iocoder.yudao.module.iot.dal.mysql.channel.IotDeviceChannelMapper channelMapper;
+    private IbmsProductMapper ibmsProductMapper;
+
+    @Resource
+    private IotDeviceChannelService iotDeviceChannelService;
 
     /**
      * 根据设备配置获取设备类型
@@ -151,13 +162,9 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
             throw exception(ACCESS_DEVICE_ACTIVATE_FAILED);
         }
         
-        // 更新设备状态为在线
-        IotDeviceDO updateDevice = new IotDeviceDO();
-        updateDevice.setId(deviceId);
-        updateDevice.setState(IotDeviceStateEnum.ONLINE.getState());
-        updateDevice.setOnlineTime(LocalDateTime.now());
-        updateDevice.setActiveTime(LocalDateTime.now());
-        deviceMapper.updateById(updateDevice);
+        // 仅写入 IBMS 运行态，避免任何 iot_device 更新副作用
+        ibmsDeviceRuntimeService.patchGatewayState(
+                deviceId, device.getTenantId(), IotDeviceStateEnum.ONLINE.getState(), System.currentTimeMillis());
         
         // 自动发现通道
         try {
@@ -201,12 +208,9 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
         // 使用 DeviceCommandPublisher 发送停用命令（不等待响应）
         deviceCommandPublisher.publishCommand(deviceType, deviceId, CMD_DEACTIVATE_DEVICE, params);
         
-        // 更新设备状态为离线
-        IotDeviceDO updateDevice = new IotDeviceDO();
-        updateDevice.setId(deviceId);
-        updateDevice.setState(IotDeviceStateEnum.OFFLINE.getState());
-        updateDevice.setOfflineTime(LocalDateTime.now());
-        deviceMapper.updateById(updateDevice);
+        // 仅写入 IBMS 运行态，避免任何 iot_device 更新副作用
+        ibmsDeviceRuntimeService.patchGatewayState(
+                deviceId, device.getTenantId(), IotDeviceStateEnum.OFFLINE.getState(), System.currentTimeMillis());
         
         // 推送设备离线WebSocket消息
         deviceMessagePushService.pushDeviceStatus(deviceId, deviceType, "OFFLINE", System.currentTimeMillis());
@@ -216,28 +220,43 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
 
     @Override
     public List<IotDeviceDO> getAccessDevices() {
-        return deviceMapper.selectList(new LambdaQueryWrapperX<IotDeviceDO>()
-                .eq(IotDeviceDO::getSubsystemCode, ACCESS_SUBSYSTEM_CODE)
-                .orderByDesc(IotDeviceDO::getId));
+        List<IbmsDeviceDO> ibmsDevices = ibmsDeviceMapper.selectList(
+                new LambdaQueryWrapperX<IbmsDeviceDO>()
+                        .eq(IbmsDeviceDO::getSubsystemCode, ACCESS_SUBSYSTEM_CODE)
+                        .orderByDesc(IbmsDeviceDO::getId));
+        if (ibmsDevices == null || ibmsDevices.isEmpty()) {
+            return List.of();
+        }
+        List<IotDeviceDO> devices = new ArrayList<>(ibmsDevices.size());
+        for (IbmsDeviceDO ibms : ibmsDevices) {
+            if (ibms == null) {
+                continue;
+            }
+            IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(ibms.getId());
+            IotDeviceDO shell = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibms, runtime);
+            if (shell != null) {
+                devices.add(shell);
+            }
+        }
+        return devices;
     }
 
     @Override
     public List<IotDeviceDO> getOnlineAccessDevices() {
-        return deviceMapper.selectList(new LambdaQueryWrapperX<IotDeviceDO>()
-                .eq(IotDeviceDO::getSubsystemCode, ACCESS_SUBSYSTEM_CODE)
-                .eq(IotDeviceDO::getState, IotDeviceStateEnum.ONLINE.getState())
-                .orderByDesc(IotDeviceDO::getId));
+        return getAccessDevices().stream()
+                .filter(d -> IotDeviceStateEnum.ONLINE.getState().equals(d.getState()))
+                .collect(java.util.stream.Collectors.toList());
     }
 
     @Override
     public boolean isDeviceOnline(Long deviceId) {
-        IotDeviceDO device = deviceMapper.selectById(deviceId);
-        return device != null && IotDeviceStateEnum.ONLINE.getState().equals(device.getState());
+        IotDeviceDO device = validateAccessDevice(deviceId);
+        return IotDeviceStateEnum.ONLINE.getState().equals(device.getState());
     }
 
     @Override
     public IotDeviceDO getAccessDevice(Long deviceId) {
-        return deviceMapper.selectById(deviceId);
+        return validateAccessDevice(deviceId);
     }
 
     /**
@@ -284,10 +303,10 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
         // 2. 获取产品信息
         String productName = null;
         if (device.getProductId() != null) {
-            cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO product = 
-                    productMapper.selectById(device.getProductId());
+            cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsProductDO product =
+                    ibmsProductMapper.selectById(device.getProductId());
             if (product != null) {
-                productName = product.getName();
+                productName = product.getProductName();
             }
         }
         
@@ -306,11 +325,18 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
             onlineDuration = java.time.Duration.between(device.getOnlineTime(), LocalDateTime.now()).getSeconds();
         }
         
-        // 5. 获取通道列表
-        List<cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO> channels = 
-                channelMapper.selectList(new LambdaQueryWrapperX<cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO>()
-                        .eq(cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO::getDeviceId, deviceId)
-                        .orderByAsc(cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO::getChannelNo));
+        // 5. 获取通道列表（迁移到 ibms_channel，门禁通道 type=ACCESS）
+        List<cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO> allChannels =
+                iotDeviceChannelService.getChannelsByDeviceId(deviceId);
+        List<cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO> channels = new ArrayList<>();
+        for (cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO c : allChannels) {
+            if (c != null && "ACCESS".equalsIgnoreCase(c.getChannelType())) {
+                channels.add(c);
+            }
+        }
+        channels.sort(Comparator.comparing(
+                cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO::getChannelNo,
+                Comparator.nullsLast(Integer::compareTo)));
         
         // 6. 构建响应VO
         cn.iocoder.yudao.module.iot.controller.admin.access.vo.device.IotAccessDeviceConfigRespVO respVO = 
@@ -430,11 +456,17 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
     }
 
     private IotDeviceDO validateAccessDevice(Long deviceId) {
-        IotDeviceDO device = deviceMapper.selectById(deviceId);
-        if (device == null) {
+        IbmsDeviceDO ibmsDevice = ibmsDeviceMapper.selectById(deviceId);
+        if (ibmsDevice == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
-        if (!ACCESS_SUBSYSTEM_CODE.equals(device.getSubsystemCode())) {
+        if (!ACCESS_SUBSYSTEM_CODE.equals(ibmsDevice.getSubsystemCode())) {
+            throw exception(ACCESS_DEVICE_NOT_EXISTS);
+        }
+
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(deviceId);
+        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibmsDevice, runtime);
+        if (device == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
         return device;

@@ -4,12 +4,11 @@ import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.quartz.core.enums.JobBusinessType;
 import cn.iocoder.yudao.framework.quartz.core.enums.JobPriority;
-import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.framework.iot.config.YudaoIotProperties;
 import cn.iocoder.yudao.module.iot.framework.job.IotBusinessJobHandler;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsIotDualTrackDeviceResolver;
 import cn.iocoder.yudao.module.iot.service.device.message.IotDeviceMessageService;
 import cn.iocoder.yudao.module.iot.service.device.property.IotDevicePropertyService;
 import jakarta.annotation.Resource;
@@ -40,7 +39,7 @@ public class IotDeviceOfflineCheckJob extends IotBusinessJobHandler {
     private YudaoIotProperties iotProperties;
 
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsIotDualTrackDeviceResolver dualTrackDeviceResolver;
     @Resource
     private IotDevicePropertyService devicePropertyService;
     @Resource
@@ -63,8 +62,8 @@ public class IotDeviceOfflineCheckJob extends IotBusinessJobHandler {
 
     @Override
     protected String doExecute(String param) {
-        // 1.1 获得在线设备列表
-        List<IotDeviceDO> devices = deviceService.getDeviceListByState(IotDeviceStateEnum.ONLINE.getState());
+        // 1.1 获得在线设备列表（IoT 台账 + IBMS 运行态在线）
+        List<IotDeviceDO> devices = dualTrackDeviceResolver.listOnlineDeviceShellsMergedForOfflineCheck();
         if (CollUtil.isEmpty(devices)) {
             return JsonUtils.toJsonString(Collections.emptyList());
         }

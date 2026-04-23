@@ -14,10 +14,14 @@ import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPersonCredentialMap
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPersonMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPermissionGroupDeviceMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPermissionGroupPersonMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.channel.IotDeviceChannelMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
 import cn.iocoder.yudao.module.iot.service.access.IotAccessEventLogService;
 import cn.iocoder.yudao.module.iot.service.access.IotAccessOperationLogService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -41,10 +45,13 @@ import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.*;
 public class IotAccessCredentialServiceImpl implements IotAccessCredentialService {
 
     @Resource
-    private IotDeviceChannelMapper channelMapper;
+    private IotDeviceChannelService iotDeviceChannelService;
 
     @Resource
-    private IotDeviceMapper deviceMapper;
+    private IbmsDeviceMapper ibmsDeviceMapper;
+
+    @Resource
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
 
     @Resource
     private IotAccessPersonCredentialMapper credentialMapper;
@@ -78,7 +85,7 @@ public class IotAccessCredentialServiceImpl implements IotAccessCredentialServic
 
         try {
             // 1. 获取通道信息
-            IotDeviceChannelDO channel = channelMapper.selectById(reqVO.getChannelId());
+            IotDeviceChannelDO channel = iotDeviceChannelService.getChannel(reqVO.getChannelId());
             if (channel == null) {
                 respVO.setMessage("通道不存在");
                 respVO.setFailReason("通道不存在");
@@ -87,7 +94,14 @@ public class IotAccessCredentialServiceImpl implements IotAccessCredentialServic
             respVO.setChannelName(channel.getChannelName());
 
             // 2. 获取设备信息
-            IotDeviceDO device = deviceMapper.selectById(channel.getDeviceId());
+            IbmsDeviceDO ibmsDevice = ibmsDeviceMapper.selectById(channel.getDeviceId());
+            if (ibmsDevice == null) {
+                respVO.setMessage("设备不存在");
+                respVO.setFailReason("设备不存在");
+                return respVO;
+            }
+            IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(channel.getDeviceId());
+            IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibmsDevice, runtime);
             if (device == null) {
                 respVO.setMessage("设备不存在");
                 respVO.setFailReason("设备不存在");

@@ -1,6 +1,6 @@
 import router from '@/router'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
-import { getRawRoute } from '@/utils/routerHelper'
+import { getRawRoute, getRouteIdentityKey, isSameRouteIdentity } from '@/utils/routerHelper'
 import { defineStore } from 'pinia'
 import { store } from '../index'
 import { findIndex } from '@/utils'
@@ -37,9 +37,17 @@ export const useTagsViewStore = defineStore('tagsView', {
     },
     // 新增tag
     addVisitedView(view: RouteLocationNormalizedLoaded) {
-      if (this.visitedViews.some((v) => v.fullPath === view.fullPath)) return
       if (view.meta?.noTagsView) return
       const visitedView = Object.assign({}, view, { title: view.meta?.title || 'no-name' })
+      const currentIndex = this.visitedViews.findIndex((v) => isSameRouteIdentity(v, view))
+
+      if (currentIndex > -1) {
+        this.visitedViews[currentIndex] = Object.assign({}, this.visitedViews[currentIndex], visitedView)
+        this.visitedViews = this.visitedViews.filter((item, index) => {
+          return index === currentIndex || !isSameRouteIdentity(item, view)
+        })
+        return
+      }
 
       if (visitedView.meta) {
         const titleSuffixList: string[] = []
@@ -83,7 +91,7 @@ export const useTagsViewStore = defineStore('tagsView', {
     // 删除tag
     delVisitedView(view: RouteLocationNormalizedLoaded) {
       for (const [i, v] of this.visitedViews.entries()) {
-        if (v.fullPath === view.fullPath) {
+        if (isSameRouteIdentity(v, view)) {
           this.visitedViews.splice(i, 1)
           break
         }
@@ -119,18 +127,18 @@ export const useTagsViewStore = defineStore('tagsView', {
     // 删除其他tag
     delOthersVisitedViews(view: RouteLocationNormalizedLoaded) {
       this.visitedViews = this.visitedViews.filter((v) => {
-        return v?.meta?.affix || v.fullPath === view.fullPath
+        return v?.meta?.affix || isSameRouteIdentity(v, view)
       })
     },
     // 删除左侧
     delLeftViews(view: RouteLocationNormalizedLoaded) {
       const index = findIndex<RouteLocationNormalizedLoaded>(
         this.visitedViews,
-        (v) => v.fullPath === view.fullPath
+        (v) => isSameRouteIdentity(v, view)
       )
       if (index > -1) {
         this.visitedViews = this.visitedViews.filter((v, i) => {
-          return v?.meta?.affix || v.fullPath === view.fullPath || i > index
+          return v?.meta?.affix || isSameRouteIdentity(v, view) || i > index
         })
         this.addCachedView()
       }
@@ -139,18 +147,18 @@ export const useTagsViewStore = defineStore('tagsView', {
     delRightViews(view: RouteLocationNormalizedLoaded) {
       const index = findIndex<RouteLocationNormalizedLoaded>(
         this.visitedViews,
-        (v) => v.fullPath === view.fullPath
+        (v) => isSameRouteIdentity(v, view)
       )
       if (index > -1) {
         this.visitedViews = this.visitedViews.filter((v, i) => {
-          return v?.meta?.affix || v.fullPath === view.fullPath || i < index
+          return v?.meta?.affix || isSameRouteIdentity(v, view) || i < index
         })
         this.addCachedView()
       }
     },
     updateVisitedView(view: RouteLocationNormalizedLoaded) {
       for (let v of this.visitedViews) {
-        if (v.fullPath === view.fullPath) {
+        if (isSameRouteIdentity(v, view)) {
           v = Object.assign(v, view)
           break
         }

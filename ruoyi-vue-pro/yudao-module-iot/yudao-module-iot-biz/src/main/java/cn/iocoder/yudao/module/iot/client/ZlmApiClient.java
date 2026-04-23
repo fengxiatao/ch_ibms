@@ -5,6 +5,8 @@ import cn.hutool.core.util.StrUtil;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -25,6 +27,8 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class ZlmApiClient {
+
+    private static final Logger log = LoggerFactory.getLogger(ZlmApiClient.class);
 
     private final ZlmConfig config;
     private final RestTemplate restTemplate = new RestTemplate();
@@ -305,6 +309,14 @@ public class ZlmApiClient {
         private String msg;
         private Object data;
 
+        public Integer getCode() {
+            return code;
+        }
+
+        public String getMsg() {
+            return msg;
+        }
+
         /**
          * 获取原始 data（可能是 Map、List 或其他类型）
          */
@@ -344,5 +356,41 @@ public class ZlmApiClient {
         private String webRtcUrl;
         /** 流标识 */
         private String streamKey;
+
+        public void setWsFlvUrl(String wsFlvUrl) {
+            this.wsFlvUrl = wsFlvUrl;
+        }
+
+        public void setFlvUrl(String flvUrl) {
+            this.flvUrl = flvUrl;
+        }
+
+        public void setHlsUrl(String hlsUrl) {
+            this.hlsUrl = hlsUrl;
+        }
+
+        public void setWsFmp4Url(String wsFmp4Url) {
+            this.wsFmp4Url = wsFmp4Url;
+        }
+
+        public void setTsUrl(String tsUrl) {
+            this.tsUrl = tsUrl;
+        }
+
+        public void setRtspUrl(String rtspUrl) {
+            this.rtspUrl = rtspUrl;
+        }
+
+        public void setRtmpUrl(String rtmpUrl) {
+            this.rtmpUrl = rtmpUrl;
+        }
+
+        public void setWebRtcUrl(String webRtcUrl) {
+            this.webRtcUrl = webRtcUrl;
+        }
+
+        public void setStreamKey(String streamKey) {
+            this.streamKey = streamKey;
+        }
     }
 }

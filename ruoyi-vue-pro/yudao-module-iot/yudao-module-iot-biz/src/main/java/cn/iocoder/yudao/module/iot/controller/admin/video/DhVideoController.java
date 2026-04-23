@@ -1,12 +1,13 @@
 package cn.iocoder.yudao.module.iot.controller.admin.video;
 
-import cn.hutool.json.JSONObject;
-import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.iot.controller.admin.video.vo.DahuaPlaybackParamsRespVO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
 import cn.iocoder.yudao.module.iot.service.video.CameraRecordingService;
+import cn.iocoder.yudao.module.iot.service.video.IbmsDeviceVideoNetworkResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,8 +32,11 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class DhVideoController {
 
     @Resource
-    private IotDeviceService deviceService;
-    
+    private IbmsDeviceMapper ibmsDeviceMapper;
+
+    @Resource
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
+
     @Resource
     private CameraRecordingService recordingService;
     
@@ -51,55 +55,32 @@ public class DhVideoController {
             @Parameter(description = "码流类型(0:子码流,1:主码流，默认0)")
             @RequestParam(value = "subType", required = false, defaultValue = "0") Integer subType
     ) {
-        IotDeviceDO device = deviceService.getDevice(deviceId);
+        IbmsDeviceDO device = ibmsDeviceMapper.selectById(deviceId);
         if (device == null) {
             throw new RuntimeException("设备不存在: deviceId=" + deviceId);
         }
 
-        // 基础信息
-        String ip = "";
-        if (device.getConfig() != null) {
-            ip = StringUtils.defaultIfBlank(device.getConfig().getIpAddress(), "");
-        }
-        Integer httpPort = 80;
-        Integer rtspPort = 554;
-        String username = null;
-        String password = null;
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(deviceId);
+        IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(device, runtime);
 
-        // 从设备配置读取参数
-        if (device.getConfig() != null) {
-            try {
-                JSONObject cfg = JSONUtil.parseObj(JSONUtil.toJsonStr(device.getConfig().toMap()));
-                httpPort = cfg.getInt("httpPort", httpPort);
-                rtspPort = cfg.getInt("rtspPort", rtspPort);
-                // 优先使用配置里的账号
-                username = StringUtils.defaultIfBlank(cfg.getStr("username"), username);
-                password = StringUtils.defaultIfBlank(cfg.getStr("password"), password);
-                // 某些数据可能把 ip 放在 config
-                ip = StringUtils.defaultIfBlank(ip, cfg.getStr("ip"));
-            } catch (Exception ignored) { }
-        }
-
-        // 仅依赖 iot_device.config，不再访问摄像头表
-
-        if (StringUtils.isBlank(ip)) {
+        if (StringUtils.isBlank(net.ip)) {
             throw new RuntimeException("设备IP未配置: deviceId=" + deviceId);
         }
 
         // 构造 Dahua H5 播放参数
-        String wsURL = String.format("ws://%s:%d/rtspoverwebsocket", ip, httpPort);
+        String wsURL = String.format("ws://%s:%d/rtspoverwebsocket", net.ip, net.httpPort);
         // Align with Dahua H5 demo: both wsURL and rtspURL use the device HTTP port
         String rtspURL = String.format(
                 "rtsp://%s:%d/cam/realmonitor?channel=%d&subtype=%d&proto=Private3",
-                ip, httpPort, channel, subType
+                net.ip, net.httpPort, channel, subType
         );
-        String target = String.format("%s:%d", ip, httpPort);
+        String target = String.format("%s:%d", net.ip, net.httpPort);
 
         DhPlayParamsRespVO vo = new DhPlayParamsRespVO();
         vo.setWsURL(wsURL);
         vo.setRtspURL(rtspURL);
-        vo.setUsername(username);
-        vo.setPassword(password);
+        vo.setUsername(net.username);
+        vo.setPassword(net.password);
         vo.setTarget(target);
         return success(vo);
     }
@@ -121,33 +102,14 @@ public class DhVideoController {
             throw new RuntimeException("摄像头不存在: cameraI d=" + cameraId);
         }
 
-        // 通过摄像头的deviceId获取设备信息（主要为了获取IP）
-        IotDeviceDO device = deviceService.getDevice(camera.getDeviceId());
+        IbmsDeviceDO device = ibmsDeviceMapper.selectById(camera.getDeviceId());
         if (device == null) {
             throw new RuntimeException("摄像头关联的设备不存在: deviceId=" + camera.getDeviceId());
         }
-
-        // 从设备获取IP
-        String ip = device.getConfig() != null ? device.getConfig().getIpAddress() : null;
-        if (StringUtils.isBlank(ip)) {
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(camera.getDeviceId());
+        IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(device, runtime);
+        if (StringUtils.isBlank(net.ip)) {
             throw new RuntimeException("设备IP未配置: deviceId=" + camera.getDeviceId());
-        }
-
-        // 从摄像头表获取连接信息（优先使用摄像头表的配置）
-        Integer httpPort = 80;  // 大华默认HTTP端口
-        String username = camera.getUsername();
-        String password = camera.getPassword();
-        
-        // 如果摄像头表没有配置，尝试从设备配置读取
-        if (StringUtils.isBlank(username) || StringUtils.isBlank(password)) {
-            if (device.getConfig() != null) {
-                try {
-                    JSONObject cfg = JSONUtil.parseObj(JSONUtil.toJsonStr(device.getConfig().toMap()));
-                    httpPort = cfg.getInt("httpPort", httpPort);
-                    username = StringUtils.defaultIfBlank(username, cfg.getStr("username"));
-                    password = StringUtils.defaultIfBlank(password, cfg.getStr("password"));
-                } catch (Exception ignored) { }
-            }
         }
 
         // 运行态禁止伪造/模拟录像文件路径。

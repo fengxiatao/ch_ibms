@@ -1,10 +1,13 @@
 package cn.iocoder.yudao.module.iot.mq.consumer.device.handler;
 
+import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.core.mq.message.changhui.ChanghuiAlarmMessage;
 import cn.iocoder.yudao.module.iot.core.mq.message.changhui.ChanghuiDataReportMessage;
 import cn.iocoder.yudao.module.iot.core.mq.message.changhui.ChanghuiUpgradeStatusMessage;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceEventLogDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceEventLogMapper;
 import cn.iocoder.yudao.module.iot.enums.device.ChanghuiDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.service.changhui.upgrade.ChanghuiUpgradeService;
@@ -106,6 +109,7 @@ public class ChanghuiDeviceEventHandler implements DeviceEventHandler {
     public static final String EVENT_TYPE_DOWNLOAD_COMPLETE = "DOWNLOAD_COMPLETE";
 
     private final IotDeviceEventLogMapper eventLogMapper;
+    private final IbmsDeviceMapper ibmsDeviceMapper;
     private final DeviceMessagePushService deviceMessagePushService;
     private final ChanghuiUpgradeService changhuiUpgradeService;
 
@@ -597,6 +601,12 @@ public class ChanghuiDeviceEventHandler implements DeviceEventHandler {
                 .eventTime(LocalDateTime.now())
                 .processed(false)
                 .build();
+
+            // 写入事件前从 `ibms_device` 台账补齐 tenantId，避免租户过滤后看不到事件记录
+            IbmsDeviceDO device = TenantUtils.executeIgnore(() -> ibmsDeviceMapper.selectById(deviceId));
+            if (device != null && device.getTenantId() != null) {
+                eventDO.setTenantId(device.getTenantId());
+            }
 
             // 保存事件
             eventLogMapper.insert(eventDO);

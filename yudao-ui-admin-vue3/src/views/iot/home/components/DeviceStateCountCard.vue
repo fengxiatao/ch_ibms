@@ -35,9 +35,7 @@
 </template>
 
 <script lang="ts" setup>
-import * as echarts from 'echarts/core'
-import { GaugeChart } from 'echarts/charts'
-import { CanvasRenderer } from 'echarts/renderers'
+import echarts from '@/plugins/echarts'
 import { IotStatisticsSummaryRespVO } from '@/api/iot/statistics'
 import type { PropType } from 'vue'
 
@@ -73,7 +71,6 @@ const initGaugeChart = (el: any, value: number, color: string) => {
     return
   }
 
-  echarts.use([GaugeChart, CanvasRenderer])
   try {
     const chart = echarts.init(el)
     chart.setOption({

@@ -29,20 +29,24 @@
     </resultMap>
     
     <select id="countDeviceByStatus" resultMap="DeviceStatusCountMap">
-        SELECT 
-            status::text as status,
+        SELECT
+            CASE
+                WHEN r.state IN (1, 3) THEN 'online'
+                WHEN r.state = 2 THEN 'offline'
+                ELSE 'fault'
+            END AS status,
             COUNT(*)::int as count
-        FROM iot_device
-        WHERE deleted = 0
+        FROM ibms_device_runtime r
+        WHERE r.deleted = 0
         GROUP BY status
     </select>
 
     <!-- 获取图层边界 -->
     <resultMap id="LayerBoundsMap" type="java.util.HashMap">
-        <result column="min_lon" property="min_lon" jdbcType="DOUBLE" javaType="java.math.BigDecimal"/>
-        <result column="min_lat" property="min_lat" jdbcType="DOUBLE" javaType="java.math.BigDecimal"/>
-        <result column="max_lon" property="max_lon" jdbcType="DOUBLE" javaType="java.math.BigDecimal"/>
-        <result column="max_lat" property="max_lat" jdbcType="DOUBLE" javaType="java.math.BigDecimal"/>
+        <result column="minX" property="minX" jdbcType="DOUBLE" javaType="java.math.BigDecimal"/>
+        <result column="minY" property="minY" jdbcType="DOUBLE" javaType="java.math.BigDecimal"/>
+        <result column="maxX" property="maxX" jdbcType="DOUBLE" javaType="java.math.BigDecimal"/>
+        <result column="maxY" property="maxY" jdbcType="DOUBLE" javaType="java.math.BigDecimal"/>
     </resultMap>
     
     <select id="getLayerBounds" resultMap="LayerBoundsMap">
@@ -84,13 +88,13 @@
                 WHERE deleted = 0
             </when>
             <when test="layer == 'device'">
-                SELECT 
-                    ST_XMin(ST_Extent(geom))::numeric as min_lon,
-                    ST_YMin(ST_Extent(geom))::numeric as min_lat,
-                    ST_XMax(ST_Extent(geom))::numeric as max_lon,
-                    ST_YMax(ST_Extent(geom))::numeric as max_lat
-                FROM iot_device
-                WHERE deleted = 0
+                SELECT
+                    MIN(r.longitude)::numeric as minX,
+                    MIN(r.latitude)::numeric as minY,
+                    MAX(r.longitude)::numeric as maxX,
+                    MAX(r.latitude)::numeric as maxY
+                FROM ibms_device_runtime r
+                WHERE r.deleted = 0
             </when>
         </choose>
     </select>
@@ -123,147 +127,190 @@
 
     <!-- 获取附近的设备 -->
     <select id="getNearbyDevices" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisDeviceRespVO">
-        SELECT 
-            id,
-            name,
-            code,
-            device_type as deviceType,
-            status,
-            health_status as healthStatus,
-            ST_AsText(geom) as geom,
+        SELECT
+            r.device_id AS id,
+            d.name AS name,
+            d.device_code AS code,
+            d.device_type_code AS type,
+            CASE
+                WHEN r.state IN (1, 3) THEN 'online'
+                WHEN r.state = 2 THEN 'offline'
+                ELSE 'fault'
+            END AS status,
+            r.longitude AS longitude,
+            r.latitude AS latitude,
             ST_Distance(
-                geom,
-                ST_SetSRID(ST_MakePoint(#{req.lon}, #{req.lat}), 4326)
-            ) as distance
-        FROM iot_device
-        WHERE deleted = 0
-        AND ST_DWithin(
-            geom,
-            ST_SetSRID(ST_MakePoint(#{req.lon}, #{req.lat}), 4326),
-            #{req.radius}
-        )
+                ST_SetSRID(ST_MakePoint(#{req.lon}, #{req.lat}), 4326)::geography,
+                ST_SetSRID(ST_MakePoint(r.longitude, r.latitude), 4326)::geography
+            ) AS distance,
+            b.name AS building,
+            f.name AS floor,
+            a.name AS room,
+            p.product_name AS productName,
+            r.online_time AS lastOnlineTime,
+            d.create_time AS createTime
+        FROM ibms_device_runtime r
+        JOIN ibms_device d ON d.id = r.device_id
+        LEFT JOIN area a ON a.id = r.room_id
+        LEFT JOIN floor f ON f.id = r.floor_id
+        LEFT JOIN building b ON b.id = r.building_id
+        LEFT JOIN ibms_product p ON p.id = d.ibms_product_id
+        WHERE r.deleted = 0
+          AND ST_DWithin(
+              ST_SetSRID(ST_MakePoint(#{req.lon}, #{req.lat}), 4326)::geography,
+              ST_SetSRID(ST_MakePoint(r.longitude, r.latitude), 4326)::geography,
+              #{req.radius}
+          )
         ORDER BY distance
         LIMIT #{req.limit}
     </select>
 
     <!-- 获取边界范围内的设备 -->
     <select id="getDevicesInBounds" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisDeviceRespVO">
-        SELECT 
-            id,
-            name,
-            code,
-            device_type as deviceType,
-            status,
-            health_status as healthStatus,
-            ST_AsText(geom) as geom
-        FROM iot_device
-        WHERE deleted = 0
-        AND ST_Within(
-            geom,
-            ST_MakeEnvelope(
-                #{req.minLon}, #{req.minLat},
-                #{req.maxLon}, #{req.maxLat},
-                4326
-            )
-        )
+        SELECT
+            r.device_id AS id,
+            d.name AS name,
+            d.device_code AS code,
+            d.device_type_code AS type,
+            CASE
+                WHEN r.state IN (1, 3) THEN 'online'
+                WHEN r.state = 2 THEN 'offline'
+                ELSE 'fault'
+            END AS status,
+            r.longitude AS longitude,
+            r.latitude AS latitude,
+            b.name AS building,
+            f.name AS floor,
+            a.name AS room,
+            p.product_name AS productName,
+            r.online_time AS lastOnlineTime,
+            d.create_time AS createTime
+        FROM ibms_device_runtime r
+        JOIN ibms_device d ON d.id = r.device_id
+        LEFT JOIN area a ON a.id = r.room_id
+        LEFT JOIN floor f ON f.id = r.floor_id
+        LEFT JOIN building b ON b.id = r.building_id
+        LEFT JOIN ibms_product p ON p.id = d.ibms_product_id
+        WHERE r.deleted = 0
+          AND r.longitude BETWEEN #{req.minLon} AND #{req.maxLon}
+          AND r.latitude BETWEEN #{req.minLat} AND #{req.maxLat}
         <if test="req.status != null and req.status != ''">
-            AND status = #{req.status}
+            AND (
+                CASE
+                    WHEN r.state IN (1, 3) THEN 'online'
+                    WHEN r.state = 2 THEN 'offline'
+                    ELSE 'fault'
+                END
+            ) = #{req.status}
         </if>
     </select>
 
     <!-- 获取设备位置信息 -->
     <select id="getDeviceLocation" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisDeviceLocationRespVO">
-        SELECT 
-            d.id,
-            d.name,
-            d.code,
-            ST_AsText(d.geom) as geom,
-            ST_X(d.geom) as lon,
-            ST_Y(d.geom) as lat,
-            a.id as areaId,
-            a.name as areaName,
-            f.id as floorId,
-            f.name as floorName,
-            b.id as buildingId,
-            b.name as buildingName
-        FROM iot_device d
-        LEFT JOIN area a ON d.area_id = a.id
-        LEFT JOIN floor f ON a.floor_id = f.id
-        LEFT JOIN building b ON f.building_id = b.id
-        WHERE d.id = #{deviceId}
-        AND d.deleted = 0
+        SELECT
+            r.device_id AS deviceId,
+            d.name AS deviceName,
+            r.longitude AS longitude,
+            r.latitude AS latitude,
+            NULL::numeric AS altitude,
+            r.address AS address,
+            c.id AS campusId,
+            c.name AS campusName,
+            b.id AS buildingId,
+            b.name AS buildingName,
+            f.id AS floorId,
+            f.name AS floorName,
+            a.id AS roomId,
+            a.name AS roomName
+        FROM ibms_device_runtime r
+        JOIN ibms_device d ON d.id = r.device_id
+        LEFT JOIN campus c ON c.id = r.campus_id
+        LEFT JOIN building b ON b.id = r.building_id
+        LEFT JOIN floor f ON f.id = r.floor_id
+        LEFT JOIN area a ON a.id = r.room_id
+        WHERE r.device_id = #{deviceId}
+          AND r.deleted = 0
     </select>
 
     <!-- 更新设备位置 -->
     <update id="updateDeviceLocation">
-        UPDATE iot_device
-        SET geom = ST_SetSRID(ST_MakePoint(#{req.lon}, #{req.lat}), 4326),
+        UPDATE ibms_device_runtime
+        SET longitude = #{req.lon},
+            latitude = #{req.lat},
             updater = #{req.updater},
             update_time = NOW()
-        WHERE id = #{req.deviceId}
+        WHERE device_id = #{req.deviceId}
         AND deleted = 0
     </update>
 
     <!-- 获取设备的空间关系 -->
     <select id="getSpatialRelation" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisSpatialRelationRespVO">
-        SELECT 
-            d.id as deviceId,
-            d.name as deviceName,
-            a.id as areaId,
-            a.name as areaName,
-            f.id as floorId,
-            f.name as floorName,
-            b.id as buildingId,
-            b.name as buildingName,
-            c.id as campusId,
-            c.name as campusName
-        FROM iot_device d
-        LEFT JOIN area a ON d.area_id = a.id
-        LEFT JOIN floor f ON a.floor_id = f.id
-        LEFT JOIN building b ON f.building_id = b.id
-        LEFT JOIN campus c ON b.campus_id = c.id
-        WHERE d.id = #{deviceId}
-        AND d.deleted = 0
+        SELECT
+            r.device_id AS deviceId,
+            d.name AS deviceName,
+            r.longitude AS longitude,
+            r.latitude AS latitude,
+            c.id AS campusId,
+            c.name AS campusName,
+            b.id AS buildingId,
+            b.name AS buildingName,
+            f.id AS floorId,
+            f.name AS floorName,
+            a.id AS roomId,
+            a.name AS roomName
+        FROM ibms_device_runtime r
+        JOIN ibms_device d ON d.id = r.device_id
+        LEFT JOIN campus c ON c.id = r.campus_id
+        LEFT JOIN building b ON b.id = r.building_id
+        LEFT JOIN floor f ON f.id = r.floor_id
+        LEFT JOIN area a ON a.id = r.room_id
+        WHERE r.device_id = #{deviceId}
+          AND r.deleted = 0
     </select>
 
     <!-- 获取热力图数据 -->
     <select id="getHeatmapData" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisHeatmapPointRespVO">
         SELECT 
-            ST_X(geom) as lon,
-            ST_Y(geom) as lat,
-            1 as intensity
-        FROM iot_device
-        WHERE deleted = 0
+            r.longitude AS longitude,
+            r.latitude AS latitude,
+            1 as value,
+            1 as weight
+        FROM ibms_device_runtime r
+        JOIN ibms_device d ON d.id = r.device_id
+        WHERE r.deleted = 0
         <if test="req.status != null and req.status != ''">
-            AND status = #{req.status}
+            AND (
+                CASE
+                    WHEN r.state IN (1, 3) THEN 'online'
+                    WHEN r.state = 2 THEN 'offline'
+                    ELSE 'fault'
+                END
+            ) = #{req.status}
         </if>
         <if test="req.deviceType != null and req.deviceType != ''">
-            AND device_type = #{req.deviceType}
+            AND d.device_type_code = #{req.deviceType}
         </if>
     </select>
 
     <!-- 获取用于聚合的设备数据 -->
     <select id="getDevicesForCluster" resultType="cn.iocoder.yudao.module.iot.controller.admin.gis.vo.IotGisDeviceRespVO">
-        SELECT 
-            id,
-            name,
-            code,
-            device_type as deviceType,
-            status,
-            health_status as healthStatus,
-            ST_AsText(geom) as geom,
-            ST_X(geom) as lon,
-            ST_Y(geom) as lat
-        FROM iot_device
-        WHERE deleted = 0
-        AND ST_Within(
-            geom,
-            ST_MakeEnvelope(
-                #{req.minLon}, #{req.minLat},
-                #{req.maxLon}, #{req.maxLat},
-                4326
-            )
-        )
+        SELECT
+            r.device_id AS id,
+            d.name AS name,
+            d.device_code AS code,
+            d.device_type_code AS type,
+            CASE
+                WHEN r.state IN (1, 3) THEN 'online'
+                WHEN r.state = 2 THEN 'offline'
+                ELSE 'fault'
+            END AS status,
+            r.longitude AS longitude,
+            r.latitude AS latitude
+        FROM ibms_device_runtime r
+        JOIN ibms_device d ON d.id = r.device_id
+        WHERE r.deleted = 0
+          AND r.longitude BETWEEN #{req.minLon} AND #{req.maxLon}
+          AND r.latitude BETWEEN #{req.minLat} AND #{req.maxLat}
     </select>
 
     <!-- 计算两点之间的距离 (单位：米) -->
@@ -314,13 +361,17 @@
                 WHERE deleted = 0
             </when>
             <when test="req.layer == 'device'">
-                SELECT 
-                    id,
-                    name,
-                    code,
-                    ST_AsText(geom) as geom
-                FROM iot_device
-                WHERE deleted = 0
+                SELECT
+                    r.device_id AS id,
+                    d.name AS name,
+                    'device' AS type,
+                    r.longitude AS longitude,
+                    r.latitude AS latitude,
+                    'Point' AS geometryType,
+                    NULL::jsonb AS properties
+                FROM ibms_device_runtime r
+                JOIN ibms_device d ON d.id = r.device_id
+                WHERE r.deleted = 0
             </when>
         </choose>
         <if test="req.pageSize != null and req.pageNo != null">
@@ -344,7 +395,7 @@
                 SELECT COUNT(*) FROM area WHERE deleted = 0
             </when>
             <when test="req.layer == 'device'">
-                SELECT COUNT(*) FROM iot_device WHERE deleted = 0
+                SELECT COUNT(*) FROM ibms_device_runtime WHERE deleted = 0
             </when>
         </choose>
     </select>

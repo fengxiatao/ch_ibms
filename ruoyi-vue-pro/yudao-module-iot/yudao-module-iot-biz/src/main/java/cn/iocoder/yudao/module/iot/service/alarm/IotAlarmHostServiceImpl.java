@@ -6,7 +6,11 @@ import cn.iocoder.yudao.module.iot.controller.admin.alarm.vo.host.IotAlarmHostPa
 import cn.iocoder.yudao.module.iot.controller.admin.alarm.vo.host.IotAlarmHostUpdateReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.alarm.vo.host.IotAlarmHostWithDetailsRespVO;
 import cn.iocoder.yudao.module.iot.controller.admin.alarm.vo.partition.IotAlarmPartitionRespVO;
-import cn.iocoder.yudao.module.iot.controller.admin.device.vo.device.IotDeviceSaveReqVO;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
+import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
+import cn.iocoder.yudao.module.iot.controller.admin.ibms.device.vo.IbmsDeviceSaveReqVO;
+import cn.iocoder.yudao.module.iot.controller.admin.ibms.product.vo.IbmsProductRespVO;
 import cn.iocoder.yudao.module.iot.convert.alarm.IotAlarmHostConvert;
 import cn.iocoder.yudao.module.iot.convert.alarm.IotAlarmPartitionConvert;
 import cn.iocoder.yudao.module.iot.convert.alarm.IotAlarmZoneConvert;
@@ -17,9 +21,9 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.alarm.IotAlarmZoneDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.alarm.IotAlarmHostMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.alarm.IotAlarmPartitionMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.alarm.IotAlarmZoneMapper;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
-import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
-import cn.iocoder.yudao.module.iot.service.product.IotProductService;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceService;
+import cn.iocoder.yudao.module.iot.service.ibms.product.IbmsProductService;
 import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageBus;
 import cn.iocoder.yudao.module.iot.core.mq.message.alarm.AlarmHostControlResponse;
 import cn.iocoder.yudao.module.iot.enums.device.AlarmDeviceTypeConstants;
@@ -29,6 +33,7 @@ import cn.iocoder.yudao.module.iot.websocket.IotWebSocketHandler;
 import cn.iocoder.yudao.module.iot.websocket.message.AlarmHostStatusMessage;
 import cn.iocoder.yudao.module.iot.websocket.message.IotMessage;
 import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -73,10 +78,15 @@ public class IotAlarmHostServiceImpl implements IotAlarmHostService {
     private IotAlarmPartitionService alarmPartitionService;
     
     @Resource
-    private IotDeviceService deviceService;
-    
+    private IbmsDeviceService ibmsDeviceService;
+
     @Resource
-    private IotProductService productService;
+    private IbmsProductService ibmsProductService;
+
+    @Resource
+    private IbmsDeviceMapper ibmsDeviceMapper;
+
+    private static final String ALARM_HOST_LEGACY_PRODUCT_KEY = "ALARM_HOST_PRODUCT";
     
     @Resource
     private IotMessageBus messageBus;
@@ -100,21 +110,48 @@ public class IotAlarmHostServiceImpl implements IotAlarmHostService {
     @Override
     @Transactional
     public Long createAlarmHost(IotAlarmHostCreateReqVO createReqVO) {
-        // 1. 先创建基础设备记录
-        IotDeviceSaveReqVO deviceReqVO = new IotDeviceSaveReqVO();
-        deviceReqVO.setDeviceName(createReqVO.getHostName()); // 使用正确的字段名
-        // 设置位置信息
-        deviceReqVO.setInstallLocation(createReqVO.getLocation()); // 使用正确的字段名
-        
-        IotProductDO alarmProduct = productService.validateProductExists("ALARM_HOST_PRODUCT");
-        deviceReqVO.setProductId(alarmProduct.getId());
-        
-        // ⚠️ 重要：设置设备账号，用于Gateway认证
-        // 这个account字段是Gateway识别设备的关键
-        deviceReqVO.setAccount(createReqVO.getAccount());
-        
-        // 创建设备并获取设备ID
-        Long deviceId = deviceService.createDevice(deviceReqVO);
+        // 1. 先创建 IBMS 台账（网关按 extra.deviceKey / device_code 解析，报警插件以 account 查库）
+        IbmsProductRespVO tpl = ibmsProductService.getProductByLegacyIotProductKey(ALARM_HOST_LEGACY_PRODUCT_KEY);
+        if (tpl == null) {
+            throw ServiceExceptionUtil.exception0(400,
+                    "未配置 IBMS 报警主机产品：请在 ibms_product.extra 中写入 productKey=ALARM_HOST_PRODUCT 的产品模板，"
+                            + "或执行 sql/mysql/ibms_product_alarm_host_seed.sql");
+        }
+        String brand = StrUtil.blankToDefault(tpl.getManufacturer(), "OTH").trim();
+        String prefix = tpl.getSystemCode() + "-" + tpl.getModelCode() + "-" + tpl.getDeviceTypeCode() + "-" + brand + "-";
+        int nextSeq = ibmsDeviceMapper.selectMaxNumericSuffixByDeviceCodePrefix(prefix) + 1;
+
+        IbmsDeviceSaveReqVO deviceReq = new IbmsDeviceSaveReqVO();
+        deviceReq.setName(createReqVO.getHostName());
+        deviceReq.setGroupCode(tpl.getGroupCode());
+        deviceReq.setSystemCode(tpl.getSystemCode());
+        deviceReq.setDeviceTypeCode(tpl.getDeviceTypeCode());
+        deviceReq.setBrand(brand);
+        deviceReq.setProductModel(tpl.getModelNumber());
+        deviceReq.setAccessType("IP");
+        deviceReq.setIp(createReqVO.getIpAddress());
+        deviceReq.setProtocol(StrUtil.blankToDefault(tpl.getProtocol(), "TCP/PS600"));
+        deviceReq.setSpace(createReqVO.getLocation());
+        deviceReq.setSeq(nextSeq);
+
+        JSONObject ex = JSONUtil.createObj();
+        ex.set("deviceKey", createReqVO.getAccount());
+        ex.set("account", createReqVO.getAccount());
+        if (createReqVO.getPort() != null) {
+            ex.set("tcpPort", createReqVO.getPort());
+        }
+        if (StrUtil.isNotBlank(createReqVO.getPassword())) {
+            ex.set("password", createReqVO.getPassword());
+        }
+        if (StrUtil.isNotBlank(createReqVO.getHostModel())) {
+            ex.set("hostModel", createReqVO.getHostModel());
+        }
+        if (StrUtil.isNotBlank(createReqVO.getHostSn())) {
+            ex.set("hostSn", createReqVO.getHostSn());
+        }
+        deviceReq.setExtra(ex.toString());
+
+        Long deviceId = ibmsDeviceService.createDevice(deviceReq);
         
         // 2. 创建报警主机记录
         IotAlarmHostDO alarmHost = IotAlarmHostConvert.INSTANCE.convert(createReqVO);
@@ -144,10 +181,13 @@ public class IotAlarmHostServiceImpl implements IotAlarmHostService {
 
     @Override
     public void deleteAlarmHost(Long id) {
-        // 校验存在
         validateAlarmHostExists(id);
-        // 删除
+        IotAlarmHostDO host = alarmHostMapper.selectById(id);
+        Long deviceId = host != null ? host.getDeviceId() : null;
         alarmHostMapper.deleteById(id);
+        if (deviceId != null) {
+            ibmsDeviceService.deleteDevice(deviceId);
+        }
     }
 
     private void validateAlarmHostExists(Long id) {

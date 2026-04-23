@@ -7,7 +7,7 @@ import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.rule.IotSceneRuleDO;
 import cn.iocoder.yudao.module.iot.enums.rule.IotSceneRuleActionTypeEnum;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsIotDualTrackDeviceResolver;
 import cn.iocoder.yudao.module.iot.service.device.message.IotDeviceMessageService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +26,7 @@ import java.util.Map;
 public class IotDeviceServiceInvokeSceneRuleAction implements IotSceneRuleAction {
 
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsIotDualTrackDeviceResolver dualTrackDeviceResolver;
     @Resource
     private IotDeviceMessageService deviceMessageService;
 
@@ -57,7 +57,7 @@ public class IotDeviceServiceInvokeSceneRuleAction implements IotSceneRuleAction
     private void executeForSingleDevice(cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage message,
                                         IotSceneRuleDO rule, IotSceneRuleDO.Action actionConfig) {
         // 1. 获取设备信息
-        IotDeviceDO device = deviceService.getDeviceFromCache(actionConfig.getDeviceId());
+        IotDeviceDO device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(actionConfig.getDeviceId());
         if (device == null) {
             log.error("[executeForSingleDevice][规则场景({}) 动作配置({}) 对应的设备({}) 不存在]",
                     rule.getId(), actionConfig, actionConfig.getDeviceId());
@@ -80,7 +80,7 @@ public class IotDeviceServiceInvokeSceneRuleAction implements IotSceneRuleAction
         }
 
         // 2. 获取产品下的所有设备
-        List<IotDeviceDO> devices = deviceService.getDeviceListByProductId(actionConfig.getProductId());
+        List<IotDeviceDO> devices = dualTrackDeviceResolver.listDeviceShellsByProductIdPreferIbmsThenIot(actionConfig.getProductId());
         if (CollUtil.isEmpty(devices)) {
             log.warn("[executeForAllDevices][规则场景({}) 动作配置({}) 产品({}) 下没有设备]",
                     rule.getId(), actionConfig, actionConfig.getProductId());

@@ -49,7 +49,7 @@
           tooltip="本月支付金额"
           title="本月支付金额"
           prefix="￥"
-          ::decimals="2"
+          :decimals="2"
           :value="fenToYuan(summary?.value?.monthPayPrice || 0)"
           :percent="
             calculateRelativeRate(summary?.value?.monthPayPrice, summary?.reference?.monthPayPrice)
@@ -238,7 +238,8 @@ const shortcutDateRangePicker = ref()
 /** 折线图配置 */
 const lineChartOptions = reactive<EChartsOption>({
   dataset: {
-    dimensions: ['date', 'turnoverPrice', 'orderPayPrice', 'rechargePrice', 'expensePrice'],
+    // 后端返回字段为 time（见 TradeTrendSummaryRespVO.time）
+    dimensions: ['time', 'turnoverPrice', 'orderPayPrice', 'rechargePrice', 'expensePrice'],
     source: []
   },
   grid: {

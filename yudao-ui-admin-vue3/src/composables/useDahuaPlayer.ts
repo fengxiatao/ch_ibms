@@ -9,6 +9,7 @@
 
 import { ref, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
+import { ensureDahuaSdkLoaded } from '@/utils/dahuaSdkLoader'
 
 // ==================== 类型定义 ====================
 
@@ -237,6 +238,14 @@ export function useDahuaPlayer() {
     config: DahuaPlayerConfig,
     channelName?: string
   ): Promise<boolean> => {
+    try {
+      await ensureDahuaSdkLoaded()
+    } catch (e) {
+      pane.error = '大华播放器 SDK 加载失败'
+      ElMessage.error('大华播放器 SDK 加载失败，请刷新页面')
+      return false
+    }
+
     if (!checkSDK()) {
       pane.error = '大华播放器 SDK 未加载'
       ElMessage.error('大华播放器 SDK 未加载，请刷新页面')
@@ -365,6 +374,14 @@ export function useDahuaPlayer() {
     config: DahuaPlaybackConfig,
     channelName?: string
   ): Promise<boolean> => {
+    try {
+      await ensureDahuaSdkLoaded()
+    } catch (e) {
+      pane.error = '大华播放器 SDK 加载失败'
+      ElMessage.error('大华播放器 SDK 加载失败，请刷新页面')
+      return false
+    }
+
     if (!checkSDK()) {
       pane.error = '大华播放器 SDK 未加载'
       ElMessage.error('大华播放器 SDK 未加载，请刷新页面')

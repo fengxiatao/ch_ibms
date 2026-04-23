@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.iot.controller.admin.device.vo.group.IotDeviceGro
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.group.IotDeviceGroupSaveReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceGroupDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceGroupMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -29,7 +30,7 @@ public class IotDeviceGroupServiceImpl implements IotDeviceGroupService {
     private IotDeviceGroupMapper deviceGroupMapper;
 
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @Override
     public Long createDeviceGroup(IotDeviceGroupSaveReqVO createReqVO) {
@@ -54,7 +55,7 @@ public class IotDeviceGroupServiceImpl implements IotDeviceGroupService {
         // 1.1 校验存在
         validateDeviceGroupExists(id);
         // 1.2 校验是否存在设备
-        if (deviceService.getDeviceCountByGroupId(id) > 0) {
+        if (countDevicesAssignedToGroup(id) > 0) {
             throw exception(DEVICE_GROUP_DELETE_FAIL_DEVICE_EXISTS);
         }
 
@@ -89,6 +90,14 @@ public class IotDeviceGroupServiceImpl implements IotDeviceGroupService {
     @Override
     public List<IotDeviceGroupDO> getDeviceGroupListByStatus(Integer status) {
         return deviceGroupMapper.selectListByStatus(status);
+    }
+
+    @Override
+    public Long countDevicesAssignedToGroup(Long groupId) {
+        if (groupId == null) {
+            return 0L;
+        }
+        return ibmsDeviceMapper.selectCountByGroupId(groupId);
     }
 
 }

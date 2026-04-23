@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>原型融合规划对比</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(35, 73, 148, 0.45), transparent 35%),
+        radial-gradient(circle at top right, rgba(0, 180, 216, 0.22), transparent 28%),
+        linear-gradient(180deg, #06111f 0%, #081b2e 42%, #050d18 100%);
+      color: #e6f4ff;
+      min-height: 100vh;
+      padding: 32px;
+    }
+    .page {
+      max-width: 1500px;
+      margin: 0 auto;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+    .title {
+      font-size: 36px;
+      font-weight: 700;
+      margin: 0 0 10px;
+      letter-spacing: 1px;
+    }
+    .subtitle {
+      margin: 0;
+      color: #8cb6d9;
+      line-height: 1.7;
+      max-width: 900px;
+      font-size: 15px;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border: 1px solid rgba(79, 195, 247, 0.35);
+      border-radius: 999px;
+      color: #9adfff;
+      background: rgba(13, 33, 54, 0.72);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+    .card {
+      background: rgba(8, 24, 41, 0.88);
+      border: 1px solid rgba(112, 166, 212, 0.18);
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 18px 36px rgba(0, 0, 0, 0.24);
+      min-height: 430px;
+      display: flex;
+      flex-direction: column;
+    }
+    .card.recommended {
+      border-color: rgba(69, 208, 255, 0.75);
+      box-shadow: 0 18px 36px rgba(0, 135, 214, 0.16);
+      position: relative;
+    }
+    .card.recommended::after {
+      content: "推荐";
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #00c2ff, #28e0ae);
+      color: #062033;
+      font-weight: 700;
+    }
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 24px;
+    }
+    .card p {
+      margin: 0;
+      color: #9db5c7;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .pill-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 14px 0 18px;
+    }
+    .pill {
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid rgba(125, 178, 223, 0.22);
+      color: #bce2ff;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .section-title {
+      font-size: 13px;
+      color: #4fd9ff;
+      margin: 18px 0 10px;
+      letter-spacing: 0.5px;
+    }
+    ul {
+      margin: 0;
+      padding-left: 18px;
+      color: #d8ecff;
+      line-height: 1.8;
+      font-size: 14px;
+    }
+    .score {
+      margin-top: auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      padding-top: 18px;
+    }
+    .score-item {
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 14px;
+      padding: 12px;
+      text-align: center;
+    }
+    .score-item strong {
+      display: block;
+      font-size: 20px;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+    .score-item span {
+      font-size: 12px;
+      color: #85a7c2;
+    }
+    .roadmap {
+      display: grid;
+      grid-template-columns: 1.15fr 1.85fr;
+      gap: 18px;
+    }
+    .panel {
+      background: rgba(8, 24, 41, 0.88);
+      border: 1px solid rgba(112, 166, 212, 0.18);
+      border-radius: 20px;
+      padding: 22px;
+    }
+    .mapping {
+      display: grid;
+      gap: 12px;
+    }
+    .mapping-row {
+      display: grid;
+      grid-template-columns: 1fr 44px 1.2fr;
+      gap: 12px;
+      align-items: center;
+    }
+    .block {
+      padding: 14px;
+      border-radius: 16px;
+      min-height: 74px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .block.prototype {
+      background: rgba(54, 103, 153, 0.22);
+      border: 1px solid rgba(111, 185, 255, 0.24);
+    }
+    .block.project {
+      background: rgba(18, 88, 86, 0.22);
+      border: 1px solid rgba(67, 219, 173, 0.22);
+    }
+    .block strong {
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+    .block span {
+      font-size: 12px;
+      color: #9bb7cb;
+      line-height: 1.6;
+    }
+    .arrow {
+      text-align: center;
+      color: #55d8ff;
+      font-size: 26px;
+      opacity: 0.9;
+    }
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .step {
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(112, 166, 212, 0.18);
+      min-height: 168px;
+    }
+    .step strong {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, #35c6ff, #20d6a3);
+      color: #062133;
+      font-size: 14px;
+    }
+    .step h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
+    .step p {
+      margin: 0;
+      color: #9db5c7;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .footer {
+      margin-top: 18px;
+      color: #88acc8;
+      font-size: 13px;
+      line-height: 1.8;
+    }
+    @media (max-width: 1200px) {
+      .grid, .roadmap, .timeline { grid-template-columns: 1fr; }
+      .mapping-row { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div>
+        <h1 class="title">智慧工厂原型融合规划</h1>
+        <p class="subtitle">
+          目标是把 React 原型里的视觉与业务表达，稳妥地糅合进当前 Vue3 中后台项目。
+          下面先把“融合方式”和“推荐落地顺序”可视化，方便你快速判断第一阶段应该偏向 UI 还原、业务接入，还是独立大屏。
+        </p>
+      </div>
+      <div class="tag">当前建议：先拆壳复用，再逐步接真数据</div>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>方案 A：整页迁移</h2>
+        <p>把原型按单页大屏方式尽量完整搬进现有项目，优先保留视觉效果与交互节奏。</p>
+        <div class="pill-row">
+          <span class="pill">上手快</span>
+          <span class="pill">视觉还原高</span>
+          <span class="pill">后续重构多</span>
+        </div>
+        <div class="section-title">适合场景</div>
+        <ul>
+          <li>近期必须先给领导或客户看完整效果</li>
+          <li>当前主要目标是演示而不是沉淀组件</li>
+          <li>允许后面再做第二轮工程化整理</li>
+        </ul>
+        <div class="section-title">主要问题</div>
+        <ul>
+          <li>React 原型和 Vue 主项目技术栈不同，不能直接平移复用代码</li>
+          <li>容易形成“看起来像成品，底层仍是演示壳”的技术债</li>
+          <li>后续接真实接口时改动面通常最大</li>
+        </ul>
+        <div class="score">
+          <div class="score-item"><strong>高</strong><span>视觉还原</span></div>
+          <div class="score-item"><strong>低</strong><span>长期复用</span></div>
+          <div class="score-item"><strong>高</strong><span>返工风险</span></div>
+        </div>
+      </section>
+
+      <section class="card recommended">
+        <h2>方案 B：模块拆解融合</h2>
+        <p>按“页面壳、卡片组件、图表模块、3D/视频能力、数据模型”拆解原型，把设计语言融入现有 Vue 页面体系。</p>
+        <div class="pill-row">
+          <span class="pill">推荐</span>
+          <span class="pill">可持续演进</span>
+          <span class="pill">工程风险更低</span>
+        </div>
+        <div class="section-title">适合场景</div>
+        <ul>
+          <li>希望最终进入正式业务系统，而不只是单独展示页</li>
+          <li>需要逐步接入真实接口、权限、路由、主题与现有组件体系</li>
+          <li>后续还会扩展更多车间、安防、能耗或视频页面</li>
+        </ul>
+        <div class="section-title">核心做法</div>
+        <ul>
+          <li>先统一设计 token 与深色大屏外壳</li>
+          <li>再抽公共卡片、指标、告警、图表、视频工作台</li>
+          <li>最后分业务域接入真实数据与现有模块能力</li>
+        </ul>
+        <div class="score">
+          <div class="score-item"><strong>中高</strong><span>视觉还原</span></div>
+          <div class="score-item"><strong>高</strong><span>长期复用</span></div>
+          <div class="score-item"><strong>中</strong><span>实施复杂度</span></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>方案 C：独立大屏子域</h2>
+        <p>把原型转成当前项目中的独立大屏专区或单独入口，尽量减少对现有业务页结构的影响。</p>
+        <div class="pill-row">
+          <span class="pill">边界清晰</span>
+          <span class="pill">适合大屏</span>
+          <span class="pill">与主流程割裂</span>
+        </div>
+        <div class="section-title">适合场景</div>
+        <ul>
+          <li>目标就是驾驶舱/指挥中心/会客展示屏</li>
+          <li>希望快速上线一块视觉成型的大屏</li>
+          <li>主项目业务页暂时不想大范围改造</li>
+        </ul>
+        <div class="section-title">主要问题</div>
+        <ul>
+          <li>容易和现有业务页面形成两套视觉系统</li>
+          <li>公共能力沉淀不足，复用到普通业务页难度大</li>
+          <li>后续若想反向收编进平台，会有第二次整合成本</li>
+        </ul>
+        <div class="score">
+          <div class="score-item"><strong>高</strong><span>展示效果</span></div>
+          <div class="score-item"><strong>中</strong><span>隔离性</span></div>
+          <div class="score-item"><strong>中高</strong><span>割裂风险</span></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="roadmap">
+      <section class="panel">
+        <h2 style="margin:0 0 14px;font-size:22px;">原型模块 → 当前项目承接点</h2>
+        <div class="mapping">
+          <div class="mapping-row">
+            <div class="block prototype">
+              <strong>导航栏 / 状态栏 / KPI 顶部区</strong>
+              <span>原型中的大屏外壳与全局指标氛围</span>
+            </div>
+            <div class="arrow">→</div>
+            <div class="block project">
+              <strong>大屏页面壳 / ContentWrap / Dark Theme</strong>
+              <span>统一为 Vue3 大屏基座与主题 token</span>
+            </div>
+          </div>
+          <div class="mapping-row">
+            <div class="block prototype">
+              <strong>Production / Environment / Safety / Energy 分区卡片</strong>
+              <span>原型里的业务区块和统计卡片组合</span>
+            </div>
+            <div class="arrow">→</div>
+            <div class="block project">
+              <strong>按业务域拆成 Vue 组件</strong>
+              <span>先 UI 组件化，再分别接现有接口与权限体系</span>
+            </div>
+          </div>
+          <div class="mapping-row">
+            <div class="block prototype">
+              <strong>Factory3DView / VideoMonitor</strong>
+              <span>React three fiber 版 3D 与视频演示能力</span>
+            </div>
+            <div class="arrow">→</div>
+            <div class="block project">
+              <strong>优先复用现有 Three / Cesium / 视频播放器能力</strong>
+              <span>保留视觉表达，不建议照搬 React 运行时实现</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 style="margin:0 0 14px;font-size:22px;">推荐的四步落地顺序</h2>
+        <div class="timeline">
+          <div class="step">
+            <strong>1</strong>
+            <h3>先定页面边界</h3>
+            <p>明确哪些内容要进“正式业务页”，哪些只进“大屏专区”，避免一次性全量铺开。</p>
+          </div>
+          <div class="step">
+            <strong>2</strong>
+            <h3>抽设计语言</h3>
+            <p>先沉淀深色背景、发光描边、KPI 卡片、图表容器、状态徽标，不急着接业务。</p>
+          </div>
+          <div class="step">
+            <strong>3</strong>
+            <h3>按域接能力</h3>
+            <p>生产、环境、安全、能耗、视频分域推进；视频和 3D 优先复用你当前项目已有能力。</p>
+          </div>
+          <div class="step">
+            <strong>4</strong>
+            <h3>最后替换假数据</h3>
+            <p>建立统一的数据适配层，把原型里的 mockData 逐步替换为真实接口与实时推送。</p>
+          </div>
+        </div>
+        <div class="footer">
+          初步判断：如果你的目标是“既要展示效果，也要最终可落地”，最稳妥的是方案 B。
+          如果只是短期做一块单独驾驶舱，则方案 C 也可成立。
+        </div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

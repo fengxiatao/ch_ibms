@@ -3,8 +3,8 @@ package cn.iocoder.yudao.module.iot.service.device.discovery.listener;
 import cn.iocoder.yudao.module.iot.core.discovery.DeviceDiscoveredEvent;
 import cn.iocoder.yudao.module.iot.core.discovery.DiscoveredDevice;
 import cn.iocoder.yudao.module.iot.service.device.discovery.dto.DiscoveredDeviceDTO;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
 import cn.iocoder.yudao.module.iot.service.device.discovery.DiscoveredDeviceService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +25,7 @@ public class DiscoveryEventListener {
     private DiscoveredDeviceService discoveredDeviceService;
     
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceService ibmsDeviceService;
     
     /**
      * 监听设备发现事件
@@ -42,8 +42,8 @@ public class DiscoveryEventListener {
             // 转换为 DTO
             DiscoveredDeviceDTO device = convertToDTO(coreDevice);
             
-            // 1. 检查是否已添加到平台
-            boolean exists = deviceService.isDeviceExistsByIp(device.getIpAddress());
+            // 1. 检查是否已添加到平台（IBMS 台账 ip 优先，双轨期仍兼容 iot_device）
+            boolean exists = ibmsDeviceService.isDeviceExistsByIp(device.getIpAddress());
             
             // 2. 保存发现记录
             if (discoveredDeviceService != null) {

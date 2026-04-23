@@ -178,10 +178,16 @@ const showRange = computed(() => {
   return total.value > 0 ? `${start}-${end}` : '0-0'
 })
 
-const formatVisitTime = (visitTime: string) => {
-  if (!visitTime) return '-'
-  const d = visitTime.slice(0, 19).replace('T', ' ')
-  return d.slice(0, 16)
+const formatVisitTime = (visitTime: string | number | Date | null | undefined) => {
+  if (visitTime === null || visitTime === undefined || visitTime === '') return '-'
+  const date = visitTime instanceof Date
+    ? visitTime
+    : typeof visitTime === 'number'
+      ? new Date(visitTime)
+      : new Date(String(visitTime))
+  if (Number.isNaN(date.getTime())) return '-'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 const getStatusTagType = (status: string) => {
@@ -211,8 +217,8 @@ const loadData = async () => {
       name: queryParams.name || undefined,
       status: queryParams.status || undefined
     })
-    const list = res?.data?.list ?? []
-    const totalCount = res?.data?.total ?? 0
+    const list = res?.list ?? res?.data?.list ?? []
+    const totalCount = res?.total ?? res?.data?.total ?? 0
     tableData.value = list.map((it: any) => ({
       ...it,
       time: it.visitTime ? String(it.visitTime).slice(11, 16) : '',

@@ -16,11 +16,7 @@
 </template>
 
 <script lang="ts" setup>
-import * as echarts from 'echarts/core'
-import { PieChart } from 'echarts/charts'
-import { CanvasRenderer } from 'echarts/renderers'
-import { TooltipComponent, LegendComponent } from 'echarts/components'
-import { LabelLayout } from 'echarts/features'
+import echarts from '@/plugins/echarts'
 import { IotStatisticsSummaryRespVO } from '@/api/iot/statistics'
 import type { PropType } from 'vue'
 
@@ -58,7 +54,6 @@ const initChart = () => {
     return
   }
 
-  echarts.use([TooltipComponent, LegendComponent, PieChart, CanvasRenderer, LabelLayout])
   try {
     const chart = echarts.init(deviceCountChartRef.value)
     chart.setOption({

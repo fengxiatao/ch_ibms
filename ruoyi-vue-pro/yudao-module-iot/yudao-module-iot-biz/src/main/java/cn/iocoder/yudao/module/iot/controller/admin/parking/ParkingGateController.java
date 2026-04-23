@@ -57,7 +57,7 @@ public class ParkingGateController {
     @GetMapping("/get")
     @Operation(summary = "获得道闸设备")
     @Parameter(name = "id", description = "编号", required = true)
-    @PreAuthorize("@ss.hasPermission('iot:parking:gate:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:gate:query-btn')")
     public CommonResult<ParkingGateRespVO> getParkingGate(@RequestParam("id") Long id) {
         ParkingGateDO parkingGate = parkingGateService.getParkingGate(id);
         return success(BeanUtils.toBean(parkingGate, ParkingGateRespVO.class));
@@ -65,7 +65,7 @@ public class ParkingGateController {
 
     @GetMapping("/page")
     @Operation(summary = "获得道闸设备分页")
-    @PreAuthorize("@ss.hasPermission('iot:parking:gate:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:gate:query-btn')")
     public CommonResult<PageResult<ParkingGateRespVO>> getParkingGatePage(@Valid ParkingGatePageReqVO pageReqVO) {
         PageResult<ParkingGateDO> pageResult = parkingGateService.getParkingGatePage(pageReqVO);
         return success(BeanUtils.toBean(pageResult, ParkingGateRespVO.class));
@@ -74,7 +74,7 @@ public class ParkingGateController {
     @GetMapping("/list-by-lot")
     @Operation(summary = "获得车场的道闸设备列表")
     @Parameter(name = "lotId", description = "车场ID", required = true)
-    @PreAuthorize("@ss.hasPermission('iot:parking:gate:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:gate:query-btn')")
     public CommonResult<List<ParkingGateRespVO>> getParkingGateListByLotId(@RequestParam("lotId") Long lotId) {
         List<ParkingGateDO> list = parkingGateService.getParkingGateListByLotId(lotId);
         return success(BeanUtils.toBean(list, ParkingGateRespVO.class));

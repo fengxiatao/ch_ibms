@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <artifactId>yudao-module-iot-newgateway</artifactId>
+        <groupId>cn.iocoder.boot</groupId>
+        <version>${revision}</version>
+    </parent>
+
+    <packaging>jar</packaging>
+    <artifactId>yudao-module-iot-newgateway-domain-access</artifactId>
+    <name>${project.artifactId}</name>
+    <description>NewGateway 门禁域：ACCESS_GEN1/2 插件与大华 NetSDK（JNA 由 core 提供）</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-module-iot-newgateway-core</artifactId>
+            <version>${revision}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.netsdk</groupId>
+            <artifactId>netsdk</artifactId>
+            <version>1.0-demo</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

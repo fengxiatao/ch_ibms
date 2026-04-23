@@ -59,7 +59,8 @@ export const useDictStore = defineStore('dict', {
             value: dictData.value,
             label: dictData.label,
             colorType: dictData.colorType,
-            cssClass: dictData.cssClass
+            cssClass: dictData.cssClass,
+            remark: dictData.remark
           })
         })
         this.dictMap = dictDataMap
@@ -89,7 +90,8 @@ export const useDictStore = defineStore('dict', {
           value: dictData.value,
           label: dictData.label,
           colorType: dictData.colorType,
-          cssClass: dictData.cssClass
+          cssClass: dictData.cssClass,
+          remark: dictData.remark
         })
       })
       this.dictMap = dictDataMap

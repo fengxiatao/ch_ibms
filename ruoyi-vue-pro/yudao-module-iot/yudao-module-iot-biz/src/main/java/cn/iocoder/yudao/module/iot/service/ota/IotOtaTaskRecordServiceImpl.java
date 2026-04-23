@@ -9,11 +9,13 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.ota.vo.task.record.IotOtaTaskRecordPageReqVO;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaFirmwareDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaTaskRecordDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.ota.IotOtaTaskRecordMapper;
 import cn.iocoder.yudao.module.iot.enums.ota.IotOtaTaskRecordStatusEnum;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
 import cn.iocoder.yudao.module.iot.service.device.message.IotDeviceMessageService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +47,9 @@ public class IotOtaTaskRecordServiceImpl implements IotOtaTaskRecordService {
     @Resource
     private IotDeviceMessageService deviceMessageService;
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
+    @Resource
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
 
     @Override
     public void createOtaTaskRecordList(List<IotDeviceDO> devices, Long firmwareId, Long taskId) {
@@ -203,7 +207,12 @@ public class IotOtaTaskRecordServiceImpl implements IotOtaTaskRecordService {
 
         // 3. 如果升级成功，则更新设备固件版本
         if (IotOtaTaskRecordStatusEnum.SUCCESS.getStatus().equals(status)) {
-            deviceService.updateDeviceFirmware(device.getId(), firmware.getId());
+            IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(device.getId());
+            if (ibms != null) {
+                ibmsDeviceRuntimeService.updateFirmwareId(device.getId(), firmware.getId());
+            } else {
+                throw exception(DEVICE_NOT_EXISTS);
+            }
         }
 
         // 4. 如果状态是“已结束”（非进行中），则更新任务状态

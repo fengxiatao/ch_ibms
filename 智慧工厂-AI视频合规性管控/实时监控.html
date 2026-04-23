@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时监控 - 工厂AI视频合规管控系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-panel: rgba(15, 23, 42, 0.85);
+            --border-color: rgba(148, 163, 184, 0.15);
+            --compliance-green: #10b981;
+            --warning-yellow: #f59e0b;
+            --violation-red: #ef4444;
+            --info-blue: #3b82f6;
+        }
+        body { background: var(--bg-primary); color: #f1f5f9; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .glass-panel { background: var(--bg-panel); backdrop-filter: blur(12px); border: 1px solid var(--border-color); border-radius: 12px; }
+
+        @keyframes alertPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 50% { box-shadow: 0 0 20px 5px rgba(239,68,68,0.2); } }
+        .alert-pulse { animation: alertPulse 1.5s ease-in-out infinite; }
+
+        .video-card { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 8px; overflow: hidden; transition: all 0.2s; cursor: pointer; }
+        .video-card:hover { transform: scale(1.02); box-shadow: 0 8px 25px rgba(0,0,0,0.4); }
+        .video-card.alert { border: 2px solid var(--violation-red); }
+
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .status-dot.online { background: var(--compliance-green); box-shadow: 0 0 8px var(--compliance-green); }
+        .status-dot.warning { background: var(--warning-yellow); box-shadow: 0 0 8px var(--warning-yellow); }
+        .status-dot.offline { background: #64748b; }
+
+        .zone-menu-item { padding: 12px 16px; border-radius: 8px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: space-between; background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .zone-menu-item:hover { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.3); }
+        .zone-menu-item.active { background: rgba(59,130,246,0.2); border-color: rgba(59,130,246,0.4); color: #60a5fa; }
+        .zone-menu-item.expanded { background: rgba(59,130,246,0.1); }
+
+        .camera-sublist { margin-left: 12px; margin-top: 8px; border-left: 2px solid rgba(59,130,246,0.3); padding-left: 12px; display: none; }
+        .camera-sublist.show { display: block; }
+        .camera-sublist-item { padding: 10px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #94a3b8; transition: all 0.2s; display: flex; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.5); margin-bottom: 4px; }
+        .camera-sublist-item:hover { background: rgba(59,130,246,0.15); color: #60a5fa; }
+        .camera-sublist-item.active { background: rgba(59,130,246,0.2); color: #60a5fa; border-left: 3px solid #3b82f6; }
+        .camera-sublist-item.alert { border-left: 3px solid var(--violation-red); background: rgba(239,68,68,0.1); }
+
+        .sidebar-menu-item { padding: 10px 16px; border-radius: 8px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 10px; color: #94a3b8; }
+        .sidebar-menu-item:hover { background: rgba(59,130,246,0.15); color: #60a5fa; }
+        .sidebar-menu-item.active { background: rgba(59,130,246,0.25); color: #60a5fa; }
+
+        .toast { position: fixed; bottom: 24px; right: 24px; background: #1e293b; border-left: 4px solid var(--info-blue); border-radius: 8px; padding: 12px 20px; z-index: 1100; transform: translateX(400px); transition: transform 0.3s; }
+        .toast.show { transform: translateX(0); }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(30,41,59,0.5); }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+    <!-- 左侧边栏 - 仅保留功能导航 -->
+    <aside class="w-64 bg-slate-900/80 border-r border-gray-800 flex flex-col shrink-0 overflow-y-auto">
+        <div class="p-5 border-b border-gray-800">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-shield-alt text-2xl text-blue-500"></i>
+                <div>
+                    <h1 class="text-lg font-bold">工厂AI视频合规管控</h1>
+                    <p class="text-xs text-gray-500">智能合规事件管理平台</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="px-4 py-4">
+            <div class="text-xs text-gray-500 uppercase mb-3 font-semibold">功能模块</div>
+            <div class="space-y-1">
+                <div class="sidebar-menu-item active">
+                    <i class="fas fa-desktop text-blue-400"></i>
+                    <span class="text-sm">实时监控</span>
+                </div>
+                <div class="sidebar-menu-item" onclick="location.href='alerts.html'">
+                    <i class="fas fa-bell text-gray-400"></i>
+                    <span class="text-sm">实时告警</span>
+                    <span class="ml-auto bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded-full">4</span>
+                </div>
+                <div class="sidebar-menu-item" onclick="location.href='events.html'">
+                    <i class="fas fa-database text-gray-400"></i>
+                    <span class="text-sm">事件管理</span>
+                </div>
+                <div class="sidebar-menu-item" onclick="location.href='analysis.html'">
+                    <i class="fas fa-chart-line text-gray-400"></i>
+                    <span class="text-sm">事件分析</span>
+                </div>
+                <div class="sidebar-menu-item" onclick="location.href='personnel.html'">
+                    <i class="fas fa-users text-gray-400"></i>
+                    <span class="text-sm">人员档案管理</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-auto p-4 border-t border-gray-800">
+            <div class="grid grid-cols-3 gap-2 text-center">
+                <div><div class="text-lg font-bold text-blue-400">6</div><div class="text-xs text-gray-500">监控点位</div></div>
+                <div><div class="text-lg font-bold text-green-400">5</div><div class="text-xs text-gray-500">合规规则</div></div>
+                <div><div class="text-lg font-bold text-purple-400">13</div><div class="text-xs text-gray-500">在场人员</div></div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <!-- 顶部工具栏 -->
+        <div class="h-14 flex items-center justify-between px-6 border-b border-gray-800 bg-slate-900/30">
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 bg-slate-800/50 rounded-lg p-1">
+                    <button class="grid-btn px-3 py-1 rounded text-sm transition hover:bg-slate-700" data-grid="6" onclick="setGrid(6)">6格</button>
+                    <button class="grid-btn px-3 py-1 rounded text-sm transition bg-slate-700 active" data-grid="4" onclick="setGrid(4)">4格</button>
+                    <button class="grid-btn px-3 py-1 rounded text-sm transition hover:bg-slate-700" data-grid="1" onclick="setGrid(1)">1格</button>
+                </div>
+                <div class="text-sm text-gray-400"><i class="fas fa-video mr-1"></i><span id="cameraCount">6</span> 路在线</div>
+            </div>
+            <div class="flex gap-2">
+                <button id="startComplianceCheck" class="px-3 py-1.5 bg-green-600/20 text-green-400 border border-green-600/30 rounded-lg text-sm hover:bg-green-600/30" onclick="toggleAI()">
+                    <i class="fas fa-brain mr-1"></i>启动AI检测
+                </button>
+                <button id="recordEvidenceBtn" class="px-3 py-1.5 bg-red-600/20 text-red-400 border border-red-600/30 rounded-lg text-sm hover:bg-red-600/30" onclick="toggleRecord()">
+                    <i class="fas fa-circle mr-1"></i>录制证据
+                </button>
+            </div>
+        </div>
+
+        <!-- 视频网格区域 -->
+        <div class="flex-1 p-4 overflow-y-auto">
+            <div id="videoGrid" class="grid gap-4 mb-6" style="grid-template-columns: repeat(2, 1fr);"></div>
+
+            <!-- 合规监控区域 - 移到主内容区下方 -->
+            <div class="glass-panel p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold flex items-center gap-2">
+                        <i class="fas fa-map-marker-alt text-blue-400"></i>合规监控区域
+                    </h3>
+                    <span class="text-xs text-gray-500">点击区域展开监控点</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <!-- A区 -->
+                    <div class="zone-wrapper">
+                        <div class="zone-menu-item" data-zone="zone-a" onclick="toggleZone(this)">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-video text-purple-400"></i>
+                                <div>
+                                    <div class="font-medium text-sm">A区 - 洁净区入口</div>
+                                    <div class="text-xs text-gray-500">2路监控</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down text-gray-500 text-xs transition-transform zone-arrow"></i>
+                        </div>
+                        <div class="camera-sublist" id="cameras-zone-a">
+                            <div class="camera-sublist-item" data-camera="CAM-01" onclick="selectCamera('CAM-01', event)">
+                                <span class="status-dot online"></span>
+                                <span class="flex-1">CAM-01 洁净服检测</span>
+                                <span class="text-xs text-gray-500">2人</span>
+                            </div>
+                            <div class="camera-sublist-item" data-camera="CAM-02" onclick="selectCamera('CAM-02', event)">
+                                <span class="status-dot online"></span>
+                                <span class="flex-1">CAM-02 更衣室合规</span>
+                                <span class="text-xs text-gray-500">1人</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- B区 -->
+                    <div class="zone-wrapper">
+                        <div class="zone-menu-item" data-zone="zone-b" onclick="toggleZone(this)">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-video text-blue-400"></i>
+                                <div>
+                                    <div class="font-medium text-sm">B区 - 洁净作业区</div>
+                                    <div class="text-xs text-gray-500">2路监控</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down text-gray-500 text-xs transition-transform zone-arrow"></i>
+                        </div>
+                        <div class="camera-sublist" id="cameras-zone-b">
+                            <div class="camera-sublist-item alert" data-camera="CAM-03" onclick="selectCamera('CAM-03', event)">
+                                <span class="status-dot warning"></span>
+                                <span class="flex-1">CAM-03 人数管控点</span>
+                                <span class="text-xs text-red-400">4人</span>
+                            </div>
+                            <div class="camera-sublist-item" data-camera="CAM-04" onclick="selectCamera('CAM-04', event)">
+                                <span class="status-dot online"></span>
+                                <span class="flex-1">CAM-04 行为规范监测</span>
+                                <span class="text-xs text-gray-500">2人</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- C区 -->
+                    <div class="zone-wrapper">
+                        <div class="zone-menu-item" data-zone="zone-c" onclick="toggleZone(this)">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-video text-green-400"></i>
+                                <div>
+                                    <div class="font-medium text-sm">C区 - 灌装生产线</div>
+                                    <div class="text-xs text-gray-500">1路监控</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down text-gray-500 text-xs transition-transform zone-arrow"></i>
+                        </div>
+                        <div class="camera-sublist" id="cameras-zone-c">
+                            <div class="camera-sublist-item" data-camera="CAM-05" onclick="selectCamera('CAM-05', event)">
+                                <span class="status-dot online"></span>
+                                <span class="flex-1">CAM-05 灌装线合规</span>
+                                <span class="text-xs text-gray-500">3人</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- D区 -->
+                    <div class="zone-wrapper">
+                        <div class="zone-menu-item" data-zone="zone-d" onclick="toggleZone(this)">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-video text-yellow-400"></i>
+                                <div>
+                                    <div class="font-medium text-sm">D区 - 原料仓储区</div>
+                                    <div class="text-xs text-gray-500">1路监控</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down text-gray-500 text-xs transition-transform zone-arrow"></i>
+                        </div>
+                        <div class="camera-sublist" id="cameras-zone-d">
+                            <div class="camera-sublist-item" data-camera="CAM-06" onclick="selectCamera('CAM-06', event)">
+                                <span class="status-dot online"></span>
+                                <span class="flex-1">CAM-06 禁区闯入检测</span>
+                                <span class="text-xs text-gray-500">1人</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部播放控制栏 -->
+        <div class="p-4 border-t border-gray-800 bg-slate-900/20">
+            <div class="flex items-center gap-4">
+                <button class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center hover:bg-blue-700">
+                    <i class="fas fa-play"></i>
+                </button>
+                <div>
+                    <div id="playbackTime" class="mono text-lg">10:32:45</div>
+                    <div class="text-xs text-gray-500">2024-03-28</div>
+                </div>
+                <div class="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div class="h-full w-2/5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="toast" class="toast">
+        <div class="flex items-center gap-2">
+            <i id="toastIcon" class="fas fa-check-circle text-green-400"></i>
+            <span id="toastMessage"></span>
+        </div>
+    </div>
+
+    <script>
+        let cameras = [
+            { id: 'CAM-01', name: 'A区-洁净服检测点', zone: 'zone-a', status: 'normal', persons: 2 },
+            { id: 'CAM-02', name: 'A区-更衣室合规', zone: 'zone-a', status: 'normal', persons: 1 },
+            { id: 'CAM-03', name: 'B区-人数管控点', zone: 'zone-b', status: 'alert', persons: 4 },
+            { id: 'CAM-04', name: 'B区-行为规范监测', zone: 'zone-b', status: 'warning', persons: 2 },
+            { id: 'CAM-05', name: 'C区-灌装线合规', zone: 'zone-c', status: 'normal', persons: 3 },
+            { id: 'CAM-06', name: 'D区-禁区闯入检测', zone: 'zone-d', status: 'normal', persons: 1 }
+        ];
+
+        let currentGrid = 4;
+        let aiRunning = false;
+        let recording = false;
+
+        function showToast(msg, type='success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const msgEl = document.getElementById('toastMessage');
+            const icons = {
+                success: 'fa-check-circle text-green-400',
+                warning: 'fa-exclamation-circle text-yellow-400',
+                error: 'fa-times-circle text-red-400',
+                info: 'fa-info-circle text-blue-400'
+            };
+            icon.className = `fas ${icons[type]}`;
+            msgEl.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function toggleZone(element) {
+            const zone = element.dataset.zone;
+            const submenu = document.getElementById(`cameras-${zone}`);
+            const arrow = element.querySelector('.zone-arrow');
+
+            // 关闭其他已展开的区域
+            document.querySelectorAll('.camera-sublist.show').forEach(el => {
+                if (el.id !== `cameras-${zone}`) {
+                    el.classList.remove('show');
+                    el.previousElementSibling.classList.remove('expanded');
+                    el.previousElementSibling.querySelector('.zone-arrow').style.transform = 'rotate(0)';
+                }
+            });
+
+            submenu.classList.toggle('show');
+            element.classList.toggle('expanded');
+            arrow.style.transform = submenu.classList.contains('show') ? 'rotate(180deg)' : 'rotate(0)';
+        }
+
+        function selectCamera(cameraId, event) {
+            event.stopPropagation();
+            document.querySelectorAll('.camera-sublist-item').forEach(item => item.classList.remove('active'));
+            document.querySelector(`[data-camera="${cameraId}"]`).classList.add('active');
+            showToast(`已选中 ${cameraId}`, 'info');
+        }
+
+        function setGrid(count) {
+            currentGrid = count;
+            document.querySelectorAll('.grid-btn').forEach(btn => {
+                btn.classList.remove('bg-slate-700', 'active');
+                if (parseInt(btn.dataset.grid) === count) btn.classList.add('bg-slate-700', 'active');
+            });
+            renderVideoGrid();
+        }
+
+        function renderVideoGrid() {
+            const container = document.getElementById('videoGrid');
+            const display = cameras.slice(0, currentGrid);
+            const cols = currentGrid === 1 ? 1 : currentGrid === 4 ? 2 : 3;
+            container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+            document.getElementById('cameraCount').textContent = display.length;
+
+            container.innerHTML = display.map(cam => `
+                <div class="video-card ${cam.status === 'alert' ? 'alert' : ''}">
+                    <div class="aspect-video bg-gradient-to-br from-slate-800 to-slate-900 relative overflow-hidden">
+                        <div class="absolute inset-0 opacity-10" style="background-image:linear-gradient(rgba(255,255,255,0.1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.1) 1px,transparent 1px);background-size:20px 20px;"></div>
+                        ${Array(Math.min(cam.persons, 3)).fill().map((_, i) => `
+                            <div class="absolute transform -translate-x-1/2 -translate-y-1/2" style="left:${30 + i * 25}%;top:${40 + (i % 2) * 20}%;">
+                                <div class="w-12 h-12 rounded-full bg-blue-600/80 flex items-center justify-center border-2 border-blue-400">
+                                    <i class="fas fa-user text-white"></i>
+                                </div>
+                            </div>
+                        `).join('')}
+                        <div class="absolute bottom-2 left-2 bg-black/60 rounded px-2 py-1">
+                            <span class="mono text-xs">${cam.id}</span>
+                        </div>
+                        <div class="absolute top-2 left-2 bg-blue-600/80 rounded px-2 py-1 flex items-center gap-1">
+                            <i class="fas fa-brain text-xs"></i>
+                            <span class="text-xs">AI检测中</span>
+                        </div>
+                        ${cam.status === 'alert' ? `<div class="absolute top-2 right-2 bg-red-600 rounded px-2 py-1"><i class="fas fa-exclamation text-xs"></i><span class="text-xs">告警</span></div>` : ''}
+                        ${cam.status === 'warning' ? `<div class="absolute top-2 right-2 bg-yellow-600 rounded px-2 py-1"><i class="fas fa-exclamation-triangle text-xs"></i><span class="text-xs">警告</span></div>` : ''}
+                    </div>
+                    <div class="p-3">
+                        <div class="text-sm font-medium">${cam.name}</div>
+                        <div class="text-xs text-gray-500 flex justify-between mt-1">
+                            <span>${cam.zone.toUpperCase()}</span>
+                            <span><i class="fas fa-user mr-1"></i>${cam.persons}人</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleAI() {
+            aiRunning = !aiRunning;
+            const btn = document.getElementById('startComplianceCheck');
+            if (aiRunning) {
+                btn.innerHTML = '<i class="fas fa-stop mr-1"></i>停止检测';
+                btn.classList.replace('bg-green-600/20', 'bg-red-600/20');
+                btn.classList.replace('text-green-400', 'text-red-400');
+                showToast('AI检测已启动', 'success');
+            } else {
+                btn.innerHTML = '<i class="fas fa-brain mr-1"></i>启动AI检测';
+                btn.classList.replace('bg-red-600/20', 'bg-green-600/20');
+                btn.classList.replace('text-red-400', 'text-green-400');
+                showToast('AI检测已停止', 'info');
+            }
+        }
+
+        function toggleRecord() {
+            recording = !recording;
+            const btn = document.getElementById('recordEvidenceBtn');
+            if (recording) {
+                btn.classList.add('alert-pulse');
+                showToast('开始录制证据', 'info');
+            } else {
+                btn.classList.remove('alert-pulse');
+                showToast('录制已保存', 'success');
+            }
+        }
+
+        function init() {
+            renderVideoGrid();
+            setInterval(() => {
+                const now = new Date();
+                const timeEl = document.getElementById('playbackTime');
+                if (timeEl) timeEl.textContent = now.toLocaleTimeString('zh-CN');
+            }, 1000);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

@@ -5,10 +5,9 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.iot.controller.admin.opc.vo.OpcZoneConfigCreateReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.opc.vo.OpcZoneConfigPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.opc.vo.OpcZoneConfigUpdateReqVO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.opc.OpcZoneConfigDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.opc.OpcZoneConfigMapper;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,7 +32,7 @@ public class OpcZoneConfigServiceImpl implements OpcZoneConfigService {
     private OpcZoneConfigMapper zoneConfigMapper;
 
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @Override
     public Long createZoneConfig(OpcZoneConfigCreateReqVO createReqVO) {
@@ -107,8 +106,7 @@ public class OpcZoneConfigServiceImpl implements OpcZoneConfigService {
      * 校验设备是否存在
      */
     private void validateDeviceExists(Long deviceId) {
-        IotDeviceDO device = deviceService.getDevice(deviceId);
-        if (device == null) {
+        if (ibmsDeviceMapper.selectById(deviceId) == null) {
             throw exception(DEVICE_NOT_EXISTS);
         }
     }

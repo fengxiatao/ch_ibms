@@ -1,10 +1,10 @@
 -- =====================================================
--- IoT 设备消息表（替代 TDEngine 的 device_message 超级表）
+-- IBMS 设备消息表（替代 TDEngine 的 device_message 超级表）
 -- 用于存储设备上下行消息
 -- =====================================================
 
 -- 设备消息主表
-CREATE TABLE IF NOT EXISTS `iot_device_message` (
+CREATE TABLE IF NOT EXISTS `ibms_device_message` (
     `id` VARCHAR(50) NOT NULL COMMENT '消息编号',
     `device_id` BIGINT NOT NULL COMMENT '设备编号',
     `tenant_id` BIGINT NULL COMMENT '租户编号',
@@ -29,11 +29,11 @@ CREATE TABLE IF NOT EXISTS `iot_device_message` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='IoT设备消息表';
 
 -- =====================================================
--- IoT 设备属性历史表（替代 TDEngine 的 product_property_* 超级表）
+-- IBMS 设备属性历史表（替代 TDEngine 的 product_property_* 超级表）
 -- 每个产品共享一张属性历史表，使用 product_id 区分
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS `iot_device_property_history` (
+CREATE TABLE IF NOT EXISTS `ibms_device_property_history` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `device_id` BIGINT NOT NULL COMMENT '设备编号',
     `product_id` BIGINT NOT NULL COMMENT '产品编号',

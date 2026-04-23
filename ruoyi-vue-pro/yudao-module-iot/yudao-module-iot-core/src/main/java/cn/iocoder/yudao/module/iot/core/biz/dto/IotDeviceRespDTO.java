@@ -57,4 +57,14 @@ public class IotDeviceRespDTO {
      */
     private String config;
 
+    /**
+     * 网关路由用设备类型（如 NVR、ACCESS_GEN1），与插件 deviceType 对齐
+     */
+    private String deviceType;
+
+    /**
+     * IBMS/台账品牌码（如 HIK、DAH），用于同类型多厂家 Adapter 选择
+     */
+    private String brand;
+
 }

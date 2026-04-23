@@ -1,4 +1,5 @@
-import { computed } from 'vue'
+import { computed, unref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAppStore } from '@/store/modules/app'
 import { Menu } from '@/layout/components/Menu'
 import { TabMenu } from '@/layout/components/TabMenu'
@@ -54,6 +55,25 @@ export const useRenderFullscreen = () => {
 }
 
 export const useRenderLayout = () => {
+  const { currentRoute } = useRouter()
+
+  /**
+   * 智慧工厂大屏页隐藏 TagsView，避免占用垂直空间并影响大屏首屏展示。
+   */
+  const hideTagsViewByRoute = computed(() => unref(currentRoute).path.startsWith('/factory/'))
+
+  /**
+   * 实际是否展示 TagsView。
+   */
+  const showTagsView = computed(() => tagsView.value && !hideTagsViewByRoute.value)
+
+  /**
+   * 工厂大屏页在布局层收窄顶部安全区，仅保留顶栏高度。
+   */
+  const layoutStyle = computed(() =>
+    hideTagsViewByRoute.value ? '--page-top-gap: var(--top-tool-height);' : undefined
+  )
+
   const renderClassic = () => {
     return (
       <>
@@ -90,7 +110,7 @@ export const useRenderLayout = () => {
               'fixed !w-full !left-0': mobile.value
             }
           ]}
-          style="transition: all var(--transition-time-02);"
+          style={[layoutStyle.value, 'transition: all var(--transition-time-02);']}
         >
           <ElScrollbar
             v-loading={pageLoading.value}
@@ -113,12 +133,12 @@ export const useRenderLayout = () => {
                 class={[
                   'bg-[var(--top-header-bg-color)]',
                   {
-                    'layout-border__bottom': !tagsView.value
+                    'layout-border__bottom': !showTagsView.value
                   }
                 ]}
               ></ToolHeader>
 
-              {tagsView.value ? (
+              {showTagsView.value ? (
                 <TagsView class="layout-border__top layout-border__bottom"></TagsView>
               ) : undefined}
             </div>
@@ -151,7 +171,7 @@ export const useRenderLayout = () => {
                   !collapse.value
               }
             ]}
-            style="transition: all var(--transition-time-02);"
+            style={[layoutStyle.value, 'transition: all var(--transition-time-02);']}
           >
             <ElScrollbar
               v-loading={pageLoading.value}
@@ -159,15 +179,15 @@ export const useRenderLayout = () => {
                 `${prefixCls}-content-scrollbar`,
                 {
                   '!h-[calc(100%-var(--tags-view-height)-var(--app-footer-height))] mt-[calc(var(--tags-view-height))]':
-                    fixedHeader.value && tagsView.value && footer.value,
+                    fixedHeader.value && showTagsView.value && footer.value,
                   '!h-[calc(100%-var(--tags-view-height))] mt-[calc(var(--tags-view-height))]':
-                    fixedHeader.value && tagsView.value && !footer.value,
+                    fixedHeader.value && showTagsView.value && !footer.value,
                   '!h-[calc(100%-var(--app-footer-height))]':
-                    (!fixedHeader.value || !tagsView.value) && footer.value
+                    (!fixedHeader.value || !showTagsView.value) && footer.value
                 }
               ]}
             >
-              {tagsView.value ? (
+              {showTagsView.value ? (
                 <TagsView
                   class={[
                     'layout-border__bottom absolute',
@@ -198,9 +218,10 @@ export const useRenderLayout = () => {
           class={[
             'flex items-center justify-between bg-[var(--top-header-bg-color)] relative',
             {
-              'layout-border__bottom': !tagsView.value
+              'layout-border__bottom': !showTagsView.value
             }
           ]}
+          style={layoutStyle.value}
         >
           {logo.value ? <Logo class="custom-hover"></Logo> : undefined}
           <Menu class="h-[var(--top-tool-height)] flex-1 px-10px"></Menu>
@@ -213,15 +234,15 @@ export const useRenderLayout = () => {
               `${prefixCls}-content-scrollbar`,
               {
                 '!h-[calc(100%-var(--tags-view-height)-var(--app-footer-height))] mt-[calc(var(--tags-view-height))]':
-                  fixedHeader.value && tagsView.value && footer.value,
+                  fixedHeader.value && showTagsView.value && footer.value,
                 '!h-[calc(100%-var(--tags-view-height))] mt-[calc(var(--tags-view-height))]':
-                  fixedHeader.value && tagsView.value && !footer.value,
+                  fixedHeader.value && showTagsView.value && !footer.value,
                 '!h-[calc(100%-var(--app-footer-height))]':
-                  (!fixedHeader.value || !tagsView.value) && footer.value
+                  (!fixedHeader.value || !showTagsView.value) && footer.value
               }
             ]}
           >
-            {tagsView.value ? (
+            {showTagsView.value ? (
               <TagsView
                 class={[
                   'layout-border__bottom layout-border__top relative',
@@ -265,7 +286,7 @@ export const useRenderLayout = () => {
                   !collapse.value && fixedMenu.value
               }
             ]}
-            style="transition: all var(--transition-time-02);"
+            style={[layoutStyle.value, 'transition: all var(--transition-time-02);']}
           >
             <ElScrollbar
               v-loading={pageLoading.value}
@@ -273,15 +294,15 @@ export const useRenderLayout = () => {
                 `${prefixCls}-content-scrollbar`,
                 {
                   '!h-[calc(100%-var(--tags-view-height)-var(--app-footer-height))] mt-[calc(var(--tags-view-height))]':
-                    fixedHeader.value && tagsView.value && footer.value,
+                    fixedHeader.value && showTagsView.value && footer.value,
                   '!h-[calc(100%-var(--tags-view-height))] mt-[calc(var(--tags-view-height))]':
-                    fixedHeader.value && tagsView.value && !footer.value,
+                    fixedHeader.value && showTagsView.value && !footer.value,
                   '!h-[calc(100%-var(--app-footer-height))]':
-                    (!fixedHeader.value || !tagsView.value) && footer.value
+                    (!fixedHeader.value || !showTagsView.value) && footer.value
                 }
               ]}
             >
-              {tagsView.value ? (
+              {showTagsView.value ? (
                 <TagsView
                   class={[
                     'relative layout-border__bottom',

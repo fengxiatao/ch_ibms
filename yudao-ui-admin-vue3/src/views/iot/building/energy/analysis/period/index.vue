@@ -125,7 +125,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
-import * as echarts from 'echarts'
+import echarts from '@/plugins/echarts'
 
 defineOptions({ name: 'BuildingEnergyPeriodAnalysis' })
 

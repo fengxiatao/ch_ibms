@@ -3,12 +3,8 @@ package cn.iocoder.yudao.module.iot.service.alert;
 import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.alert.vo.recrod.IotAlertRecordPageReqVO;
-import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
-import cn.iocoder.yudao.module.iot.dal.dataobject.alert.IotAlertConfigDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.alert.IotAlertRecordDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.alert.IotAlertRecordMapper;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -27,9 +23,6 @@ public class IotAlertRecordServiceImpl implements IotAlertRecordService {
 
     @Resource
     private IotAlertRecordMapper alertRecordMapper;
-
-    @Resource
-    private IotDeviceService deviceService;
 
     @Override
     public IotAlertRecordDO getAlertRecord(Long id) {

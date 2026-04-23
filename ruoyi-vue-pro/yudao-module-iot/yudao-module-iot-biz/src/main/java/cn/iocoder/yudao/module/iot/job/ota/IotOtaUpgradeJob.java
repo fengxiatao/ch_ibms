@@ -6,12 +6,14 @@ import cn.iocoder.yudao.framework.quartz.core.enums.JobBusinessType;
 import cn.iocoder.yudao.framework.quartz.core.enums.JobConflictStrategy;
 import cn.iocoder.yudao.framework.quartz.core.enums.JobPriority;
 import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaFirmwareDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaTaskRecordDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.enums.ota.IotOtaTaskRecordStatusEnum;
 import cn.iocoder.yudao.module.iot.framework.job.IotBusinessJobHandler;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
 import cn.iocoder.yudao.module.iot.service.ota.IotOtaFirmwareService;
 import cn.iocoder.yudao.module.iot.service.ota.IotOtaTaskRecordService;
 import jakarta.annotation.Resource;
@@ -41,7 +43,9 @@ public class IotOtaUpgradeJob extends IotBusinessJobHandler {
     @Resource
     private IotOtaFirmwareService otaFirmwareService;
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
+    @Resource
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
 
     @Override
     public JobBusinessType getBusinessType() {
@@ -80,7 +84,7 @@ public class IotOtaUpgradeJob extends IotBusinessJobHandler {
         for (IotOtaTaskRecordDO record : records) {
             try {
                 // 2.1 设备如果不在线，直接跳过
-                IotDeviceDO device = deviceService.getDeviceFromCache(record.getDeviceId());
+                var device = resolveDeviceForOta(record.getDeviceId());
                 // TODO 长辉开发团队：【优化】当前逻辑跳过了离线的设备，但未充分利用 MQTT 的离线消息能力。
                 // 1. MQTT 协议本身支持持久化会话（Clean Session=false）和 QoS > 0 的消息，允许 broker 为离线设备缓存消息。
                 // 2. 对于 OTA 升级这类非实时性强的任务，即使设备当前离线，也应该可以推送升级指令。设备在下次上线时即可收到。
@@ -107,6 +111,15 @@ public class IotOtaUpgradeJob extends IotBusinessJobHandler {
             }
         }
         return StrUtil.format("升级任务推送成功：{} 条，送失败：{} 条", successCount, failureCount);
+    }
+
+    private cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO resolveDeviceForOta(Long deviceId) {
+        IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(deviceId);
+        if (ibms != null) {
+            return IbmsDeviceLedgerRuntimeHelper.buildLegacyOtaDeviceShell(ibms,
+                    ibmsDeviceRuntimeService.getByDeviceId(deviceId));
+        }
+        return null;
     }
 
 }

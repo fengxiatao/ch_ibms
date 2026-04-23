@@ -79,4 +79,39 @@ public interface IotMessageTopics {
      * </ul>
      */
     String DEVICE_EVENT_REPORTED = "iot_device_event_reported";
+
+    /**
+     * 设备台账/连接配置变更（Biz → NewGateway）
+     * <ul>
+     *   <li>消息类型: {@link cn.iocoder.yudao.module.iot.core.mq.message.DeviceProfileChangedMessage}</li>
+     *   <li>用途: 网关本地缓存 upsert/delete，替代网关 HTTP 拉取设备</li>
+     * </ul>
+     */
+    String DEVICE_PROFILE_CHANGED = "iot_device_profile_changed";
+
+    /**
+     * 网关向 Biz 请求设备快照（Request，Gateway → Biz）
+     * <ul>
+     *   <li>消息类型: {@link cn.iocoder.yudao.module.iot.core.mq.message.GatewayDeviceSnapshotRequestMessage}</li>
+     *   <li>应答: {@link #GATEWAY_DEVICE_SNAPSHOT_REPLY}</li>
+     * </ul>
+     */
+    String GATEWAY_DEVICE_SNAPSHOT_REQUEST = "iot_gateway_device_snapshot_request";
+
+    /**
+     * Biz 对网关快照请求的应答（Reply，Biz → Gateway）
+     * <ul>
+     *   <li>消息类型: {@link cn.iocoder.yudao.module.iot.core.mq.message.GatewayDeviceSnapshotReplyMessage}</li>
+     * </ul>
+     */
+    String GATEWAY_DEVICE_SNAPSHOT_REPLY = "iot_gateway_device_snapshot_reply";
+
+    /**
+     * 网关请求 Biz 按租户批量重推 Profile（Gateway → Biz，单向）
+     * <ul>
+     *   <li>消息类型: {@link cn.iocoder.yudao.module.iot.core.mq.message.GatewayProfileWarmupRequestMessage}</li>
+     *   <li>处理: Biz 在租户上下文中对本租户全部 IBMS 设备发布 {@link #DEVICE_PROFILE_CHANGED}</li>
+     * </ul>
+     */
+    String GATEWAY_PROFILE_WARMUP_REQUEST = "iot_gateway_profile_warmup_request";
 }

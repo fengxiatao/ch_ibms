@@ -14,6 +14,7 @@ import { ElScrollbar } from 'element-plus'
 import { useScrollTo } from '@/hooks/event/useScrollTo'
 import { useTagsView } from '@/hooks/web/useTagsView'
 import { cloneDeep } from 'lodash-es'
+import { getRouteIdentityKey, isSameRouteIdentity } from '@/utils/routerHelper'
 
 defineOptions({ name: 'TagsView' })
 
@@ -48,6 +49,8 @@ const tagsViewImmerse = computed(() => appStore.getTagsViewImmerse)
 const tagsViewIcon = computed(() => appStore.getTagsViewIcon)
 
 const isDark = computed(() => appStore.getIsDark)
+
+const hideTagsViewScrollTools = computed(() => unref(currentRoute).path.startsWith('/factory/cockpit'))
 
 // 初始化tag
 const initTags = () => {
@@ -128,7 +131,7 @@ const closeRightTags = () => {
 const moveToCurrentTag = async () => {
   await nextTick()
   for (const v of unref(visitedViews)) {
-    if (v.fullPath === unref(currentRoute).fullPath) {
+    if (isSameRouteIdentity(v, unref(currentRoute))) {
       moveToTarget(v)
       break
     }
@@ -148,7 +151,7 @@ const moveToTarget = (currentTag: RouteLocationNormalizedLoaded) => {
     firstTag = tagList[0]
     lastTag = tagList[tagList.length - 1]
   }
-  if ((firstTag?.to as RouteLocationNormalizedLoaded).fullPath === currentTag.fullPath) {
+  if (isSameRouteIdentity((firstTag?.to as RouteLocationNormalizedLoaded) || currentTag, currentTag)) {
     // 直接滚动到0的位置
     const { start } = useScrollTo({
       el: wrap$!,
@@ -157,7 +160,7 @@ const moveToTarget = (currentTag: RouteLocationNormalizedLoaded) => {
       duration: 500
     })
     start()
-  } else if ((lastTag?.to as RouteLocationNormalizedLoaded).fullPath === currentTag.fullPath) {
+  } else if (isSameRouteIdentity((lastTag?.to as RouteLocationNormalizedLoaded) || currentTag, currentTag)) {
     // 滚动到最后的位置
     const { start } = useScrollTo({
       el: wrap$!,
@@ -169,7 +172,7 @@ const moveToTarget = (currentTag: RouteLocationNormalizedLoaded) => {
   } else {
     // find preTag and nextTag
     const currentIndex: number = tagList.findIndex(
-      (item) => (item?.to as RouteLocationNormalizedLoaded).fullPath === currentTag.fullPath
+      (item) => isSameRouteIdentity(item?.to as RouteLocationNormalizedLoaded, currentTag)
     )
     const tgsRefs = document.getElementsByClassName(`${prefixCls}__item`)
 
@@ -204,7 +207,7 @@ const moveToTarget = (currentTag: RouteLocationNormalizedLoaded) => {
 
 // 是否是当前tag
 const isActive = (route: RouteLocationNormalizedLoaded): boolean => {
-  return route.fullPath === unref(currentRoute).fullPath
+  return isSameRouteIdentity(route, unref(currentRoute))
 }
 
 // 所有右键菜单组件的元素
@@ -215,7 +218,7 @@ const visibleChange = (visible: boolean, tagItem: RouteLocationNormalizedLoaded)
   if (visible) {
     for (const v of unref(itemRefs)) {
       const elDropdownMenuRef = v.elDropdownMenuRef
-      if (tagItem.fullPath !== v.tagItem.fullPath) {
+      if (!isSameRouteIdentity(tagItem, v.tagItem)) {
         elDropdownMenuRef?.handleClose()
         setSelectTag(tagItem)
       }
@@ -271,11 +274,13 @@ watch(
 
 <template>
   <div
+    v-if="!hideTagsViewScrollTools"
     :id="prefixCls"
     :class="prefixCls"
     class="relative w-full flex bg-[#fff] dark:bg-[var(--el-bg-color)]"
   >
     <span
+      v-if="!hideTagsViewScrollTools"
       :class="tagsViewImmerse ? '' : `${prefixCls}__tool ${prefixCls}__tool--first`"
       class="h-[var(--tags-view-height)] w-[var(--tags-view-height)] flex cursor-pointer items-center justify-center"
       @click="move(-200)"
@@ -291,7 +296,7 @@ watch(
         <div class="h-[var(--tags-view-height)] flex">
           <ContextMenu
             v-for="item in visitedViews"
-            :key="item.fullPath"
+            :key="getRouteIdentityKey(item)"
             :ref="itemRefs.set"
             :class="[
               `${prefixCls}__item`,
@@ -307,7 +312,7 @@ watch(
               {
                 icon: 'ep:refresh',
                 label: t('common.reload'),
-                disabled: selectedTag?.fullPath !== item.fullPath,
+                disabled: !isSameRouteIdentity(selectedTag || item, item),
                 command: () => {
                   refreshSelectedTag(item)
                 }
@@ -326,8 +331,8 @@ watch(
                 label: t('common.closeTheLeftTab'),
                 disabled:
                   !!visitedViews?.length &&
-                  (item.fullPath === visitedViews[0].fullPath ||
-                    selectedTag?.fullPath !== item.fullPath),
+                  (isSameRouteIdentity(item, visitedViews[0]) ||
+                    !isSameRouteIdentity(selectedTag || item, item)),
                 command: () => {
                   closeLeftTags()
                 }
@@ -337,8 +342,8 @@ watch(
                 label: t('common.closeTheRightTab'),
                 disabled:
                   !!visitedViews?.length &&
-                  (item.fullPath === visitedViews[visitedViews.length - 1].fullPath ||
-                    selectedTag?.fullPath !== item.fullPath),
+                  (isSameRouteIdentity(item, visitedViews[visitedViews.length - 1]) ||
+                    !isSameRouteIdentity(selectedTag || item, item)),
                 command: () => {
                   closeRightTags()
                 }
@@ -347,7 +352,7 @@ watch(
                 divided: true,
                 icon: 'ep:discount',
                 label: t('common.closeOther'),
-                disabled: selectedTag?.fullPath !== item.fullPath,
+                disabled: !isSameRouteIdentity(selectedTag || item, item),
                 command: () => {
                   closeOthersTags()
                 }
@@ -400,6 +405,7 @@ watch(
       </ElScrollbar>
     </div>
     <span
+      v-if="!hideTagsViewScrollTools"
       :class="tagsViewImmerse ? '' : `${prefixCls}__tool`"
       class="h-[var(--tags-view-height)] w-[var(--tags-view-height)] flex cursor-pointer items-center justify-center"
       @click="move(200)"

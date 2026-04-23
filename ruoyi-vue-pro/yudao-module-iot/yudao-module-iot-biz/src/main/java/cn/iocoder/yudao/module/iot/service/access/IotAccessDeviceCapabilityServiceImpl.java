@@ -7,10 +7,15 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConf
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
 import cn.iocoder.yudao.module.iot.core.gateway.dto.AccessControlDeviceCommand;
 import cn.iocoder.yudao.module.iot.core.gateway.dto.AccessControlDeviceResponse;
+import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfig;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessDeviceCapabilityMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
 import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.enums.access.CredentialTypeConstants;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
 import cn.iocoder.yudao.module.iot.service.access.dto.CapabilityCheckResult;
 import cn.iocoder.yudao.module.iot.service.access.dto.CapabilityCheckResult.CapabilityErrorType;
 import lombok.extern.slf4j.Slf4j;
@@ -20,8 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.annotation.Resource;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 设备能力缓存服务实现
@@ -41,7 +49,10 @@ public class IotAccessDeviceCapabilityServiceImpl implements IotAccessDeviceCapa
     private AccessControlMessageBusClient messageBusClient;
 
     @Resource
-    private IotDeviceService iotDeviceService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
+
+    @Resource
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
     
     @Resource
     @Lazy
@@ -98,6 +109,13 @@ public class IotAccessDeviceCapabilityServiceImpl implements IotAccessDeviceCapa
         // ===== 通过消息总线从网关刷新真实能力（避免默认“全支持”导致错误下发/撤销） =====
         try {
             IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+            if (device == null) {
+                IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(deviceId);
+                if (ibms != null) {
+                    IbmsDeviceRuntimeDO rt = ibmsDeviceRuntimeService.getByDeviceId(deviceId);
+                    device = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibms, rt);
+                }
+            }
             if (device != null) {
                 String ip = getDeviceIp(device);
                 Integer port = getDevicePort(device);
@@ -121,7 +139,7 @@ public class IotAccessDeviceCapabilityServiceImpl implements IotAccessDeviceCapa
                 AccessControlDeviceResponse resp = messageBusClient.sendAndWait(cmd, 10);
                 if (resp != null && Boolean.TRUE.equals(resp.getSuccess()) && resp.getDeviceCapability() != null) {
                     applyGatewayCapability(capability, deviceType, resp.getDeviceCapability(), resp.getData());
-                    // 同步写回到 iot_device.config，供业务侧按能力做“精准下发/撤销”
+                    // 同步写回到 ibms_device_runtime.config，供业务侧按能力做“精准下发/撤销”
                     updateDeviceConfigCapabilitySnapshot(device, deviceType, resp.getDeviceCapability(), resp.getData());
                 } else {
                     log.warn("[DeviceCapability] 网关能力查询失败，使用缓存/默认能力: deviceId={}, msg={}",
@@ -220,24 +238,29 @@ public class IotAccessDeviceCapabilityServiceImpl implements IotAccessDeviceCapa
     private void updateDeviceConfigCapabilitySnapshot(IotDeviceDO device,
                                                       String deviceType,
                                                       AccessControlDeviceResponse.DeviceCapability dc,
-                                                      java.util.Map<String, Object> rawData) {
+                                                      Map<String, Object> rawData) {
         if (device == null || device.getId() == null || device.getConfig() == null) {
             return;
         }
 
-        java.util.Map<String, Object> snapshot = new java.util.HashMap<>();
+        Map<String, Object> snapshot = new HashMap<>();
         snapshot.put("deviceType", deviceType);
         snapshot.put("hasCard", Boolean.TRUE.equals(dc.getSupCardService()));
         snapshot.put("hasFace", Boolean.TRUE.equals(dc.getSupFaceService()));
         snapshot.put("hasFingerprint", Boolean.TRUE.equals(dc.getSupFingerprintService()));
-        if (dc.getMaxCardCount() != null) snapshot.put("maxCardCount", dc.getMaxCardCount());
-        if (dc.getMaxFaceCount() != null) snapshot.put("maxFaceCount", dc.getMaxFaceCount());
-        if (dc.getMaxFingerprintCount() != null) snapshot.put("maxFingerprintCount", dc.getMaxFingerprintCount());
-        // maxDoorCount 在 rawData.capabilities.maxDoorCount
+        if (dc.getMaxCardCount() != null) {
+            snapshot.put("maxCardCount", dc.getMaxCardCount());
+        }
+        if (dc.getMaxFaceCount() != null) {
+            snapshot.put("maxFaceCount", dc.getMaxFaceCount());
+        }
+        if (dc.getMaxFingerprintCount() != null) {
+            snapshot.put("maxFingerprintCount", dc.getMaxFingerprintCount());
+        }
         if (rawData != null) {
             Object capsObj = rawData.get("capabilities");
-            if (capsObj instanceof java.util.Map) {
-                Object maxDoorCount = ((java.util.Map<?, ?>) capsObj).get("maxDoorCount");
+            if (capsObj instanceof Map) {
+                Object maxDoorCount = ((Map<?, ?>) capsObj).get("maxDoorCount");
                 if (maxDoorCount instanceof Number) {
                     snapshot.put("maxDoorCount", ((Number) maxDoorCount).intValue());
                 } else if (maxDoorCount != null) {
@@ -245,19 +268,41 @@ public class IotAccessDeviceCapabilityServiceImpl implements IotAccessDeviceCapa
                 }
             }
         }
-        snapshot.put("updatedAt", java.time.LocalDateTime.now().toString());
+        snapshot.put("updatedAt", LocalDateTime.now().toString());
 
-        // 写回 config
-        if (device.getConfig() instanceof AccessDeviceConfig) {
-            AccessDeviceConfig cfg = (AccessDeviceConfig) device.getConfig();
-            cfg.setAccessCapabilities(snapshot);
-            cfg.setCapabilityTime(java.time.LocalDateTime.now());
-            iotDeviceService.updateDeviceConfig(device.getId(), cfg);
-        } else if (device.getConfig() instanceof GenericDeviceConfig) {
-            GenericDeviceConfig cfg = (GenericDeviceConfig) device.getConfig();
-            cfg.set("accessCapabilities", snapshot);
-            iotDeviceService.updateDeviceConfig(device.getId(), cfg);
+        IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(device.getId());
+        if (ibms == null) {
+            return;
         }
+        ibmsDeviceRuntimeService.ensureRowForDevice(ibms);
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(device.getId());
+        if (runtime == null) {
+            return;
+        }
+
+        DeviceConfig cfg = runtime.getConfig();
+        if (cfg == null) {
+            cfg = device.getConfig();
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        DateTimeFormatter capTimeFmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+        if (cfg instanceof AccessDeviceConfig) {
+            AccessDeviceConfig ac = (AccessDeviceConfig) cfg;
+            ac.setAccessCapabilities(snapshot);
+            ac.setCapabilityTime(now);
+        } else if (cfg instanceof GenericDeviceConfig) {
+            GenericDeviceConfig g = (GenericDeviceConfig) cfg;
+            g.set("accessCapabilities", snapshot);
+            g.set("capabilityTime", now.format(capTimeFmt));
+        } else {
+            GenericDeviceConfig g = new GenericDeviceConfig();
+            g.set("accessCapabilities", snapshot);
+            g.set("capabilityTime", now.format(capTimeFmt));
+            cfg = g;
+        }
+
+        ibmsDeviceRuntimeService.saveRuntimeConfig(device.getId(), cfg);
     }
 
     private String getDeviceIp(IotDeviceDO device) {
@@ -272,7 +317,23 @@ public class IotAccessDeviceCapabilityServiceImpl implements IotAccessDeviceCapa
             AccessDeviceConfig cfg = (AccessDeviceConfig) device.getConfig();
             return cfg.getPort() != null ? cfg.getPort() : 37777;
         }
-        // GenericDeviceConfig 走默认端口
+        if (device.getConfig() instanceof GenericDeviceConfig) {
+            GenericDeviceConfig g = (GenericDeviceConfig) device.getConfig();
+            if (g.getPort() != null) {
+                return g.getPort();
+            }
+            Object tcp = g.get("tcpPort");
+            if (tcp instanceof Number) {
+                return ((Number) tcp).intValue();
+            }
+            if (tcp != null) {
+                try {
+                    return Integer.parseInt(tcp.toString());
+                } catch (NumberFormatException ignore) {
+                    return 37777;
+                }
+            }
+        }
         return 37777;
     }
 

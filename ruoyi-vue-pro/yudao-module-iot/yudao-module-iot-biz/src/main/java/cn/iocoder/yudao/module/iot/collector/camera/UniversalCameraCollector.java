@@ -3,12 +3,17 @@ package cn.iocoder.yudao.module.iot.collector.camera;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.core.mq.producer.IotDeviceMessageProducer;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.collector.camera.protocol.CameraProtocol;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -35,9 +40,13 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 @Slf4j
 public class UniversalCameraCollector {
+
+    private static final Logger log = LoggerFactory.getLogger(UniversalCameraCollector.class);
     
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
+    @Resource
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
     
     @Resource
     private IotDeviceMessageProducer messageProducer;
@@ -76,15 +85,18 @@ public class UniversalCameraCollector {
         for (Long productId : cameraProductIds) {
             // 使用 TenantUtils 执行，自动处理租户上下文
             TenantUtils.execute(1L, () -> {
-                List<IotDeviceDO> devices = deviceService.getDeviceListByProductId(productId);
-                
-                if (devices.isEmpty()) {
+                List<IbmsDeviceDO> ledgers = ibmsDeviceMapper.selectListByIbmsProductId(productId);
+                if (ledgers.isEmpty()) {
                     return;
                 }
-                
-                log.info("[pollCameraStatus][开始轮询产品({}) 的 {} 个设备]", productId, devices.size());
-                
-                for (IotDeviceDO device : devices) {
+                log.info("[pollCameraStatus][开始轮询产品(ibms_product_id={}) 的 {} 个设备]", productId, ledgers.size());
+
+                for (IbmsDeviceDO ledger : ledgers) {
+                    IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(ledger,
+                            ibmsDeviceRuntimeService.getByDeviceId(ledger.getId()));
+                    if (device == null) {
+                        continue;
+                    }
                     try {
                         pollSingleDevice(device);
                     } catch (Exception e) {

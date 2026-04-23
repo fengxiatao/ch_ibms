@@ -3,7 +3,7 @@ spring:
     name: yudao-server
 
   profiles:
-    active: dev
+    active: local
 
   config:
     import:
@@ -284,6 +284,12 @@ yudao:
       - /app-api/user/wechatLogin # 停车场小程序微信登录接口
       - /app-api/user/wechatBinding # 停车场小程序检查绑定状态
       - /app-api/parking/** # 停车场小程序所有接口（根据业务需要调整）
+      - /admin-api/iot/device/activation/** # 允许 IoT 设备激活接口免登录调用（用于设备拉取/落地联调）
+      - /admin-api/iot/factory/environmental/dashboard # 工厂环保监测工作台聚合接口
+      - /admin-api/iot/factory/report/dashboard # 工厂报表中心工作台聚合接口
+      - /admin-api/iot/factory/report/generate # 工厂报表中心报表生成接口
+      - /admin-api/iot/factory/report/preview # 工厂报表中心报表预览接口
+      - /admin-api/iot/factory/report/download # 工厂报表中心报表下载接口
   api-encrypt:
     enable: true # 是否开启 API 加密
     algorithm: AES # 加密算法，支持 AES、RSA 等
@@ -326,6 +332,7 @@ yudao:
       - /ws/** # WebSocket 端点，租户信息在连接建立后从用户上下文获取
       - /app-api/parking/** # 停车场小程序接口，忽略租户过滤
       - /app-api/user/** # 停车场小程序用户接口，忽略租户过滤
+      - /admin-api/iot/device/activation/** # IoT 设备激活：匿名联调场景跳过租户校验
     ignore-visit-urls:
       - /admin-api/system/user/profile/**
       - /admin-api/system/auth/**
@@ -362,6 +369,9 @@ yudao:
         key: pLXUGAwK5305
         customer: E77DF18BE109F454A5CD319E44BF5177
   iot:
+    # 新建基线：网关通过 MQ 获取设备快照；仅迁移期需恢复 HTTP 时设为 true
+    gateway-rpc:
+      enabled: false
     message-bus:
       type: rocketmq # 消息总线的类型
       name-server: ${rocketmq.name-server:127.0.0.1:9876} # RocketMQ NameServer 地址

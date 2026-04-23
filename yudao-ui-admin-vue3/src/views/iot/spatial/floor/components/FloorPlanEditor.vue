@@ -638,7 +638,7 @@ const saveDeviceProperties = async () => {
   savingDevice.value = true
   try {
     await request.put({
-      url: '/admin-api/iot/device/update',
+      url: '/admin-api/iot/ibms/device/update',
       data: {
         id: selectedDevice.value.deviceId,
         deviceName: selectedDevice.value.deviceName,

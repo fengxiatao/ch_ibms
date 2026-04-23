@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人员档案管理 - 工厂AI视频合规管控系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-panel: rgba(15, 23, 42, 0.85);
+            --border-color: rgba(148, 163, 184, 0.15);
+            --compliance-green: #10b981;
+            --warning-yellow: #f59e0b;
+            --violation-red: #ef4444;
+            --info-blue: #3b82f6;
+        }
+        body { background: var(--bg-primary); color: #f1f5f9; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .glass-panel { background: var(--bg-panel); backdrop-filter: blur(12px); border: 1px solid var(--border-color); border-radius: 12px; }
+
+        .sidebar-menu-item { padding: 10px 16px; border-radius: 8px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 10px; color: #94a3b8; }
+        .sidebar-menu-item:hover { background: rgba(59,130,246,0.15); color: #60a5fa; }
+        .sidebar-menu-item.active { background: rgba(59,130,246,0.25); color: #60a5fa; }
+
+        .person-card { background: rgba(30,41,59,0.6); border-radius: 12px; padding: 20px; transition: all 0.2s; border: 1px solid transparent; }
+        .person-card:hover { border-color: rgba(59,130,246,0.3); transform: translateY(-2px); }
+
+        .compliance-score { width: 48px; height: 48px; border-radius: 50%; border: 3px solid; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; }
+        .compliance-score.high { border-color: var(--compliance-green); color: var(--compliance-green); }
+        .compliance-score.medium { border-color: var(--warning-yellow); color: var(--warning-yellow); }
+        .compliance-score.low { border-color: var(--violation-red); color: var(--violation-red); }
+
+        .zone-badge { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+        .zone-badge.normal { background: rgba(16,185,129,0.2); color: #34d399; }
+        .zone-badge.warning { background: rgba(245,158,11,0.2); color: #fbbf24; }
+        .zone-badge.violation { background: rgba(239,68,68,0.2); color: #f87171; }
+
+        .toast { position: fixed; bottom: 24px; right: 24px; background: #1e293b; border-left: 4px solid var(--info-blue); border-radius: 8px; padding: 12px 20px; z-index: 1100; transform: translateX(400px); transition: transform 0.3s; }
+        .toast.show { transform: translateX(0); }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-content { background: #1e293b; border: 1px solid #334155; border-radius: 16px; width: 90%; max-width: 500px; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(30,41,59,0.5); }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+    <!-- 左侧边栏 -->
+    <aside class="w-72 bg-slate-900/80 border-r border-gray-800 flex flex-col shrink-0 overflow-y-auto">
+        <div class="p-5 border-b border-gray-800">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-shield-alt text-2xl text-blue-500"></i>
+                <div>
+                    <h1 class="text-lg font-bold">工厂AI视频合规管控</h1>
+                    <p class="text-xs text-gray-500">智能合规事件管理平台</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="px-4 py-3 border-t border-gray-800">
+            <div class="text-xs text-gray-500 uppercase mb-2 font-semibold">功能模块</div>
+            <div class="space-y-1">
+                <div class="sidebar-menu-item" onclick="location.href='monitor.html'">
+                    <i class="fas fa-desktop text-gray-400"></i>
+                    <span class="text-sm">实时监控</span>
+                </div>
+                <div class="sidebar-menu-item" onclick="location.href='alerts.html'">
+                    <i class="fas fa-bell text-gray-400"></i>
+                    <span class="text-sm">实时告警</span>
+                </div>
+                <div class="sidebar-menu-item" onclick="location.href='events.html'">
+                    <i class="fas fa-database text-gray-400"></i>
+                    <span class="text-sm">事件管理</span>
+                </div>
+                <div class="sidebar-menu-item" onclick="location.href='analysis.html'">
+                    <i class="fas fa-chart-line text-gray-400"></i>
+                    <span class="text-sm">事件分析</span>
+                </div>
+                <div class="sidebar-menu-item active">
+                    <i class="fas fa-users text-purple-400"></i>
+                    <span class="text-sm">人员档案管理</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-auto p-4 border-t border-gray-800">
+            <div class="grid grid-cols-3 gap-2 text-center">
+                <div><div class="text-lg font-bold text-blue-400">6</div><div class="text-xs text-gray-500">监控点位</div></div>
+                <div><div class="text-lg font-bold text-green-400">5</div><div class="text-xs text-gray-500">合规规则</div></div>
+                <div><div class="text-lg font-bold text-purple-400">13</div><div class="text-xs text-gray-500">在场人员</div></div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容区：人员档案管理 -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <div class="p-6 border-b border-gray-800 bg-slate-900/30">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-bold flex items-center gap-2">
+                        <i class="fas fa-users text-purple-400"></i>人员档案管理
+                    </h2>
+                    <p class="text-gray-500 text-sm mt-1">员工合规档案与行为记录</p>
+                </div>
+                <div class="flex gap-2">
+                    <button class="px-4 py-2 bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded-lg text-sm hover:bg-blue-600/30" onclick="showAddModal()">
+                        <i class="fas fa-plus mr-1"></i>新增人员
+                    </button>
+                    <button class="px-4 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600">
+                        <i class="fas fa-download mr-1"></i>导出
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-6">
+            <!-- 筛选栏 -->
+            <div class="glass-panel p-4 mb-4">
+                <div class="flex flex-wrap gap-3">
+                    <input type="text" id="searchInput" placeholder="搜索姓名/部门/工号" class="flex-1 min-w-[200px] bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm" oninput="renderPersonnel()">
+                    <select id="statusFilter" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm" onchange="renderPersonnel()">
+                        <option value="all">全部状态</option>
+                        <option value="normal">正常</option>
+                        <option value="warning">警告</option>
+                        <option value="violation">违规</option>
+                    </select>
+                    <select id="deptFilter" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm" onchange="renderPersonnel()">
+                        <option value="all">全部部门</option>
+                        <option value="生产部">生产部</option>
+                        <option value="质量部">质量部</option>
+                        <option value="技术部">技术部</option>
+                        <option value="物流部">物流部</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 人员卡片网格 -->
+            <div id="personnelGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+        </div>
+    </main>
+
+    <!-- 人员详情模态框 -->
+    <div id="detailModal" class="modal-overlay">
+        <div class="modal-content p-5">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-semibold text-lg">人员详情</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">
+        <div class="flex items-center gap-2">
+            <i id="toastIcon" class="fas fa-check-circle text-green-400"></i>
+            <span id="toastMessage"></span>
+        </div>
+    </div>
+
+    <script>
+        let persons = [
+            { id: 'P001', name: '王建国', department: '生产部', position: '操作员', status: 'violation', score: 68, todayAlerts: 3, totalAlerts: 12, phone: '138****1234', entryDate: '2020-03-15', lastViolation: '2024-03-28' },
+            { id: 'P002', name: '李秀英', department: '质量部', position: '质检员', status: 'warning', score: 82, todayAlerts: 1, totalAlerts: 5, phone: '139****5678', entryDate: '2019-06-20', lastViolation: '2024-03-27' },
+            { id: 'P003', name: '张伟', department: '生产部', position: '班长', status: 'normal', score: 96, todayAlerts: 0, totalAlerts: 2, phone: '137****9012', entryDate: '2018-01-10', lastViolation: '2024-02-15' },
+            { id: 'P004', name: '陈敏', department: '技术部', position: '技术员', status: 'normal', score: 91, todayAlerts: 0, totalAlerts: 1, phone: '136****3456', entryDate: '2021-09-01', lastViolation: '2024-01-20' },
+            { id: 'P005', name: '刘芳', department: '生产部', position: '操作员', status: 'normal', score: 94, todayAlerts: 0, totalAlerts: 3, phone: '135****7890', entryDate: '2020-11-20', lastViolation: '2024-03-10' },
+            { id: 'P006', name: '赵强', department: '物流部', position: '搬运工', status: 'violation', score: 71, todayAlerts: 2, totalAlerts: 8, phone: '134****2468', entryDate: '2022-02-28', lastViolation: '2024-03-28' },
+            { id: 'P007', name: '孙丽', department: '质量部', position: '质检主管', status: 'normal', score: 98, todayAlerts: 0, totalAlerts: 0, phone: '133****1357', entryDate: '2017-05-15', lastViolation: null },
+            { id: 'P008', name: '周杰', department: '技术部', position: '工程师', status: 'normal', score: 89, todayAlerts: 0, totalAlerts: 4, phone: '132****8642', entryDate: '2019-08-10', lastViolation: '2024-03-05' }
+        ];
+
+        function showToast(msg, type='success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const msgEl = document.getElementById('toastMessage');
+            const icons = { success: 'fa-check-circle text-green-400', warning: 'fa-exclamation-circle text-yellow-400', error: 'fa-times-circle text-red-400', info: 'fa-info-circle text-blue-400' };
+            icon.className = `fas ${icons[type]}`;
+            msgEl.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function renderPersonnel() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const status = document.getElementById('statusFilter').value;
+            const dept = document.getElementById('deptFilter').value;
+
+            let filtered = persons.filter(p => {
+                const matchSearch = !search || p.name.toLowerCase().includes(search) || p.department.toLowerCase().includes(search) || p.id.toLowerCase().includes(search);
+                const matchStatus = status === 'all' || p.status === status;
+                const matchDept = dept === 'all' || p.department === dept;
+                return matchSearch && matchStatus && matchDept;
+            });
+
+            const container = document.getElementById('personnelGrid');
+            container.innerHTML = filtered.map(p => `
+                <div class="person-card cursor-pointer" onclick="viewDetail('${p.id}')">
+                    <div class="flex items-start gap-4">
+                        <div class="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xl font-bold flex-shrink-0">
+                            ${p.name[0]}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <div class="font-semibold text-lg">${p.name}</div>
+                                    <div class="text-xs text-gray-500">${p.id} · ${p.position}</div>
+                                </div>
+                                <div class="compliance-score ${p.score >= 90 ? 'high' : p.score >= 80 ? 'medium' : 'low'}">${p.score}</div>
+                            </div>
+                            <div class="mt-3 space-y-1 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-500">部门</span>
+                                    <span>${p.department}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-500">入职日期</span>
+                                    <span>${p.entryDate}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-500">累计违规</span>
+                                    <span class="${p.totalAlerts > 5 ? 'text-red-400' : 'text-gray-400'}">${p.totalAlerts}次</span>
+                                </div>
+                            </div>
+                            <div class="mt-3 pt-3 border-t border-gray-700 flex justify-between items-center">
+                                <span class="zone-badge ${p.status}">${p.status === 'normal' ? '正常' : p.status === 'warning' ? '警告' : '违规'}</span>
+                                <button class="text-blue-400 text-xs hover:text-blue-300">
+                                    查看详情 <i class="fas fa-arrow-right ml-1"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function viewDetail(id) {
+            const p = persons.find(x => x.id === id);
+            const content = document.getElementById('modalContent');
+            content.innerHTML = `
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl font-bold">
+                        ${p.name[0]}
+                    </div>
+                    <div>
+                        <div class="text-xl font-semibold">${p.name}</div>
+                        <div class="text-gray-400">${p.id} · ${p.position}</div>
+                        <div class="mt-1">
+                            <span class="zone-badge ${p.status}">${p.status === 'normal' ? '正常' : p.status === 'warning' ? '警告' : '违规'}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="p-3 bg-slate-800/50 rounded-lg text-center">
+                        <div class="text-2xl font-bold ${p.score >= 90 ? 'text-green-400' : p.score >= 80 ? 'text-yellow-400' : 'text-red-400'}">${p.score}</div>
+                        <div class="text-xs text-gray-500">合规评分</div>
+                    </div>
+                    <div class="p-3 bg-slate-800/50 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-blue-400">${p.totalAlerts}</div>
+                        <div class="text-xs text-gray-500">累计违规</div>
+                    </div>
+                </div>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between py-2 border-b border-gray-700">
+                        <span class="text-gray-400">部门</span>
+                        <span>${p.department}</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-700">
+                        <span class="text-gray-400">联系电话</span>
+                        <span>${p.phone}</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-700">
+                        <span class="text-gray-400">入职日期</span>
+                        <span>${p.entryDate}</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-700">
+                        <span class="text-gray-400">今日违规</span>
+                        <span class="${p.todayAlerts > 0 ? 'text-red-400' : 'text-green-400'}">${p.todayAlerts}次</span>
+                    </div>
+                    <div class="flex justify-between py-2">
+                        <span class="text-gray-400">最近违规</span>
+                        <span>${p.lastViolation || '无'}</span>
+                    </div>
+                </div>
+                <div class="mt-4 flex gap-2">
+                    <button class="flex-1 py-2 bg-blue-600 rounded-lg text-sm hover:bg-blue-700">编辑档案</button>
+                    <button class="flex-1 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600">查看记录</button>
+                </div>
+            `;
+            document.getElementById('detailModal').classList.add('active');
+        }
+
+        function closeModal() { document.getElementById('detailModal').classList.remove('active'); }
+
+        function showAddModal() { showToast('新增人员功能开发中', 'info'); }
+
+        function init() { renderPersonnel(); }
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

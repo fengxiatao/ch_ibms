@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>品牌与展示 - 大屏信息发布端</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 50%, #0f1419 100%);
+            color: #e2e8f0;
+            overflow: hidden;
+            height: 100vh;
+        }
+        .tech-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+        .particles {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .particle {
+            position: absolute;
+            width: 2px; height: 2px;
+            background: rgba(59, 130, 246, 0.5);
+            border-radius: 50%;
+            animation: float 15s infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100vh) translateX(50px); opacity: 0; }
+        }
+        .container {
+            position: relative;
+            z-index: 10;
+            height: 100vh;
+            display: grid;
+            grid-template-rows: 100px 1fr 140px;
+            padding: 24px;
+            gap: 20px;
+        }
+        /* 顶部区域 */
+        .header {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            padding: 0 32px;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 16px;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .brand-logo {
+            width: 60px; height: 60px;
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: bold;
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
+        }
+        .brand-text h1 {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa, #22d3ee);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+        }
+        .brand-text p {
+            font-size: 14px;
+            color: #64748b;
+        }
+        .header-center {
+            display: flex;
+            gap: 48px;
+            justify-content: center;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 0 24px;
+            border-right: 1px solid rgba(59, 130, 246, 0.2);
+        }
+        .stat-item:last-child {
+            border-right: none;
+        }
+        .stat-item .value {
+            font-size: 36px;
+            font-weight: 700;
+            color: #22d3ee;
+            font-variant-numeric: tabular-nums;
+        }
+        .stat-item .label {
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+        .datetime {
+            text-align: right;
+            justify-self: end;
+        }
+        .datetime .time {
+            font-size: 42px;
+            font-weight: 700;
+            color: #e2e8f0;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 2px;
+        }
+        .datetime .date {
+            font-size: 14px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+        /* 中部主区域 */
+        .main-content {
+            display: grid;
+            grid-template-columns: 380px 1fr 380px;
+            gap: 20px;
+        }
+        /* 左侧信息栏 */
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .panel-card {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 16px;
+            padding: 20px;
+        }
+        .panel-card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #e2e8f0;
+        }
+        .panel-card h3::before {
+            content: '';
+            width: 3px; height: 16px;
+            background: linear-gradient(180deg, #3b82f6, #06b6d4);
+            border-radius: 2px;
+        }
+        .data-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            background: rgba(30, 41, 59, 0.4);
+            border-radius: 10px;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        .data-row:hover {
+            background: rgba(59, 130, 246, 0.15);
+            border-left-color: #3b82f6;
+        }
+        .data-row .label {
+            font-size: 14px;
+            color: #94a3b8;
+        }
+        .data-row .value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+        .data-row .value.up { color: #10b981; }
+        .data-row .value.down { color: #ef4444; }
+        .tour-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .tour-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px;
+            background: rgba(30, 41, 59, 0.4);
+            border-radius: 10px;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        .tour-item.active {
+            background: rgba(59, 130, 246, 0.2);
+            border-left-color: #3b82f6;
+        }
+        .tour-item:hover:not(.active) {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        .tour-icon {
+            width: 40px; height: 40px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(6, 182, 212, 0.2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .tour-info h4 {
+            font-size: 15px;
+            font-weight: 500;
+            color: #e2e8f0;
+            margin-bottom: 2px;
+        }
+        .tour-info p {
+            font-size: 12px;
+            color: #64748b;
+        }
+        /* 中央3D区域 */
+        .scene-area {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 16px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .scene-header {
+            position: absolute;
+            top: 20px; left: 20px; right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+        .scene-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 22px;
+            font-weight: 600;
+        }
+        .scene-title::before {
+            content: '';
+            width: 4px; height: 22px;
+            background: linear-gradient(180deg, #3b82f6, #06b6d4);
+            border-radius: 2px;
+        }
+        .scene-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 18px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 20px;
+            color: #10b981;
+            font-size: 14px;
+        }
+        .scene-status::before {
+            content: '';
+            width: 8px; height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .scene-content {
+            flex: 1;
+            position: relative;
+        }
+        #three-canvas {
+            width: 100%; height: 100%;
+        }
+        .scene-overlay {
+            position: absolute;
+            bottom: 24px; left: 24px; right: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        .scene-info {
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            padding: 20px 24px;
+            max-width: 450px;
+        }
+        .scene-info h3 {
+            font-size: 20px;
+            margin-bottom: 8px;
+            color: #22d3ee;
+        }
+        .scene-info p {
+            font-size: 14px;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+        .scene-progress {
+            display: flex;
+            gap: 10px;
+        }
+        .progress-dot {
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.3);
+            transition: all 0.3s;
+        }
+        .progress-dot.active {
+            background: #3b82f6;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
+        }
+        .broadcast-bar {
+            position: absolute;
+            bottom: 24px; right: 24px;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 30px;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .broadcast-wave {
+            display: flex;
+            gap: 3px;
+            align-items: center;
+            height: 24px;
+        }
+        .broadcast-bar-wave {
+            width: 3px;
+            background: linear-gradient(180deg, #3b82f6, #06b6d4);
+            border-radius: 2px;
+            animation: wave 1s ease-in-out infinite;
+        }
+        .broadcast-bar-wave:nth-child(1) { height: 10px; animation-delay: 0s; }
+        .broadcast-bar-wave:nth-child(2) { height: 18px; animation-delay: 0.1s; }
+        .broadcast-bar-wave:nth-child(3) { height: 14px; animation-delay: 0.2s; }
+        .broadcast-bar-wave:nth-child(4) { height: 22px; animation-delay: 0.3s; }
+        .broadcast-bar-wave:nth-child(5) { height: 12px; animation-delay: 0.4s; }
+        @keyframes wave {
+            0%, 100% { transform: scaleY(0.5); }
+            50% { transform: scaleY(1); }
+        }
+        .broadcast-text {
+            font-size: 14px;
+            color: #e2e8f0;
+        }
+        /* 右侧信息栏 */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .honor-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px;
+            background: rgba(30, 41, 59, 0.4);
+            border-radius: 12px;
+            transition: all 0.3s;
+        }
+        .honor-item:hover {
+            background: rgba(59, 130, 246, 0.15);
+            transform: translateX(-5px);
+        }
+        .honor-icon {
+            width: 48px; height: 48px;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+        }
+        .honor-info h4 {
+            font-size: 15px;
+            font-weight: 500;
+            color: #e2e8f0;
+            margin-bottom: 4px;
+        }
+        .honor-info p {
+            font-size: 12px;
+            color: #64748b;
+        }
+        .qr-section {
+            text-align: center;
+            padding: 20px;
+        }
+        .qr-code {
+            width: 140px; height: 140px;
+            background: white;
+            border-radius: 12px;
+            margin: 0 auto 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #333;
+        }
+        .qr-section p {
+            font-size: 13px;
+            color: #64748b;
+        }
+        /* 底部区域 */
+        .bottom-bar {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+        }
+        .bottom-item {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 12px;
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .bottom-icon {
+            width: 56px; height: 56px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            background: rgba(59, 130, 246, 0.15);
+        }
+        .bottom-content h4 {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .bottom-content p {
+            font-size: 20px;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+        .terminal-info {
+            position: absolute;
+            top: 20px; right: 20px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 12px;
+            color: #64748b;
+        }
+        .terminal-info span {
+            color: #10b981;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="tech-bg"></div>
+    <div class="particles" id="particles"></div>
+
+    <div class="container">
+        <!-- 顶部 -->
+        <header class="header">
+            <div class="brand">
+                <div class="brand-logo">智</div>
+                <div class="brand-text">
+                    <h1>智慧工厂数字孪生展示</h1>
+                    <p>Smart Factory Digital Twin Showcase</p>
+                </div>
+            </div>
+
+            <div class="header-center">
+                <div class="stat-item">
+                    <div class="value" id="visitTotal">1,280</div>
+                    <div class="label">累计参观人次</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="visitToday">15</div>
+                    <div class="label">今日参观</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value" id="satisfaction">96.5%</div>
+                    <div class="label">满意度</div>
+                </div>
+            </div>
+
+            <div class="datetime">
+                <div class="time" id="currentTime">11:29:07</div>
+                <div class="date" id="currentDate">2026/04/15 星期三</div>
+            </div>
+        </header>
+
+        <!-- 中部 -->
+        <div class="main-content">
+            <!-- 左侧 -->
+            <div class="left-panel">
+                <div class="panel-card">
+                    <h3>实时生产数据</h3>
+                    <div class="data-list">
+                        <div class="data-row">
+                            <span class="label">当日产量</span>
+                            <span class="value up">8,520件</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="label">设备利用率</span>
+                            <span class="value up">96.8%</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="label">产品合格率</span>
+                            <span class="value up">99.2%</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="label">能耗指数</span>
+                            <span class="value down">85.3</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="label">OEE综合效率</span>
+                            <span class="value up">92.5%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-card" style="flex: 1;">
+                    <h3>参观路线</h3>
+                    <div class="tour-list">
+                        <div class="tour-item active" data-scene="0">
+                            <div class="tour-icon">🏭</div>
+                            <div class="tour-info">
+                                <h4>智能制造车间</h4>
+                                <p>核心生产线展示</p>
+                            </div>
+                        </div>
+                        <div class="tour-item" data-scene="1">
+                            <div class="tour-icon">🔬</div>
+                            <div class="tour-info">
+                                <h4>研发中心</h4>
+                                <p>技术创新实力</p>
+                            </div>
+                        </div>
+                        <div class="tour-item" data-scene="2">
+                            <div class="tour-icon">📦</div>
+                            <div class="tour-info">
+                                <h4>仓储物流</h4>
+                                <p>智能物流系统</p>
+                            </div>
+                        </div>
+                        <div class="tour-item" data-scene="3">
+                            <div class="tour-icon">🌿</div>
+                            <div class="tour-info">
+                                <h4>绿色能源</h4>
+                                <p>节能减排成果</p>
+                            </div>
+                        </div>
+                        <div class="tour-item" data-scene="4">
+                            <div class="tour-icon">🏆</div>
+                            <div class="tour-info">
+                                <h4>企业荣誉</h4>
+                                <p>资质与认证</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 中央3D -->
+            <div class="scene-area">
+                <div class="terminal-info">
+                    终端状态<span>● 在线</span> | 播放模式<span>自动轮播</span>
+                </div>
+
+                <div class="scene-header">
+                    <div class="scene-title">数字孪生工厂</div>
+                    <div class="scene-status">自动轮播中</div>
+                </div>
+
+                <div class="scene-content">
+                    <div id="three-canvas"></div>
+
+                    <div class="scene-overlay">
+                        <div class="scene-info">
+                            <h3 id="sceneName">智能制造车间</h3>
+                            <p id="sceneDesc">全面展示智能化生产线，实时呈现设备运行状态与生产数据，体现数字化制造能力</p>
+                        </div>
+                        <div class="scene-progress" id="sceneProgress">
+                            <div class="progress-dot active"></div>
+                            <div class="progress-dot"></div>
+                            <div class="progress-dot"></div>
+                            <div class="progress-dot"></div>
+                            <div class="progress-dot"></div>
+                        </div>
+                    </div>
+
+                    <div class="broadcast-bar">
+                        <div class="broadcast-wave">
+                            <div class="broadcast-bar-wave"></div>
+                            <div class="broadcast-bar-wave"></div>
+                            <div class="broadcast-bar-wave"></div>
+                            <div class="broadcast-bar-wave"></div>
+                            <div class="broadcast-bar-wave"></div>
+                        </div>
+                        <span class="broadcast-text" id="broadcastText">正在讲解：智能制造车间...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧 -->
+            <div class="right-panel">
+                <div class="panel-card">
+                    <h3>企业荣誉</h3>
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <div class="honor-item">
+                            <div class="honor-icon">🏆</div>
+                            <div class="honor-info">
+                                <h4>国家科技进步奖</h4>
+                                <p>2023年度</p>
+                            </div>
+                        </div>
+                        <div class="honor-item">
+                            <div class="honor-icon">🥇</div>
+                            <div class="honor-info">
+                                <h4>智能制造示范企业</h4>
+                                <p>工信部认定</p>
+                            </div>
+                        </div>
+                        <div class="honor-item">
+                            <div class="honor-icon">📜</div>
+                            <div class="honor-info">
+                                <h4>高新技术企业</h4>
+                                <p>国家级认证</p>
+                            </div>
+                        </div>
+                        <div class="honor-item">
+                            <div class="honor-icon">🌟</div>
+                            <div class="honor-info">
+                                <h4>绿色工厂认证</h4>
+                                <p>ISO14001</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-card">
+                    <h3>互动入口</h3>
+                    <div class="qr-section">
+                        <div class="qr-code">二维码</div>
+                        <p>扫码获取详细资料<br>或预约参观</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部 -->
+        <div class="bottom-bar">
+            <div class="bottom-item">
+                <div class="bottom-icon" style="color: #3b82f6;">🤖</div>
+                <div class="bottom-content">
+                    <h4>智能装备</h4>
+                    <p>128 台</p>
+                </div>
+            </div>
+            <div class="bottom-item">
+                <div class="bottom-icon" style="color: #06b6d4;">💻</div>
+                <div class="bottom-content">
+                    <h4>数字化程度</h4>
+                    <p>98.5%</p>
+                </div>
+            </div>
+            <div class="bottom-item">
+                <div class="bottom-icon" style="color: #8b5cf6;">📊</div>
+                <div class="bottom-content">
+                    <h4>年产能力</h4>
+                    <p>500万台</p>
+                </div>
+            </div>
+            <div class="bottom-item">
+                <div class="bottom-icon" style="color: #10b981;">🌐</div>
+                <div class="bottom-content">
+                    <h4>服务全球</h4>
+                    <p>50+ 国家</p>
+                </div>
+            </div>
+            <div class="bottom-item">
+                <div class="bottom-icon" style="color: #f59e0b;">⚡</div>
+                <div class="bottom-content">
+                    <h4>响应时间</h4>
+                    <p>&lt;50ms</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const scenes = [
+            { name: '智能制造车间', desc: '全面展示智能化生产线，实时呈现设备运行状态与生产数据，体现数字化制造能力' },
+            { name: '研发中心', desc: '汇聚顶尖研发人才，拥有500+项核心专利技术，持续引领行业技术创新' },
+            { name: '仓储物流中心', desc: 'AGV智能搬运，全自动立体仓库，日处理订单10万+，实现无人化仓储管理' },
+            { name: '绿色能源中心', desc: '光伏装机容量50MW，年减少碳排放2万吨，打造零碳智慧工厂' },
+            { name: '企业荣誉墙', desc: '国家科技进步奖、智能制造示范企业、绿色工厂认证等多项国家级荣誉' }
+        ];
+
+        let currentScene = 0;
+        let sceneInterval;
+        let scene, camera, renderer, factoryGroup;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initParticles();
+            updateTime();
+            setInterval(updateTime, 1000);
+            initThreeJS();
+            startAutoCarousel();
+        });
+
+        function initParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 30; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 15 + 's';
+                particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+                container.appendChild(particle);
+            }
+        }
+
+        function updateTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false });
+            const dateStr = now.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+            const weekStr = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()];
+            document.getElementById('currentTime').textContent = timeStr;
+            document.getElementById('currentDate').textContent = `${dateStr} 星期${weekStr}`;
+        }
+
+        function startAutoCarousel() {
+            sceneInterval = setInterval(() => {
+                currentScene = (currentScene + 1) % scenes.length;
+                updateScene(currentScene);
+            }, 10000);
+        }
+
+        function updateScene(index) {
+            document.getElementById('sceneName').textContent = scenes[index].name;
+            document.getElementById('sceneDesc').textContent = scenes[index].desc;
+            document.getElementById('broadcastText').textContent = `正在讲解：${scenes[index].name}...`;
+
+            document.querySelectorAll('.progress-dot').forEach((dot, i) => {
+                dot.classList.toggle('active', i === index);
+            });
+            document.querySelectorAll('.tour-item').forEach((item, i) => {
+                item.classList.toggle('active', i === index);
+            });
+
+            updateThreeJSScene(index);
+        }
+
+        function initThreeJS() {
+            const container = document.getElementById('three-canvas');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0e1a);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(25, 20, 25);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0x404040, 1);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0x3b82f6, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            scene.add(directionalLight);
+
+            createFactoryModel();
+            animate();
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createFactoryModel() {
+            factoryGroup = new THREE.Group();
+
+            const ground = new THREE.Mesh(
+                new THREE.PlaneGeometry(40, 40),
+                new THREE.MeshStandardMaterial({ color: 0x1a1f2e, roughness: 0.8 })
+            );
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -3;
+            factoryGroup.add(ground);
+
+            const grid = new THREE.GridHelper(40, 40, 0x3b82f6, 0x1e293b);
+            grid.position.y = -2.9;
+            factoryGroup.add(grid);
+
+            const building = new THREE.Mesh(
+                new THREE.BoxGeometry(16, 8, 12),
+                new THREE.MeshStandardMaterial({ color: 0x2d3748, transparent: true, opacity: 0.9 })
+            );
+            building.position.set(0, 1, 0);
+            factoryGroup.add(building);
+
+            const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(16, 8, 12));
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x3b82f6 }));
+            line.position.set(0, 1, 0);
+            factoryGroup.add(line);
+
+            const colors = [0x3b82f6, 0x06b6d4, 0x8b5cf6, 0x10b981, 0xf59e0b, 0xef4444];
+            for (let i = 0; i < 6; i++) {
+                const machine = new THREE.Mesh(
+                    new THREE.BoxGeometry(2, 3, 2),
+                    new THREE.MeshStandardMaterial({ color: colors[i], emissive: colors[i], emissiveIntensity: 0.2 })
+                );
+                machine.position.set(-6 + i * 2.5, -0.5, 3);
+                factoryGroup.add(machine);
+
+                const light = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.2, 16, 16),
+                    new THREE.MeshBasicMaterial({ color: 0x10b981 })
+                );
+                light.position.set(-6 + i * 2.5, 1.5, 3);
+                factoryGroup.add(light);
+            }
+
+            for (let i = 0; i < 30; i++) {
+                const particle = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.1, 8, 8),
+                    new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.8 })
+                );
+                particle.position.set(-8 + Math.random() * 16, -0.5, 3 + (Math.random() - 0.5) * 0.5);
+                particle.userData = { speed: 0.03 + Math.random() * 0.02, offset: Math.random() * Math.PI * 2 };
+                factoryGroup.add(particle);
+            }
+
+            scene.add(factoryGroup);
+        }
+
+        function updateThreeJSScene(sceneIndex) {
+            if (!factoryGroup) return;
+            const positions = [
+                { x: 25, y: 20, z: 25 }, { x: -25, y: 15, z: 25 },
+                { x: 25, y: 15, z: -25 }, { x: 0, y: 30, z: 0 }, { x: 20, y: 10, z: 20 }
+            ];
+            gsap.to(camera.position, { x: positions[sceneIndex].x, y: positions[sceneIndex].y, z: positions[sceneIndex].z, duration: 2 });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (factoryGroup) {
+                factoryGroup.rotation.y += 0.001;
+                factoryGroup.children.forEach(child => {
+                    if (child.userData && child.userData.speed) {
+                        child.position.x += child.userData.speed;
+                        if (child.position.x > 8) child.position.x = -8;
+                        child.material.opacity = 0.5 + Math.sin(Date.now() * 0.005 + child.userData.offset) * 0.3;
+                    }
+                });
+            }
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('three-canvas');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+    </script>
+</body>
+</html>

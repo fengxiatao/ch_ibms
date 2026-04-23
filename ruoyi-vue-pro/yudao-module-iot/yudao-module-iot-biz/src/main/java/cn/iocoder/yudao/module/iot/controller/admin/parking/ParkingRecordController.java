@@ -38,7 +38,7 @@ public class ParkingRecordController {
 
     @GetMapping("/present/page")
     @Operation(summary = "获得在场车辆分页")
-    @PreAuthorize("@ss.hasPermission('iot:parking:present-vehicle:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:present-vehicle:query-btn')")
     public CommonResult<PageResult<ParkingPresentVehicleRespVO>> getPresentVehiclePage(@Valid ParkingPresentVehiclePageReqVO pageReqVO) {
         PageResult<ParkingPresentVehicleDO> pageResult = parkingRecordService.getPresentVehiclePage(pageReqVO);
         return success(BeanUtils.toBean(pageResult, ParkingPresentVehicleRespVO.class));
@@ -47,7 +47,7 @@ public class ParkingRecordController {
     @GetMapping("/present/get")
     @Operation(summary = "获得在场车辆")
     @Parameter(name = "id", description = "编号", required = true)
-    @PreAuthorize("@ss.hasPermission('iot:parking:present-vehicle:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:present-vehicle:query-btn')")
     public CommonResult<ParkingPresentVehicleRespVO> getPresentVehicle(@RequestParam("id") Long id) {
         ParkingPresentVehicleDO presentVehicle = parkingRecordService.getPresentVehicle(id);
         return success(BeanUtils.toBean(presentVehicle, ParkingPresentVehicleRespVO.class));
@@ -70,7 +70,7 @@ public class ParkingRecordController {
 
     @GetMapping("/page")
     @Operation(summary = "获得进出记录分页")
-    @PreAuthorize("@ss.hasPermission('iot:parking:record:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:record:query-btn')")
     public CommonResult<PageResult<ParkingRecordRespVO>> getRecordPage(@Valid ParkingRecordPageReqVO pageReqVO) {
         PageResult<ParkingRecordDO> pageResult = parkingRecordService.getRecordPage(pageReqVO);
         return success(BeanUtils.toBean(pageResult, ParkingRecordRespVO.class));
@@ -79,7 +79,7 @@ public class ParkingRecordController {
     @GetMapping("/get")
     @Operation(summary = "获得进出记录")
     @Parameter(name = "id", description = "编号", required = true)
-    @PreAuthorize("@ss.hasPermission('iot:parking:record:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:record:query-btn')")
     public CommonResult<ParkingRecordRespVO> getRecord(@RequestParam("id") Long id) {
         ParkingRecordDO record = parkingRecordService.getRecord(id);
         return success(BeanUtils.toBean(record, ParkingRecordRespVO.class));
@@ -103,7 +103,7 @@ public class ParkingRecordController {
             @Parameter(name = "plateNumber", description = "车牌号", required = true),
             @Parameter(name = "lotId", description = "车场ID", required = true)
     })
-    @PreAuthorize("@ss.hasPermission('iot:parking:record:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:record:query-btn')")
     public CommonResult<BigDecimal> calculateParkingFee(@RequestParam("plateNumber") String plateNumber,
                                                         @RequestParam("lotId") Long lotId) {
         return success(parkingRecordService.calculateParkingFee(plateNumber, lotId));

@@ -1,36 +1,40 @@
 package cn.iocoder.yudao.module.iot.job;
 
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.enums.device.CapabilityRefreshDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.enums.device.NvrDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.service.access.IotAccessDeviceCapabilityService;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
 import cn.iocoder.yudao.module.iot.service.video.nvr.NvrQueryService;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import jakarta.annotation.Resource;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
- * 门禁设备能力刷新定时任务
+ * 门禁 / NVR 等设备能力刷新定时任务
  *
- * <p>周期性调用网关 QUERY_DEVICE_CAPABILITY，并将能力快照写回 iot_device.config，
- * 供业务侧按能力做精准下发/撤销，避免“默认全支持”的一窝熟行为。</p>
+ * <p>周期性调用网关 QUERY_DEVICE_CAPABILITY（门禁）或触发 NVR 通道扫描，将能力快照写回台账
+ * {@code ibms_device.extra}（{@code accessCapabilities} / {@code nvrCapabilities}），供业务侧精准下发。</p>
  *
- * <p>目前按租户 1 执行（与现有 NVR/视频任务一致），后续如需多租户可遍历租户列表。</p>
+ * <p>迭代说明：由遍历 {@code iot_device} 改为以 {@code ibms_device} + {@code extra.gatewayRuntimeState}
+ * 在线为准，与 IBMS 主数据收敛一致。</p>
  */
 @Component
 @Slf4j
@@ -38,7 +42,7 @@ import java.util.Map;
 public class AccessDeviceCapabilityRefreshJob {
 
     @Resource
-    private IotDeviceMapper deviceMapper;
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @Resource
     private IotAccessDeviceCapabilityService capabilityService;
@@ -46,71 +50,54 @@ public class AccessDeviceCapabilityRefreshJob {
     @Resource
     private NvrQueryService nvrQueryService;
 
-    @Resource
-    private IotDeviceService iotDeviceService;
-
-    /**
-     * 刷新间隔（毫秒），默认 10 分钟
-     */
-    @Value("${iot.access.capability-refresh.interval:600000}")
-    private long intervalMs;
-
-    /**
-     * 能力 TTL（分钟），默认 24 小时
-     */
     @Value("${iot.access.capability-refresh.ttl-minutes:1440}")
     private long ttlMinutes;
 
-    /**
-     * 每次任务最大刷新数量（避免大批量阻塞）
-     */
     @Value("${iot.access.capability-refresh.max-per-run:50}")
     private int maxPerRun;
 
     @Scheduled(fixedDelayString = "${iot.access.capability-refresh.interval:600000}", initialDelay = 15000)
     public void refreshOnlineAccessCapabilities() {
-        // TODO: 当前使用默认租户ID=1，未来如需支持多租户，需要遍历所有租户
         TenantUtils.execute(1L, () -> {
             try {
                 int refreshed = 0;
                 LocalDateTime now = LocalDateTime.now();
                 Duration ttl = Duration.ofMinutes(ttlMinutes);
 
-                // 仅刷新“在线”的门禁设备，避免定时任务主动把离线设备拉起登录
-                for (IotDeviceDO device : deviceMapper.selectList()) {
+                List<IbmsDeviceDO> onlineList = ibmsDeviceMapper
+                        .selectListByGatewayRuntimeState(IotDeviceStateEnum.ONLINE.getState());
+                if (onlineList == null) {
+                    return;
+                }
+                for (IbmsDeviceDO ibms : onlineList) {
                     if (refreshed >= maxPerRun) {
                         break;
                     }
-                    if (device == null || device.getId() == null) {
-                        continue;
-                    }
-                    if (!IotDeviceStateEnum.ONLINE.getState().equals(device.getState())) {
+                    if (ibms == null || ibms.getId() == null) {
                         continue;
                     }
 
-                    // 根据插件 deviceType 标识是否需要刷新能力（门禁一/二代、NVR；排除报警主机、长辉 TCP）
-                    String pluginDeviceType = resolvePluginDeviceType(device);
+                    String pluginDeviceType = resolvePluginDeviceTypeFromIbms(ibms);
                     if (!CapabilityRefreshDeviceTypeConstants.isCapabilityRefreshEnabled(pluginDeviceType)) {
                         continue;
                     }
 
-                    LocalDateTime capTime = extractCapabilityTime(device);
+                    LocalDateTime capTime = extractCapabilityTimeFromIbms(ibms);
                     if (capTime != null && Duration.between(capTime, now).compareTo(ttl) < 0) {
-                        continue; // 未过期
+                        continue;
                     }
 
                     try {
-                        Long tenantId = device.getTenantId() != null ? device.getTenantId() : 1L;
-                        // 分设备类型执行不同刷新策略
+                        Long tenantId = ibms.getTenantId() != null ? ibms.getTenantId() : 1L;
                         if (NvrDeviceTypeConstants.NVR.equalsIgnoreCase(pluginDeviceType)) {
-                            TenantUtils.execute(tenantId, () -> refreshNvrCapability(device));
+                            TenantUtils.execute(tenantId, () -> refreshNvrCapabilityIbms(ibms));
                         } else {
-                            TenantUtils.execute(tenantId, () -> capabilityService.refreshCapability(device.getId()));
+                            TenantUtils.execute(tenantId, () -> capabilityService.refreshCapability(ibms.getId()));
                         }
                         refreshed++;
                     } catch (Exception e) {
                         log.warn("[AccessCapabilityRefreshJob] 刷新能力失败: deviceId={}, error={}",
-                                device.getId(), e.getMessage());
+                                ibms.getId(), e.getMessage());
                     }
                 }
 
@@ -124,75 +111,75 @@ public class AccessDeviceCapabilityRefreshJob {
         });
     }
 
-    private LocalDateTime extractCapabilityTime(IotDeviceDO device) {
-        if (device == null || device.getConfig() == null) {
+    private LocalDateTime extractCapabilityTimeFromIbms(IbmsDeviceDO device) {
+        if (device == null || StrUtil.isBlank(device.getExtra())) {
             return null;
         }
-        if (device.getConfig() instanceof AccessDeviceConfig) {
-            return ((AccessDeviceConfig) device.getConfig()).getCapabilityTime();
-        }
-        if (device.getConfig() instanceof GenericDeviceConfig) {
-            Object capsObj = ((GenericDeviceConfig) device.getConfig()).get("accessCapabilities");
-            if (capsObj instanceof Map<?, ?>) {
-                Object updatedAt = ((Map<?, ?>) capsObj).get("updatedAt");
-                if (updatedAt != null) {
-                    try {
-                        return LocalDateTime.parse(String.valueOf(updatedAt));
-                    } catch (Exception ignore) {
-                        return null;
-                    }
+        try {
+            JSONObject o = JSONUtil.parseObj(device.getExtra().trim());
+            Object ac = o.get("accessCapabilities");
+            if (ac instanceof JSONObject) {
+                Object u = ((JSONObject) ac).get("updatedAt");
+                if (u != null) {
+                    return LocalDateTime.parse(String.valueOf(u));
                 }
             }
-        }
-        return null;
-    }
-
-    /**
-     * 解析 newgateway 插件 deviceType（用于能力刷新策略选择）
-     *
-     * <p>优先取 config.accessCapabilities.deviceType（refreshCapability 会写回），其次取 GenericDeviceConfig.deviceType。</p>
-     */
-    private String resolvePluginDeviceType(IotDeviceDO device) {
-        if (device == null || device.getConfig() == null) {
+            Object nv = o.get("nvrCapabilities");
+            if (nv instanceof JSONObject) {
+                Object u = ((JSONObject) nv).get("updatedAt");
+                if (u != null) {
+                    return LocalDateTime.parse(String.valueOf(u));
+                }
+            }
+        } catch (Exception ignore) {
             return null;
         }
-        // 1) accessCapabilities.deviceType（Access/Generic 都可能写）
-        Object capsObj = null;
-        if (device.getConfig() instanceof AccessDeviceConfig) {
-            capsObj = ((AccessDeviceConfig) device.getConfig()).getAccessCapabilities();
-        } else if (device.getConfig() instanceof GenericDeviceConfig) {
-            capsObj = ((GenericDeviceConfig) device.getConfig()).get("accessCapabilities");
-        }
-        if (capsObj instanceof Map<?, ?>) {
-            Object dt = ((Map<?, ?>) capsObj).get("deviceType");
-            if (dt != null) {
-                return String.valueOf(dt);
-            }
-        }
-        // 2) GenericDeviceConfig.deviceType（NVR/ACCESS_GENx 通常在这里）
-        if (device.getConfig() instanceof GenericDeviceConfig) {
-            return ((GenericDeviceConfig) device.getConfig()).getDeviceType();
-        }
         return null;
     }
 
-    private void refreshNvrCapability(IotDeviceDO nvr) {
+    private String resolvePluginDeviceTypeFromIbms(IbmsDeviceDO d) {
+        if (d == null) {
+            return null;
+        }
+        if (StrUtil.isNotBlank(d.getExtra())) {
+            try {
+                JSONObject o = JSONUtil.parseObj(d.getExtra().trim());
+                Object caps = o.get("accessCapabilities");
+                if (caps instanceof JSONObject) {
+                    Object dt = ((JSONObject) caps).get("deviceType");
+                    if (dt != null) {
+                        return String.valueOf(dt);
+                    }
+                }
+                String dt2 = o.getStr("deviceType");
+                if (StrUtil.isNotBlank(dt2)) {
+                    return dt2;
+                }
+            } catch (Exception ignored) {
+                // fall through
+            }
+        }
+        if ("NVR".equals(d.getDeviceTypeCode()) || Objects.equals(d.getIbmsProductId(), 4L)) {
+            return NvrDeviceTypeConstants.NVR;
+        }
+        return AccessDeviceTypeConstants.getAccessDeviceType(d);
+    }
+
+    private void refreshNvrCapabilityIbms(IbmsDeviceDO nvr) {
         if (nvr == null || nvr.getId() == null) {
             return;
         }
-        // 复用现有 NVR 通道刷新逻辑（会触发 newgateway 扫描通道并同步到 DB）
-        List<IotDeviceDO> channels = nvrQueryService.refreshChannelsByNvrId(nvr.getId());
+        var channels = nvrQueryService.refreshChannelsByNvrId(nvr.getId());
 
-        // 写回一份“能力/概览快照”到 iot_device.config，供业务侧快速判断（例如通道数、更新时间）
-        if (nvr.getConfig() instanceof GenericDeviceConfig) {
-            GenericDeviceConfig cfg = (GenericDeviceConfig) nvr.getConfig();
-            Map<String, Object> snap = new HashMap<>();
-            snap.put("deviceType", NvrDeviceTypeConstants.NVR);
-            snap.put("channelCount", channels != null ? channels.size() : 0);
-            snap.put("updatedAt", LocalDateTime.now().toString());
-            cfg.set("nvrCapabilities", snap);
-            iotDeviceService.updateDeviceConfig(nvr.getId(), cfg);
-        }
+        JSONObject ex = JSONUtil.parseObj(StrUtil.blankToDefault(nvr.getExtra(), "{}"));
+        Map<String, Object> snap = new HashMap<>();
+        snap.put("deviceType", NvrDeviceTypeConstants.NVR);
+        snap.put("channelCount", channels != null ? channels.size() : 0);
+        snap.put("updatedAt", LocalDateTime.now().toString());
+        ex.set("nvrCapabilities", new JSONObject(snap));
+
+        ibmsDeviceMapper.update(null, new LambdaUpdateWrapper<IbmsDeviceDO>()
+                .eq(IbmsDeviceDO::getId, nvr.getId())
+                .set(IbmsDeviceDO::getExtra, ex.toString()));
     }
 }
-

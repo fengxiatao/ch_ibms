@@ -6,6 +6,7 @@
 import { ref, nextTick, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { DEFAULT_NVR_CONFIG } from '@/composables/useDahuaPlayer'
+import { ensureDahuaSdkLoaded } from '@/utils/dahuaSdkLoader'
 import type { PlaybackPane, ChannelRecordingInfo } from '../types'
 
 /** 录像文件信息 */
@@ -23,12 +24,27 @@ export interface DahuaRecordFile {
 export function useDahuaPlayback() {
   const recordsLoading = ref(false)
   const isLoggedIn = ref(false)
+  const isStreamOnlyMode = () => {
+    if (typeof window === 'undefined') return false
+    return (window as any).__IBMS_VIDEO_PLAYBACK_STREAM_ONLY__ === true
+  }
 
   /**
    * 登录设备
    */
   const loginDevice = async (): Promise<boolean> => {
+    if (isStreamOnlyMode()) {
+      console.warn('[大华回放] 当前为流媒体模式，跳过 SDK 登录')
+      return false
+    }
     if (isLoggedIn.value) return true
+
+    try {
+      await ensureDahuaSdkLoaded()
+    } catch (e) {
+      console.error('[大华回放] SDK 加载失败:', e)
+      return false
+    }
 
     // @ts-ignore
     if (typeof window.RPC === 'undefined') {
@@ -63,6 +79,10 @@ export function useDahuaPlayback() {
     startTime: string,
     endTime: string
   ): Promise<DahuaRecordFile[]> => {
+    if (isStreamOnlyMode()) {
+      console.warn('[大华回放] 当前为流媒体模式，跳过 SDK 查询')
+      return []
+    }
     // 确保已登录
     const loggedIn = await loginDevice()
     if (!loggedIn) {
@@ -186,6 +206,18 @@ export function useDahuaPlayback() {
     channelName?: string,
     seekSeconds?: number
   ): Promise<boolean> => {
+    if (isStreamOnlyMode()) {
+      pane.error = '当前为流媒体模式，已禁用大华 SDK 回放'
+      return false
+    }
+    try {
+      await ensureDahuaSdkLoaded()
+    } catch (e) {
+      pane.error = '大华播放器 SDK 加载失败'
+      ElMessage.error('大华播放器 SDK 加载失败')
+      return false
+    }
+
     // @ts-ignore
     if (typeof window.PlayerControl === 'undefined') {
       pane.error = '大华播放器 SDK 未加载'
@@ -501,6 +533,10 @@ export function useDahuaPlayback() {
     onProgress?: (progress: number) => void,
     onComplete?: () => void
   ): Promise<boolean> => {
+    if (isStreamOnlyMode()) {
+      ElMessage.warning('当前为流媒体模式，已禁用大华 SDK 裁剪')
+      return false
+    }
     // @ts-ignore
     if (typeof window.PlayerControl === 'undefined') {
       ElMessage.error('大华播放器 SDK 未加载')

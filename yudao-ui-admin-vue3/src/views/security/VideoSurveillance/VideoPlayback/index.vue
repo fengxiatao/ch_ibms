@@ -216,7 +216,8 @@ const {
 } = useDahuaPlayback()
 
 // 播放模式：sdk = 大华 NVR SDK（内网），stream = 流媒体回放（外网）
-const playbackMode = ref<'sdk' | 'stream'>('sdk')
+// 默认使用 stream，避免外网环境加载大华 WASM 解码器导致内存溢出/连接失败
+const playbackMode = ref<'sdk' | 'stream'>('stream')
 
 // 流媒体回放（外网 ZLM）
 const {
@@ -1476,15 +1477,18 @@ const formatDateTime = (d: Date): string => {
 // ==================== 生命周期 ====================
 
 onMounted(() => {
+  ;(window as any).__IBMS_VIDEO_PLAYBACK_STREAM_ONLY__ = true
   initDefaultTimeRange()
 })
 
 onUnmounted(() => {
+  ;(window as any).__IBMS_VIDEO_PLAYBACK_STREAM_ONLY__ = false
   stopAllPanes()
 })
 
 // 切换为流媒体模式时同步窗口数量
 watch(playbackMode, (mode) => {
+  ;(window as any).__IBMS_VIDEO_PLAYBACK_STREAM_ONLY__ = mode === 'stream'
   if (mode === 'stream' && streamWindows.value.length !== gridLayout.value) {
     const next = Array.from({ length: gridLayout.value }, (_, i) =>
       streamWindows.value[i] ? { ...streamWindows.value[i] } : { playing: false }

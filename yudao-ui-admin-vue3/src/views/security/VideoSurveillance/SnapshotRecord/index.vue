@@ -42,36 +42,21 @@
           class="device-tree"
         >
           <template #default="{ data }">
-            <div 
-              class="tree-node" 
+            <div
+              class="tree-node"
               :class="'node-type-' + data.type"
             >
               <Icon
-                v-if="data.type === 'building'"
+                v-if="data.type === 'space'"
                 icon="ep:office-building"
                 style="color: #409eff"
               />
               <Icon
-                v-else-if="data.type === 'floor'"
-                icon="ep:tickets"
-                style="color: #67c23a"
-              />
-              <Icon
-                v-else-if="data.type === 'area'"
-                icon="ep:location"
-                style="color: #e6a23c"
-              />
-              <Icon
-                v-else-if="data.type === 'channels'"
-                icon="ep:folder"
-                style="color: #909399"
-              />
-              <Icon
                 v-else-if="data.type === 'channel'"
-                icon="ep:video-camera"
-                style="color: #f56c6c"
+                :icon="data.ibmsChannel?.onlineStatus === 1 ? 'ep:video-camera-filled' : 'ep:video-camera'"
+                :style="{ color: data.ibmsChannel?.onlineStatus === 1 ? '#67c23a' : '#909399' }"
               />
-              <Icon v-else icon="ep:video-camera" style="color: #f56c6c" />
+              <Icon v-else icon="ep:video-camera" style="color: #909399" />
               <span>{{ data.name }}</span>
             </div>
           </template>
@@ -230,12 +215,12 @@ import {
   ZoomIn,
   Search
 } from '@element-plus/icons-vue'
-import { getBuildingList } from '@/api/iot/spatial/building'
-import { getFloorListByBuildingId } from '@/api/iot/spatial/floor'
-import { getAreaListByFloorId } from '@/api/iot/spatial/area'
 import { getCameraSnapshotPage, deleteCameraSnapshot } from '@/api/iot/video'
-import { getChannelPage } from '@/api/iot/channel'
+import { getSpaceTree, type IbmsSpaceTreeNodeRespVO } from '@/api/iot/ibms/space'
+import { getChannelPage as getIbmsChannelPage } from '@/api/iot/ibms/channel'
 import type { CameraSnapshotRespVO } from '@/api/iot/video'
+import type { DeviceTreeNode, IbmsChannel } from '../RealTimePreview/types'
+import patrolCaptureFallback from '@/assets/images/patrol-capture.svg'
 
 /**
  * 抓图记录页面组件
@@ -311,17 +296,15 @@ const previewImage = reactive<{
 const treeProps = {
   children: 'children',
   label: 'name',
-  isLeaf: (data: any) => {
-    // 只有通道节点是叶子节点
-    return data.type === 'channel'
-  }
+  isLeaf: (data: DeviceTreeNode) => data.type === 'channel'
 }
 
-// 摄像头树形数据（从空间管理API加载）
-const cameraTreeData = ref<any[]>([])
+/** 与实时预览 / 录像回放一致：IBMS 空间树 + 安防视频通道（VT） */
+const MAX_PAGE_SIZE = 100
+const spaceTreeChildrenMap = new Map<number, IbmsSpaceTreeNodeRespVO[]>()
 
-// 设备列表数据（从摄像头树中提取）
-const deviceList = ref<any[]>([])
+// 摄像头树形数据（根节点来自 getSpaceTree）
+const cameraTreeData = ref<DeviceTreeNode[]>([])
 
 // 抓图记录列表数据
 const snapshotList = ref<CameraSnapshotRespVO[]>([])
@@ -333,83 +316,155 @@ const loading = ref(false)
 const cameraTreeRef = ref()
 
 // 选中的通道列表
-const selectedChannels = ref<any[]>([])
+const selectedChannels = ref<DeviceTreeNode[]>([])
 
 // 选中的抓图记录列表
 const selectedSnapshots = ref<CameraSnapshotRespVO[]>([])
 
-/**
- * 判断设备是否为摄像机（基于设备能力，不硬编码产品ID）
- * @param device 设备对象
- * @returns 是否为摄像机
- */
-const isCameraDevice = (device: any): boolean => {
-  try {
-    // 解析设备配置
-    const config = device.config ? JSON.parse(device.config) : {}
-    
-    // 判断标准：具有以下摄像机特征之一即可
-    // 1. 有RTSP端口配置（视频流协议）
-    const hasRtspPort = config.rtspPort !== undefined && config.rtspPort !== null
-    
-    // 2. 支持ONVIF协议（网络视频设备标准协议）
-    const hasOnvifSupport = config.onvifSupported === true || config.onvifPort !== undefined
-    
-    // 3. 有快照接口配置
-    const hasSnapshotConfig = config.snapshot !== undefined && config.snapshot !== null
-    
-    // 4. 有视频厂商标识（hikvision、dahua、uniview等）
-    const hasVendor = config.vendor !== undefined && config.vendor !== null
-    
-    // 满足任一条件即判定为摄像机
-    return hasRtspPort || hasOnvifSupport || hasSnapshotConfig || hasVendor
-    
-  } catch (error) {
-    console.warn(`⚠️ 设备配置解析失败 [${device.deviceName}]:`, error)
-    return false
+const mapStatusToOnlineStatus = (status?: string) => {
+  if (status === 'online') return 1
+  if (status === 'offline') return 0
+  return undefined
+}
+
+const mapChannelRowToIbmsChannel = (row: Record<string, any>): IbmsChannel => {
+  let extra: Record<string, any> = {}
+  if (row?.extra) {
+    try {
+      extra = JSON.parse(row.extra)
+    } catch {
+      extra = {}
+    }
+  }
+  return {
+    id: row.id,
+    deviceId: row.deviceId ?? 0,
+    channelNo: row.channelNo ?? 1,
+    channelName: row.name || `通道${row.channelNo ?? 1}`,
+    channelCode: row.code,
+    targetIp: row.ip,
+    targetPort: extra.targetPort,
+    rtspPort: extra.rtspPort,
+    targetChannelNo: extra.targetChannelNo,
+    username: extra.username,
+    password: extra.password,
+    streamUrlMain: extra.streamUrlMain,
+    streamUrlSub: extra.streamUrlSub,
+    ptzSupport: extra.ptzSupport,
+    hasAudio: extra.hasAudio,
+    onlineStatus: mapStatusToOnlineStatus(row.status),
+    enableStatus: extra.enableStatus,
+    spaceId: row.spaceId,
+    gbChannelId: extra.gbChannelId,
+    gbDeviceId: extra.gbDeviceId
   }
 }
 
+const mapSpaceNode = (space: IbmsSpaceTreeNodeRespVO): DeviceTreeNode => ({
+  id: `space-${space.id}`,
+  name: space.name,
+  type: 'space',
+  spaceId: space.id
+})
+
+const buildSpaceNodeIndex = (nodes: IbmsSpaceTreeNodeRespVO[]) => {
+  spaceTreeChildrenMap.clear()
+  const walk = (list: IbmsSpaceTreeNodeRespVO[]) => {
+    for (const item of list) {
+      spaceTreeChildrenMap.set(item.id, item.children || [])
+      if (item.children?.length) walk(item.children)
+    }
+  }
+  walk(nodes)
+}
+
+const loadChannelsBySpace = async (spaceId: number): Promise<DeviceTreeNode[]> => {
+  const rows: any[] = []
+  let pageNo = 1
+  let total = 0
+  do {
+    const res = await getIbmsChannelPage({
+      pageNo,
+      pageSize: MAX_PAGE_SIZE,
+      business: 'security',
+      typeCode: 'VT',
+      spaceId
+    })
+    const page = res && (res as any).list ? res : (res as any)?.data
+    const list = page?.list || []
+    total = Number(page?.total || 0)
+    rows.push(...list)
+    if (!list.length || rows.length >= total) break
+    pageNo += 1
+  } while (true)
+
+  return rows.map((row: any) => {
+    const ibmsChannel = mapChannelRowToIbmsChannel(row)
+    const channelShim = {
+      id: row.id,
+      channelName: ibmsChannel.channelName,
+      channelNo: row.channelNo,
+      deviceId: row.deviceId
+    }
+    return {
+      id: `channel-${row.id}`,
+      name: ibmsChannel.channelName,
+      type: 'channel' as const,
+      channelId: row.id,
+      channelNo: ibmsChannel.channelNo,
+      ibmsChannel,
+      channel: channelShim
+    } as DeviceTreeNode
+  })
+}
+
 /**
- * 搜索视频通道（根据通道名称模糊查询）
+ * 搜索视频通道（与录像回放一致：IBMS 通道分页 keyword）
  */
 const handleChannelSearch = async () => {
   const keyword = deviceSearchKeyword.value.trim()
-  
+
   if (!keyword) {
     ElMessage.warning('请输入搜索关键词')
     return
   }
-  
+
   try {
     console.log('[快照记录] 🔍 搜索通道:', keyword)
-    
-    // 使用通道分页查询接口进行搜索
-    const result = await getChannelPage({
-      channelName: keyword,
-      channelType: 'video',
+
+    const res = await getIbmsChannelPage({
+      keyword,
+      business: 'security',
+      typeCode: 'VT',
       pageNo: 1,
-      pageSize: 100
+      pageSize: MAX_PAGE_SIZE
     })
-    
-    if (result.list && result.list.length > 0) {
-      // 将搜索结果转换为树节点格式
-      cameraTreeData.value = result.list.map((channel: any) => ({
-        id: `channel-${channel.id}`,
-        name: channel.channelName,
-        type: 'channel',
-        channelId: channel.id,
-        channelNo: channel.channelNo,
-        deviceId: channel.deviceId,
-        channel: channel
-      }))
-      
-      ElMessage.success(`找到 ${result.list.length} 个匹配的视频通道`)
-      console.log(`[快照记录] ✅ 搜索完成，找到 ${result.list.length} 个通道`)
+    const page = res && (res as any).list ? res : (res as any)?.data
+    const list = page?.list || []
+
+    if (list.length > 0) {
+      cameraTreeData.value = list.map((row: any) => {
+        const ibmsChannel = mapChannelRowToIbmsChannel(row)
+        return {
+          id: `channel-${row.id}`,
+          name: ibmsChannel.channelName,
+          type: 'channel' as const,
+          channelId: row.id,
+          channelNo: ibmsChannel.channelNo,
+          ibmsChannel,
+          channel: {
+            id: row.id,
+            channelName: ibmsChannel.channelName,
+            channelNo: row.channelNo,
+            deviceId: row.deviceId
+          }
+        } as DeviceTreeNode
+      })
+
+      ElMessage.success(`找到 ${list.length} 个匹配的视频通道`)
     } else {
       cameraTreeData.value = []
       ElMessage.info('未找到匹配的视频通道')
-      console.log('[快照记录] ℹ️ 未找到匹配的通道')
     }
   } catch (error: any) {
     console.error('[快照记录] ❌ 搜索失败:', error)
@@ -428,162 +483,37 @@ const handleSearchClear = () => {
 }
 
 /**
- * 加载空间树（初始只加载建筑列表）
+ * 加载 IBMS 空间树根节点（与实时预览 / 录像回放一致）
  */
 const loadSpaceTree = async () => {
   try {
-    console.log('[快照记录] 🔄 开始加载空间树（懒加载模式）...')
-    
-    // 回退方案：只加载建筑列表，不加载子节点
-    const buildings = await getBuildingList()
-    
-    console.log('[快照记录] ✅ 加载到建筑:', buildings.length, '个')
-    
-    // 将建筑转换为树节点格式
-    const treeData = buildings.map((building: any) => ({
-      id: `building-${building.id}`,
-      name: building.name,
-      type: 'building',
-      buildingId: building.id,
-      // 不预先加载 children，由 loadTreeNode 按需加载
-    }))
-    
-    cameraTreeData.value = treeData
-    
-    ElMessage.success(`已加载 ${treeData.length} 个建筑，请展开查看楼层`)
-    
+    const spaces = await getSpaceTree()
+    buildSpaceNodeIndex(spaces || [])
+    cameraTreeData.value = (spaces || []).map(mapSpaceNode)
   } catch (error: any) {
-    console.error('[快照记录] ❌ 加载失败:', error)
-    ElMessage.error('加载空间树失败: ' + error.message)
+    console.error('[快照记录] ❌ 加载空间树失败:', error)
+    ElMessage.error('加载空间列表失败: ' + (error?.message || ''))
     cameraTreeData.value = []
   }
 }
 
 /**
- * 懒加载树节点（按需加载子节点）
- * @param node 当前节点
- * @param resolve 回调函数
+ * 懒加载：子空间 + 当前空间下安防视频通道（与 PlaybackDeviceTree 一致）
  */
 const loadTreeNode = async (node: any, resolve: Function) => {
   try {
-    const data = node.data
-    let children: any[] = []
-
-    console.log('[快照记录] 🔄 懒加载节点:', data.type, data.name)
-
-    // 根据节点类型加载不同的子节点
-    if (data.type === 'building') {
-      // 添加"通道"节点
-      children.push({
-        id: `channels-building-${data.buildingId}`,
-        name: '通道',
-        type: 'channels',
-        buildingId: data.buildingId
-      })
-      
-      // 建筑节点 -> 加载楼层列表
-      const floors = await getFloorListByBuildingId(data.buildingId)
-      console.log('[快照记录] ✅ 建筑', data.name, '有', floors.length, '个楼层')
-      
-      children.push(...floors.map((floor: any) => ({
-        id: `floor-${floor.id}`,
-        name: floor.name,
-        type: 'floor',
-        floorId: floor.id,
-        buildingId: data.buildingId,
-        floor: floor
-      })))
-
-    } else if (data.type === 'floor') {
-      // 添加"通道"节点
-      children.push({
-        id: `channels-floor-${data.floorId}`,
-        name: '通道',
-        type: 'channels',
-        floorId: data.floorId,
-        buildingId: data.buildingId
-      })
-      
-      // 楼层节点 -> 加载区域列表
-      const areas = await getAreaListByFloorId(data.floorId)
-      console.log('[快照记录] ✅ 楼层', data.name, '有', areas.length, '个区域')
-      
-      children.push(...areas.map((area: any) => ({
-        id: `area-${area.id}`,
-        name: area.name,
-        type: 'area',
-        areaId: area.id,
-        floorId: data.floorId
-      })))
-
-    } else if (data.type === 'area') {
-      // 添加"通道"节点
-      children.push({
-        id: `channels-area-${data.areaId}`,
-        name: '通道',
-        type: 'channels',
-        areaId: data.areaId,
-        floorId: data.floorId,
-        buildingId: data.buildingId
-      })
-      
-    } else if (data.type === 'channels') {
-      // 加载通道列表
-      const params: any = {
-        pageNo: 1,
-        pageSize: 100
-      }
-      
-      // 根据层级添加筛选条件
-      if (data.buildingId) params.buildingId = data.buildingId
-      if (data.floorId) params.floorId = data.floorId
-      if (data.areaId) params.areaId = data.areaId
-      if (data.spaceId) params.spaceId = data.spaceId
-      
-      const channelsRes = await getChannelPage(params)
-      const channels = channelsRes.list || []
-      
-      console.log('[快照记录] ✅ 加载到', channels.length, '个通道')
-      
-      children = channels.map((ch: any) => ({
-        id: `channel-${ch.id}`,
-        name: ch.channelName || `通道${ch.channelNo}`,
-        type: 'channel',
-        channelId: ch.id,
-        channel: ch
-      }))
+    const data = node.data as DeviceTreeNode
+    if (!data || data.type !== 'space' || !data.spaceId) {
+      resolve([])
+      return
     }
-
-    resolve(children)
-
+    const childSpaces = (spaceTreeChildrenMap.get(data.spaceId) || []).map(mapSpaceNode)
+    const channels = await loadChannelsBySpace(data.spaceId)
+    resolve([...childSpaces, ...channels])
   } catch (error: any) {
     console.error('[快照记录] ❌ 懒加载节点失败:', error)
-    ElMessage.error('加载子节点失败: ' + error.message)
-    resolve([]) // 失败时返回空数组
-  }
-}
-
-/**
- * 从树数据中提取所有设备到列表（递归）
- * 注意：在懒加载模式下，此函数已不再使用
- * 设备列表会在 loadTreeNode 中按需动态添加
- */
-
-/**
- * 获取节点图标
- */
-const getNodeIcon = (type: string) => {
-  switch (type) {
-    case 'building':
-      return 'ep:office-building'  // 🏢 建筑图标
-    case 'floor':
-      return 'ep:grid'              // 📐 楼层图标
-    case 'area':
-      return 'ep:location'          // 📍 区域图标
-    case 'device':
-      return 'ep:video-camera'      // 📹 设备图标
-    default:
-      return 'ep:folder'            // 📁 默认图标
+    ElMessage.error('加载子节点失败: ' + (error?.message || ''))
+    resolve([])
   }
 }
 
@@ -591,20 +521,14 @@ const getNodeIcon = (type: string) => {
  * 处理摄像头选择事件
  * @param data 选中的节点数据
  */
-const handleCameraSelect = (data: any) => {
-  console.log('[快照记录] 点击节点:', data)
-  
-  // 只有通道节点才能选择
-  if (data.type === 'channel' && data.channel) {
-    // 通道节点点击时，可以显示该通道的信息
-    ElMessage.info(`已选择通道: ${data.channel.channelName || data.name}`)
-  } else {
-    // 点击建筑、楼层、区域节点，显示该节点信息
-    const typeText = data.type === 'building' ? '建筑' : 
-                     data.type === 'floor' ? '楼层' : 
-                     data.type === 'area' ? '区域' :
-                     data.type === 'channels' ? '通道文件夹' : '节点'
-    ElMessage.info(`选中${typeText}: ${data.name}`)
+const handleCameraSelect = (data: DeviceTreeNode) => {
+  if (data.type === 'channel') {
+    const label = data.ibmsChannel?.channelName || data.channel?.channelName || data.name
+    ElMessage.info(`已选择通道: ${label}`)
+    return
+  }
+  if (data.type === 'space') {
+    ElMessage.info(`选中空间: ${data.name}`)
   }
 }
 
@@ -680,7 +604,11 @@ const formatFileSize = (bytes: number): string => {
  */
 const handleImageError = (event: Event) => {
   const target = event.target as HTMLImageElement
-  target.src = '/src/assets/images/patrol-capture.svg'
+  // 避免兜底图也加载失败时重复触发 onerror 导致控制台刷屏
+  target.onerror = null
+  if (target.src !== patrolCaptureFallback) {
+    target.src = patrolCaptureFallback
+  }
 }
 
 /**
@@ -1038,13 +966,6 @@ onMounted(async () => {
         :deep(.el-tree-node__content) {
           .el-checkbox {
             display: none;
-          }
-        }
-        
-        // 显示"通道"文件夹节点的复选框
-        :deep(.el-tree-node__content:has(.node-type-channels)) {
-          .el-checkbox {
-            display: inline-block;
           }
         }
         

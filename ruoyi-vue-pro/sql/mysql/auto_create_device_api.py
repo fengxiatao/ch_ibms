@@ -101,7 +101,7 @@ class IoTDeviceAPI:
     
     def create_device(self, device_data):
         """Create device (will trigger complete initialization)"""
-        url = f"{API_BASE}/iot/device/create"
+        url = f"{API_BASE}/iot/ibms/device/create"
         
         try:
             response = requests.post(url, json=device_data, headers=self.headers, timeout=10)

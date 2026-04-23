@@ -68,7 +68,7 @@ public class ParkingVehicleController {
     @GetMapping("/free/get")
     @Operation(summary = "获得免费车")
     @Parameter(name = "id", description = "编号", required = true)
-    @PreAuthorize("@ss.hasPermission('iot:parking:free-vehicle:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:free-vehicle:query-btn')")
     public CommonResult<ParkingFreeVehicleRespVO> getFreeVehicle(@RequestParam("id") Long id) {
         ParkingFreeVehicleDO freeVehicle = parkingFreeVehicleService.getFreeVehicle(id);
         return success(BeanUtils.toBean(freeVehicle, ParkingFreeVehicleRespVO.class));
@@ -76,7 +76,7 @@ public class ParkingVehicleController {
 
     @GetMapping("/free/page")
     @Operation(summary = "获得免费车分页")
-    @PreAuthorize("@ss.hasPermission('iot:parking:free-vehicle:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:free-vehicle:query-btn')")
     public CommonResult<PageResult<ParkingFreeVehicleRespVO>> getFreeVehiclePage(@Valid ParkingFreeVehiclePageReqVO pageReqVO) {
         PageResult<ParkingFreeVehicleDO> pageResult = parkingFreeVehicleService.getFreeVehiclePage(pageReqVO);
         return success(BeanUtils.toBean(pageResult, ParkingFreeVehicleRespVO.class));
@@ -111,7 +111,7 @@ public class ParkingVehicleController {
     @GetMapping("/monthly/get")
     @Operation(summary = "获得月租车")
     @Parameter(name = "id", description = "编号", required = true)
-    @PreAuthorize("@ss.hasPermission('iot:parking:monthly-vehicle:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:monthly-vehicle:query-btn')")
     public CommonResult<ParkingMonthlyVehicleRespVO> getMonthlyVehicle(@RequestParam("id") Long id) {
         ParkingMonthlyVehicleDO monthlyVehicle = parkingMonthlyVehicleService.getMonthlyVehicle(id);
         return success(BeanUtils.toBean(monthlyVehicle, ParkingMonthlyVehicleRespVO.class));
@@ -119,7 +119,7 @@ public class ParkingVehicleController {
 
     @GetMapping("/monthly/page")
     @Operation(summary = "获得月租车分页")
-    @PreAuthorize("@ss.hasPermission('iot:parking:monthly-vehicle:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:monthly-vehicle:query-btn')")
     public CommonResult<PageResult<ParkingMonthlyVehicleRespVO>> getMonthlyVehiclePage(@Valid ParkingMonthlyVehiclePageReqVO pageReqVO) {
         PageResult<ParkingMonthlyVehicleDO> pageResult = parkingMonthlyVehicleService.getMonthlyVehiclePage(pageReqVO);
         return success(BeanUtils.toBean(pageResult, ParkingMonthlyVehicleRespVO.class));

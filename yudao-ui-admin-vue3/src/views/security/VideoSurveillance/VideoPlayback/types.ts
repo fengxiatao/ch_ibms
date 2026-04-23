@@ -39,11 +39,12 @@ export interface PlaybackPane {
 export interface DeviceTreeNode {
   id: string
   name: string
-  type: 'building' | 'floor' | 'area' | 'channels' | 'channel'
+  type: 'building' | 'floor' | 'area' | 'channels' | 'space' | 'channel'
   // 关联 ID
   buildingId?: number
   floorId?: number
   areaId?: number
+  spaceId?: number
   channelId?: number
   // IBMS 通道数据
   ibmsChannel?: IbmsChannel

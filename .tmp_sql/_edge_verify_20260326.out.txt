@@ -1,0 +1,3 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+monthly_cnt	monthly_recharge_cnt	free_cnt	blacklist_cnt	present_edge_cnt	unpaid_record_cnt	access_event_cnt	access_op_cnt
+0	0	0	0	0	0	0	0

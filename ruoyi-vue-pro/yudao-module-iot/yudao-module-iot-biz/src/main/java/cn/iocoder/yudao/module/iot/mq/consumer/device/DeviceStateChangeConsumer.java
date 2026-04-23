@@ -1,5 +1,8 @@
 package cn.iocoder.yudao.module.iot.mq.consumer.device;
 
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
 import cn.iocoder.yudao.module.iot.core.gateway.dto.DeviceStateChangeMessage;
@@ -7,8 +10,9 @@ import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageBus;
 import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageSubscriber;
 import cn.iocoder.yudao.module.iot.core.messagebus.topics.IotMessageTopics;
 import cn.iocoder.yudao.module.iot.dal.dataobject.alarm.IotAlarmHostDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.alarm.IotAlarmHostMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.enums.device.AlarmDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.enums.device.ChanghuiDeviceTypeConstants;
@@ -17,7 +21,8 @@ import cn.iocoder.yudao.module.iot.mq.consumer.device.handler.DeviceStateHandler
 import cn.iocoder.yudao.module.iot.mq.producer.DeviceCommandPublisher;
 import cn.iocoder.yudao.module.iot.service.access.IotAccessAuthDispatchService;
 import cn.iocoder.yudao.module.iot.service.changhui.upgrade.ChanghuiUpgradeService;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.service.ibms.channel.IbmsChannelService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceGatewaySupportService;
 import cn.iocoder.yudao.module.iot.service.device.activation.DeviceActivationStateManager;
 import cn.iocoder.yudao.module.iot.service.device.discovery.DiscoveredDeviceService;
 import cn.iocoder.yudao.module.iot.websocket.DeviceMessagePushService;
@@ -76,7 +81,6 @@ public class DeviceStateChangeConsumer implements IotMessageSubscriber<DeviceSta
     private static final long CHANNEL_SYNC_DELAY_MS = 2000;
 
     private final IotMessageBus messageBus;
-    private final IotDeviceService deviceService;
     private final DeviceMessagePushService pushService;
     private final DeviceCommandPublisher commandPublisher;
     private final Map<String, DeviceStateHandler> stateHandlers;
@@ -100,25 +104,28 @@ public class DeviceStateChangeConsumer implements IotMessageSubscriber<DeviceSta
     private DiscoveredDeviceService discoveredDeviceService;
     
     @Resource
-    private cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService channelService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
+
+    @Resource
+    private IbmsChannelService ibmsChannelService;
+
+    @Resource
+    private IbmsDeviceGatewaySupportService ibmsDeviceGatewaySupportService;
 
     /**
      * 构造函数
      * 
      * @param messageBus 消息总线
-     * @param deviceService 设备服务
      * @param pushService WebSocket 推送服务
      * @param commandPublisher 命令发布器
      * @param handlerList 设备状态处理器列表（Spring 自动注入所有实现）
      */
     @Autowired
     public DeviceStateChangeConsumer(IotMessageBus messageBus,
-                                      IotDeviceService deviceService,
                                       DeviceMessagePushService pushService,
                                       DeviceCommandPublisher commandPublisher,
                                       @Autowired(required = false) List<DeviceStateHandler> handlerList) {
         this.messageBus = messageBus;
-        this.deviceService = deviceService;
         this.pushService = pushService;
         this.commandPublisher = commandPublisher;
         this.stateHandlers = new HashMap<>();
@@ -331,17 +338,26 @@ public class DeviceStateChangeConsumer implements IotMessageSubscriber<DeviceSta
         }
         
         try {
-            // 通过设备ID获取IP地址，然后标记为已激活
-            cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO device = 
-                    deviceService.getDevice(deviceId);
-            if (device != null) {
-                String deviceIp = cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper
-                        .getIpAddress(device);
-                if (deviceIp != null) {
-                    discoveredDeviceService.markAsActivated(deviceIp, deviceId);
-                    log.info("[DeviceStateChangeConsumer] 已清理设备发现记录: ip={}, deviceId={}", 
-                            deviceIp, deviceId);
+            IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(deviceId);
+            if (ibms == null) {
+                return;
+            }
+            String deviceIp = StrUtil.trimToNull(ibms.getIp());
+            if (deviceIp == null && StrUtil.isNotBlank(ibms.getExtra())) {
+                try {
+                    JSONObject ex = JSONUtil.parseObj(ibms.getExtra().trim());
+                    deviceIp = StrUtil.trimToNull(ex.getStr("ip"));
+                    if (deviceIp == null) {
+                        deviceIp = StrUtil.trimToNull(ex.getStr("host"));
+                    }
+                } catch (Exception ignored) {
+                    // ignore
                 }
+            }
+            if (deviceIp != null) {
+                discoveredDeviceService.markAsActivated(deviceIp, deviceId);
+                log.info("[DeviceStateChangeConsumer] 已清理设备发现记录(IBMS): ip={}, deviceId={}",
+                        deviceIp, deviceId);
             }
         } catch (Exception e) {
             log.error("[DeviceStateChangeConsumer] 清理设备发现记录失败: deviceId={}, error={}", 
@@ -360,12 +376,14 @@ public class DeviceStateChangeConsumer implements IotMessageSubscriber<DeviceSta
     void triggerNvrChannelSync(Long deviceId) {
         try {
             Thread.sleep(CHANNEL_SYNC_DELAY_MS);
-            
-            // 调用通道服务同步
-            Integer syncCount = channelService.syncDeviceChannels(deviceId);
-            log.info("[DeviceStateChangeConsumer] NVR/PTZ 通道同步完成: deviceId={}, syncCount={}", 
-                    deviceId, syncCount);
-            
+
+            if (ibmsDeviceMapper.selectById(deviceId) != null) {
+                ibmsChannelService.syncChannelsFromDevice(deviceId);
+                log.info("[DeviceStateChangeConsumer] NVR 通道已同步至 ibms_channel: deviceId={}", deviceId);
+                return;
+            }
+            log.debug("[DeviceStateChangeConsumer] 跳过通道同步，非 IBMS 设备: deviceId={}", deviceId);
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("[DeviceStateChangeConsumer] NVR 通道同步被中断: deviceId={}", deviceId);
@@ -407,9 +425,7 @@ public class DeviceStateChangeConsumer implements IotMessageSubscriber<DeviceSta
      */
     void updateDatabaseStatus(Long deviceId, Integer newState, Long timestamp) {
         try {
-            deviceService.updateDeviceStateWithTimestamp(deviceId, newState, timestamp);
-            log.debug("[DeviceStateChangeConsumer] 数据库状态更新成功: deviceId={}, newState={}", 
-                    deviceId, newState);
+            ibmsDeviceGatewaySupportService.updateGatewayDeviceStateWithTimestamp(deviceId, newState, timestamp);
         } catch (Exception e) {
             log.error("[DeviceStateChangeConsumer] 数据库状态更新失败: deviceId={}, newState={}, error={}",
                     deviceId, newState, e.getMessage(), e);
@@ -509,8 +525,11 @@ public class DeviceStateChangeConsumer implements IotMessageSubscriber<DeviceSta
             // 延迟等待设备就绪
             Thread.sleep(CHANNEL_SYNC_DELAY_MS);
 
-            // 【重要】从数据库获取正确的设备类型，不依赖消息中可能错误的值
-            IotDeviceDO device = deviceService.getDevice(deviceId);
+            IbmsDeviceDO device = ibmsDeviceMapper.selectById(deviceId);
+            if (device == null) {
+                log.warn("[DeviceStateChangeConsumer] 门禁通道同步跳过，未找到 IBMS 设备: deviceId={}", deviceId);
+                return;
+            }
             String correctDeviceType = AccessDeviceTypeConstants.getAccessDeviceType(device);
             
             if (!correctDeviceType.equals(messageDeviceType)) {

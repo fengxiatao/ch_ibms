@@ -15,9 +15,11 @@ import cn.iocoder.yudao.module.iot.core.util.IotDeviceMessageUtils;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.rule.IotDataRuleDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.rule.IotDataSinkDO;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.rule.IotDataRuleMapper;
 import cn.iocoder.yudao.module.iot.dal.redis.RedisKeyConstants;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
 import cn.iocoder.yudao.module.iot.service.product.IotProductService;
 import cn.iocoder.yudao.module.iot.service.rule.data.action.IotDataRuleAction;
 import cn.iocoder.yudao.module.iot.service.thingmodel.IotThingModelService;
@@ -33,6 +35,7 @@ import java.util.*;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
 import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.DATA_RULE_NOT_EXISTS;
+import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.DEVICE_NOT_EXISTS;
 
 /**
  * IoT 数据流转规则 Service 实现类
@@ -50,7 +53,7 @@ public class IotDataRuleServiceImpl implements IotDataRuleService {
     @Resource
     private IotProductService productService;
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
     @Resource
     private IotThingModelService thingModelService;
     @Resource
@@ -120,12 +123,29 @@ public class IotDataRuleServiceImpl implements IotDataRuleService {
         productService.validateProductsExist(
                 convertSet(sourceConfigs, IotDataRuleDO.SourceConfig::getProductId));
 
-        // 2. 校验设备
-        deviceService.validateDeviceListExists(convertSet(sourceConfigs, IotDataRuleDO.SourceConfig::getDeviceId,
-                config -> ObjUtil.notEqual(config.getDeviceId(), IotDeviceDO.DEVICE_ID_ALL)));
+        // 2. 校验设备（IBMS 台账主键与历史 iot_device 双轨）
+        Set<Long> deviceIds = convertSet(sourceConfigs, IotDataRuleDO.SourceConfig::getDeviceId,
+                config -> ObjUtil.notEqual(config.getDeviceId(), IotDeviceDO.DEVICE_ID_ALL));
+        validateDataRuleDeviceIdsDualTrack(deviceIds);
 
         // 3. 校验物模型存在
         validateThingModelsExist(sourceConfigs);
+    }
+
+    /** 设备主键收口到 {@code ibms_device}：不允许回退到 {@code iot_device}。 */
+    private void validateDataRuleDeviceIdsDualTrack(Set<Long> deviceIds) {
+        if (CollUtil.isEmpty(deviceIds)) {
+            return;
+        }
+        Set<Long> remaining = new HashSet<>(deviceIds);
+        List<IbmsDeviceDO> ibmsHits = ibmsDeviceMapper.selectList(
+                new LambdaQueryWrapperX<IbmsDeviceDO>().in(IbmsDeviceDO::getId, remaining));
+        for (IbmsDeviceDO d : ibmsHits) {
+            remaining.remove(d.getId());
+        }
+        if (CollUtil.isNotEmpty(remaining)) {
+            throw exception(DEVICE_NOT_EXISTS);
+        }
     }
 
     /**

@@ -55,7 +55,7 @@ public class ParkingBlacklistController {
     @GetMapping("/get")
     @Operation(summary = "获得黑名单")
     @Parameter(name = "id", description = "编号", required = true)
-    @PreAuthorize("@ss.hasPermission('iot:parking:blacklist:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:blacklist:query-btn')")
     public CommonResult<ParkingBlacklistRespVO> getBlacklist(@RequestParam("id") Long id) {
         ParkingBlacklistDO blacklist = parkingBlacklistService.getBlacklist(id);
         return success(BeanUtils.toBean(blacklist, ParkingBlacklistRespVO.class));
@@ -63,7 +63,7 @@ public class ParkingBlacklistController {
 
     @GetMapping("/page")
     @Operation(summary = "获得黑名单分页")
-    @PreAuthorize("@ss.hasPermission('iot:parking:blacklist:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:blacklist:query-btn')")
     public CommonResult<PageResult<ParkingBlacklistRespVO>> getBlacklistPage(@Valid ParkingBlacklistPageReqVO pageReqVO) {
         PageResult<ParkingBlacklistDO> pageResult = parkingBlacklistService.getBlacklistPage(pageReqVO);
         return success(BeanUtils.toBean(pageResult, ParkingBlacklistRespVO.class));

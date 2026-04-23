@@ -14,12 +14,14 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
-import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsProductDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPersonDeviceAuthMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPersonMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.channel.IotDeviceChannelMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.product.IotProductMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceRuntimeMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsProductMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +51,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
 import cn.iocoder.yudao.module.iot.service.access.dto.DispatchResult;
+import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
 import cn.iocoder.yudao.module.iot.websocket.DeviceMessagePushService;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -78,13 +81,16 @@ public class AccessManagementServiceImpl implements AccessManagementService {
     private static final String ACCESS_CHANNEL_TYPE = "ACCESS";
 
     @Resource
-    private IotDeviceMapper deviceMapper;
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @Resource
-    private IotDeviceChannelMapper channelMapper;
+    private IotDeviceChannelService iotDeviceChannelService;
 
     @Resource
-    private IotProductMapper productMapper;
+    private IbmsProductMapper ibmsProductMapper;
+
+    @Resource
+    private IbmsDeviceRuntimeMapper ibmsDeviceRuntimeMapper;
 
     @Resource
     private AccessControlMessageBusClient messageBusClient;
@@ -118,22 +124,25 @@ public class AccessManagementServiceImpl implements AccessManagementService {
     @Override
     public List<AccessControllerTreeVO> getControllerTree() {
         // 1. 查询所有门禁控制器
-        List<IotDeviceDO> devices = deviceMapper.selectList(new LambdaQueryWrapperX<IotDeviceDO>()
-                .eq(IotDeviceDO::getSubsystemCode, ACCESS_SUBSYSTEM_CODE)
-                .orderByDesc(IotDeviceDO::getId));
-        
-        // 2. 转换为树形结构
-        return buildControllerTree(devices);
+        List<IbmsDeviceDO> ibmsDevices = ibmsDeviceMapper.selectList(new LambdaQueryWrapperX<IbmsDeviceDO>()
+                .eq(IbmsDeviceDO::getSubsystemCode, ACCESS_SUBSYSTEM_CODE)
+                .orderByDesc(IbmsDeviceDO::getId));
+
+        // 2. 转换为树形结构（沿用 legacy DTO 视图）
+        return buildControllerTree(buildAccessDeviceShells(ibmsDevices));
     }
 
     @Override
     public List<AccessControllerTreeVO> getOnlineControllerTree() {
         // 1. 查询在线的门禁控制器
-        List<IotDeviceDO> devices = deviceMapper.selectList(new LambdaQueryWrapperX<IotDeviceDO>()
-                .eq(IotDeviceDO::getSubsystemCode, ACCESS_SUBSYSTEM_CODE)
-                .eq(IotDeviceDO::getState, IotDeviceStateEnum.ONLINE.getState())
-                .orderByDesc(IotDeviceDO::getId));
-        
+        List<IbmsDeviceDO> ibmsDevices = ibmsDeviceMapper.selectList(new LambdaQueryWrapperX<IbmsDeviceDO>()
+                .eq(IbmsDeviceDO::getSubsystemCode, ACCESS_SUBSYSTEM_CODE)
+                .orderByDesc(IbmsDeviceDO::getId));
+
+        List<IotDeviceDO> devices = buildAccessDeviceShells(ibmsDevices).stream()
+                .filter(d -> IotDeviceStateEnum.ONLINE.getState().equals(d.getState()))
+                .collect(Collectors.toList());
+
         // 2. 转换为树形结构
         return buildControllerTree(devices);
     }
@@ -141,40 +150,65 @@ public class AccessManagementServiceImpl implements AccessManagementService {
     @Override
     public AccessControllerDetailVO getControllerDetail(Long deviceId) {
         // 1. 获取设备信息
-        IotDeviceDO device = deviceMapper.selectById(deviceId);
+        IbmsDeviceDO ibmsDevice = ibmsDeviceMapper.selectById(deviceId);
+        if (ibmsDevice == null) {
+            throw exception(ACCESS_DEVICE_NOT_EXISTS);
+        }
+        if (!ACCESS_SUBSYSTEM_CODE.equals(ibmsDevice.getSubsystemCode())) {
+            throw exception(ACCESS_DEVICE_NOT_EXISTS);
+        }
+
+        // 2. 组装 legacy 设备壳对象 + 运行态信息
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeMapper.selectById(deviceId);
+        IotDeviceDO device = cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper
+                .buildLegacyAccessDeviceShell(ibmsDevice, runtime);
         if (device == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
-        if (!ACCESS_SUBSYSTEM_CODE.equals(device.getSubsystemCode())) {
-            throw exception(ACCESS_DEVICE_NOT_EXISTS);
-        }
-        
-        // 2. 获取产品信息
+
+        // 3. 获取产品信息（IBMS 单台账）
         String productName = null;
-        if (device.getProductId() != null) {
-            IotProductDO product = productMapper.selectById(device.getProductId());
+        if (ibmsDevice.getIbmsProductId() != null) {
+            IbmsProductDO product = ibmsProductMapper.selectById(ibmsDevice.getIbmsProductId());
             if (product != null) {
-                productName = product.getName();
+                productName = product.getProductName();
             }
         }
         
-        // 3. 获取通道列表
-        List<IotDeviceChannelDO> channels = channelMapper.selectList(new LambdaQueryWrapperX<IotDeviceChannelDO>()
-                .eq(IotDeviceChannelDO::getDeviceId, deviceId)
-                .orderByAsc(IotDeviceChannelDO::getChannelNo));
+        // 4. 获取通道列表（迁移到 ibms_channel：仅 ACCESS）
+        List<IotDeviceChannelDO> allChannels = iotDeviceChannelService.getChannelsByDeviceId(deviceId);
+        List<IotDeviceChannelDO> channels = new ArrayList<>();
+        if (allChannels != null) {
+            for (IotDeviceChannelDO c : allChannels) {
+                if (c != null && ACCESS_CHANNEL_TYPE.equalsIgnoreCase(c.getChannelType())) {
+                    channels.add(c);
+                }
+            }
+        }
+        channels.sort(java.util.Comparator.comparing(
+                IotDeviceChannelDO::getChannelNo,
+                java.util.Comparator.nullsLast(Integer::compareTo)));
         
-        // 4. 构建详情VO
+        // 5. 构建详情VO
         return buildControllerDetail(device, productName, channels);
     }
 
     @Override
     public void refreshControllerStatus(Long deviceId) {
         // 验证设备存在
-        IotDeviceDO device = deviceMapper.selectById(deviceId);
-        if (device == null) {
+        IbmsDeviceDO ibmsDevice = ibmsDeviceMapper.selectById(deviceId);
+        if (ibmsDevice == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
-        if (!ACCESS_SUBSYSTEM_CODE.equals(device.getSubsystemCode())) {
+        if (!ACCESS_SUBSYSTEM_CODE.equals(ibmsDevice.getSubsystemCode())) {
+            throw exception(ACCESS_DEVICE_NOT_EXISTS);
+        }
+
+        // 组装 legacy 设备壳对象（包含 ip/port/username/password/config）
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeMapper.selectById(deviceId);
+        IotDeviceDO device = cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper
+                .buildLegacyAccessDeviceShell(ibmsDevice, runtime);
+        if (device == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
 
@@ -261,10 +295,19 @@ public class AccessManagementServiceImpl implements AccessManagementService {
             treeVO.setStateDesc(getStateDesc(device.getState()));
             treeVO.setLastOnlineTime(device.getOnlineTime());
             
-            // 查询门通道
-            List<IotDeviceChannelDO> channels = channelMapper.selectList(new LambdaQueryWrapperX<IotDeviceChannelDO>()
-                    .eq(IotDeviceChannelDO::getDeviceId, device.getId())
-                    .orderByAsc(IotDeviceChannelDO::getChannelNo));
+            // 查询门通道（迁移到 ibms_channel：仅 ACCESS）
+            List<IotDeviceChannelDO> allChannels = iotDeviceChannelService.getChannelsByDeviceId(device.getId());
+            List<IotDeviceChannelDO> channels = new ArrayList<>();
+            if (allChannels != null) {
+                for (IotDeviceChannelDO c : allChannels) {
+                    if (c != null && ACCESS_CHANNEL_TYPE.equalsIgnoreCase(c.getChannelType())) {
+                        channels.add(c);
+                    }
+                }
+            }
+            channels.sort(java.util.Comparator.comparing(
+                    IotDeviceChannelDO::getChannelNo,
+                    java.util.Comparator.nullsLast(Integer::compareTo)));
             
             treeVO.setChannelCount(channels.size());
             treeVO.setChannels(buildDoorChannels(channels, online));
@@ -652,6 +695,43 @@ public class AccessManagementServiceImpl implements AccessManagementService {
         return defaultValue;
     }
 
+    /**
+     * 把 {@code ibms_device + ibms_device_runtime} 转成 legacy 壳对象（仅用于现有 VO/命令参数拼装）。
+     */
+    private List<IotDeviceDO> buildAccessDeviceShells(List<IbmsDeviceDO> ibmsDevices) {
+        if (ibmsDevices == null || ibmsDevices.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> deviceIds = ibmsDevices.stream()
+                .map(IbmsDeviceDO::getId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        List<IbmsDeviceRuntimeDO> runtimes = CollectionUtils.isEmpty(deviceIds)
+                ? List.of()
+                : ibmsDeviceRuntimeMapper.selectList(
+                new LambdaQueryWrapperX<IbmsDeviceRuntimeDO>()
+                        .in(IbmsDeviceRuntimeDO::getDeviceId, deviceIds));
+        Map<Long, IbmsDeviceRuntimeDO> runtimeMap = runtimes == null
+                ? Map.of()
+                : runtimes.stream().collect(Collectors.toMap(IbmsDeviceRuntimeDO::getDeviceId,
+                Function.identity(), (a, b) -> a));
+
+        return ibmsDevices.stream()
+                .map(ibms -> {
+                    if (ibms == null) {
+                        return null;
+                    }
+                    cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO runtime =
+                            runtimeMap.get(ibms.getId());
+                    return cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper
+                            .buildLegacyAccessDeviceShell(ibms, runtime);
+                })
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
     // ========== 门控操作方法 ==========
 
     @Override
@@ -659,18 +739,26 @@ public class AccessManagementServiceImpl implements AccessManagementService {
         long startTime = System.currentTimeMillis();
         
         // 1. 验证设备存在
-        IotDeviceDO device = deviceMapper.selectById(reqVO.getDeviceId());
-        if (device == null) {
+        IbmsDeviceDO ibmsDevice = ibmsDeviceMapper.selectById(reqVO.getDeviceId());
+        if (ibmsDevice == null) {
             return DoorControlRespVO.failure(reqVO.getDeviceId(), reqVO.getChannelId(), 
                     reqVO.getAction(), "设备不存在");
         }
-        if (!ACCESS_SUBSYSTEM_CODE.equals(device.getSubsystemCode())) {
+        if (!ACCESS_SUBSYSTEM_CODE.equals(ibmsDevice.getSubsystemCode())) {
             return DoorControlRespVO.failure(reqVO.getDeviceId(), reqVO.getChannelId(), 
                     reqVO.getAction(), "设备不是门禁设备");
         }
 
-        // 2. 验证通道存在
-        IotDeviceChannelDO channel = channelMapper.selectById(reqVO.getChannelId());
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeMapper.selectById(reqVO.getDeviceId());
+        IotDeviceDO device = cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper
+                .buildLegacyAccessDeviceShell(ibmsDevice, runtime);
+        if (device == null) {
+            return DoorControlRespVO.failure(reqVO.getDeviceId(), reqVO.getChannelId(),
+                    reqVO.getAction(), "设备不存在");
+        }
+
+        // 2. 验证通道存在（迁移到 ibms_channel：ACCESS）
+        IotDeviceChannelDO channel = iotDeviceChannelService.getChannel(reqVO.getChannelId());
         if (channel == null || !channel.getDeviceId().equals(reqVO.getDeviceId())) {
             return DoorControlRespVO.failure(reqVO.getDeviceId(), reqVO.getChannelId(), 
                     reqVO.getAction(), "通道不存在或不属于该设备");
@@ -1038,12 +1126,20 @@ public class AccessManagementServiceImpl implements AccessManagementService {
         
         Map<Long, IotDeviceDO> deviceMap = CollectionUtils.isEmpty(deviceIds) 
                 ? Map.of() 
-                : deviceMapper.selectBatchIds(deviceIds).stream()
+                : ibmsDeviceMapper.selectBatchIds(deviceIds).stream()
+                        .map(ibms -> {
+                            IotDeviceDO shell = new IotDeviceDO();
+                            shell.setId(ibms.getId());
+                            shell.setDeviceName(ibms.getName());
+                            return shell;
+                        })
                         .collect(Collectors.toMap(IotDeviceDO::getId, Function.identity()));
         
-        Map<Long, IotDeviceChannelDO> channelMap = CollectionUtils.isEmpty(channelIds) 
-                ? Map.of() 
-                : channelMapper.selectBatchIds(channelIds).stream()
+        Map<Long, IotDeviceChannelDO> channelMap = CollectionUtils.isEmpty(channelIds)
+                ? Map.of()
+                : channelIds.stream()
+                        .map(iotDeviceChannelService::getChannel)
+                        .filter(c -> c != null)
                         .collect(Collectors.toMap(IotDeviceChannelDO::getId, Function.identity()));
 
         // 5. 根据人员姓名和设备名称进行过滤（如果有）

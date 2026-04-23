@@ -3,8 +3,8 @@ package cn.iocoder.yudao.module.iot.service.opc;
 import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageBus;
 import cn.iocoder.yudao.module.iot.core.messagebus.topics.IotMessageTopics;
 import cn.iocoder.yudao.module.iot.core.mq.message.opc.OpcControlCommand;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class OpcControlServiceImpl implements OpcControlService {
 
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @Resource
     private IotMessageBus messageBus;
@@ -51,15 +51,15 @@ public class OpcControlServiceImpl implements OpcControlService {
      */
     private Boolean sendControlCommand(Long deviceId, Integer command, String commandName) {
         try {
-            // 1. 查询设备
-            IotDeviceDO device = deviceService.getDevice(deviceId);
+            // 1. 查询 IBMS 台账设备
+            IbmsDeviceDO device = ibmsDeviceMapper.selectById(deviceId);
             if (device == null) {
                 log.warn("[sendControlCommand][设备不存在] deviceId={}", deviceId);
                 return false;
             }
 
-            // 2. 从 serialNumber 获取 account
-            String serialNumber = device.getSerialNumber();
+            // 2. 从设备序列号（sn）获取 account
+            String serialNumber = device.getSn();
             if (serialNumber == null || serialNumber.isEmpty()) {
                 log.warn("[sendControlCommand][设备未配置账号] deviceId={}", deviceId);
                 return false;
@@ -91,7 +91,7 @@ public class OpcControlServiceImpl implements OpcControlService {
                     .password("1234") // TODO: 从配置读取
                     .sequence(sequence)
                     .deviceId(deviceId)
-                    .deviceName(device.getDeviceName())
+                    .deviceName(device.getName())
                     .build();
 
             // 5. 发布到消息总线（由Gateway消费并发送，使用统一通道）

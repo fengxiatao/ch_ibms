@@ -6,17 +6,19 @@ import cn.iocoder.yudao.module.iot.controller.admin.dashboard.vo.DeviceStatistic
 import cn.iocoder.yudao.module.iot.controller.admin.dashboard.vo.HomeScreenRespVO;
 import cn.iocoder.yudao.module.iot.controller.admin.dashboard.vo.RealTimeMonitorRespVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.alert.IotAlertRecordDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceEventLogDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.epatrol.EpatrolTaskDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.parking.ParkingLotDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsChannelDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.alert.IotAlertRecordMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.channel.IotDeviceChannelMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceEventLogMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceRuntimeMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.epatrol.EpatrolTaskMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.parking.ParkingLotMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsChannelMapper;
+import cn.hutool.core.util.StrUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -46,13 +48,15 @@ import java.util.stream.Collectors;
 public class IotDashboardServiceImpl implements IotDashboardService {
 
     @Resource
-    private IotDeviceMapper deviceMapper;
+    private IbmsDeviceMapper deviceMapper;
+    @Resource
+    private IbmsDeviceRuntimeMapper deviceRuntimeMapper;
     @Resource
     private IotAlertRecordMapper alertRecordMapper;
     @Resource
     private IotDeviceEventLogMapper deviceEventLogMapper;
     @Resource
-    private IotDeviceChannelMapper channelMapper;
+    private IbmsChannelMapper ibmsChannelMapper;
     @Resource
     private EpatrolTaskMapper epatrolTaskMapper;
     @Resource
@@ -62,18 +66,23 @@ public class IotDashboardServiceImpl implements IotDashboardService {
     public DeviceStatisticsRespVO getDeviceStatistics() {
         DeviceStatisticsRespVO vo = new DeviceStatisticsRespVO();
 
-        // 查询所有设备
-        List<IotDeviceDO> allDevices = deviceMapper.selectList();
+        // 查询所有 IBMS 设备
+        List<IbmsDeviceDO> allDevices = deviceMapper.selectList();
         vo.setTotalDevices((long) allDevices.size());
 
-        // 统计各状态设备数
-        Map<Integer, Long> statusCountMap = allDevices.stream()
-                .filter(device -> device.getState() != null)
-                .collect(Collectors.groupingBy(IotDeviceDO::getState, Collectors.counting()));
+        // 运行态 state：仅从 ibms_device_runtime 读取
+        List<Long> ids = allDevices.stream().map(IbmsDeviceDO::getId).toList();
+        Map<Long, Integer> stateMap = deviceRuntimeMapper.selectStateMapByDeviceIds(ids);
 
-        long onlineDevices = statusCountMap.getOrDefault(1, 0L); // ONLINE = 1
-        long offlineDevices = statusCountMap.getOrDefault(2, 0L); // OFFLINE = 2
-        long inactiveDevices = statusCountMap.getOrDefault(0, 0L); // INACTIVE = 0
+        long onlineDevices = allDevices.stream()
+                .filter(d -> stateMap.getOrDefault(d.getId(), 0) == 1) // ONLINE = 1
+                .count();
+        long offlineDevices = allDevices.stream()
+                .filter(d -> stateMap.getOrDefault(d.getId(), 0) == 2) // OFFLINE = 2
+                .count();
+        long inactiveDevices = allDevices.stream()
+                .filter(d -> stateMap.getOrDefault(d.getId(), 0) == 0) // INACTIVE = 0
+                .count();
 
         vo.setOnlineDevices(onlineDevices);
         vo.setOfflineDevices(offlineDevices);
@@ -96,7 +105,7 @@ public class IotDashboardServiceImpl implements IotDashboardService {
         // 各产品设备数量分布
         Map<String, Long> devicesByProduct = allDevices.stream()
                 .collect(Collectors.groupingBy(
-                        device -> device.getProductId() != null ? device.getProductId().toString() : "未知",
+                        device -> device.getIbmsProductId() != null ? device.getIbmsProductId().toString() : "未知",
                         Collectors.counting()
                 ));
         vo.setDevicesByProduct(devicesByProduct);
@@ -294,15 +303,17 @@ public class IotDashboardServiceImpl implements IotDashboardService {
         LocalDateTime todayEnd = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
 
         // ==================== 设备统计 ====================
-        List<IotDeviceDO> allDevices = deviceMapper.selectList();
+        List<IbmsDeviceDO> allDevices = deviceMapper.selectList();
         long deviceTotal = allDevices.size();
-        Map<Integer, Long> statusCountMap = allDevices.stream()
-                .filter(d -> d.getState() != null)
-                .collect(Collectors.groupingBy(IotDeviceDO::getState, Collectors.counting()));
+        List<Long> ids = allDevices.stream().map(IbmsDeviceDO::getId).toList();
+        Map<Long, Integer> stateMap = deviceRuntimeMapper.selectStateMapByDeviceIds(ids);
 
-        long onlineDevices = statusCountMap.getOrDefault(1, 0L);
-        long offlineDevices = statusCountMap.getOrDefault(2, 0L);
-        long inactiveDevices = statusCountMap.getOrDefault(0, 0L);
+        long onlineDevices = allDevices.stream()
+                .filter(d -> stateMap.getOrDefault(d.getId(), 0) == 1)
+                .count();
+        long offlineDevices = allDevices.stream()
+                .filter(d -> stateMap.getOrDefault(d.getId(), 0) == 2)
+                .count();
 
         // ==================== 告警统计 ====================
         List<IotAlertRecordDO> allAlerts = alertRecordMapper.selectList();
@@ -318,9 +329,17 @@ public class IotDashboardServiceImpl implements IotDashboardService {
         long abnormalDevices = faultDevices + (unhandledAlerts > 0 ? Math.min(unhandledAlerts, 10) : 0);
 
         // ==================== 通道统计 ====================
-        List<IotDeviceChannelDO> allChannels = channelMapper.selectList();
+        List<IbmsChannelDO> allChannels = ibmsChannelMapper.selectList(
+                new LambdaQueryWrapperX<IbmsChannelDO>()
+                        .select(IbmsChannelDO::getStatus));
         long channelOnline = allChannels.stream()
-                .filter(c -> c.getOnlineStatus() != null && c.getOnlineStatus() == 1)
+                .filter(c -> {
+                    String status = c.getStatus();
+                    return StrUtil.isNotBlank(status)
+                            && ("online".equalsIgnoreCase(status)
+                            || "armed".equalsIgnoreCase(status)
+                            || "warning".equalsIgnoreCase(status));
+                })
                 .count();
         long channelOffline = allChannels.size() - channelOnline;
         double channelOnlineRate = allChannels.isEmpty() ? 0.0 :
@@ -329,12 +348,12 @@ public class IotDashboardServiceImpl implements IotDashboardService {
 
         // 存储设备统计（deviceType 为存储设备类型）
         // 假设 deviceType: 5-NVR, 6-DVR（具体值需根据实际枚举定义调整）
-        List<IotDeviceDO> storageDevices = allDevices.stream()
+        List<IbmsDeviceDO> storageDevices = allDevices.stream()
                 .filter(d -> d.getDeviceType() != null &&
                         (d.getDeviceType() == 5 || d.getDeviceType() == 6))
                 .toList();
         long storageOnline = storageDevices.stream()
-                .filter(d -> d.getState() != null && d.getState() == 1)
+                .filter(d -> stateMap.getOrDefault(d.getId(), 0) == 1)
                 .count();
         long storageOffline = storageDevices.size() - storageOnline;
         double storageOnlineRate = storageDevices.isEmpty() ? 100.0 :

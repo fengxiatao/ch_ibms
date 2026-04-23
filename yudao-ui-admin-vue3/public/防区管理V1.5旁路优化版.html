@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IBMS智慧物联 · 防区管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Inter', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+        .glass-card {
+            background: rgba(51, 65, 85, 0.4);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            background: rgba(51, 65, 85, 0.6);
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+        .sidebar-item {
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+        .sidebar-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), transparent);
+            transition: width 0.3s;
+        }
+        .sidebar-item:hover::before, .sidebar-item.active::before { width: 100%; }
+        .sidebar-item:hover, .sidebar-item.active {
+            border-left-color: #3b82f6;
+            color: #60a5fa;
+            background: rgba(59, 130, 246, 0.05);
+        }
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+        }
+        .status-online { background: #10b981; box-shadow: 0 0 8px #10b981; }
+        .status-offline { background: #ef4444; }
+        .status-warning { background: #f59e0b; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.3); }
+        ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.5); border-radius: 3px; }
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+        .modal-enter { animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes modalSlideIn {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .data-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        .data-table th {
+            background: rgba(30, 41, 59, 0.8);
+            font-weight: 600; text-transform: uppercase; font-size: 0.75rem;
+            letter-spacing: 0.05em; color: #94a3b8; padding: 12px 16px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+        .data-table td { padding: 16px; border-bottom: 1px solid rgba(148, 163, 184, 0.05); }
+        .data-table tr:hover td { background: rgba(59, 130, 246, 0.03); }
+        .search-input {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            transition: all 0.3s;
+        }
+        .search-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+        .btn-primary { background: linear-gradient(135deg, #3b82f6, #2563eb); transition: all 0.3s; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 20px -5px rgba(59, 130, 246, 0.4); }
+        .btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 10px 20px -5px rgba(239, 68, 68, 0.4); }
+        .btn-success { background: linear-gradient(135deg, #10b981, #059669); }
+        .btn-success:hover { transform: translateY(-1px); box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.4); }
+        .batch-bar {
+            transform: translateY(100%);
+            transition: transform 0.3s;
+        }
+        .batch-bar.show { transform: translateY(0); }
+        .zone-badge {
+            display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px;
+            border-radius: 20px; font-size: 0.75rem; font-weight: 500;
+        }
+        .badge-instant { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .badge-delay { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .badge-24h { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); }
+        .badge-perimeter { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .badge-emergency { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .badge-fire { background: rgba(249, 115, 22, 0.15); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); }
+        .form-input {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: white; padding: 0.5rem 0.75rem; border-radius: 0.5rem; width: 100%;
+        }
+        .form-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+        .form-label { display: block; font-size: 0.875rem; color: #94a3b8; margin-bottom: 0.25rem; }
+        .detector-tag {
+            display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+            background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 12px; font-size: 0.7rem; color: #34d399; margin-right: 4px; margin-bottom: 4px;
+        }
+        .space-tree { max-height: 300px; overflow-y: auto; }
+        .space-item { padding: 8px 12px; cursor: pointer; border-radius: 6px; }
+        .space-item:hover { background: rgba(59, 130, 246, 0.1); }
+        .space-item.selected { background: rgba(59, 130, 246, 0.2); border-left: 3px solid #3b82f6; }
+        .toast {
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 0.5rem; padding: 1rem 1.5rem; display: flex; align-items: center;
+            gap: 0.75rem; box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+            animation: toastSlideIn 0.3s ease;
+        }
+        @keyframes toastSlideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .toast.success { border-left: 4px solid #10b981; }
+        .toast.error { border-left: 4px solid #ef4444; }
+        .toast.warning { border-left: 4px solid #f59e0b; }
+        .toast.info { border-left: 4px solid #3b82f6; }
+        .confirm-dialog {
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 1rem; padding: 1.5rem; max-width: 400px; text-align: center;
+        }
+        .info-box {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            color: #93c5fd;
+            font-size: 0.875rem;
+        }
+        .btn-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex">
+
+    <!-- 左侧导航栏 -->
+    <aside class="w-64 glass-panel flex flex-col border-r border-slate-700/30 z-20">
+        <div class="p-6 border-b border-slate-700/30">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <i class="fas fa-shield-alt text-white text-lg"></i>
+                </div>
+                <div><h1 class="font-bold text-lg text-white tracking-tight">IBMS防区管理</h1><p class="text-xs text-slate-400">安全防护系统</p></div>
+            </div>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-4">
+            <div class="px-4 mb-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">功能模块</div>
+            <a href="#" class="sidebar-item active flex items-center gap-3 px-6 py-3 text-slate-300"><i class="fas fa-shield-alt w-5 text-center"></i><span>防区管理</span></a>
+        </nav>
+        <div class="p-4 border-t border-slate-700/30">
+            <div class="glass-card rounded-xl p-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-sm font-bold text-white">A</div>
+                    <div class="flex-1 min-w-0"><p class="text-sm font-medium text-white truncate">安防管理员</p><p class="text-xs text-slate-400">security@ibms.com</p></div>
+                    <button class="text-slate-400 hover:text-white transition-colors"><i class="fas fa-cog"></i></button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 flex flex-col overflow-hidden relative bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800">
+        <!-- 顶部栏 -->
+        <header class="h-16 glass-panel border-b border-slate-700/30 flex items-center justify-between px-6 z-10">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 text-sm text-slate-400"><span>IBMS防区管理</span><i class="fas fa-chevron-right text-xs"></i><span>防区管理</span></div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 px-4 py-2 glass-card rounded-lg">
+                    <span class="status-dot status-online"></span>
+                    <span class="text-sm text-slate-300">系统运行正常</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 内容滚动区 -->
+        <div class="flex-1 overflow-y-auto p-6 relative" id="main-content">
+            <!-- 防区统计卡片 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div class="glass-card rounded-xl p-4 flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center text-2xl text-blue-400">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div>
+                        <p class="text-2xl font-bold text-white" id="zone-total">0</p>
+                        <p class="text-sm text-slate-400">总防区</p>
+                    </div>
+                </div>
+                <div class="glass-card rounded-xl p-4 flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-lg bg-green-500/20 flex items-center justify-center text-2xl text-green-400">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <div>
+                        <p class="text-2xl font-bold text-green-400" id="zone-armed">0</p>
+                        <p class="text-sm text-slate-400">已布防</p>
+                    </div>
+                </div>
+                <div class="glass-card rounded-xl p-4 flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-lg bg-red-500/20 flex items-center justify-center text-2xl text-red-400">
+                        <i class="fas fa-unlock"></i>
+                    </div>
+                    <div>
+                        <p class="text-2xl font-bold text-red-400" id="zone-disarmed">0</p>
+                        <p class="text-sm text-slate-400">已撤防</p>
+                    </div>
+                </div>
+                <div class="glass-card rounded-xl p-4 flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center text-2xl text-purple-400">
+                        <i class="fas fa-ban"></i>
+                    </div>
+                    <div>
+                        <p class="text-2xl font-bold text-purple-400" id="zone-bypassed">0</p>
+                        <p class="text-sm text-slate-400">已旁路</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作栏 -->
+            <div class="glass-card rounded-xl p-4 mb-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3 flex-1 min-w-[300px]">
+                        <div class="relative flex-1 max-w-md">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                            <input type="text" id="zone-search" placeholder="搜索防区名称、编码..." class="search-input w-full rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500" oninput="filterZones()">
+                        </div>
+                        <select id="filter-panel" class="glass-card rounded-lg px-3 py-2.5 text-sm text-slate-300" onchange="filterZones()">
+                            <option value="">全部主机</option>
+                        </select>
+                        <select id="filter-zone-type" class="glass-card rounded-lg px-3 py-2.5 text-sm text-slate-300" onchange="filterZones()">
+                            <option value="">全部类型</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="openZoneWizard()" class="btn-primary px-4 py-2.5 rounded-lg text-white font-medium flex items-center gap-2"><i class="fas fa-plus"></i><span>新建防区</span></button>
+                        <button onclick="batchArmZones()" class="btn-success px-4 py-2.5 rounded-lg text-white font-medium flex items-center gap-2"><i class="fas fa-lock"></i><span>批量布防</span></button>
+                        <button onclick="batchDisarmZones()" class="btn-danger px-4 py-2.5 rounded-lg text-white font-medium flex items-center gap-2"><i class="fas fa-unlock"></i><span>批量撤防</span></button>
+                        <button onclick="exportZones()" class="px-4 py-2.5 glass-card rounded-lg text-slate-300 hover:text-white transition-colors"><i class="fas fa-download"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 防区列表 -->
+            <div class="glass-card rounded-xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="w-10"><input type="checkbox" id="select-all-zones" class="rounded border-slate-600 bg-slate-800 text-blue-600" onchange="toggleSelectAllZones()"></th>
+                                <th>防区信息 / 编码</th>
+                                <th>所属主机</th>
+                                <th>防区类型</th>
+                                <th>总线地址</th>
+                                <th>模块通道</th>
+                                <th>状态</th>
+                                <th>布防状态</th>
+                                <th>旁路状态</th>
+                                <th>关联探测器</th>
+                                <th>空间位置</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="zone-table-body"></tbody>
+                    </table>
+                </div>
+                <div class="p-4 border-t border-slate-700/30 flex items-center justify-between">
+                    <div class="text-sm text-slate-400">显示 <span id="zone-page-start">1</span>-<span id="zone-page-end">10</span> 共 <span id="zone-page-total">0</span></div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="changeZonePage(-1)" class="px-3 py-1.5 glass-card rounded text-slate-400 hover:text-white disabled:opacity-50" id="zone-prev-page"><i class="fas fa-chevron-left"></i></button>
+                        <span class="px-3 py-1.5 text-white" id="zone-page-current">1</span>
+                        <button onclick="changeZonePage(1)" class="px-4 py-2 glass-card rounded text-slate-400 hover:text-white disabled:opacity-50" id="zone-next-page"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 批量操作栏 -->
+    <div class="fixed bottom-0 left-64 right-0 glass-panel border-t border-slate-700/30 p-4 batch-bar z-40 flex items-center justify-between" id="batch-bar">
+        <div class="flex items-center gap-4"><span class="text-white font-medium">已选择 <span id="batch-selected-count" class="text-blue-400">0</span> 个防区</span><button onclick="clearZoneSelection()" class="text-slate-400 hover:text-white text-sm"><i class="fas fa-times mr-1"></i>清除选择</button></div>
+        <div class="flex items-center gap-3">
+            <button onclick="batchZoneAction('arm')" class="px-4 py-2 btn-success rounded-lg"><i class="fas fa-lock mr-2"></i>批量布防</button>
+            <button onclick="batchZoneAction('disarm')" class="px-4 py-2 btn-danger rounded-lg"><i class="fas fa-unlock mr-2"></i>批量撤防</button>
+            <button onclick="batchZoneAction('bypass')" class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30"><i class="fas fa-ban mr-2"></i>批量旁路</button>
+            <button onclick="batchZoneAction('unbypass')" class="px-4 py-2 bg-slate-500/20 text-slate-400 rounded-lg hover:bg-slate-500/30"><i class="fas fa-check mr-2"></i>取消旁路</button>
+            <button onclick="batchZoneAction('delete')" class="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30"><i class="fas fa-trash mr-2"></i>删除</button>
+        </div>
+    </div>
+
+    <!-- 模态框: 防区配置 -->
+    <div id="modal-zone-form" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50">
+        <div class="glass-panel rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden modal-enter flex flex-col">
+            <div class="p-6 border-b border-slate-700/30 flex justify-between items-center"><h3 class="text-xl font-bold text-white" id="zone-form-title">新建防区</h3><button onclick="closeModal('modal-zone-form')" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button></div>
+            <div class="flex-1 overflow-y-auto p-6">
+                <form id="zone-form" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="form-label">所属报警主机 <span class="text-red-400">*</span></label><select id="zone-panel" class="form-input" onchange="onZonePanelChange()"><option value="">请选择</option></select></div>
+                        <div><label class="form-label">防区号 <span class="text-red-400">*</span></label><input type="number" id="zone-number" class="form-input" min="1" max="256" onchange="updateZoneCode()"></div>
+                        <div><label class="form-label">防区名称 <span class="text-red-400">*</span></label><input type="text" id="zone-name" class="form-input" placeholder="如 大堂南侧防区"></div>
+                        <div>
+                            <label class="form-label">防区类型</label>
+                            <select id="zone-type" class="form-input" onchange="onZoneTypeChange()">
+                            </select>
+                        </div>
+                        <div><label class="form-label">总线地址</label><input type="number" id="zone-bus-address" class="form-input" min="1" max="254" value="1"></div>
+                        <div><label class="form-label">模块通道</label><input type="number" id="zone-module-channel" class="form-input" min="1" max="8" value="1"></div>
+                        <div id="zone-entry-delay-field"><label class="form-label">入口延时(秒)</label><input type="number" id="zone-entry-delay" class="form-input" value="0" min="0" max="255"></div>
+                        <div id="zone-exit-delay-field"><label class="form-label">出口延时(秒)</label><input type="number" id="zone-exit-delay" class="form-input" value="0" min="0" max="255"></div>
+                    </div>
+                    <div class="border-t border-slate-700 pt-4">
+                        <label class="form-label font-semibold">防区说明</label>
+                        <div class="info-box mt-2">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            <span id="zone-type-description">新建防区后，防区状态默认为"已启用"，您可以通过列表操作或批量操作进行布防/撤防。</span>
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-700 pt-4">
+                        <label class="form-label font-semibold">关联探测器</label>
+                        <div id="zone-detectors" class="mt-2 space-y-2"></div>
+                        <button type="button" onclick="addDetectorRow()" class="mt-2 text-sm text-blue-400 hover:text-blue-300"><i class="fas fa-plus mr-1"></i>添加探测器</button>
+                    </div>
+                    <div class="border-t border-slate-700 pt-4">
+                        <label class="form-label font-semibold">空间位置</label>
+                        <div class="space-tree glass-card p-3 mt-2" id="zone-space-tree"></div>
+                        <div class="grid grid-cols-2 gap-4 mt-3"><div><input type="text" id="zone-area" class="form-input bg-slate-700/50" readonly placeholder="区域码"></div><div><input type="text" id="zone-subarea" class="form-input bg-slate-700/50" readonly placeholder="子区域码"></div></div>
+                    </div>
+                    <div class="bg-blue-900/20 p-3 rounded"><span class="text-sm text-blue-300">防区编码: </span><span id="zone-code-preview" class="font-mono text-xs text-white">请先选择报警主机</span></div>
+                </form>
+            </div>
+            <div class="p-6 border-t border-slate-700/30 flex justify-end gap-3"><button onclick="closeModal('modal-zone-form')" class="px-6 py-2 glass-card rounded-lg">取消</button><button onclick="saveZone()" class="btn-primary px-6 py-2 rounded-lg">保存防区</button></div>
+        </div>
+    </div>
+
+    <!-- Toast & Confirm 容器 -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+    <div id="confirm-container" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50"></div>
+
+    <script>
+        (function() {
+            'use strict';
+            // ==================== 数据模型 ====================
+            const DataModel = { panels: [], zones: [], detectors: [] };
+
+            // 防区类型配置 - 包含业务规则
+            const ZONE_TYPES = {
+                1: {
+                    name: '即时防区',
+                    badge: 'badge-instant',
+                    icon: 'fa-bolt',
+                    hasEntryDelay: false,
+                    hasExitDelay: false,
+                    defaultEntryDelay: 0,
+                    defaultExitDelay: 0,
+                    description: '触发后立即报警，适用于内部防护区域',
+                    canBypass: true  // 可以旁路
+                },
+                2: {
+                    name: '延时防区',
+                    badge: 'badge-delay',
+                    icon: 'fa-hourglass-half',
+                    hasEntryDelay: true,
+                    hasExitDelay: true,
+                    defaultEntryDelay: 30,
+                    defaultExitDelay: 45,
+                    description: '支持入口/出口延时，适用于主要出入口',
+                    canBypass: true
+                },
+                3: {
+                    name: '24小时防区',
+                    badge: 'badge-24h',
+                    icon: 'fa-clock',
+                    hasEntryDelay: false,
+                    hasExitDelay: false,
+                    defaultEntryDelay: 0,
+                    defaultExitDelay: 0,
+                    description: '全天候监控，无论布防状态如何都会报警',
+                    canBypass: false  // 不能旁路
+                },
+                4: {
+                    name: '周界防区',
+                    badge: 'badge-perimeter',
+                    icon: 'fa-border-all',
+                    hasEntryDelay: false,
+                    hasExitDelay: false,
+                    defaultEntryDelay: 0,
+                    defaultExitDelay: 0,
+                    description: '用于建筑物边界防护，触发即报警',
+                    canBypass: true
+                },
+                5: {
+                    name: '紧急防区',
+                    badge: 'badge-emergency',
+                    icon: 'fa-exclamation-triangle',
+                    hasEntryDelay: false,
+                    hasExitDelay: false,
+                    defaultEntryDelay: 0,
+                    defaultExitDelay: 0,
+                    description: '手动触发紧急报警（劫持、医疗等）',
+                    canBypass: false  // 不能旁路
+                },
+                6: {
+                    name: '消防防区',
+                    badge: 'badge-fire',
+                    icon: 'fa-fire',
+                    hasEntryDelay: false,
+                    hasExitDelay: false,
+                    defaultEntryDelay: 0,
+                    defaultExitDelay: 0,
+                    description: '火灾探测报警，烟感、温感等设备',
+                    canBypass: false  // 不能旁路
+                }
+            };
+
+            const SPACES = [
+                { id: "F01", code: "F01", name: "地上1层", type: "floor", children: [
+                    { id: "F01-LBY", code: "LBY", name: "大堂" },
+                    { id: "F01-OFA", code: "OFA", name: "办公A区" },
+                    { id: "F01-OFB", code: "OFB", name: "办公B区" },
+                    { id: "F01-CON", code: "CON", name: "会议室" }
+                ] },
+                { id: "F02", code: "F02", name: "地上2层", type: "floor", children: [
+                    { id: "F02-FIN", code: "FIN", name: "财务室" },
+                    { id: "F02-IT", code: "IT", name: "IT机房" },
+                    { id: "F02-CEO", code: "CEO", name: "总裁办" }
+                ] },
+                { id: "B01", code: "B01", name: "地下1层", type: "floor", children: [
+                    { id: "B01-PK", code: "PK", name: "停车场" },
+                    { id: "B01-WH", code: "WH", name: "仓库" },
+                    { id: "B01-ENG", code: "ENG", name: "工程部" }
+                ] }
+            ];
+
+            // ==================== 状态管理 ====================
+            const State = {
+                selectedZones: [],
+                zonePage: 1,
+                zonePageSize: 10,
+                filteredZones: [],
+                currentEditZone: null
+            };
+
+            // ==================== 工具函数 ====================
+            const generateId = () => 'ID-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
+            const generateZoneCode = (panelCode, zoneNumber) => `${panelCode}-ZN${zoneNumber.toString().padStart(2, '0')}`;
+
+            function showToast(message, type = 'info', duration = 3000) {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                const icons = { success: 'fa-check-circle text-green-400', error: 'fa-times-circle text-red-400', warning: 'fa-exclamation-triangle text-yellow-400', info: 'fa-info-circle text-blue-400' };
+                toast.innerHTML = `<i class="fas ${icons[type]} text-lg"></i><span class="text-white">${message}</span>`;
+                container.appendChild(toast);
+                setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(100%)'; setTimeout(() => toast.remove(), 300); }, duration);
+            }
+
+            function showConfirm(title, message, onConfirm) {
+                const container = document.getElementById('confirm-container');
+                container.innerHTML = `<div class="confirm-dialog modal-enter"><h4 class="text-white font-bold text-lg mb-2">${title}</h4><p class="text-slate-300 mb-4">${message}</p><div class="flex justify-center gap-3"><button onclick="window.closeConfirm(false)" class="px-4 py-2 glass-card rounded-lg text-slate-300 hover:text-white">取消</button><button onclick="window.closeConfirm(true)" class="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30">确认</button></div></div>`;
+                container.classList.remove('hidden'); container.classList.add('flex');
+                window.confirmCallback = (result) => { container.classList.add('hidden'); container.classList.remove('flex'); if (result && onConfirm) onConfirm(); };
+            }
+            window.closeConfirm = (result) => { if (window.confirmCallback) window.confirmCallback(result); };
+
+            // ==================== 初始化样本数据 ====================
+            function initSampleData() {
+                const panel1 = { id: generateId(), name: '1楼报警主机', code: 'PNL-HONE-F01-001', brand: 'HONE', model: 'AH-16', busType: 'RS485', busAddress: 1, zoneCount: 16, ip: '192.168.1.100', status: 'online' };
+                const panel2 = { id: generateId(), name: 'B1停车场报警主机', code: 'PNL-BOS-B01-002', brand: 'BOS', model: 'AH-BUS', busType: 'RS485', busAddress: 2, zoneCount: 64, ip: '192.168.1.101', status: 'online' };
+                const panel3 = { id: generateId(), name: '2楼财务室主机', code: 'PNL-HIK-F02-003', brand: 'HIK', model: 'DS-19A08', busType: 'TCP/IP', busAddress: 3, zoneCount: 8, ip: '192.168.1.102', status: 'online' };
+                DataModel.panels.push(panel1, panel2, panel3);
+
+                const detectors = [
+                    { id: generateId(), name: '1楼大堂红外', type: 'IR', typeName: '红外探测器', brand: '霍尼韦尔', access: '无线', status: 'online', battery: 100, location: '大堂东北角' },
+                    { id: generateId(), name: 'B1门磁', type: 'MG', typeName: '门磁', brand: '博世', access: '开关量', status: 'online', battery: null, location: 'B1入口' },
+                    { id: generateId(), name: '财务室玻璃破碎', type: 'GB', typeName: '玻璃破碎探测器', brand: '海康威视', access: 'RS485', status: 'offline', battery: 15, location: '财务室窗户' },
+                    { id: generateId(), name: '2楼走廊烟感', type: 'SM', typeName: '烟感探测器', brand: '霍尼韦尔', access: '无线', status: 'online', battery: 30, location: '2楼走廊' },
+                    { id: generateId(), name: '周界电子围栏1', type: 'EZ', typeName: '电子围栏', brand: '博世', access: 'RS485', status: 'online', battery: null, location: '园区东侧围墙' },
+                    { id: generateId(), name: '总裁办红外', type: 'IR', typeName: '红外探测器', brand: '海康威视', access: '无线', status: 'online', battery: 85, location: '总裁办南侧' },
+                    { id: generateId(), name: 'IT机房烟感', type: 'SM', typeName: '烟感探测器', brand: '霍尼韦尔', access: '开关量', status: 'online', battery: null, location: 'IT机房吊顶' },
+                    { id: generateId(), name: '仓库门磁', type: 'MG', typeName: '门磁', brand: '博世', access: '无线', status: 'offline', battery: 5, location: 'B1仓库大门' },
+                    { id: generateId(), name: '会议室玻璃破碎', type: 'GB', typeName: '玻璃破碎探测器', brand: '海康威视', access: 'RS485', status: 'online', battery: 70, location: '1楼会议室落地窗' },
+                    { id: generateId(), name: '紧急按钮', type: 'IR', typeName: '红外探测器', brand: '霍尼韦尔', access: '开关量', status: 'online', battery: null, location: '前台' }
+                ];
+                DataModel.detectors = detectors;
+
+                const zones = [];
+                for (let i = 1; i <= 8; i++) {
+                    const zone = {
+                        id: generateId(),
+                        zoneNumber: i,
+                        name: `1楼-${i <= 4 ? '大堂' : '办公区'}防区${i}`,
+                        code: generateZoneCode(panel1.code, i),
+                        panelId: panel1.id,
+                        panelName: panel1.name,
+                        zoneType: i <= 4 ? 1 : (i <= 6 ? 2 : 3),
+                        busAddress: 1 + Math.floor((i-1)/8),
+                        moduleChannel: (i-1)%8 + 1,
+                        armed: i % 2 === 0,
+                        bypass: i === 3,
+                        status: i === 5 ? 'warning' : 'online',
+                        entryDelay: i <= 2 ? 30 : 0,
+                        exitDelay: i <= 2 ? 45 : 0,
+                        detectors: [],
+                        spaceCode: 'F01',
+                        subSpaceCode: i <= 4 ? 'LBY' : i <=6 ? 'OFA' : 'OFB'
+                    };
+                    if (i === 1) zone.detectors.push({ id: detectors[0].id, name: detectors[0].name, type: detectors[0].typeName });
+                    if (i === 2) zone.detectors.push({ id: detectors[1].id, name: detectors[1].name, type: detectors[1].typeName });
+                    if (i === 3) zone.detectors.push({ id: detectors[2].id, name: detectors[2].name, type: detectors[2].typeName });
+                    if (i === 4) zone.detectors.push({ id: detectors[3].id, name: detectors[3].name, type: detectors[3].typeName });
+                    if (i === 5) zone.detectors.push({ id: detectors[8].id, name: detectors[8].name, type: detectors[8].typeName });
+                    if (i === 6) zone.detectors.push({ id: detectors[0].id, name: detectors[0].name, type: detectors[0].typeName });
+                    if (i === 7) zone.detectors.push({ id: detectors[3].id, name: detectors[3].name, type: detectors[3].typeName });
+                    if (i === 8) zone.detectors.push({ id: detectors[8].id, name: detectors[8].name, type: detectors[8].typeName });
+                    zones.push(zone);
+                }
+
+                for (let i = 1; i <= 6; i++) {
+                    const zone = {
+                        id: generateId(),
+                        zoneNumber: i,
+                        name: `B1-${i <= 3 ? '停车场' : '仓库'}防区${i}`,
+                        code: generateZoneCode(panel2.code, i),
+                        panelId: panel2.id,
+                        panelName: panel2.name,
+                        zoneType: i <= 2 ? 4 : (i <= 4 ? 3 : 1),
+                        busAddress: 2 + Math.floor((i-1)/8),
+                        moduleChannel: (i-1)%8 + 1,
+                        armed: i % 3 !== 0,
+                        bypass: i === 4,
+                        status: i === 2 ? 'offline' : 'online',
+                        entryDelay: 0,
+                        exitDelay: 0,
+                        detectors: [],
+                        spaceCode: 'B01',
+                        subSpaceCode: i <= 3 ? 'PK' : 'WH'
+                    };
+                    if (i === 1) zone.detectors.push({ id: detectors[1].id, name: detectors[1].name, type: detectors[1].typeName });
+                    if (i === 2) zone.detectors.push({ id: detectors[7].id, name: detectors[7].name, type: detectors[7].typeName });
+                    if (i === 3) zone.detectors.push({ id: detectors[4].id, name: detectors[4].name, type: detectors[4].typeName });
+                    if (i === 4) zone.detectors.push({ id: detectors[7].id, name: detectors[7].name, type: detectors[7].typeName });
+                    if (i === 5) zone.detectors.push({ id: detectors[9].id, name: detectors[9].name, type: detectors[9].typeName });
+                    if (i === 6) zone.detectors.push({ id: detectors[4].id, name: detectors[4].name, type: detectors[4].typeName });
+                    zones.push(zone);
+                }
+
+                for (let i = 1; i <= 4; i++) {
+                    const zone = {
+                        id: generateId(),
+                        zoneNumber: i,
+                        name: `2楼-${i === 1 ? '财务室' : i===2 ? 'IT机房' : i===3 ? '总裁办' : '走廊'}防区${i}`,
+                        code: generateZoneCode(panel3.code, i),
+                        panelId: panel3.id,
+                        panelName: panel3.name,
+                        zoneType: 3,
+                        busAddress: 3,
+                        moduleChannel: i,
+                        armed: true,
+                        bypass: false,
+                        status: 'online',
+                        entryDelay: 0,
+                        exitDelay: 0,
+                        detectors: [],
+                        spaceCode: 'F02',
+                        subSpaceCode: i === 1 ? 'FIN' : i===2 ? 'IT' : i===3 ? 'CEO' : 'OFA'
+                    };
+                    if (i === 1) zone.detectors.push({ id: detectors[2].id, name: detectors[2].name, type: detectors[2].typeName });
+                    if (i === 2) zone.detectors.push({ id: detectors[6].id, name: detectors[6].name, type: detectors[6].typeName });
+                    if (i === 3) zone.detectors.push({ id: detectors[5].id, name: detectors[5].name, type: detectors[5].typeName });
+                    if (i === 4) zone.detectors.push({ id: detectors[3].id, name: detectors[3].name, type: detectors[3].typeName });
+                    zones.push(zone);
+                }
+
+                DataModel.zones = zones;
+                State.filteredZones = [...DataModel.zones];
+            }
+
+            // ==================== 空间树渲染 ====================
+            function renderSpaceTree(containerId, selectedSpaceId) {
+                const container = document.getElementById(containerId);
+                if (!container) return;
+
+                let html = '';
+                SPACES.forEach(floor => {
+                    const isSelected = selectedSpaceId === floor.id || (selectedSpaceId && selectedSpaceId.startsWith(floor.id));
+                    html += `<div class="space-item ${isSelected ? 'selected' : ''}" onclick="selectSpace('${floor.id}', '${floor.code}', '')">${floor.name}</div>`;
+                    if (floor.children && floor.children.length > 0) {
+                        html += '<div class="pl-4">';
+                        floor.children.forEach(room => {
+                            const isRoomSelected = selectedSpaceId === room.id;
+                            html += `<div class="space-item ${isRoomSelected ? 'selected' : ''}" onclick="selectSpace('${room.id}', '${floor.code}', '${room.code}')">${room.name}</div>`;
+                        });
+                        html += '</div>';
+                    }
+                });
+                container.innerHTML = html;
+            }
+
+            window.selectSpace = function(spaceId, areaCode, subCode) {
+                document.getElementById('zone-area').value = areaCode;
+                document.getElementById('zone-subarea').value = subCode;
+
+                const allItems = document.querySelectorAll('.space-item');
+                allItems.forEach(item => item.classList.remove('selected'));
+                const selectedItem = document.querySelector(`.space-item[onclick*="${spaceId}"]`);
+                if (selectedItem) selectedItem.classList.add('selected');
+            };
+
+            // ==================== 防区列表渲染 ====================
+            function renderZoneList() {
+                document.getElementById('zone-total').innerText = DataModel.zones.length;
+                document.getElementById('zone-armed').innerText = DataModel.zones.filter(z => z.armed).length;
+                document.getElementById('zone-disarmed').innerText = DataModel.zones.filter(z => !z.armed).length;
+                document.getElementById('zone-bypassed').innerText = DataModel.zones.filter(z => z.bypass).length;
+
+                const filterPanel = document.getElementById('filter-panel');
+                if (filterPanel) {
+                    filterPanel.innerHTML = '<option value="">全部主机</option>' + DataModel.panels.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+                }
+
+                const filterZoneType = document.getElementById('filter-zone-type');
+                if (filterZoneType) {
+                    filterZoneType.innerHTML = '<option value="">全部类型</option>' + Object.entries(ZONE_TYPES).map(([id, type]) => `<option value="${id}">${type.name}</option>`).join('');
+                }
+
+                const search = document.getElementById('zone-search')?.value.toLowerCase() || '';
+                const panelId = document.getElementById('filter-panel')?.value || '';
+                const zoneType = document.getElementById('filter-zone-type')?.value || '';
+                State.filteredZones = DataModel.zones.filter(z =>
+                    (!search || z.name.toLowerCase().includes(search) || z.code.toLowerCase().includes(search)) &&
+                    (!panelId || z.panelId === panelId) &&
+                    (!zoneType || z.zoneType == zoneType)
+                );
+
+                const total = State.filteredZones.length, page = State.zonePage, size = State.zonePageSize;
+                const start = (page-1)*size, end = Math.min(start+size, total);
+                document.getElementById('zone-page-start').innerText = total ? start+1 : 0;
+                document.getElementById('zone-page-end').innerText = end;
+                document.getElementById('zone-page-total').innerText = total;
+                document.getElementById('zone-page-current').innerText = page;
+                document.getElementById('zone-prev-page').disabled = page === 1;
+                document.getElementById('zone-next-page').disabled = end >= total;
+
+                const pageData = State.filteredZones.slice(start, end);
+                let html = '';
+                pageData.forEach(zone => {
+                    const zoneTypeObj = ZONE_TYPES[zone.zoneType] || { name: '未知', badge:'', icon:'', canBypass: true };
+                    const spaceDisplay = zone.spaceCode ? `${zone.spaceCode}${zone.subSpaceCode ? '-'+zone.subSpaceCode : ''}` : '未指派';
+                    const canBypass = zoneTypeObj.canBypass;
+
+                    let detectorsHtml = '';
+                    if (zone.detectors && zone.detectors.length > 0) {
+                        detectorsHtml = zone.detectors.map(d =>
+                            `<span class="detector-tag" title="${d.type}"><i class="fas fa-satellite-dish"></i>${d.name}</span>`
+                        ).join(' ');
+                    } else {
+                        detectorsHtml = '<span class="text-xs text-slate-500">未关联</span>';
+                    }
+
+                    // 旁路按钮 - 根据防区类型和当前状态显示不同按钮
+                    let bypassButton = '';
+                    if (canBypass) {
+                        if (zone.bypass) {
+                            // 已旁路 - 显示取消旁路按钮
+                            bypassButton = `<button onclick="toggleBypassZone('${zone.id}')" class="text-purple-400 hover:text-purple-300 mr-2" title="取消旁路"><i class="fas fa-check-circle"></i></button>`;
+                        } else {
+                            // 未旁路 - 显示旁路按钮
+                            bypassButton = `<button onclick="toggleBypassZone('${zone.id}')" class="text-slate-500 hover:text-purple-400 mr-2" title="旁路"><i class="fas fa-ban"></i></button>`;
+                        }
+                    } else {
+                        // 不能旁路的防区 - 显示禁用图标
+                        bypassButton = `<span class="text-slate-600 mr-2" title="${zoneTypeObj.name}不允许旁路"><i class="fas fa-ban"></i></span>`;
+                    }
+
+                    html += `<tr>
+                        <td><input type="checkbox" class="zone-checkbox" value="${zone.id}" ${State.selectedZones.includes(zone.id)?'checked':''} onchange="toggleZoneSelect('${zone.id}')"></td>
+                        <td><div><div class="font-medium text-white">${zone.name}</div><div class="text-xs text-slate-400">${zone.code}</div></div></td>
+                        <td>${zone.panelName || '-'}</td>
+                        <td><span class="zone-badge ${zoneTypeObj.badge}"><i class="fas ${zoneTypeObj.icon} mr-1"></i>${zoneTypeObj.name}</span></td>
+                        <td>${zone.busAddress || '-'}</td><td>CH${zone.moduleChannel || '1'}</td>
+                        <td><span class="status-dot status-${zone.status}"></span> ${zone.status==='online'?'正常':zone.status==='warning'?'预警':'离线'}</td>
+                        <td><span class="${zone.armed?'text-green-400':'text-red-400'}">${zone.armed?'布防':'撤防'}</span></td>
+                        <td><span class="${zone.bypass?'text-purple-400':'text-slate-400'}">${zone.bypass?'旁路':'正常'}</span></td>
+                        <td><div class="flex flex-wrap gap-1">${detectorsHtml}</div></td>
+                        <td>${spaceDisplay}</td>
+                        <td>
+                            <button onclick="editZone('${zone.id}')" class="text-blue-400 hover:text-blue-300 mr-2"><i class="fas fa-edit"></i></button>
+                            ${bypassButton}
+                            <button onclick="toggleArmZone('${zone.id}')" class="${zone.armed?'text-red-400 hover:text-red-300':'text-green-400 hover:text-green-300'} mr-2"><i class="fas fa-${zone.armed?'unlock':'lock'}"></i></button>
+                            <button onclick="deleteZone('${zone.id}')" class="text-red-400 hover:text-red-300"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>`;
+                });
+                document.getElementById('zone-table-body').innerHTML = html || '<tr><td colspan="12" class="text-center py-8">暂无防区</td></tr>';
+                updateBatchBar();
+            }
+
+            // ==================== 防区选择相关 ====================
+            window.toggleZoneSelect = function(zoneId) {
+                const index = State.selectedZones.indexOf(zoneId);
+                if (index > -1) {
+                    State.selectedZones.splice(index, 1);
+                } else {
+                    State.selectedZones.push(zoneId);
+                }
+                updateBatchBar();
+            };
+
+            window.toggleSelectAllZones = function() {
+                const isChecked = document.getElementById('select-all-zones').checked;
+                if (isChecked) {
+                    State.selectedZones = State.filteredZones.map(z => z.id);
+                } else {
+                    State.selectedZones = [];
+                }
+                renderZoneList();
+            };
+
+            window.clearZoneSelection = function() {
+                State.selectedZones = [];
+                renderZoneList();
+            };
+
+            function updateBatchBar() {
+                const batchBar = document.getElementById('batch-bar');
+                const countElement = document.getElementById('batch-selected-count');
+                countElement.innerText = State.selectedZones.length;
+
+                if (State.selectedZones.length > 0) {
+                    batchBar.classList.add('show');
+                } else {
+                    batchBar.classList.remove('show');
+                }
+            }
+
+            // ==================== 分页 ====================
+            window.changeZonePage = function(direction) {
+                const newPage = State.zonePage + direction;
+                if (newPage < 1) return;
+                const totalPages = Math.ceil(State.filteredZones.length / State.zonePageSize);
+                if (newPage > totalPages) return;
+                State.zonePage = newPage;
+                renderZoneList();
+            };
+
+            // ==================== 筛选 ====================
+            window.filterZones = function() {
+                State.zonePage = 1;
+                renderZoneList();
+            };
+
+            // ==================== 防区操作 ====================
+
+            // 单个防区 - 旁路/取消旁路
+            window.toggleBypassZone = function(zoneId) {
+                const zone = DataModel.zones.find(z => z.id === zoneId);
+                if (!zone) return;
+
+                const zoneTypeObj = ZONE_TYPES[zone.zoneType] || { canBypass: true, name: '未知防区' };
+
+                // 检查是否可以旁路
+                if (!zoneTypeObj.canBypass) {
+                    showToast(`${zoneTypeObj.name}不允许旁路`, 'warning');
+                    return;
+                }
+
+                if (zone.bypass) {
+                    // 取消旁路
+                    showConfirm('取消旁路', `确定要取消防区【${zone.name}】的旁路状态吗？`, () => {
+                        zone.bypass = false;
+                        showToast(`防区 ${zone.name} 已取消旁路`, 'success');
+                        renderZoneList();
+                    });
+                } else {
+                    // 旁路
+                    showConfirm('旁路防区', `确定要将防区【${zone.name}】设置为旁路状态吗？旁路后该防区将不再触发报警。`, () => {
+                        zone.bypass = true;
+                        showToast(`防区 ${zone.name} 已设置为旁路`, 'success');
+                        renderZoneList();
+                    });
+                }
+            };
+
+            window.toggleArmZone = function(zoneId) {
+                const zone = DataModel.zones.find(z => z.id === zoneId);
+                if (zone) {
+                    zone.armed = !zone.armed;
+                    showToast(`防区 ${zone.name} 已${zone.armed ? '布防' : '撤防'}`, 'success');
+                    renderZoneList();
+                }
+            };
+
+            window.batchArmZones = function() {
+                const count = State.selectedZones.length > 0 ? State.selectedZones.length : State.filteredZones.length;
+                const action = State.selectedZones.length > 0 ? 'arm' : 'arm-all';
+                showConfirm('批量布防', `将对 ${count} 个防区执行布防操作，是否继续？`, () => {
+                    if (action === 'arm-all') {
+                        State.selectedZones = [...State.filteredZones.map(z => z.id)];
+                    }
+                    batchZoneAction('arm');
+                });
+            };
+
+            window.batchDisarmZones = function() {
+                const count = State.selectedZones.length > 0 ? State.selectedZones.length : State.filteredZones.length;
+                const action = State.selectedZones.length > 0 ? 'disarm' : 'disarm-all';
+                showConfirm('批量撤防', `将对 ${count} 个防区执行撤防操作，是否继续？`, () => {
+                    if (action === 'disarm-all') {
+                        State.selectedZones = [...State.filteredZones.map(z => z.id)];
+                    }
+                    batchZoneAction('disarm');
+                });
+            };
+
+            window.batchZoneAction = function(action) {
+                if (State.selectedZones.length === 0) return showToast('请先选择防区', 'warning');
+
+                if (action === 'delete') {
+                    showConfirm('批量删除', `确定删除 ${State.selectedZones.length} 个防区？`, () => {
+                        State.selectedZones.forEach(id => {
+                            DataModel.zones = DataModel.zones.filter(z => z.id !== id);
+                        });
+                        State.filteredZones = State.filteredZones.filter(z => !State.selectedZones.includes(z.id));
+                        State.selectedZones = [];
+                        showToast('批量删除成功', 'success');
+                        renderZoneList();
+                    });
+                } else if (action === 'bypass') {
+                    // 批量旁路 - 检查是否有不允许旁路的防区
+                    const notBypassableZones = State.selectedZones
+                        .map(id => DataModel.zones.find(z => z.id === id))
+                        .filter(z => z && !ZONE_TYPES[z.zoneType]?.canBypass);
+
+                    if (notBypassableZones.length > 0) {
+                        const names = notBypassableZones.map(z => z.name).join('、');
+                        showToast(`${notBypassableZones.length}个防区不允许旁路：${names}`, 'warning');
+                        return;
+                    }
+
+                    showConfirm('批量旁路', `将对 ${State.selectedZones.length} 个防区设置为旁路状态，是否继续？`, () => {
+                        let successCount = 0;
+                        State.selectedZones.forEach(id => {
+                            const z = DataModel.zones.find(z=>z.id===id);
+                            if (z && ZONE_TYPES[z.zoneType]?.canBypass) {
+                                z.bypass = true;
+                                successCount++;
+                            }
+                        });
+                        showToast(`批量旁路成功：${successCount}个防区`, 'success');
+                        renderZoneList();
+                    });
+                } else if (action === 'unbypass') {
+                    // 批量取消旁路
+                    showConfirm('取消旁路', `将对 ${State.selectedZones.length} 个防区取消旁路状态，是否继续？`, () => {
+                        State.selectedZones.forEach(id => {
+                            const z = DataModel.zones.find(z=>z.id===id);
+                            if (z) z.bypass = false;
+                        });
+                        showToast(`批量取消旁路成功：${State.selectedZones.length}个防区`, 'success');
+                        renderZoneList();
+                    });
+                } else {
+                    let actionText = action==='arm'?'布防':'撤防';
+                    State.selectedZones.forEach(id => {
+                        const z = DataModel.zones.find(z=>z.id===id);
+                        if (!z) return;
+                        if (action === 'arm') z.armed = true;
+                        else if (action === 'disarm') z.armed = false;
+                    });
+                    showToast(`批量${actionText}操作成功`, 'success');
+                    renderZoneList();
+                }
+            };
+
+            window.deleteZone = function(zoneId) {
+                const zone = DataModel.zones.find(z => z.id === zoneId);
+                if (!zone) return;
+
+                const hasDetectors = zone.detectors && zone.detectors.length > 0;
+                let message = hasDetectors
+                    ? `防区【${zone.name}】关联了 ${zone.detectors.length} 个探测器，删除后将一并解除关联。确定要删除吗？`
+                    : `确定要删除防区【${zone.name}】吗？`;
+
+                showConfirm('确认删除', message, () => {
+                    DataModel.zones = DataModel.zones.filter(z => z.id !== zoneId);
+                    State.filteredZones = State.filteredZones.filter(z => z.id !== zoneId);
+                    State.selectedZones = State.selectedZones.filter(id => id !== zoneId);
+                    showToast(`防区 ${zone.name} 已删除`, 'success');
+                    renderZoneList();
+                });
+            };
+
+            window.exportZones = function() {
+                showToast('防区数据导出功能开发中', 'info');
+            };
+
+            // ==================== 防区辅助函数 ====================
+            window.openZoneWizard = function() {
+                State.currentEditZone = null;
+                document.getElementById('zone-form-title').innerText = '新建防区';
+                document.getElementById('zone-form').reset();
+
+                const panelSelect = document.getElementById('zone-panel');
+                panelSelect.innerHTML = '<option value="">请选择</option>' + DataModel.panels.map(p =>
+                    `<option value="${p.id}">${p.name} (${p.code})</option>`
+                ).join('');
+
+                const zoneTypeSelect = document.getElementById('zone-type');
+                zoneTypeSelect.innerHTML = Object.entries(ZONE_TYPES).map(([id, type]) =>
+                    `<option value="${id}">${type.name}</option>`
+                ).join('');
+
+                onZoneTypeChange();
+
+                document.getElementById('zone-detectors').innerHTML = '';
+                document.getElementById('zone-code-preview').innerText = '请先选择报警主机';
+
+                renderSpaceTree('zone-space-tree', null);
+                document.getElementById('zone-area').value = '';
+                document.getElementById('zone-subarea').value = '';
+
+                openModal('modal-zone-form');
+            };
+
+            // 防区类型变更时更新延时字段和说明
+            window.onZoneTypeChange = function() {
+                const zoneTypeId = parseInt(document.getElementById('zone-type').value);
+                const config = ZONE_TYPES[zoneTypeId];
+
+                if (!config) return;
+
+                const entryDelayField = document.getElementById('zone-entry-delay-field');
+                const exitDelayField = document.getElementById('zone-exit-delay-field');
+
+                if (config.hasEntryDelay) {
+                    entryDelayField.style.display = 'block';
+                    document.getElementById('zone-entry-delay').value = config.defaultEntryDelay;
+                } else {
+                    entryDelayField.style.display = 'none';
+                    document.getElementById('zone-entry-delay').value = 0;
+                }
+
+                if (config.hasExitDelay) {
+                    exitDelayField.style.display = 'block';
+                    document.getElementById('zone-exit-delay').value = config.defaultExitDelay;
+                } else {
+                    exitDelayField.style.display = 'none';
+                    document.getElementById('zone-exit-delay').value = 0;
+                }
+
+                document.getElementById('zone-type-description').textContent = config.description;
+            };
+
+            window.onZonePanelChange = function() {
+                const panelId = document.getElementById('zone-panel').value;
+                const panel = DataModel.panels.find(p => p.id === panelId);
+                if (!panel) return;
+
+                const panelZones = DataModel.zones.filter(z => z.panelId === panelId);
+                const maxZone = panelZones.length > 0 ? Math.max(...panelZones.map(z => z.zoneNumber)) : 0;
+                const nextZoneNumber = maxZone + 1;
+
+                document.getElementById('zone-number').value = nextZoneNumber;
+                document.getElementById('zone-bus-address').value = panel.busAddress + Math.floor((nextZoneNumber - 1) / 8);
+                document.getElementById('zone-module-channel').value = ((nextZoneNumber - 1) % 8) + 1;
+
+                updateZoneCode();
+            };
+
+            window.updateZoneCode = function() {
+                const panelId = document.getElementById('zone-panel').value;
+                const zoneNumber = document.getElementById('zone-number').value;
+                const panel = DataModel.panels.find(p => p.id === panelId);
+
+                if (panel && zoneNumber && zoneNumber > 0) {
+                    document.getElementById('zone-code-preview').innerText = generateZoneCode(panel.code, parseInt(zoneNumber));
+                } else {
+                    document.getElementById('zone-code-preview').innerText = '请先选择报警主机并填写防区号';
+                }
+            };
+
+            window.addDetectorRow = function() {
+                const container = document.getElementById('zone-detectors');
+                const row = document.createElement('div');
+                row.className = 'flex items-center gap-2';
+
+                let detectorOptions = '<option value="">选择探测器</option>';
+                DataModel.detectors.forEach(d => {
+                    detectorOptions += `<option value="${d.id}">${d.name} (${d.typeName})</option>`;
+                });
+
+                row.innerHTML = `
+                    <select class="detector-select form-input text-sm flex-1">
+                        ${detectorOptions}
+                    </select>
+                    <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-300 px-2"><i class="fas fa-times"></i></button>
+                `;
+                container.appendChild(row);
+            };
+
+            window.saveZone = function() {
+                const panelId = document.getElementById('zone-panel').value;
+                const zoneNumber = parseInt(document.getElementById('zone-number').value);
+                const zoneName = document.getElementById('zone-name').value.trim();
+                const zoneType = parseInt(document.getElementById('zone-type').value);
+                const busAddress = parseInt(document.getElementById('zone-bus-address').value) || 1;
+                const moduleChannel = parseInt(document.getElementById('zone-module-channel').value) || 1;
+                const entryDelay = parseInt(document.getElementById('zone-entry-delay').value) || 0;
+                const exitDelay = parseInt(document.getElementById('zone-exit-delay').value) || 0;
+                const areaCode = document.getElementById('zone-area').value;
+                const subCode = document.getElementById('zone-subarea').value;
+
+                if (!panelId) {
+                    showToast('请选择所属报警主机', 'error');
+                    return;
+                }
+                if (!zoneNumber || zoneNumber < 1 || zoneNumber > 256) {
+                    showToast('请填写有效的防区号(1-256)', 'error');
+                    return;
+                }
+                if (!zoneName) {
+                    showToast('请输入防区名称', 'error');
+                    return;
+                }
+
+                const panel = DataModel.panels.find(p => p.id === panelId);
+                if (!panel) {
+                    showToast('所选报警主机不存在', 'error');
+                    return;
+                }
+
+                // 新建时检查防区号重复
+                if (!State.currentEditZone && DataModel.zones.some(z => z.panelId === panelId && z.zoneNumber === zoneNumber)) {
+                    showToast(`该主机下防区号 ${zoneNumber} 已存在`, 'error');
+                    return;
+                }
+
+                // 编辑时检查防区号重复（排除自身）
+                if (State.currentEditZone && DataModel.zones.some(z => z.panelId === panelId && z.zoneNumber === zoneNumber && z.id !== State.currentEditZone.id)) {
+                    showToast(`该主机下防区号 ${zoneNumber} 已存在`, 'error');
+                    return;
+                }
+
+                // 收集关联探测器
+                const detectors = [];
+                document.querySelectorAll('#zone-detectors .flex').forEach(row => {
+                    const select = row.querySelector('.detector-select');
+
+                    if (select && select.value) {
+                        const detector = DataModel.detectors.find(d => d.id === select.value);
+                        if (detector) {
+                            detectors.push({
+                                id: detector.id,
+                                name: detector.name,
+                                type: detector.typeName
+                            });
+                        }
+                    }
+                });
+
+                const zoneData = {
+                    id: State.currentEditZone ? State.currentEditZone.id : generateId(),
+                    zoneNumber,
+                    name: zoneName,
+                    code: generateZoneCode(panel.code, zoneNumber),
+                    panelId,
+                    panelName: panel.name,
+                    zoneType,
+                    busAddress,
+                    moduleChannel,
+                    armed: true,
+                    bypass: false,
+                    status: 'online',
+                    entryDelay,
+                    exitDelay,
+                    detectors: detectors,
+                    spaceCode: areaCode,
+                    subSpaceCode: subCode
+                };
+
+                if (State.currentEditZone) {
+                    zoneData.armed = State.currentEditZone.armed;
+                    zoneData.bypass = State.currentEditZone.bypass;
+
+                    const index = DataModel.zones.findIndex(z => z.id === State.currentEditZone.id);
+                    if (index !== -1) {
+                        DataModel.zones[index] = zoneData;
+                        showToast('防区更新成功', 'success');
+                    }
+                } else {
+                    DataModel.zones.push(zoneData);
+                    showToast('防区添加成功', 'success');
+                }
+
+                State.filteredZones = [...DataModel.zones];
+                closeModal('modal-zone-form');
+                renderZoneList();
+            };
+
+            window.editZone = function(zoneId) {
+                const zone = DataModel.zones.find(z => z.id === zoneId);
+                if (!zone) return;
+
+                State.currentEditZone = zone;
+                document.getElementById('zone-form-title').innerText = '编辑防区';
+
+                const panelSelect = document.getElementById('zone-panel');
+                panelSelect.innerHTML = '<option value="">请选择</option>' + DataModel.panels.map(p =>
+                    `<option value="${p.id}" ${p.id === zone.panelId ? 'selected' : ''}>${p.name} (${p.code})</option>`
+                ).join('');
+
+                const zoneTypeSelect = document.getElementById('zone-type');
+                zoneTypeSelect.innerHTML = Object.entries(ZONE_TYPES).map(([id, type]) =>
+                    `<option value="${id}" ${parseInt(id) === zone.zoneType ? 'selected' : ''}>${type.name}</option>`
+                ).join('');
+
+                document.getElementById('zone-number').value = zone.zoneNumber;
+                document.getElementById('zone-name').value = zone.name;
+                document.getElementById('zone-bus-address').value = zone.busAddress || 1;
+                document.getElementById('zone-module-channel').value = zone.moduleChannel || 1;
+
+                onZoneTypeChange();
+
+                document.getElementById('zone-entry-delay').value = zone.entryDelay || 0;
+                document.getElementById('zone-exit-delay').value = zone.exitDelay || 0;
+
+                document.getElementById('zone-area').value = zone.spaceCode || '';
+                document.getElementById('zone-subarea').value = zone.subSpaceCode || '';
+
+                const spaceId = zone.subSpaceCode ? `${zone.spaceCode}-${zone.subSpaceCode}` : zone.spaceCode;
+                renderSpaceTree('zone-space-tree', spaceId);
+
+                const detectorContainer = document.getElementById('zone-detectors');
+                detectorContainer.innerHTML = '';
+
+                if (zone.detectors && zone.detectors.length > 0) {
+                    zone.detectors.forEach(d => {
+                        const row = document.createElement('div');
+                        row.className = 'flex items-center gap-2';
+
+                        let detectorOptions = `<option value="${d.id}" selected>${d.name} (${d.type})</option>`;
+                        DataModel.detectors.forEach(det => {
+                            if (det.id !== d.id) {
+                                detectorOptions += `<option value="${det.id}">${det.name} (${det.typeName})</option>`;
+                            }
+                        });
+
+                        row.innerHTML = `
+                            <select class="detector-select form-input text-sm flex-1">
+                                ${detectorOptions}
+                            </select>
+                            <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-300 px-2"><i class="fas fa-times"></i></button>
+                        `;
+                        detectorContainer.appendChild(row);
+                    });
+                }
+
+                updateZoneCode();
+                openModal('modal-zone-form');
+            };
+
+            // ==================== 模态框控制 ====================
+            window.openModal = function(modalId) {
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                    document.body.style.overflow = 'hidden';
+                }
+            };
+
+            window.closeModal = function(modalId) {
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                    document.body.style.overflow = '';
+                }
+            };
+
+            // ==================== 初始化 ====================
+            function init() {
+                initSampleData();
+                renderZoneList();
+
+                document.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('modal-backdrop')) {
+                        const modal = e.target;
+                        if (modal.id === 'modal-zone-form') closeModal('modal-zone-form');
+                        if (modal.id === 'confirm-container') closeConfirm(false);
+                    }
+                });
+            }
+
+            document.addEventListener('DOMContentLoaded', init);
+        })();
+    </script>
+</body>
+</html>

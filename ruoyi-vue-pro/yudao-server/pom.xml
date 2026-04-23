@@ -31,6 +31,10 @@
             <version>${revision}</version>
         </dependency>
         <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.taosdata.jdbc</groupId>
             <artifactId>taos-jdbcdriver</artifactId>
         </dependency>
@@ -87,7 +91,13 @@
                     <executable>java</executable>
                     <!-- 启用长 classpath 支持，解决 Windows CreateProcess error=206 错误 -->
                     <longClasspath>true</longClasspath>
-                    <mainClass>cn.iocoder.yudao.server.YudaoServerApplication</mainClass>
+                    <!-- 让 exec:exec 也使用 Maven 解析出的 runtime classpath，避免运行期缺类 -->
+                    <classpathScope>runtime</classpathScope>
+                    <arguments>
+                        <argument>-classpath</argument>
+                        <classpath/>
+                        <argument>cn.iocoder.yudao.server.YudaoServerApplication</argument>
+                    </arguments>
                 </configuration>
             </plugin>
         </plugins>

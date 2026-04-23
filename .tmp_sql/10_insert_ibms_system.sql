@@ -1,0 +1,16 @@
+INSERT INTO system_dict_data(sort,label,value,dict_type,status,remark,creator,updater) VALUES
+(1,'视频监控','VI','ibms_system',0,'{"group": "SA", "en": "Video Surveillance", "desc": "摄像机/NVR/DVR"}','excel_v22','excel_v22'),
+(2,'门禁系统','AC','ibms_system',0,'{"group": "ST", "en": "Access Control", "desc": "门禁控制器/读卡器"}','excel_v22','excel_v22'),
+(3,'入侵报警','AL','ibms_system',0,'{"group": "SA", "en": "Alarm System", "desc": "报警主机/探测器"}','excel_v22','excel_v22'),
+(4,'访客系统','VM','ibms_system',0,'{"group": "ST", "en": "Visitor Management", "desc": "访客主机"}','excel_v22','excel_v22'),
+(5,'楼宇自控','BA','ibms_system',0,'{"group": "SB", "en": "Building Automation", "desc": "DDC/传感器/执行器"}','excel_v22','excel_v22'),
+(6,'火灾报警','FD','ibms_system',0,'{"group": "SF", "en": "Fire Detection", "desc": "火灾报警主机/探测器"}','excel_v22','excel_v22'),
+(7,'智能照明','LI','ibms_system',0,'{"group": "SB", "en": "Lighting Control", "desc": "照明控制箱/灯具"}','excel_v22','excel_v22'),
+(8,'环境监测','EM','ibms_system',0,'{"group": "SB", "en": "Environmental Monitoring", "desc": "传感器"}','excel_v22','excel_v22'),
+(9,'变配电','EP','ibms_system',0,'{"group": "SE", "en": "Power Distribution", "desc": "电力仪表/断路器"}','excel_v22','excel_v22'),
+(10,'智能对讲','IC','ibms_system',0,'{"group": "ST", "en": "Intercom System", "desc": "门口机/管理机"}','excel_v22','excel_v22'),
+(11,'电梯控制','EL','ibms_system',0,'{"group": "SB", "en": "Elevator Control", "desc": "电梯主控器"}','excel_v22','excel_v22'),
+(12,'能源管理','EN','ibms_system',0,'{"group": "SE", "en": "Energy Management", "desc": "电能表/能耗监测"}','excel_v22','excel_v22'),
+(13,'公共广播','PA','ibms_system',0,'{"group": "SF", "en": "Public Address", "desc": "功放/喇叭"}','excel_v22','excel_v22'),
+(14,'停车场','CA','ibms_system',0,'{"group": "ST", "en": "Car Park", "desc": "道闸/摄像机/检测器"}','excel_v22','excel_v22'),
+(15,'巡更系统','GR','ibms_system',0,'{"group": "SA", "en": "Guard Tour", "desc": "巡更棒/巡更点"}','excel_v22','excel_v22');

@@ -8,10 +8,10 @@ import cn.iocoder.yudao.module.iot.controller.admin.video.vo.CameraSnapshotPageR
 import cn.iocoder.yudao.module.iot.controller.admin.video.vo.CameraSnapshotRespVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.camera.IotCameraSnapshotDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.camera.IotCameraSnapshotMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -47,7 +48,7 @@ public class CameraSnapshotServiceImpl implements CameraSnapshotService {
     private IotCameraSnapshotMapper cameraSnapshotMapper;
 
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @Resource
     private IotDeviceChannelService channelService;
@@ -271,16 +272,15 @@ public class CameraSnapshotServiceImpl implements CameraSnapshotService {
             return List.of();
         }
 
-        // 查询所有涉及的设备ID
         List<Long> deviceIds = list.stream()
-                .map(IotCameraSnapshotDO::getChannelId)
+                .map(IotCameraSnapshotDO::getDeviceId)
+                .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
-        
-        // 批量查询设备信息
-        Map<Long, IotDeviceDO> deviceMap = new HashMap<>();
+
+        Map<Long, IbmsDeviceDO> deviceMap = new HashMap<>();
         for (Long deviceId : deviceIds) {
-            IotDeviceDO device = deviceService.getDevice(deviceId);
+            IbmsDeviceDO device = ibmsDeviceMapper.selectById(deviceId);
             if (device != null) {
                 deviceMap.put(deviceId, device);
             }
@@ -290,10 +290,11 @@ public class CameraSnapshotServiceImpl implements CameraSnapshotService {
             CameraSnapshotRespVO vo = new CameraSnapshotRespVO();
             BeanUtils.copyProperties(snapshot, vo);
 
-            // 填充设备名称
-            IotDeviceDO device = deviceMap.get(snapshot.getChannelId());
-            if (device != null && StrUtil.isBlank(vo.getChannelName())) {
-                // 通道名称需要从通道表查询
+            if (StrUtil.isBlank(vo.getChannelName()) && snapshot.getDeviceId() != null) {
+                IbmsDeviceDO device = deviceMap.get(snapshot.getDeviceId());
+                if (device != null) {
+                    vo.setChannelName(StrUtil.blankToDefault(device.getName(), device.getNickname()));
+                }
             }
 
             return vo;

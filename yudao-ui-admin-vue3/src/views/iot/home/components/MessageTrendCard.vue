@@ -46,11 +46,7 @@
 </template>
 
 <script lang="ts" setup>
-import * as echarts from 'echarts/core'
-import { LineChart } from 'echarts/charts'
-import { CanvasRenderer } from 'echarts/renderers'
-import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
-import { UniversalTransition } from 'echarts/features'
+import echarts from '@/plugins/echarts'
 import {
   StatisticsApi,
   IotStatisticsDeviceMessageSummaryByDateRespVO,
@@ -113,14 +109,6 @@ const initChart = () => {
   }
 
   // 配置图表
-  echarts.use([
-    LineChart,
-    CanvasRenderer,
-    GridComponent,
-    LegendComponent,
-    TooltipComponent,
-    UniversalTransition
-  ])
   try {
     const chart = echarts.init(messageChartRef.value)
     chart.setOption({

@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>品牌与展示 - 交互触控端</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 50%, #0f1419 100%);
+            color: #e2e8f0;
+            overflow: hidden;
+            height: 100vh;
+            touch-action: none;
+        }
+        .tech-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+        .container {
+            position: relative;
+            z-index: 10;
+            height: 100vh;
+            display: grid;
+            grid-template-rows: 90px 1fr 100px;
+            padding: 24px;
+            gap: 20px;
+        }
+        .header {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 40px;
+            padding: 0 32px;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 16px;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .brand-logo {
+            width: 56px; height: 56px;
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            font-weight: bold;
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
+        }
+        .brand h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa, #22d3ee);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .scene-tabs {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .scene-tab {
+            padding: 12px 28px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: #94a3b8;
+        }
+        .scene-tab:hover, .scene-tab.active {
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            color: white;
+            border-color: transparent;
+            transform: scale(1.05);
+        }
+        .header-actions {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+        .lang-switch {
+            display: flex;
+            background: rgba(30, 41, 59, 0.6);
+            border-radius: 25px;
+            padding: 4px;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+        .lang-btn {
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+            background: transparent;
+            color: #64748b;
+        }
+        .lang-btn.active {
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            color: white;
+        }
+        .help-btn {
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            background: rgba(30, 41, 59, 0.6);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            color: #e2e8f0;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .help-btn:hover {
+            background: rgba(59, 130, 246, 0.3);
+        }
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 420px;
+            gap: 24px;
+            min-height: 0;
+        }
+        .scene-container {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .scene-toolbar {
+            position: absolute;
+            top: 20px; right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+        .toolbar-btn {
+            width: 48px; height: 48px;
+            border-radius: 12px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            color: #e2e8f0;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .toolbar-btn:hover {
+            background: rgba(59, 130, 246, 0.3);
+            transform: scale(1.1);
+        }
+        #three-canvas {
+            width: 100%; height: 100%;
+        }
+        .interaction-hint {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 24px 48px;
+            border-radius: 16px;
+            font-size: 20px;
+            color: #22d3ee;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            text-align: center;
+        }
+        .interaction-hint.show {
+            opacity: 1;
+        }
+        .scene-info {
+            position: absolute;
+            bottom: 24px; left: 24px; right: 24px;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        .scene-info h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #22d3ee;
+        }
+        .scene-info p {
+            font-size: 15px;
+            color: #94a3b8;
+            line-height: 1.6;
+        }
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .panel-card {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 16px;
+            padding: 20px;
+        }
+        .panel-card h3 {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .panel-card h3::before {
+            content: '';
+            width: 4px; height: 16px;
+            background: linear-gradient(180deg, #3b82f6, #06b6d4);
+            border-radius: 2px;
+        }
+        .nav-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .nav-item {
+            padding: 20px 16px;
+            background: rgba(30, 41, 59, 0.4);
+            border: 2px solid transparent;
+            border-radius: 14px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .nav-item:hover, .nav-item.active {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            transform: translateY(-3px);
+        }
+        .nav-item .icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        .nav-item h4 {
+            font-size: 15px;
+            font-weight: 500;
+            color: #e2e8f0;
+            margin-bottom: 4px;
+        }
+        .nav-item p {
+            font-size: 12px;
+            color: #64748b;
+        }
+        .data-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .data-card {
+            padding: 18px;
+            background: rgba(30, 41, 59, 0.4);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 1px solid transparent;
+        }
+        .data-card:hover {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.3);
+            transform: scale(1.02);
+        }
+        .data-card .label {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 8px;
+        }
+        .data-card .value {
+            font-size: 26px;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+        .data-card .value.up { color: #10b981; }
+        .data-card .value.down { color: #ef4444; }
+        .action-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .action-btn {
+            padding: 18px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .action-btn.primary {
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            color: white;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+        }
+        .action-btn.secondary {
+            background: rgba(30, 41, 59, 0.6);
+            color: #94a3b8;
+            border: 2px solid rgba(59, 130, 246, 0.3);
+        }
+        .action-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(59, 130, 246, 0.3);
+        }
+        .bottom-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+        .bottom-item {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 14px;
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .bottom-icon {
+            width: 52px; height: 52px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            background: rgba(59, 130, 246, 0.15);
+        }
+        .bottom-content h4 {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+        .bottom-content p {
+            font-size: 18px;
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-content {
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 24px;
+            width: 100%;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            padding: 28px 32px;
+            border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h2 {
+            font-size: 26px;
+            background: linear-gradient(135deg, #60a5fa, #22d3ee);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .modal-close {
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            background: rgba(30, 41, 59, 0.6);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            color: #e2e8f0;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .modal-close:hover {
+            background: rgba(239, 68, 68, 0.3);
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+        .modal-body {
+            padding: 28px 32px;
+            font-size: 16px;
+            line-height: 1.8;
+            color: #94a3b8;
+        }
+        .modal-body h4 {
+            color: #e2e8f0;
+            margin: 20px 0 10px;
+            font-size: 18px;
+        }
+        .modal-body ul {
+            margin-left: 24px;
+        }
+        .modal-body li {
+            margin: 8px 0;
+        }
+        #tourProgress {
+            position: fixed;
+            top: 110px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 25px;
+            padding: 12px 24px;
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            gap: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        #tourProgress.active {
+            display: flex;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="tech-bg"></div>
+    <div class="container">
+        <header class="header">
+            <div class="brand">
+                <div class="brand-logo">智</div>
+                <h1>智慧工厂展厅</h1>
+            </div>
+            <div class="scene-tabs">
+                <button class="scene-tab active" onclick="switchScene('workshop')">智能制造</button>
+                <button class="scene-tab" onclick="switchScene('rd')">研发中心</button>
+                <button class="scene-tab" onclick="switchScene('logistics')">仓储物流</button>
+            </div>
+            <div class="header-actions">
+                <div class="lang-switch">
+                    <button class="lang-btn active" onclick="switchLang('zh')">中文</button>
+                    <button class="lang-btn" onclick="switchLang('en')">English</button>
+                </div>
+                <button class="help-btn" onclick="showHelp()">?</button>
+            </div>
+        </header>
+        <div class="main-content">
+            <div class="scene-container">
+                <div class="scene-toolbar">
+                    <button class="toolbar-btn" onclick="resetView()" title="重置视角">⟲</button>
+                    <button class="toolbar-btn" onclick="toggleAutoRotate()" title="自动旋转">↻</button>
+                    <button class="toolbar-btn" onclick="zoomIn()" title="放大">+</button>
+                    <button class="toolbar-btn" onclick="zoomOut()" title="缩小">−</button>
+                </div>
+                <div id="three-canvas"></div>
+                <div class="interaction-hint" id="interactionHint">
+                    <div>👆 单指旋转</div>
+                    <div>🤏 双指缩放</div>
+                    <div>👆 点击查看详情</div>
+                </div>
+                <div class="scene-info">
+                    <h3 id="sceneTitle">智能制造车间</h3>
+                    <p id="sceneDesc">点击设备查看详细信息，双指缩放查看细节，全方位了解智能生产线</p>
+                </div>
+            </div>
+            <div class="right-panel">
+                <div class="panel-card">
+                    <h3>展厅导航</h3>
+                    <div class="nav-grid">
+                        <div class="nav-item active" onclick="showSection('company')">
+                            <div class="icon">🏢</div>
+                            <h4>企业概况</h4>
+                            <p>公司介绍</p>
+                        </div>
+                        <div class="nav-item" onclick="showSection('products')">
+                            <div class="icon">📦</div>
+                            <h4>产品展示</h4>
+                            <p>核心产品</p>
+                        </div>
+                        <div class="nav-item" onclick="showSection('honors')">
+                            <div class="icon">🏆</div>
+                            <h4>荣誉资质</h4>
+                            <p>企业认证</p>
+                        </div>
+                        <div class="nav-item" onclick="showSection('tech')">
+                            <div class="icon">🔬</div>
+                            <h4>技术实力</h4>
+                            <p>研发能力</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-card">
+                    <h3>实时监控</h3>
+                    <div class="data-grid">
+                        <div class="data-card" onclick="showDataDetail('output')">
+                            <div class="label">当日产量</div>
+                            <div class="value up">8,520</div>
+                        </div>
+                        <div class="data-card" onclick="showDataDetail('efficiency')">
+                            <div class="label">设备效率</div>
+                            <div class="value up">96.8%</div>
+                        </div>
+                        <div class="data-card" onclick="showDataDetail('quality')">
+                            <div class="label">合格率</div>
+                            <div class="value up">99.2%</div>
+                        </div>
+                        <div class="data-card" onclick="showDataDetail('energy')">
+                            <div class="label">能耗指数</div>
+                            <div class="value down">85.3</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button class="action-btn primary" onclick="startTour()">
+                        <span>▶</span>
+                        <span>自动参观</span>
+                    </button>
+                    <button class="action-btn secondary" onclick="showBooking()">
+                        <span>📅</span>
+                        <span>预约参观</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="bottom-bar">
+            <div class="bottom-item">
+                <div class="bottom-icon" style="color: #3b82f6;">🤖</div>
+                <div class="bottom-content">
+                    <h4>智能装备</h4>
+                    <p>128 台机器人</p>
+                </div>
+            </div>
+            <div class="bottom-item">
+                <div class="bottom-icon" style="color: #06b6d4;">💻</div>
+                <div class="bottom-content">
+                    <h4>自动化率</h4>
+                    <p>98.5%</p>
+                </div>
+            </div>
+            <div class="bottom-item">
+                <div class="bottom-icon" style="color: #8b5cf6;">📊</div>
+                <div class="bottom-content">
+                    <h4>年产能力</h4>
+                    <p>500 万台</p>
+                </div>
+            </div>
+            <div class="bottom-item">
+                <div class="bottom-icon" style="color: #10b981;">🌐</div>
+                <div class="bottom-content">
+                    <h4>全球服务</h4>
+                    <p>50+ 国家</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="tourProgress">
+        <div style="font-size: 14px; color: #e2e8f0; font-weight: 500;">自动参观中</div>
+        <div style="width: 200px; height: 6px; background: rgba(59, 130, 246, 0.2); border-radius: 3px; overflow: hidden;">
+            <div id="tourProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #3b82f6, #06b6d4); border-radius: 3px; transition: width 0.3s;"></div>
+        </div>
+        <div id="tourStepText" style="font-size: 13px; color: #64748b;">1/8</div>
+        <button onclick="stopTour()" style="width: 28px; height: 28px; border-radius: 50%; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center;">×</button>
+    </div>
+    <div class="modal-overlay" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">详细信息</h2>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 自动参观功能模块 ====================
+        let tourActive = false;
+        let tourStep = 0;
+        let tourTimeout = null;
+
+        const tourRoute = [
+            {
+                id: 'overview',
+                title: '全景概览',
+                description: '智慧工厂整体布局，年产500万台智能装备',
+                cameraPos: { x: 25, y: 20, z: 25 },
+                targetPos: { x: 0, y: 0, z: 0 },
+                duration: 4,
+                highlight: null,
+                infoPanel: {
+                    title: '智慧工厂全景',
+                    content: '<div style="margin-bottom: 20px;"><div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;"><div style="width: 60px; height: 60px; background: linear-gradient(135deg, #3b82f6, #06b6d4); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px;">🏭</div><div><div style="font-size: 20px; font-weight: 600; color: #e2e8f0;">智慧工厂展厅</div><div style="font-size: 14px; color: #64748b;">Smart Factory Showcase</div></div></div><p style="color: #94a3b8; line-height: 1.8; font-size: 15px;">欢迎来到智慧工厂展厅，这里展示了全球领先的智能制造解决方案。工厂占地50,000平方米，拥有128台工业机器人，自动化率高达98.5%。</p></div><div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;"><div style="background: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border: 1px solid rgba(59, 130, 246, 0.2);"><div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">占地面积</div><div style="font-size: 22px; font-weight: 700; color: #3b82f6;">50,000㎡</div></div><div style="background: rgba(6, 182, 212, 0.1); padding: 15px; border-radius: 10px; border: 1px solid rgba(6, 182, 212, 0.2);"><div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">机器人数量</div><div style="font-size: 22px; font-weight: 700; color: #06b6d4;">128台</div></div><div style="background: rgba(139, 92, 246, 0.1); padding: 15px; border-radius: 10px; border: 1px solid rgba(139, 92, 246, 0.2);"><div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">自动化率</div><div style="font-size: 22px; font-weight: 700; color: #8b5cf6;">98.5%</div></div><div style="background: rgba(16, 185, 129, 0.1); padding: 15px; border-radius: 10px; border: 1px solid rgba(16, 185, 129, 0.2);"><div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">年产能力</div><div style="font-size: 22px; font-weight: 700; color: #10b981;">500万台</div></div></div>'
+                }
+            },
+            {
+                id: 'production-line',
+                title: '智能生产线',
+                description: '全自动装配线，实现无人化生产',
+                cameraPos: { x: 15, y: 8, z: 12 },
+                targetPos: { x: 0, y: 0, z: 2 },
+                duration: 5,
+                highlight: 'machines',
+                infoPanel: {
+                    title: '智能生产线',
+                    content: '<div style="margin-bottom: 20px;"><div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;"><div style="width: 60px; height: 60px; background: linear-gradient(135deg, #8b5cf6, #ec4899); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px;">⚙️</div><div><div style="font-size: 20px; font-weight: 600; color: #e2e8f0;">全自动生产线</div><div style="font-size: 14px; color: #64748b;">Automated Production Line</div></div></div><p style="color: #94a3b8; line-height: 1.8; font-size: 15px;">采用工业4.0标准建设的智能生产线，集成数控加工、智能焊接、自动装配、AGV物流四大核心模块。通过MES系统实现全流程数字化管理，单线日产能可达3000件。</p></div><div style="background: rgba(139, 92, 246, 0.1); border-radius: 12px; padding: 20px; border: 1px solid rgba(139, 92, 246, 0.2);"><div style="font-size: 16px; font-weight: 600; color: #e2e8f0; margin-bottom: 15px;">核心设备配置</div><div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;"><div style="display: flex; align-items: center; gap: 10px;"><div style="width: 8px; height: 8px; background: #3b82f6; border-radius: 50%;"></div><span style="color: #94a3b8; font-size: 14px;">数控加工中心 × 12</span></div><div style="display: flex; align-items: center; gap: 10px;"><div style="width: 8px; height: 8px; background: #06b6d4; border-radius: 50%;"></div><span style="color: #94a3b8; font-size: 14px;">焊接机器人 × 24</span></div><div style="display: flex; align-items: center; gap: 10px;"><div style="width: 8px; height: 8px; background: #8b5cf6; border-radius: 50%;"></div><span style="color: #94a3b8; font-size: 14px;">自动装配线 × 8</span></div><div style="display: flex; align-items: center; gap: 10px;"><div style="width: 8px; height: 8px; background: #10b981; border-radius: 50%;"></div><span style="color: #94a3b8; font-size: 14px;">AGV搬运车 × 32</span></div></div></div>'
+                }
+            },
+            {
+                id: 'machining',
+                title: '数控加工中心',
+                description: '高精度数控加工，误差小于0.01mm',
+                cameraPos: { x: 8, y: 5, z: 8 },
+                targetPos: { x: -4, y: 0, z: 2 },
+                duration: 4.5,
+                highlight: 'machine-0',
+                infoPanel: {
+                    title: '数控加工中心',
+                    content: '<div style="margin-bottom: 20px;"><div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;"><div style="width: 60px; height: 60px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px;">🔧</div><div><div style="font-size: 20px; font-weight: 600; color: #e2e8f0;">五轴数控加工中心</div><div style="font-size: 14px; color: #64748b;">5-Axis CNC Machining Center</div></div></div><p style="color: #94a3b8; line-height: 1.8; font-size: 15px;">配备德国进口五轴联动数控系统，支持复杂曲面一次成型加工。定位精度±0.005mm，重复定位精度±0.003mm，满足航空航天级加工要求。</p></div><div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px;"><div style="background: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; text-align: center;"><div style="font-size: 28px; font-weight: 700; color: #3b82f6;">±0.005</div><div style="font-size: 12px; color: #64748b; margin-top: 5px;">定位精度(mm)</div></div><div style="background: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; text-align: center;"><div style="font-size: 28px; font-weight: 700; color: #3b82f6;">24,000</div><div style="font-size: 12px; color: #64748b; margin-top: 5px;">主轴转速(rpm)</div></div></div><div style="background: rgba(30, 41, 59, 0.6); border-radius: 10px; padding: 15px;"><div style="font-size: 14px; color: #64748b; margin-bottom: 10px;">实时运行状态</div><div style="display: flex; align-items: center; gap: 20px;"><div style="display: flex; align-items: center; gap: 8px;"><div style="width: 10px; height: 10px; background: #10b981; border-radius: 50%; animation: pulse 2s infinite;"></div><span style="color: #e2e8f0; font-size: 14px;">运行中</span></div><div style="color: #94a3b8; font-size: 14px;">当前工序：精铣加工</div><div style="color: #94a3b8; font-size: 14px;">进度：68%</div></div></div>'
+                }
+            },
+            {
+                id: 'welding',
+                title: '智能焊接机器人',
+                description: 'AI视觉引导，焊接合格率99.9%',
+                cameraPos: { x: 6, y: 5, z: 8 },
+                targetPos: { x: -1.5, y: 0, z: 2 },
+                duration: 4.5,
+                highlight: 'machine-1',
+                infoPanel: {
+                    title: '智能焊接机器人',
+                    content: '<div style="margin-bottom: 20px;"><div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;"><div style="width: 60px; height: 60px; background: linear-gradient(135deg, #06b6d4, #0891b2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px;">🤖</div><div><div style="font-size: 20px; font-weight: 600; color: #e2e8f0;">AI焊接机器人</div><div style="font-size: 14px; color: #64748b;">AI Welding Robot</div></div></div><p style="color: #94a3b8; line-height: 1.8; font-size: 15px;">集成3D视觉识别系统和AI焊缝跟踪算法，自动识别工件位置和焊缝轨迹。支持电弧跟踪和激光跟踪两种模式，适应不同材质和厚度的焊接需求。</p></div><div style="background: rgba(6, 182, 212, 0.1); border-radius: 12px; padding: 20px; border: 1px solid rgba(6, 182, 212, 0.2); margin-bottom: 15px;"><div style="font-size: 16px; font-weight: 600; color: #e2e8f0; margin-bottom: 15px;">AI视觉系统参数</div><div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center;"><div><div style="font-size: 24px; font-weight: 700; color: #06b6d4;">0.1mm</div><div style="font-size: 12px; color: #64748b; margin-top: 5px;">识别精度</div></div><div><div style="font-size: 24px; font-weight: 700; color: #06b6d4;">50ms</div><div style="font-size: 12px; color: #64748b; margin-top: 5px;">响应时间</div></div><div><div style="font-size: 24px; font-weight: 700; color: #06b6d4;">99.9%</div><div style="font-size: 12px; color: #64748b; margin-top: 5px;">焊接合格率</div></div></div></div><div style="display: flex; gap: 10px;"><div style="flex: 1; background: rgba(30, 41, 59, 0.6); border-radius: 8px; padding: 12px; text-align: center;"><div style="font-size: 20px; font-weight: 600; color: #e2e8f0;">1,250</div><div style="font-size: 12px; color: #64748b;">今日焊接数</div></div><div style="flex: 1; background: rgba(30, 41, 59, 0.6); border-radius: 8px; padding: 12px; text-align: center;"><div style="font-size: 20px; font-weight: 600; color: #e2e8f0;">98.7%</div><div style="font-size: 12px; color: #64748b;">设备稼动率</div></div></div>'
+                }
+            },
+            {
+                id: 'assembly',
+                title: '自动装配线',
+                description: '柔性装配系统，支持多品种混流生产',
+                cameraPos: { x: 4, y: 5, z: 8 },
+                targetPos: { x: 1, y: 0, z: 2 },
+                duration: 4.5,
+                highlight: 'machine-2',
+                infoPanel: {
+                    title: '柔性自动装配线',
+                    content: '<div style="margin-bottom: 20px;"><div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;"><div style="width: 60px; height: 60px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px;">🔄</div><div><div style="font-size: 20px; font-weight: 600; color: #e2e8f0;">柔性装配系统</div><div style="font-size: 14px; color: #64748b;">Flexible Assembly System</div></div></div><p style="color: #94a3b8; line-height: 1.8; font-size: 15px;">模块化设计的柔性装配线，通过快速换模技术实现15分钟内切换产品型号。支持8种产品混流生产，单线产能3000件/天，换型时间行业领先。</p></div><div style="background: rgba(139, 92, 246, 0.1); border-radius: 12px; padding: 20px; border: 1px solid rgba(139, 92, 246, 0.2); margin-bottom: 15px;"><div style="font-size: 16px; font-weight: 600; color: #e2e8f0; margin-bottom: 15px;">今日生产数据</div><div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;"><div style="text-align: center;"><div style="font-size: 26px; font-weight: 700; color: #8b5cf6;">2,850</div><div style="font-size: 12px; color: #64748b; margin-top: 5px;">已完成</div></div><div style="text-align: center;"><div style="font-size: 26px; font-weight: 700; color: #10b981;">150</div><div style="font-size: 12px; color: #64748b; margin-top: 5px;">进行中</div></div><div style="text-align: center;"><div style="font-size: 26px; font-weight: 700; color: #f59e0b;">99.4%</div><div style="font-size: 12px; color: #64748b; margin-top: 5px;">合格率</div></div></div></div><div style="display: flex; gap: 8px; flex-wrap: wrap;"><span style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 6px 12px; border-radius: 20px; font-size: 12px;">型号A-Pro</span><span style="background: rgba(6, 182, 212, 0.2); color: #22d3ee; padding: 6px 12px; border-radius: 20px; font-size: 12px;">型号B-Max</span><span style="background: rgba(139, 92, 246, 0.2); color: #a78bfa; padding: 6px 12px; border-radius: 20px; font-size: 12px;">型号C-Lite</span><span style="background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 6px 12px; border-radius: 20px; font-size: 12px;">+5种型号</span></div>'
+                }
+            },
+            {
+                id: 'agv',
+                title: 'AGV智能物流',
+                description: '无人搬运系统，物流效率提升300%',
+                cameraPos: { x: 2, y: 5, z: 8 },
+                targetPos: { x: 3.5, y: 0, z: 2 },
+                duration: 4.5,
+                highlight: 'machine-3',
+                infoPanel: {
+                    title: 'AGV智能物流系统',
+                    content: '<div style="margin-bottom: 20px;"><div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;"><div style="width: 60px; height: 60px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px;">🚛</div><div><div style="font-size: 20px; font-weight: 600; color: #e2e8f0;">AGV搬运系统</div><div style="font-size: 14px; color: #64748b;">Automated Guided Vehicle</div></div></div><p style="color: #94a3b8; line-height: 1.8; font-size: 15px;">采用SLAM激光导航技术的无人搬运车集群，实现车间内物料自动配送。32台AGV协同作业，支持24小时不间断运行，物流效率较传统方式提升300%。</p></div><div style="background: rgba(16, 185, 129, 0.1); border-radius: 12px; padding: 20px; border: 1px solid rgba(16, 185, 129, 0.2); margin-bottom: 15px;"><div style="font-size: 16px; font-weight: 600; color: #e2e8f0; margin-bottom: 15px;">AGV车队实时状态</div><div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;"><div style="background: rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 12px 5px;"><div style="font-size: 20px; font-weight: 700; color: #10b981;">28</div><div style="font-size: 11px; color: #64748b; margin-top: 3px;">运行中</div></div><div style="background: rgba(245, 158, 11, 0.2); border-radius: 8px; padding: 12px 5px;"><div style="font-size: 20px; font-weight: 700; color: #f59e0b;">2</div><div style="font-size: 11px; color: #64748b; margin-top: 3px;">充电中</div></div><div style="background: rgba(59, 130, 246, 0.2); border-radius: 8px; padding: 12px 5px;"><div style="font-size: 20px; font-weight: 700; color: #3b82f6;">1</div><div style="font-size: 11px; color: #64748b; margin-top: 3px;">待命</div></div><div style="background: rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 12px 5px;"><div style="font-size: 20px; font-weight: 700; color: #ef4444;">1</div><div style="font-size: 11px; color: #64748b; margin-top: 3px;">维护</div></div></div></div><div style="display: flex; align-items: center; justify-content: space-between; background: rgba(30, 41, 59, 0.6); border-radius: 10px; padding: 15px;"><div><div style="font-size: 14px; color: #64748b; margin-bottom: 5px;">今日配送任务</div><div style="font-size: 24px; font-weight: 700; color: #e2e8f0;">1,856 <span style="font-size: 14px; font-weight: 400; color: #64748b;">次</span></div></div><div style="text-align: right;"><div style="font-size: 14px; color: #64748b; margin-bottom: 5px;">平均配送时间</div><div style="font-size: 24px; font-weight: 700; color: #10b981;">4.2 <span style="font-size: 14px; font-weight: 400; color: #64748b;">分钟</span></div></div></div>'
+                }
+            },
+            {
+                id: 'quality',
+                title: '质量检测中心',
+                description: 'AI视觉质检，缺陷检出率99.95%',
+                cameraPos: { x: -5, y: 8, z: 12 },
+                targetPos: { x: 0, y: 2, z: 0 },
+                duration: 5,
+                highlight: null,
+                infoPanel: {
+                    title: 'AI质量检测中心',
+                    content: '<div style="margin-bottom: 20px;"><div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;"><div style="width: 60px; height: 60px; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px;">🔍</div><div><div style="font-size: 20px; font-weight: 600; color: #e2e8f0;">AI视觉质检</div><div style="font-size: 14px; color: #64748b;">AI Visual Inspection</div></div></div><p style="color: #94a3b8; line-height: 1.8; font-size: 15px;">基于深度学习的AI视觉检测系统，可同时检测外观缺陷、尺寸偏差、装配完整性等20+项指标。检测速度0.5秒/件，缺陷检出率达99.95%，远超人工检测水平。</p></div><div style="background: rgba(245, 158, 11, 0.1); border-radius: 12px; padding: 20px; border: 1px solid rgba(245, 158, 11, 0.2); margin-bottom: 15px;"><div style="font-size: 16px; font-weight: 600; color: #e2e8f0; margin-bottom: 15px;">今日质检统计</div><div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center;"><div><div style="font-size: 26px; font-weight: 700; color: #10b981;">8,520</div><div style="font-size: 12px; color: #64748b; margin-top: 5px;">检测总数</div></div><div><div style="font-size: 26px; font-weight: 700; color: #3b82f6;">8,492</div><div style="font-size: 12px; color: #64748b; margin-top: 5px;">合格品</div></div><div><div style="font-size: 26px; font-weight: 700; color: #ef4444;">28</div><div style="font-size: 12px; color: #64748b; margin-top: 5px;">缺陷品</div></div></div></div><div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;"><div style="background: rgba(30, 41, 59, 0.6); border-radius: 8px; padding: 12px;"><div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">检测精度</div><div style="font-size: 18px; font-weight: 600; color: #e2e8f0;">0.02mm</div></div><div style="background: rgba(30, 41, 59, 0.6); border-radius: 8px; padding: 12px;"><div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">检测速度</div><div style="font-size: 18px; font-weight: 600; color: #e2e8f0;">0.5s/件</div></div><div style="background: rgba(30, 41, 59, 0.6); border-radius: 8px; padding: 12px;"><div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">检出率</div><div style="font-size: 18px; font-weight: 600; color: #e2e8f0;">99.95%</div></div><div style="background: rgba(30, 41, 59, 0.6); border-radius: 8px; padding: 12px;"><div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">误检率</div><div style="font-size: 18px; font-weight: 600; color: #e2e8f0;">0.03%</div></div></div>'
+                }
+            },
+            {
+                id: 'data-center',
+                title: '数字孪生中心',
+                description: '实时数据可视化，生产状态一屏掌控',
+                cameraPos: { x: 0, y: 15, z: 20 },
+                targetPos: { x: 0, y: 0, z: 0 },
+                duration: 5,
+                highlight: null,
+                infoPanel: {
+                    title: '数字孪生控制中心',
+                    content: '<div style="margin-bottom: 20px;"><div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;"><div style="width: 60px; height: 60px; background: linear-gradient(135deg, #ec4899, #be185d); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px;">📊</div><div><div style="font-size: 20px; font-weight: 600; color: #e2e8f0;">数字孪生中心</div><div style="font-size: 14px; color: #64748b;">Digital Twin Center</div></div></div><p style="color: #94a3b8; line-height: 1.8; font-size: 15px;">基于数字孪生技术的生产指挥中心，实时映射物理工厂状态。集成MES、ERP、WMS等系统数据，实现生产全流程可视化监控和智能决策支持。</p></div><div style="background: rgba(236, 72, 153, 0.1); border-radius: 12px; padding: 20px; border: 1px solid rgba(236, 72, 153, 0.2); margin-bottom: 15px;"><div style="font-size: 16px; font-weight: 600; color: #e2e8f0; margin-bottom: 15px;">实时生产指标</div><div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;"><div style="display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.4); padding: 12px; border-radius: 8px;"><span style="color: #94a3b8; font-size: 14px;">OEE综合效率</span><span style="color: #10b981; font-size: 18px; font-weight: 600;">96.8%</span></div><div style="display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.4); padding: 12px; border-radius: 8px;"><span style="color: #94a3b8; font-size: 14px;">计划达成率</span><span style="color: #3b82f6; font-size: 18px; font-weight: 600;">102.3%</span></div><div style="display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.4); padding: 12px; border-radius: 8px;"><span style="color: #94a3b8; font-size: 14px;">设备稼动率</span><span style="color: #06b6d4; font-size: 18px; font-weight: 600;">94.5%</span></div><div style="display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.4); padding: 12px; border-radius: 8px;"><span style="color: #94a3b8; font-size: 14px;">人均产出</span><span style="color: #8b5cf6; font-size: 18px; font-weight: 600;">+35%</span></div></div></div><div style="display: flex; gap: 10px;"><div style="flex: 1; background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(6, 182, 212, 0.2)); border-radius: 10px; padding: 15px; text-align: center; border: 1px solid rgba(59, 130, 246, 0.3);"><div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">数据刷新频率</div><div style="font-size: 20px; font-weight: 600; color: #e2e8f0;">实时</div></div><div style="flex: 1; background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(236, 72, 153, 0.2)); border-radius: 10px; padding: 15px; text-align: center; border: 1px solid rgba(139, 92, 246, 0.3);"><div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">数据接入点</div><div style="font-size: 20px; font-weight: 600; color: #e2e8f0;">2,500+</div></div></div>'
+                }
+            }
+        ];
+
+        function startTour() {
+            if (tourActive) {
+                stopTour();
+                return;
+            }
+            tourActive = true;
+            tourStep = 0;
+            const btn = document.querySelector('.action-btn.primary');
+            btn.innerHTML = '<span>⏸</span><span>暂停参观</span>';
+            btn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+            document.getElementById('tourProgress').classList.add('active');
+            executeTourStep();
+        }
+
+        function stopTour() {
+            tourActive = false;
+            if (tourTimeout) {
+                clearTimeout(tourTimeout);
+                tourTimeout = null;
+            }
+            const btn = document.querySelector('.action-btn.primary');
+            btn.innerHTML = '<span>▶</span><span>自动参观</span>';
+            btn.style.background = 'linear-gradient(135deg, #3b82f6, #06b6d4)';
+            document.getElementById('tourProgress').classList.remove('active');
+            closeModal();
+            document.getElementById('sceneTitle').textContent = '智能制造车间';
+            document.getElementById('sceneDesc').textContent = '点击设备查看详细信息，双指缩放查看细节，全方位了解智能生产线';
+            resetHighlight();
+        }
+
+        function executeTourStep() {
+            if (!tourActive || tourStep >= tourRoute.length) {
+                if (tourActive) {
+                    tourStep = 0;
+                    executeTourStep();
+                }
+                return;
+            }
+            const step = tourRoute[tourStep];
+            updateTourProgress();
+            gsap.to(camera.position, {
+                x: step.cameraPos.x,
+                y: step.cameraPos.y,
+                z: step.cameraPos.z,
+                duration: step.duration,
+                ease: 'power2.inOut',
+                onUpdate: function() {
+                    camera.lookAt(step.targetPos.x, step.targetPos.y, step.targetPos.z);
+                }
+            });
+            document.getElementById('sceneTitle').textContent = step.title;
+            document.getElementById('sceneDesc').textContent = step.description;
+            highlightObject(step.highlight);
+            const modalDelay = (step.duration * 1000) / 2;
+            tourTimeout = setTimeout(() => {
+                if (tourActive) {
+                    document.getElementById('modalTitle').textContent = step.infoPanel.title;
+                    document.getElementById('modalContent').innerHTML = step.infoPanel.content;
+                    document.getElementById('detailModal').classList.add('active');
+                    const displayDuration = (step.duration * 1000) / 2 + 2000;
+                    tourTimeout = setTimeout(() => {
+                        if (tourActive) {
+                            closeModal();
+                            tourStep++;
+                            tourTimeout = setTimeout(executeTourStep, 1000);
+                        }
+                    }, displayDuration);
+                }
+            }, modalDelay);
+        }
+
+        function highlightObject(highlight) {
+            resetHighlight();
+            if (!highlight) return;
+            if (highlight === 'machines') {
+                factoryGroup.children.forEach(child => {
+                    if (child.userData && child.userData.type === 'machine') {
+                        gsap.to(child.material, { emissiveIntensity: 0.8, duration: 0.5, yoyo: true, repeat: 5 });
+                    }
+                });
+            } else if (highlight.startsWith('machine-')) {
+                const machineId = parseInt(highlight.split('-')[1]);
+                factoryGroup.children.forEach(child => {
+                    if (child.userData && child.userData.type === 'machine' && child.userData.id === machineId) {
+                        gsap.to(child.material, { emissiveIntensity: 0.8, duration: 0.5, yoyo: true, repeat: 7 });
+                        gsap.to(child.scale, { x: 1.2, y: 1.2, z: 1.2, duration: 0.4, yoyo: true, repeat: 7 });
+                    }
+                });
+            }
+        }
+
+        function resetHighlight() {
+            factoryGroup.children.forEach(child => {
+                if (child.material && child.material.emissive) {
+                    child.material.emissiveIntensity = 0.2;
+                }
+                if (child.userData && child.userData.type === 'machine') {
+                    gsap.to(child.scale, { x: 1, y: 1, z: 1, duration: 0.3 });
+                }
+            });
+        }
+
+        function updateTourProgress() {
+            const progressBar = document.getElementById('tourProgressBar');
+            const stepText = document.getElementById('tourStepText');
+            if (progressBar && stepText) {
+                const progress = ((tourStep + 1) / tourRoute.length) * 100;
+                progressBar.style.width = progress + '%';
+                stepText.textContent = tourStep + 1 + '/' + tourRoute.length;
+            }
+        }
+
+        let currentLang = 'zh', autoRotate = false;
+        let scene, camera, renderer, factoryGroup;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initThreeJS();
+            setupTouchEvents();
+            setTimeout(() => {
+                document.getElementById('interactionHint').classList.add('show');
+                setTimeout(() => document.getElementById('interactionHint').classList.remove('show'), 4000);
+            }, 1000);
+        });
+
+        function switchLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function switchScene(sceneType) {
+            document.querySelectorAll('.scene-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            const titles = { workshop: '智能制造车间', rd: '研发中心', logistics: '仓储物流中心' };
+            document.getElementById('sceneTitle').textContent = titles[sceneType];
+            updateSceneCamera(sceneType);
+        }
+
+        function showSection(section) {
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            const contents = {
+                company: { title: '企业概况', content: '<h4>智慧工厂科技股份有限公司</h4><p>成立于2010年，专注于智能制造领域...</p>' },
+                products: { title: '核心产品', content: '<h4>智能装备系列</h4><p>工业机器人、AGV搬运机器人...</p>' },
+                honors: { title: '荣誉资质', content: '<h4>国家级认证</h4><p>国家高新技术企业、智能制造示范企业...</p>' },
+                tech: { title: '技术实力', content: '<h4>研发能力</h4><p>研发投入占年营收15%，研发团队500+人...</p>' }
+            };
+            const data = contents[section];
+            document.getElementById('modalTitle').textContent = data.title;
+            document.getElementById('modalContent').innerHTML = data.content;
+            document.getElementById('detailModal').classList.add('active');
+        }
+
+        function showDataDetail(type) {
+            const details = {
+                output: { title: '产量详情', content: '<h4>今日生产数据</h4><ul><li>计划产量：10,000件</li><li>实际产量：8,520件</li></ul>' },
+                efficiency: { title: '设备效率分析', content: '<h4>OEE综合效率</h4><ul><li>时间开动率：98.5%</li><li>性能开动率：97.8%</li></ul>' },
+                quality: { title: '质量监控', content: '<h4>质量指标</h4><ul><li>一次合格率：99.2%</li><li>返工率：0.5%</li></ul>' },
+                energy: { title: '能耗分析', content: '<h4>能源消耗</h4><ul><li>电力：12,500 kWh</li><li>天然气：850 m³</li></ul>' }
+            };
+            const data = details[type];
+            document.getElementById('modalTitle').textContent = data.title;
+            document.getElementById('modalContent').innerHTML = data.content;
+            document.getElementById('detailModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.remove('active');
+        }
+
+        function showHelp() {
+            document.getElementById('interactionHint').classList.add('show');
+            setTimeout(() => document.getElementById('interactionHint').classList.remove('show'), 3000);
+        }
+
+        function showBooking() { 
+            document.getElementById('modalTitle').textContent = '预约参观';
+            document.getElementById('modalContent').innerHTML = '<div style="text-align: center; padding: 20px;"><div style="font-size: 60px; margin-bottom: 20px;">📅</div><h4 style="color: #e2e8f0; margin-bottom: 15px;">欢迎预约参观</h4><p style="color: #94a3b8; margin-bottom: 20px;">请通过以下方式预约参观智慧工厂展厅</p><div style="background: rgba(30, 41, 59, 0.6); border-radius: 12px; padding: 20px; margin-bottom: 20px;"><div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 15px;"><span style="font-size: 24px;">📞</span><span style="font-size: 20px; color: #e2e8f0; font-weight: 600;">400-888-9999</span></div><div style="display: flex; align-items: center; justify-content: center; gap: 10px;"><span style="font-size: 24px;">📧</span><span style="font-size: 16px; color: #94a3b8;">visit@smartfactory.com</span></div></div><p style="color: #64748b; font-size: 14px;">工作时间：周一至周五 9:00-17:00</p></div>';
+            document.getElementById('detailModal').classList.add('active');
+        }
+
+        function initThreeJS() {
+            const container = document.getElementById('three-canvas');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0e1a);
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(20, 15, 20);
+            camera.lookAt(0, 0, 0);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+            scene.add(new THREE.AmbientLight(0x404040, 1));
+            const directionalLight = new THREE.DirectionalLight(0x3b82f6, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            scene.add(directionalLight);
+            factoryGroup = new THREE.Group();
+            const ground = new THREE.Mesh(
+                new THREE.PlaneGeometry(30, 30),
+                new THREE.MeshStandardMaterial({ color: 0x1a1f2e, roughness: 0.8 })
+            );
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -2;
+            factoryGroup.add(ground);
+            factoryGroup.add(new THREE.GridHelper(30, 30, 0x3b82f6, 0x1e293b));
+            const building = new THREE.Mesh(
+                new THREE.BoxGeometry(12, 6, 8),
+                new THREE.MeshStandardMaterial({ color: 0x2d3748, transparent: true, opacity: 0.9 })
+            );
+            building.position.set(0, 1, 0);
+            factoryGroup.add(building);
+            const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(12, 6, 8));
+            factoryGroup.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x3b82f6 })));
+            const colors = [0x3b82f6, 0x06b6d4, 0x8b5cf6, 0x10b981];
+            for (let i = 0; i < 4; i++) {
+                const machine = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.5, 2, 1.5),
+                    new THREE.MeshStandardMaterial({ color: colors[i], emissive: colors[i], emissiveIntensity: 0.2 })
+                );
+                machine.position.set(-4 + i * 2.5, 0, 2);
+                machine.userData = { type: 'machine', id: i };
+                factoryGroup.add(machine);
+            }
+            scene.add(factoryGroup);
+            animate();
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+        }
+
+        function updateSceneCamera(type) {
+            const positions = { workshop: { x: 15, y: 12, z: 15 }, rd: { x: -15, y: 10, z: 15 }, logistics: { x: 15, y: 10, z: -15 } };
+            gsap.to(camera.position, { x: positions[type].x, y: positions[type].y, z: positions[type].z, duration: 1.5 });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (factoryGroup) {
+                if (autoRotate) factoryGroup.rotation.y += 0.005;
+            }
+            renderer.render(scene, camera);
+        }
+
+        function resetView() { gsap.to(camera.position, { x: 20, y: 15, z: 20, duration: 1 }); }
+        function toggleAutoRotate() { autoRotate = !autoRotate; }
+        function zoomIn() { const dir = new THREE.Vector3().subVectors(camera.position, new THREE.Vector3(0, 0, 0)).normalize(); camera.position.add(dir.multiplyScalar(-2)); }
+        function zoomOut() { const dir = new THREE.Vector3().subVectors(camera.position, new THREE.Vector3(0, 0, 0)).normalize(); camera.position.add(dir.multiplyScalar(2)); }
+
+        function setupTouchEvents() {
+            const container = document.getElementById('three-canvas');
+            let touchStartX = 0, touchStartY = 0, initialDistance = 0;
+            container.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) { touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; }
+                else if (e.touches.length === 2) { initialDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); }
+            });
+            container.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (e.touches.length === 1 && factoryGroup) {
+                    const deltaX = e.touches[0].clientX - touchStartX;
+                    factoryGroup.rotation.y += deltaX * 0.005;
+                    touchStartX = e.touches[0].clientX;
+                } else if (e.touches.length === 2) {
+                    const currentDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                    const scale = currentDistance / initialDistance;
+                    const dir = new THREE.Vector3().subVectors(camera.position, new THREE.Vector3(0, 0, 0)).normalize();
+                    camera.position.add(dir.multiplyScalar((1 - scale) * 5));
+                    initialDistance = currentDistance;
+                }
+            });
+            container.addEventListener('click', (e) => {
+                const rect = container.getBoundingClientRect();
+                const mouse = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(factoryGroup.children);
+                if (intersects.length > 0 && intersects[0].object.userData.type === 'machine') {
+                    const machines = ['数控加工中心', '智能焊接机器人', '自动装配线', 'AGV搬运系统'];
+                    document.getElementById('modalTitle').textContent = machines[intersects[0].object.userData.id];
+                    document.getElementById('modalContent').innerHTML = '<h4>设备参数</h4><ul><li>运行状态：正常</li><li>今日产量：500件</li><li>运行效率：95%</li></ul>';
+                    document.getElementById('detailModal').classList.add('active');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

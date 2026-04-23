@@ -1,0 +1,96 @@
+/* App-specific styles */
+
+/* Ensure canvas takes full height */
+canvas {
+  display: block;
+}
+
+/* Custom scrollbar for the entire app */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #36BFFA;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0EA5E9;
+}
+
+/* Progress bar customization */
+[data-slot="progress-indicator"] {
+  background: linear-gradient(90deg, #36BFFA, #16C79A) !important;
+}
+
+/* Selection styling */
+::selection {
+  background: rgba(54, 191, 250, 0.3);
+  color: #F1F5F9;
+}
+
+/* Focus styling */
+*:focus-visible {
+  outline: 2px solid #36BFFA;
+  outline-offset: 2px;
+}
+
+/* Button hover transitions */
+button {
+  transition: all 0.2s ease;
+}
+
+/* Card hover effect */
+.factory-card {
+  transition: all 0.2s ease;
+}
+
+.factory-card:hover {
+  border-color: rgba(54, 191, 250, 0.3);
+}
+
+/* Animation for pulse effects */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(54, 191, 250, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(54, 191, 250, 0.8);
+  }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1400px) {
+  .grid-cols-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .grid-cols-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .grid-cols-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .grid-cols-4,
+  .grid-cols-3,
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+}

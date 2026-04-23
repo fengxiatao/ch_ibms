@@ -139,4 +139,20 @@ public class ZlmConfig {
         }
         return getServerIp();
     }
+
+    public String getApiUrl() {
+        return apiUrl;
+    }
+
+    public String getSecret() {
+        return secret;
+    }
+
+    public Integer getRtspPort() {
+        return rtspPort;
+    }
+
+    public Integer getRtmpPort() {
+        return rtmpPort;
+    }
 }

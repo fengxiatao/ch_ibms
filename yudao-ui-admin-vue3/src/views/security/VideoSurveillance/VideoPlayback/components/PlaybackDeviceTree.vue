@@ -43,16 +43,7 @@
             :draggable="data.type === 'channel'"
             @dragstart="handleTreeDragStart($event, data)"
           >
-            <Icon
-              v-if="data.type === 'building'"
-              icon="ep:office-building"
-              style="color: #409eff"
-            />
-            <Icon
-              v-else-if="data.type === 'floor'"
-              icon="ep:tickets"
-              style="color: #67c23a"
-            />
+            <Icon v-if="data.type === 'space'" icon="ep:office-building" style="color: #409eff" />
             <Icon
               v-else-if="data.type === 'channel'"
               :icon="data.ibmsChannel?.onlineStatus === 1 ? 'ep:video-camera-filled' : 'ep:video-camera'"
@@ -105,9 +96,8 @@
 import { ref, onMounted, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Icon } from '@/components/Icon'
-import { getBuildingList } from '@/api/iot/spatial/building'
-import { getFloorListByBuildingId } from '@/api/iot/spatial/floor'
-import { getChannelPage } from '@/api/iot/channel'
+import { getSpaceTree, type IbmsSpaceTreeNodeRespVO } from '@/api/iot/ibms/space'
+import { getChannelPage as getIbmsChannelPage } from '@/api/iot/ibms/channel'
 import type { DeviceTreeNode, IbmsChannel } from '../types'
 
 // Emits
@@ -130,8 +120,10 @@ const searching = computed(() => props.searching === true)
 // 选中的通道
 const selectedChannels = ref<IbmsChannel[]>([])
 
-// 建筑树数据
+// 空间树数据
 const buildingTreeData = ref<DeviceTreeNode[]>([])
+const spaceTreeChildrenMap = new Map<number, IbmsSpaceTreeNodeRespVO[]>()
+const MAX_PAGE_SIZE = 100
 
 // 筛选表单
 const filterForm = reactive({
@@ -150,68 +142,107 @@ const disabledFutureDate = (time: Date) => {
   return time.getTime() > Date.now()
 }
 
-// ==================== 建筑树加载 ====================
+const mapStatusToOnlineStatus = (status?: string) => {
+  if (status === 'online') return 1
+  if (status === 'offline') return 0
+  return undefined
+}
 
-const loadBuildingTree = async () => {
-  try {
-    const buildings = await getBuildingList()
-    buildingTreeData.value = buildings.map((b: any) => ({
-      id: `building-${b.id}`,
-      name: b.name,
-      type: 'building',
-      buildingId: b.id
-    }))
-  } catch (e: any) {
-    console.error('[建筑树] 加载失败:', e)
-    ElMessage.error('加载建筑列表失败')
+const mapChannelRowToIbmsChannel = (row: Record<string, any>): IbmsChannel => {
+  let extra: Record<string, any> = {}
+  if (row?.extra) {
+    try {
+      extra = JSON.parse(row.extra)
+    } catch {
+      extra = {}
+    }
   }
+  return {
+    id: row.id,
+    channelName: row.name || `通道${row.channelNo ?? 1}`,
+    channelNo: row.channelNo ?? 1,
+    targetIp: row.ip,
+    targetPort: extra.targetPort,
+    username: extra.username,
+    password: extra.password,
+    onlineStatus: mapStatusToOnlineStatus(row.status)
+  }
+}
+
+const mapSpaceNode = (space: IbmsSpaceTreeNodeRespVO): DeviceTreeNode => ({
+  id: `space-${space.id}`,
+  name: space.name,
+  type: 'space',
+  spaceId: space.id
+})
+
+const buildSpaceNodeIndex = (nodes: IbmsSpaceTreeNodeRespVO[]) => {
+  spaceTreeChildrenMap.clear()
+  const walk = (list: IbmsSpaceTreeNodeRespVO[]) => {
+    for (const item of list) {
+      spaceTreeChildrenMap.set(item.id, item.children || [])
+      if (item.children?.length) walk(item.children)
+    }
+  }
+  walk(nodes)
+}
+
+const loadSpaceTree = async () => {
+  try {
+    const spaces = await getSpaceTree()
+    buildSpaceNodeIndex(spaces || [])
+    buildingTreeData.value = (spaces || []).map(mapSpaceNode)
+  } catch (e: any) {
+    console.error('[空间树] 加载失败:', e)
+    ElMessage.error('加载空间列表失败')
+  }
+}
+
+const loadChannelsBySpace = async (spaceId: number) => {
+  const channels: any[] = []
+  let pageNo = 1
+  let total = 0
+  do {
+    const res = await getIbmsChannelPage({
+      pageNo,
+      pageSize: MAX_PAGE_SIZE,
+      business: 'security',
+      typeCode: 'VT',
+      spaceId
+    })
+    const page = (res && (res as any).list) ? res : (res as any)?.data
+    const list = page?.list || []
+    total = Number(page?.total || 0)
+    channels.push(...list)
+    if (!list.length || channels.length >= total) break
+    pageNo += 1
+  } while (true)
+
+  return channels.map((row: any) => {
+    const ibmsChannel = mapChannelRowToIbmsChannel(row)
+    return {
+      id: `channel-${row.id}`,
+      name: ibmsChannel.channelName,
+      type: 'channel' as const,
+      channelId: row.id,
+      ibmsChannel
+    } as DeviceTreeNode
+  })
 }
 
 const loadTreeNode = async (node: any, resolve: Function) => {
   try {
     const data = node.data as DeviceTreeNode
-    let children: DeviceTreeNode[] = []
-
-    if (data.type === 'building') {
-      // 只加载楼层
-      const floors = await getFloorListByBuildingId(data.buildingId!)
-      children = floors.map((f: any) => ({
-        id: `floor-${f.id}`,
-        name: f.name,
-        type: 'floor' as const,
-        floorId: f.id,
-        buildingId: data.buildingId
-      }))
-    } else if (data.type === 'floor') {
-      // 按空间查询通道（iot_device_channel 有 floorId，录像回放后端用 channel.id 查询）
-      const channelsRes = await getChannelPage({
-        pageNo: 1,
-        pageSize: 100,
-        channelType: 'video',
-        floorId: data.floorId
-      })
-      const channels = channelsRes.list || []
-
-      children = channels.map((ch: any) => {
-        const ibmsChannel: IbmsChannel = {
-          id: ch.id,
-          channelName: ch.channelName || `通道${ch.channelNo ?? 1}`,
-          channelNo: ch.channelNo ?? 1,
-          onlineStatus: ch.status
-        }
-        return {
-          id: `channel-${ch.id}`,
-          name: ibmsChannel.channelName,
-          type: 'channel' as const,
-          channelId: ch.id,
-          ibmsChannel
-        }
-      })
+    if (!data || data.type !== 'space' || !data.spaceId) {
+      resolve([])
+      return
     }
-
-    resolve(children)
+    const childSpaces = (spaceTreeChildrenMap.get(data.spaceId) || []).map(mapSpaceNode)
+    const channels = await loadChannelsBySpace(data.spaceId)
+    resolve([...childSpaces, ...channels])
   } catch (e: any) {
     console.error('[树节点] 加载失败:', e)
+    ElMessage.error('加载节点失败')
     resolve([])
   }
 }
@@ -285,12 +316,13 @@ const initDefaultTimeRange = () => {
 
 onMounted(() => {
   initDefaultTimeRange()
-  loadBuildingTree()
+  loadSpaceTree()
 })
 
 // 暴露方法
 defineExpose({
-  loadBuildingTree,
+  loadBuildingTree: loadSpaceTree,
+  loadSpaceTree,
   selectedChannels,
   filterForm
 })

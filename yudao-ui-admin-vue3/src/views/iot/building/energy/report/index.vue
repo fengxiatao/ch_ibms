@@ -212,7 +212,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import * as EnergyApi from '@/api/iot/building/energy'
-import * as echarts from 'echarts'
+import echarts from '@/plugins/echarts'
 import { useMessage } from '@/hooks/web/useMessage'
 
 defineOptions({ name: 'BuildingEnergyReport' })

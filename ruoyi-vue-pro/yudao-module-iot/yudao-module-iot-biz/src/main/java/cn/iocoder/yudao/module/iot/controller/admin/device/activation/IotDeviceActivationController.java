@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.iot.controller.admin.device.activation;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.iot.controller.admin.device.activation.vo.DeviceActivationReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.device.activation.vo.DeviceActivationRespVO;
 import cn.iocoder.yudao.module.iot.service.device.discovery.dto.DiscoveredDeviceDTO;
@@ -10,6 +12,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import jakarta.annotation.security.PermitAll;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,11 +22,11 @@ import java.util.Map;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 /**
- * IoT 设备激活控制器
+ * 设备激活（仅 IBMS 台账 + 网关 CONNECT）
  *
  * @author 长辉信息科技有限公司
  */
-@Tag(name = "管理后台 - IoT 设备激活")
+@Tag(name = "管理后台 - 设备激活（IBMS）")
 @RestController
 @RequestMapping("/iot/device/activation")
 @Validated
@@ -34,9 +37,13 @@ public class IotDeviceActivationController {
     
     @PostMapping("/activate")
     @Operation(summary = "激活设备")
+    @PermitAll
+    @TenantIgnore
     public CommonResult<Map<String, String>> activateDevice(@Valid @RequestBody DeviceActivationReqVO reqVO) {
         // 构建发现设备对象
+        Long tenantId = TenantContextHolder.getTenantId();
         DiscoveredDeviceDTO discoveredDevice = DiscoveredDeviceDTO.builder()
+            .tenantId(tenantId)
             .ipAddress(reqVO.getIpAddress())
             .vendor(reqVO.getVendor())
             .model(reqVO.getModel())
@@ -66,6 +73,8 @@ public class IotDeviceActivationController {
     @GetMapping("/result/{activationId}")
     @Operation(summary = "获取激活结果（包含错误信息）")
     @Parameter(name = "activationId", description = "激活请求ID", required = true)
+    @PermitAll
+    @TenantIgnore
     public CommonResult<DeviceActivationRespVO> getActivationResult(@PathVariable("activationId") String activationId) {
         Map<String, Object> statusInfo = deviceActivationService.getActivationStatusDetail(activationId);
         
@@ -85,6 +94,8 @@ public class IotDeviceActivationController {
     @GetMapping("/status/{activationId}")
     @Operation(summary = "获取激活状态")
     @Parameter(name = "activationId", description = "激活请求ID", required = true)
+    @PermitAll
+    @TenantIgnore
     public CommonResult<Map<String, String>> getActivationStatus(@PathVariable("activationId") String activationId) {
         String status = deviceActivationService.getActivationStatus(activationId);
         
@@ -98,6 +109,8 @@ public class IotDeviceActivationController {
     @PostMapping("/disconnect/{deviceId}")
     @Operation(summary = "断开设备连接")
     @Parameter(name = "deviceId", description = "设备ID", required = true)
+    @PermitAll
+    @TenantIgnore
     public CommonResult<Boolean> disconnectDevice(@PathVariable("deviceId") Long deviceId) {
         deviceActivationService.disconnectDevice(deviceId);
         return success(true);

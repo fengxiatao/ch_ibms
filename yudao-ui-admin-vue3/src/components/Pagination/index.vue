@@ -8,7 +8,7 @@
     :page-sizes="[10, 20, 30, 50, 100]"
     :pager-count="pagerCount"
     :total="total"
-    :small="isSmall"
+    :size="paginationSize"
     class="float-right mb-15px mt-15px"
     layout="total, sizes, prev, pager, next, jumper"
     @size-change="handleSizeChange"
@@ -28,6 +28,7 @@ const isSmall = ref<boolean>(layoutCurrentSize.value === 'small')
 watchEffect(() => {
   isSmall.value = layoutCurrentSize.value === 'small'
 })
+const paginationSize = computed(() => (isSmall.value ? 'small' : undefined))
 
 const props = defineProps({
   // 总条目数

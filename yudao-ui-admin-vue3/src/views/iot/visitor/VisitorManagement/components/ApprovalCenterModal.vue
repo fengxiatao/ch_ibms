@@ -235,7 +235,7 @@ const resolveProcessedCount = () => {
   }
   NewVisitorManagementApi.getStats()
     .then((res: any) => {
-      const d = res?.data
+      const d = res
       processedCountValue.value = d?.todayProcessedCount ?? d?.today_processed_count ?? 0
     })
     .catch(() => {})
@@ -317,7 +317,7 @@ function loadList() {
   }
   NewVisitorManagementApi.getAppointmentPage(params)
     .then((res: any) => {
-      const list = res?.data?.list ?? res?.list ?? []
+      const list = res?.list ?? res?.data?.list ?? []
       const raw = Array.isArray(list) ? list : []
       approvalList.value = raw.map((item: any) => ({
         ...item,

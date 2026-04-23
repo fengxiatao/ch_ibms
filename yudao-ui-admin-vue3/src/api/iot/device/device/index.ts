@@ -101,66 +101,126 @@ export interface IotDeviceMessageSendReqVO {
   params?: any // 请求参数
 }
 
-// 设备 API
+/** IBMS 分页/详情行 → 历史 DeviceVO 形状（降低旧页面改动量；台账以 ibms_device 为准） */
+function mapIbmsRowToDeviceVO(row: Record<string, any>) {
+  if (!row) {
+    return row
+  }
+  return {
+    ...row,
+    deviceName: row.name ?? row.deviceName,
+    productId: row.ibmsProductId ?? row.productId,
+    ipAddress: row.ip ?? row.ipAddress,
+    serialNumber: row.sn ?? row.serialNumber,
+    state: row.state ?? 0
+  }
+}
+
+function mapIbmsSimpleToDeviceVO(row: Record<string, any>) {
+  return {
+    ...row,
+    deviceName: row.name ?? row.deviceName,
+    productId: row.ibmsProductId ?? row.productId,
+    state: row.state ?? 0
+  }
+}
+
+// 设备 API（统一走 IBMS 台账 `/iot/ibms/device/*`）
 export const DeviceApi = {
   // 查询设备分页
   getDevicePage: async (params: any) => {
-    return await request.get({ url: `/iot/device/page`, params })
+    const data = await request.get({
+      url: '/iot/ibms/device/page',
+      params: {
+        pageNo: params.pageNo,
+        pageSize: params.pageSize,
+        keyword: params.deviceName ?? params.name,
+        ibmsProductId: params.productId
+      }
+    })
+    if (data?.list?.length) {
+      data.list = data.list.map(mapIbmsRowToDeviceVO)
+    }
+    return data
   },
 
   // 查询设备详情
   getDevice: async (id: number) => {
-    return await request.get({ url: `/iot/device/get?id=` + id })
+    const data: any = await request.get({ url: '/iot/ibms/device/get', params: { id } })
+    return mapIbmsRowToDeviceVO(data)
   },
 
   // 新增设备
   createDevice: async (data: DeviceVO) => {
-    return await request.post({ url: `/iot/device/create`, data })
+    return await request.post({ url: `/iot/ibms/device/create`, data })
   },
 
   // 修改设备
   updateDevice: async (data: DeviceVO) => {
-    return await request.put({ url: `/iot/device/update`, data })
+    return await request.put({ url: `/iot/ibms/device/update`, data })
   },
 
   // 修改设备分组
   updateDeviceGroup: async (data: { ids: number[]; groupIds: number[] }) => {
-    return await request.put({ url: `/iot/device/update-group`, data })
+    return await request.put({ url: '/iot/ibms/device/update-group', data })
   },
 
   // 删除单个设备
   deleteDevice: async (id: number) => {
-    return await request.delete({ url: `/iot/device/delete?id=` + id })
+    return await request.delete({ url: `/iot/ibms/device/delete?id=` + id })
   },
 
   // 删除多个设备
   deleteDeviceList: async (ids: number[]) => {
-    return await request.delete({ url: `/iot/device/delete-list`, params: { ids: ids.join(',') } })
+    return await request.delete({
+      url: '/iot/ibms/device/delete-list',
+      params: { ids: ids.join(',') }
+    })
   },
 
   // 导出设备
   exportDeviceExcel: async (params: any) => {
-    return await request.download({ url: `/iot/device/export-excel`, params })
+    return await request.download({
+      url: `/iot/ibms/device/export-excel`,
+      params: {
+        pageNo: params.pageNo ?? 1,
+        pageSize: -1,
+        keyword: params.deviceName ?? params.name,
+        systemCode: params.deviceType,
+        ibmsProductId: params.productId
+      }
+    })
   },
 
-  // 获取设备数量
+  // 获取设备数量（双轨合计）
   getDeviceCount: async (productId: number) => {
-    return await request.get({ url: `/iot/device/count?productId=` + productId })
+    return await request.get({
+      url: '/iot/ibms/device/count',
+      params: { ibmsProductId: productId }
+    })
   },
 
   // 获取设备的精简信息列表
   getSimpleDeviceList: async (deviceType?: number, productId?: number) => {
-    return await request.get({ url: `/iot/device/simple-list?`, params: { deviceType, productId } })
+    const list: any[] = await request.get({
+      url: '/iot/ibms/device/simple-list',
+      params: { deviceType, ibmsProductId: productId }
+    })
+    return (list || []).map(mapIbmsSimpleToDeviceVO)
   },
 
   // 根据产品编号，获取设备的精简信息列表
   getDeviceListByProductId: async (productId: number) => {
-    return await request.get({ url: `/iot/device/simple-list?`, params: { productId } })
+    const list: any[] = await request.get({
+      url: '/iot/ibms/device/simple-list',
+      params: { ibmsProductId: productId }
+    })
+    return (list || []).map(mapIbmsSimpleToDeviceVO)
   },
 
   // 获取导入模板
   importDeviceTemplate: async () => {
-    return await request.download({ url: `/iot/device/get-import-template` })
+    return await request.download({ url: `/iot/ibms/device/get-import-template` })
   },
 
   // 获取设备属性最新数据

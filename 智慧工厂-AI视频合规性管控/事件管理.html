@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>事件管理 - 工厂AI视频合规管控系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-panel: rgba(15, 23, 42, 0.85);
+            --border-color: rgba(148, 163, 184, 0.15);
+            --compliance-green: #10b981;
+            --warning-yellow: #f59e0b;
+            --violation-red: #ef4444;
+            --info-blue: #3b82f6;
+        }
+        body { background: var(--bg-primary); color: #f1f5f9; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .glass-panel { background: var(--bg-panel); backdrop-filter: blur(12px); border: 1px solid var(--border-color); border-radius: 12px; }
+
+        .sidebar-menu-item { padding: 10px 16px; border-radius: 8px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 10px; color: #94a3b8; }
+        .sidebar-menu-item:hover { background: rgba(59,130,246,0.15); color: #60a5fa; }
+        .sidebar-menu-item.active { background: rgba(59,130,246,0.25); color: #60a5fa; }
+
+        .toast { position: fixed; bottom: 24px; right: 24px; background: #1e293b; border-left: 4px solid var(--info-blue); border-radius: 8px; padding: 12px 20px; z-index: 1100; transform: translateX(400px); transition: transform 0.3s; }
+        .toast.show { transform: translateX(0); }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-content { background: #1e293b; border: 1px solid #334155; border-radius: 16px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(30,41,59,0.5); }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+    <!-- 左侧边栏 -->
+    <aside class="w-72 bg-slate-900/80 border-r border-gray-800 flex flex-col shrink-0 overflow-y-auto">
+        <div class="p-5 border-b border-gray-800">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-shield-alt text-2xl text-blue-500"></i>
+                <div>
+                    <h1 class="text-lg font-bold">工厂AI视频合规管控</h1>
+                    <p class="text-xs text-gray-500">智能合规事件管理平台</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="px-4 py-3 border-t border-gray-800">
+            <div class="text-xs text-gray-500 uppercase mb-2 font-semibold">功能模块</div>
+            <div class="space-y-1">
+                <div class="sidebar-menu-item" onclick="location.href='monitor.html'">
+                    <i class="fas fa-desktop text-gray-400"></i>
+                    <span class="text-sm">实时监控</span>
+                </div>
+                <div class="sidebar-menu-item" onclick="location.href='alerts.html'">
+                    <i class="fas fa-bell text-gray-400"></i>
+                    <span class="text-sm">实时告警</span>
+                </div>
+                <div class="sidebar-menu-item active">
+                    <i class="fas fa-database text-blue-400"></i>
+                    <span class="text-sm">事件管理</span>
+                </div>
+                <div class="sidebar-menu-item" onclick="location.href='analysis.html'">
+                    <i class="fas fa-chart-line text-gray-400"></i>
+                    <span class="text-sm">事件分析</span>
+                </div>
+                <div class="sidebar-menu-item" onclick="location.href='personnel.html'">
+                    <i class="fas fa-users text-gray-400"></i>
+                    <span class="text-sm">人员档案管理</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-auto p-4 border-t border-gray-800">
+            <div class="grid grid-cols-3 gap-2 text-center">
+                <div><div class="text-lg font-bold text-blue-400">6</div><div class="text-xs text-gray-500">监控点位</div></div>
+                <div><div class="text-lg font-bold text-green-400">5</div><div class="text-xs text-gray-500">合规规则</div></div>
+                <div><div class="text-lg font-bold text-purple-400">13</div><div class="text-xs text-gray-500">在场人员</div></div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容区：事件管理 -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <div class="p-6 border-b border-gray-800 bg-slate-900/30">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-bold flex items-center gap-2">
+                        <i class="fas fa-database text-blue-400"></i>事件管理
+                    </h2>
+                    <p class="text-gray-500 text-sm mt-1">历史事件查询、处理与归档</p>
+                </div>
+                <div class="flex gap-2">
+                    <button class="px-4 py-2 bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded-lg text-sm hover:bg-blue-600/30" onclick="batchHandle()">
+                        <i class="fas fa-check-double mr-1"></i>批量处理
+                    </button>
+                    <button class="px-4 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600">
+                        <i class="fas fa-download mr-1"></i>导出
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-6">
+            <!-- 筛选栏 -->
+            <div class="glass-panel p-4 mb-4">
+                <div class="flex flex-wrap gap-3">
+                    <input type="text" id="searchInput" placeholder="搜索事件/人员/地点" class="flex-1 min-w-[200px] bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm" oninput="renderEvents()">
+                    <select id="statusFilter" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm" onchange="renderEvents()">
+                        <option value="all">全部状态</option>
+                        <option value="pending">未处理</option>
+                        <option value="resolved">已处理</option>
+                    </select>
+                    <select id="typeFilter" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm" onchange="renderEvents()">
+                        <option value="all">全部类型</option>
+                        <option value="hygiene">卫生异常</option>
+                        <option value="count">人数超限</option>
+                        <option value="behavior">行为违规</option>
+                        <option value="intrusion">禁区闯入</option>
+                        <option value="equipment">设备异常</option>
+                    </select>
+                    <input type="date" id="dateFilter" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm" onchange="renderEvents()">
+                </div>
+            </div>
+
+            <!-- 事件表格 -->
+            <div class="glass-panel flex-1 p-4">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-700 text-gray-400">
+                                <th class="text-left py-3 px-2"><input type="checkbox" id="selectAll" class="rounded bg-slate-800 border-slate-600"></th>
+                                <th class="text-left py-3 px-2">事件</th>
+                                <th class="text-left py-3 px-2">级别</th>
+                                <th class="text-left py-3 px-2">区域</th>
+                                <th class="text-left py-3 px-2">人员</th>
+                                <th class="text-left py-3 px-2">时间</th>
+                                <th class="text-left py-3 px-2">状态</th>
+                                <th class="text-left py-3 px-2">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="eventTable"></tbody>
+                    </table>
+                </div>
+                <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-700">
+                    <span class="text-xs text-gray-500" id="pageSummary">共 0 条</span>
+                    <div class="flex gap-2">
+                        <button onclick="prevPage()" class="px-3 py-1 bg-slate-700 rounded text-xs hover:bg-slate-600">上一页</button>
+                        <span class="text-xs text-gray-400 py-1" id="pageNum">第 1/1 页</span>
+                        <button onclick="nextPage()" class="px-3 py-1 bg-slate-700 rounded text-xs hover:bg-slate-600">下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 详情模态框 -->
+    <div id="detailModal" class="modal-overlay">
+        <div class="modal-content p-5">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-semibold text-lg">事件详情</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">
+        <div class="flex items-center gap-2">
+            <i id="toastIcon" class="fas fa-check-circle text-green-400"></i>
+            <span id="toastMessage"></span>
+        </div>
+    </div>
+
+    <script>
+        let events = [
+            { id: 1, type: 'hygiene', level: 'critical', title: '洁净服穿戴异常', description: '检测到人员未正确佩戴口罩', camera: 'CAM-01', zone: 'zone-a', location: 'A区洁净区入口', time: '2024-03-28 09:15:23', status: 'pending', person: '王建国', snapshot: 'https://picsum.photos/id/20/100/80', handleMethod: null },
+            { id: 2, type: 'count', level: 'warning', title: '区域人数超限', description: 'B区作业区当前人数4人，超出上限3人', camera: 'CAM-03', zone: 'zone-b', location: 'B区洁净作业区', time: '2024-03-28 10:45:12', status: 'pending', person: null, snapshot: 'https://picsum.photos/id/26/100/80', handleMethod: null },
+            { id: 3, type: 'behavior', level: 'warning', title: '违规操作行为', description: '检测到人员裸手接触原料', camera: 'CAM-04', zone: 'zone-b', location: 'B区关键工位', time: '2024-03-28 11:30:45', status: 'pending', person: '李秀英', snapshot: 'https://picsum.photos/id/29/100/80', handleMethod: null },
+            { id: 4, type: 'intrusion', level: 'critical', title: '禁区闯入告警', description: '未授权人员进入原料仓储区', camera: 'CAM-06', zone: 'zone-d', location: 'D区原料仓储区', time: '2024-03-28 13:20:08', status: 'pending', person: '赵强', snapshot: 'https://picsum.photos/id/31/100/80', handleMethod: null },
+            { id: 5, type: 'equipment', level: 'info', title: '设备-人员匹配异常', description: '非授权操作人员', camera: 'CAM-05', zone: 'zone-c', location: 'C区灌装线', time: '2024-03-28 14:55:30', status: 'resolved', person: '陈敏', snapshot: 'https://picsum.photos/id/42/100/80', handleMethod: '现场检查', handleTime: '15:20', handleResult: '已核实' },
+            { id: 6, type: 'hygiene', level: 'warning', title: '未戴工作帽', description: '员工未佩戴工作帽', camera: 'CAM-02', zone: 'zone-a', location: 'A区更衣室', time: '2024-03-28 08:30:15', status: 'resolved', person: '刘芳', snapshot: 'https://picsum.photos/id/44/100/80', handleMethod: '人员提醒', handleTime: '08:45', handleResult: '已提醒' },
+            { id: 7, type: 'behavior', level: 'critical', title: '违规跨越传送带', description: '员工违规跨越运行中传送带', camera: 'CAM-04', zone: 'zone-b', location: 'B区包装线', time: '2024-03-28 07:55:30', status: 'resolved', person: '王建国', snapshot: 'https://picsum.photos/id/45/100/80', handleMethod: '现场检查', handleTime: '08:10', handleResult: '安全警告' }
+        ];
+
+        for (let i = 8; i <= 20; i++) {
+            const types = ['hygiene', 'count', 'behavior', 'intrusion', 'equipment'];
+            const persons = ['王建国', '李秀英', '张伟', '陈敏', '刘芳', '赵强'];
+            events.push({
+                id: i,
+                type: types[i%5],
+                level: i%3===0?'critical':'warning',
+                title: `${['卫生异常','人数预警','操作违规','闯入告警','设备匹配'][i%5]}事件`,
+                description: 'AI检测到合规异常',
+                camera: `CAM-0${(i%6)+1}`,
+                zone: `zone-${['a','b','c','d'][i%4]}`,
+                location: `监控区域${i}`,
+                time: `2024-03-28 ${10+(i%12)}:${(i*3)%60}:00`,
+                status: i%4===0?'resolved':'pending',
+                person: persons[i%6],
+                snapshot: `https://picsum.photos/id/${i+30}/100/80`,
+                handleMethod: null
+            });
+        }
+
+        let currentPage = 1;
+        let pageSize = 8;
+
+        function showToast(msg, type='success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const msgEl = document.getElementById('toastMessage');
+            const icons = { success: 'fa-check-circle text-green-400', warning: 'fa-exclamation-circle text-yellow-400', error: 'fa-times-circle text-red-400', info: 'fa-info-circle text-blue-400' };
+            icon.className = `fas ${icons[type]}`;
+            msgEl.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function renderEvents() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const status = document.getElementById('statusFilter').value;
+            const type = document.getElementById('typeFilter').value;
+            const date = document.getElementById('dateFilter').value;
+
+            let filtered = events.filter(e => {
+                const matchSearch = !search || e.title.toLowerCase().includes(search) || (e.person && e.person.toLowerCase().includes(search)) || e.location.toLowerCase().includes(search);
+                const matchStatus = status === 'all' || e.status === status;
+                const matchType = type === 'all' || e.type === type;
+                const matchDate = !date || e.time.includes(date);
+                return matchSearch && matchStatus && matchType && matchDate;
+            });
+
+            const totalPages = Math.ceil(filtered.length / pageSize);
+            if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
+            const start = (currentPage - 1) * pageSize;
+            const pageData = filtered.slice(start, start + pageSize);
+
+            const tbody = document.getElementById('eventTable');
+            tbody.innerHTML = pageData.map(e => `
+                <tr class="border-b border-gray-800 hover:bg-slate-800/50">
+                    <td class="py-3 px-2"><input type="checkbox" class="event-checkbox rounded bg-slate-800 border-slate-600" value="${e.id}"></td>
+                    <td class="py-3 px-2">
+                        <div class="flex items-center gap-2">
+                            <img src="${e.snapshot}" class="w-10 h-8 rounded object-cover">
+                            <div>
+                                <div class="text-sm">${e.title}</div>
+                                <div class="text-xs text-gray-500">${e.description}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="py-3 px-2">
+                        <span class="px-2 py-0.5 rounded text-xs ${e.level === 'critical' ? 'bg-red-500/20 text-red-400' : e.level === 'warning' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}">
+                            ${e.level === 'critical' ? '严重' : e.level === 'warning' ? '警告' : '提示'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-2 text-sm">${e.location}</td>
+                    <td class="py-3 px-2 text-sm">${e.person || '-'}</td>
+                    <td class="py-3 px-2 text-sm text-gray-400">${e.time}</td>
+                    <td class="py-3 px-2">
+                        <span class="px-2 py-0.5 rounded text-xs ${e.status === 'pending' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}">
+                            ${e.status === 'pending' ? '未处理' : '已处理'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-2">
+                        <button onclick="viewDetail(${e.id})" class="text-blue-400 hover:text-blue-300 mr-2"><i class="fas fa-eye"></i></button>
+                        ${e.status === 'pending' ? `<button onclick="quickHandle(${e.id})" class="text-green-400 hover:text-green-300"><i class="fas fa-check"></i></button>` : ''}
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('pageSummary').textContent = `共 ${filtered.length} 条`;
+            document.getElementById('pageNum').textContent = `第 ${currentPage}/${totalPages || 1} 页`;
+        }
+
+        function prevPage() { if (currentPage > 1) { currentPage--; renderEvents(); } }
+        function nextPage() { currentPage++; renderEvents(); }
+
+        function quickHandle(id) {
+            const e = events.find(x => x.id === id);
+            if (e) {
+                e.status = 'resolved';
+                e.handleMethod = '快速处理';
+                e.handleTime = new Date().toLocaleTimeString();
+                e.handleResult = '已处理';
+                renderEvents();
+                showToast('事件已处理', 'success');
+            }
+        }
+
+        function batchHandle() {
+            const checked = document.querySelectorAll('.event-checkbox:checked');
+            if (checked.length === 0) { showToast('请选择要处理的事件', 'warning'); return; }
+            if (confirm(`确定批量处理 ${checked.length} 条事件？`)) {
+                checked.forEach(cb => {
+                    const e = events.find(x => x.id == cb.value);
+                    if (e && e.status === 'pending') {
+                        e.status = 'resolved';
+                        e.handleMethod = '批量处理';
+                        e.handleTime = new Date().toLocaleTimeString();
+                        e.handleResult = '批量处理完成';
+                    }
+                });
+                renderEvents();
+                showToast(`已处理 ${checked.length} 条事件`, 'success');
+            }
+        }
+
+        function viewDetail(id) {
+            const e = events.find(x => x.id === id);
+            const content = document.getElementById('modalContent');
+            content.innerHTML = `
+                <img src="${e.snapshot}" class="w-full h-48 object-cover rounded-lg mb-4">
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div class="text-gray-400">事件类型:</div><div>${e.title}</div>
+                    <div class="text-gray-400">告警级别:</div><div><span class="px-2 py-0.5 rounded text-xs ${e.level === 'critical' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}">${e.level === 'critical' ? '严重' : '警告'}</span></div>
+                    <div class="text-gray-400">发生时间:</div><div>${e.time}</div>
+                    <div class="text-gray-400">监控点位:</div><div>${e.camera}</div>
+                    <div class="text-gray-400">具体位置:</div><div>${e.location}</div>
+                    <div class="text-gray-400">涉及人员:</div><div>${e.person || '未识别'}</div>
+                    <div class="text-gray-400">当前状态:</div><div class="${e.status === 'pending' ? 'text-red-400' : 'text-green-400'}">${e.status === 'pending' ? '未处理' : '已处理'}</div>
+                </div>
+                ${e.handleResult ? `
+                    <div class="mt-4 p-3 bg-green-900/20 border border-green-600/30 rounded-lg">
+                        <div class="text-green-400 text-sm font-medium mb-1">处理结果</div>
+                        <div class="text-sm">处理方式: ${e.handleMethod}</div>
+                        <div class="text-sm">处理时间: ${e.handleTime}</div>
+                        <div class="text-sm">处理备注: ${e.handleResult}</div>
+                    </div>
+                ` : ''}
+            `;
+            document.getElementById('detailModal').classList.add('active');
+        }
+
+        function closeModal() { document.getElementById('detailModal').classList.remove('active'); }
+
+        document.getElementById('selectAll').addEventListener('change', function() {
+            document.querySelectorAll('.event-checkbox').forEach(cb => cb.checked = this.checked);
+        });
+
+        function init() { renderEvents(); }
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

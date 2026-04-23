@@ -65,6 +65,10 @@ onBeforeUnmount(() => {
 
 const sensors = ref<IbmsEnvSensorVO[]>([])
 
+const getAirSourceName = (sensor?: Partial<IbmsEnvSensorVO>) => {
+  return sensor?.sensorName || sensor?.sensorCode || '环境监测点'
+}
+
 const buildFloorPointsFromSensors = (latestMap: Map<number, IbmsEnvDataRecordVO>) => {
   const list: FloorPoint[] = []
   for (const sensor of sensors.value) {
@@ -193,12 +197,16 @@ const loadOverviewData = async () => {
     }
     buildFloorPointsFromSensors(latestMap)
 
-    const anyIndoor = sensors.value.find((s) => s.sensorCode === 'A-4F-AIR') || sensors.value[0]
+    const anyIndoor =
+      sensors.value.find((s) => s.id && s.sensorCode?.includes('AIR') && s.sensorCode !== 'OUT-ENV') ||
+      sensors.value.find((s) => s.id)
     if (anyIndoor?.id) {
       const history = (await getEnvDataRecordHistory(anyIndoor.id, 24)) as IbmsEnvDataRecordVO[]
       if (history?.length) {
         buildTempSeriesFromHistory(history)
-        buildTrendDataForSensor('B栋4层监测点', history)
+        const airSourceName = getAirSourceName(anyIndoor)
+        buildTrendDataForSensor(airSourceName, history)
+        airSource.value = airSourceName
       }
     }
   } catch {
@@ -221,7 +229,7 @@ const outdoorWeather = reactive({
   temp: 0,
   humid: 0,
   desc: '室外环境监测',
-  tip: '模拟测试数据',
+  tip: '实时监测数据',
   updatedAt: ''
 })
 
@@ -310,7 +318,7 @@ const historyCompare = reactive({
   updatedAt: ''
 })
 
-const airSource = ref('B栋4层监测点')
+const airSource = ref('')
 const airRange = ref<AirRange>('day')
 
 const rangeTextMap: Record<AirRange, '近24小时' | '近7天' | '近30天'> = {
@@ -321,9 +329,12 @@ const rangeTextMap: Record<AirRange, '近24小时' | '近7天' | '近30天'> = {
 
 const trendDataMap = reactive<Record<string, Record<'近24小时' | '近7天' | '近30天', TrendDataset>>>({})
 
+const airSourceOptions = computed(() => Object.keys(trendDataMap))
+
 const airSeriesData = computed(() => {
   const rangeText = rangeTextMap[airRange.value]
-  const fallback = trendDataMap['B栋4层监测点']?.['近24小时']
+  const defaultSource = airSource.value || airSourceOptions.value[0] || ''
+  const fallback = defaultSource ? trendDataMap[defaultSource]?.['近24小时'] : undefined
   return trendDataMap[airSource.value]?.[rangeText] ?? fallback ?? {
     labels: [],
     pm25: [],
@@ -468,25 +479,6 @@ onBeforeUnmount(() => {
 <template>
   <div class="env-overview-page">
     <div class="container">
-      <div class="header-card">
-        <div class="header-left">
-          <div class="header-icon">
-            <Icon icon="ep:orange" />
-          </div>
-          <div class="header-title">室内环境监测数据总览</div>
-        </div>
-        <div class="header-right">
-          <div class="time">
-            <Icon icon="ep:clock" class="mr-6px" />
-            <span class="time-value">{{ currentTimeText }}</span>
-          </div>
-          <div class="status">
-            <span class="pulse-dot"></span>
-            <span class="status-text">系统正常</span>
-          </div>
-        </div>
-      </div>
-
       <el-row :gutter="16" class="env-row--equal-height">
         <el-col :xs="24" :md="12" :lg="6">
           <el-card shadow="hover" class="panel-card">
@@ -660,11 +652,12 @@ onBeforeUnmount(() => {
             <div class="control-item">
               <span class="control-label">数据来源：</span>
               <el-select v-model="airSource" size="small" class="!w-200px">
-                <el-option label="A栋1层监测点" value="A栋1层监测点" />
-                <el-option label="A栋3层监测点" value="A栋3层监测点" />
-                <el-option label="B栋2层监测点" value="B栋2层监测点" />
-                <el-option label="B栋4层监测点" value="B栋4层监测点" />
-                <el-option label="全楼10个监测点平均值" value="全楼10个监测点平均值" />
+                <el-option
+                  v-for="option in airSourceOptions"
+                  :key="option"
+                  :label="option"
+                  :value="option"
+                />
               </el-select>
             </div>
             <el-button-group>

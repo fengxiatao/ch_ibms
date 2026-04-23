@@ -4,10 +4,13 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
-import cn.iocoder.yudao.module.iot.dal.mysql.channel.IotDeviceChannelMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
+import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
 import cn.iocoder.yudao.module.iot.mq.producer.DeviceCommandPublisher;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -15,6 +18,7 @@ import org.springframework.validation.annotation.Validated;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.mq.manager.DeviceCommandResponseManager;
 import jakarta.annotation.Resource;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,10 +64,13 @@ public class IotAccessChannelServiceImpl implements IotAccessChannelService {
     private DeviceCommandResponseManager responseManager;
 
     @Resource
-    private IotDeviceChannelMapper channelMapper;
+    private IotDeviceChannelService channelService;
 
     @Resource
-    private IotDeviceMapper deviceMapper;
+    private IbmsDeviceMapper ibmsDeviceMapper;
+
+    @Resource
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
 
     @Resource
     private DeviceCommandPublisher deviceCommandPublisher;
@@ -99,7 +106,13 @@ public class IotAccessChannelServiceImpl implements IotAccessChannelService {
 
     @Override
     public int discoverChannels(Long deviceId) {
-        IotDeviceDO device = deviceMapper.selectById(deviceId);
+        IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(deviceId);
+        if (ibms == null) {
+            throw exception(ACCESS_DEVICE_NOT_EXISTS);
+        }
+
+        var runtime = ibmsDeviceRuntimeService.getByDeviceId(deviceId);
+        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibms, runtime);
         if (device == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
@@ -158,7 +171,15 @@ public class IotAccessChannelServiceImpl implements IotAccessChannelService {
      * 处理通道列表
      */
     private int processChannelList(Long deviceId, List<Map<String, Object>> channelList) {
-        int count = 0;
+        if (channelList == null || channelList.isEmpty()) {
+            return 0;
+        }
+
+        // 1) 先把门禁“通道行”收口到 ibms_channel（DR/DR-READER）
+        List<IotDeviceChannelService.AccessChannelSyncInfo> syncInfos = new ArrayList<>();
+        // 2) 再把门禁配置（doorState/doorStatus/doorMode）写入 extra.config
+        Map<Integer, Map<String, Object>> configByChannelNo = new HashMap<>();
+
         for (Map<String, Object> channelInfo : channelList) {
             Integer channelNo = getInteger(channelInfo, "channelNo");
             String channelName = getString(channelInfo, "channelName");
@@ -166,48 +187,56 @@ public class IotAccessChannelServiceImpl implements IotAccessChannelService {
             String doorStatus = getString(channelInfo, "doorStatus");
             Integer doorMode = getInteger(channelInfo, "doorMode");
 
-            // 检查通道是否已存在
-            List<IotDeviceChannelDO> existingChannels = channelMapper.selectListByDeviceId(deviceId);
-            IotDeviceChannelDO existingChannel = existingChannels.stream()
-                    .filter(ch -> ch.getChannelNo() != null && ch.getChannelNo().equals(channelNo))
-                    .findFirst()
-                    .orElse(null);
-            
-            if (existingChannel == null) {
-                // 新通道,插入数据库
-                IotDeviceChannelDO channel = IotDeviceChannelDO.builder()
-                        .deviceId(deviceId)
-                        .channelNo(channelNo)
-                        .channelName(channelName)
-                        .channelType("ACCESS")
-                        .deviceType("ACCESS_CONTROL")
-                        .onlineStatus(1)
-                        .enableStatus(1)
-                        .build();
-                
-                // 保存门状态和模式到config
-                if (doorState != null || doorMode != null) {
-                    Map<String, Object> config = new HashMap<>();
-                    if (doorState != null) {
-                        config.put("doorState", doorState);
-                        config.put("doorStatus", doorStatus);
-                    }
-                    if (doorMode != null) {
-                        config.put("doorMode", doorMode);
-                    }
-                    channel.setConfig(config);
+            if (channelNo == null) {
+                continue;
+            }
+
+            syncInfos.add(IotDeviceChannelService.AccessChannelSyncInfo.builder()
+                    .channelNo(channelNo)
+                    .channelName(channelName)
+                    .channelType("ACCESS")
+                    // discovery 场景未知“在线/离线”，这里默认开启（armed）
+                    .status(1)
+                    .capabilities(null)
+                    .build());
+
+            boolean hasCfg = doorState != null || doorMode != null || doorStatus != null;
+            if (hasCfg) {
+                Map<String, Object> cfg = configByChannelNo.computeIfAbsent(channelNo, k -> new HashMap<>());
+                if (doorState != null) {
+                    cfg.put("doorState", doorState);
                 }
-                
-                channelMapper.insert(channel);
-                count++;
-                log.info("[discoverChannels] 新增通道: deviceId={}, channelNo={}, channelName={}", 
-                        deviceId, channelNo, channelName);
-            } else {
-                // 已存在的通道,更新状态信息
-                updateExistingChannel(existingChannel, channelName, doorState, doorStatus, doorMode);
+                if (doorStatus != null) {
+                    cfg.put("doorStatus", doorStatus);
+                }
+                if (doorMode != null) {
+                    cfg.put("doorMode", doorMode);
+                }
             }
         }
-        return count;
+
+        if (syncInfos.isEmpty()) {
+            return 0;
+        }
+
+        var syncResult = channelService.syncAccessChannels(deviceId, syncInfos);
+        int inserted = syncResult != null ? syncResult.getInsertedCount() : 0;
+
+        // 将门禁状态/模式写入 extra.config（避免后续 G4 删除 iot_device_channel 断链）
+        for (Map.Entry<Integer, Map<String, Object>> entry : configByChannelNo.entrySet()) {
+            Integer channelNo = entry.getKey();
+            Map<String, Object> cfg = entry.getValue();
+            if (channelNo == null || cfg == null || cfg.isEmpty()) {
+                continue;
+            }
+            IotDeviceChannelDO channel = channelService.getChannelByDeviceIdAndChannelNo(deviceId, channelNo);
+            if (channel == null || channel.getId() == null) {
+                continue;
+            }
+            channelService.updateChannelConfig(channel.getId(), cfg);
+        }
+
+        return inserted;
     }
 
     /**
@@ -215,40 +244,21 @@ public class IotAccessChannelServiceImpl implements IotAccessChannelService {
      */
     private void updateExistingChannel(IotDeviceChannelDO existingChannel, String channelName,
                                         Integer doorState, String doorStatus, Integer doorMode) {
-        boolean needUpdate = false;
+        if (existingChannel == null || existingChannel.getId() == null) {
+            return;
+        }
         Map<String, Object> config = existingChannel.getConfig();
         if (config == null) {
             config = new HashMap<>();
         }
-        
-        // 更新门状态
         if (doorState != null) {
             config.put("doorState", doorState);
             config.put("doorStatus", doorStatus);
-            needUpdate = true;
         }
-        
-        // 更新门模式
         if (doorMode != null) {
             config.put("doorMode", doorMode);
-            needUpdate = true;
         }
-        
-        // 如果通道名称为空或为默认名称,则更新为SDK返回的名称
-        if (existingChannel.getChannelName() == null || 
-            existingChannel.getChannelName().isEmpty() ||
-            existingChannel.getChannelName().startsWith("通道") ||
-            existingChannel.getChannelName().startsWith("Channel")) {
-            existingChannel.setChannelName(channelName);
-            needUpdate = true;
-        }
-        
-        if (needUpdate) {
-            existingChannel.setConfig(config);
-            channelMapper.updateById(existingChannel);
-            log.info("[discoverChannels] 更新通道状态: deviceId={}, channelNo={}", 
-                    existingChannel.getDeviceId(), existingChannel.getChannelNo());
-        }
+        channelService.updateChannelConfig(existingChannel.getId(), config);
     }
 
     /**
@@ -301,24 +311,39 @@ public class IotAccessChannelServiceImpl implements IotAccessChannelService {
 
     @Override
     public List<IotDeviceChannelDO> getChannelsByDeviceId(Long deviceId) {
-        return channelMapper.selectListByDeviceId(deviceId);
+        List<IotDeviceChannelDO> all = channelService.getChannelsByDeviceId(deviceId);
+        if (all == null || all.isEmpty()) {
+            return List.of();
+        }
+        List<IotDeviceChannelDO> access = new ArrayList<>();
+        for (IotDeviceChannelDO c : all) {
+            if (c != null && "ACCESS".equalsIgnoreCase(c.getChannelType())) {
+                access.add(c);
+            }
+        }
+        return access;
     }
 
     @Override
     public IotDeviceChannelDO getChannel(Long channelId) {
-        return channelMapper.selectById(channelId);
+        return channelService.getChannel(channelId);
     }
 
     /**
      * 执行门控制操作
      */
     private void executeDoorControl(Long channelId, String operationType, Long operatorId, String operatorName) {
-        IotDeviceChannelDO channel = channelMapper.selectById(channelId);
+        IotDeviceChannelDO channel = channelService.getChannel(channelId);
         if (channel == null) {
             throw exception(CHANNEL_NOT_EXISTS);
         }
 
-        IotDeviceDO device = deviceMapper.selectById(channel.getDeviceId());
+        IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(channel.getDeviceId());
+        if (ibms == null) {
+            throw exception(ACCESS_DEVICE_NOT_EXISTS);
+        }
+        var runtime = ibmsDeviceRuntimeService.getByDeviceId(channel.getDeviceId());
+        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibms, runtime);
         if (device == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
@@ -398,9 +423,7 @@ public class IotAccessChannelServiceImpl implements IotAccessChannelService {
             
             config.put("alwaysMode", alwaysMode);
             config.put("alwaysModeCode", alwaysModeCode);
-            channel.setConfig(config);
-            
-            channelMapper.updateById(channel);
+            channelService.updateChannelConfig(channel.getId(), config);
             log.info("[updateChannelAlwaysMode] 更新通道常开/常闭模式成功: channelId={}, alwaysMode={}", 
                     channel.getId(), alwaysMode);
         } catch (Exception e) {
@@ -412,16 +435,21 @@ public class IotAccessChannelServiceImpl implements IotAccessChannelService {
     @Override
     public cn.iocoder.yudao.module.iot.controller.admin.access.vo.device.IotAccessChannelDetailRespVO getChannelDetail(Long channelId) {
         // 1. 获取通道基本信息
-        IotDeviceChannelDO channel = channelMapper.selectById(channelId);
+        IotDeviceChannelDO channel = channelService.getChannel(channelId);
         if (channel == null) {
             throw exception(ACCESS_CHANNEL_NOT_EXISTS);
         }
         
         // 2. 获取设备信息
-        IotDeviceDO device = deviceMapper.selectById(channel.getDeviceId());
-        
+        IotDeviceDO device = null;
+        IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(channel.getDeviceId());
+        if (ibms != null) {
+            var runtime = ibmsDeviceRuntimeService.getByDeviceId(channel.getDeviceId());
+            device = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibms, runtime);
+        }
+
         // 3. 构建响应VO
-        cn.iocoder.yudao.module.iot.controller.admin.access.vo.device.IotAccessChannelDetailRespVO respVO = 
+        cn.iocoder.yudao.module.iot.controller.admin.access.vo.device.IotAccessChannelDetailRespVO respVO =
                 new cn.iocoder.yudao.module.iot.controller.admin.access.vo.device.IotAccessChannelDetailRespVO();
         
         // 基本信息

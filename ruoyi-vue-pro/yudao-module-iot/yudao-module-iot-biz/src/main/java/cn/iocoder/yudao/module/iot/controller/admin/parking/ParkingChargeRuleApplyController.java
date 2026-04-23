@@ -55,7 +55,7 @@ public class ParkingChargeRuleApplyController {
     @GetMapping("/get")
     @Operation(summary = "获得收费规则应用")
     @Parameter(name = "id", description = "编号", required = true)
-    @PreAuthorize("@ss.hasPermission('iot:parking:charge-rule-apply:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:charge-rule-apply:query-btn')")
     public CommonResult<ParkingChargeRuleApplyRespVO> getChargeRuleApply(@RequestParam("id") Long id) {
         ParkingChargeRuleApplyDO chargeRuleApply = parkingChargeRuleApplyService.getChargeRuleApply(id);
         return success(BeanUtils.toBean(chargeRuleApply, ParkingChargeRuleApplyRespVO.class));
@@ -63,7 +63,7 @@ public class ParkingChargeRuleApplyController {
 
     @GetMapping("/page")
     @Operation(summary = "获得收费规则应用分页")
-    @PreAuthorize("@ss.hasPermission('iot:parking:charge-rule-apply:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:charge-rule-apply:query-btn')")
     public CommonResult<PageResult<ParkingChargeRuleApplyRespVO>> getChargeRuleApplyPage(@Valid ParkingChargeRuleApplyPageReqVO pageReqVO) {
         PageResult<ParkingChargeRuleApplyDO> pageResult = parkingChargeRuleApplyService.getChargeRuleApplyPage(pageReqVO);
         return success(BeanUtils.toBean(pageResult, ParkingChargeRuleApplyRespVO.class));

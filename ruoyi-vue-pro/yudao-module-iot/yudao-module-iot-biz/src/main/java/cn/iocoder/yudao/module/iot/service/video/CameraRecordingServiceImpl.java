@@ -12,14 +12,19 @@ import cn.iocoder.yudao.module.iot.core.messagebus.topics.IotMessageTopics;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.dal.dataobject.camera.IotCameraRecordingDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.camera.IotCameraRecordingMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.enums.device.NvrDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.mq.producer.DeviceCommandPublisher;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceDahuaSdkHelper;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
 import cn.iocoder.yudao.module.iot.mq.manager.DeviceCommandResponseManager;
+import cn.iocoder.yudao.module.iot.service.video.IbmsDeviceVideoNetworkResolver;
+import org.apache.commons.lang3.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -61,8 +66,11 @@ public class CameraRecordingServiceImpl implements CameraRecordingService {
     private IotCameraRecordingMapper cameraRecordingMapper;
 
     @Resource
-    private IotDeviceService deviceService;
-    
+    private IbmsDeviceMapper ibmsDeviceMapper;
+
+    @Resource
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
+
     @Resource
     private IotDeviceChannelService channelService;
 
@@ -133,21 +141,21 @@ public class CameraRecordingServiceImpl implements CameraRecordingService {
                     continue;
                 }
             
-                // 2. 查询设备信息
-                IotDeviceDO device = deviceService.getDevice(channel.getDeviceId());
+                // 2. 查询设备信息（IBMS 台账 + 运行态）
+                IbmsDeviceDO device = ibmsDeviceMapper.selectById(channel.getDeviceId());
                 if (device == null) {
                     log.warn("[录像查询] 设备不存在: deviceId={}", channel.getDeviceId());
                     continue;
                 }
-                
-                // 3. 获取设备连接信息（从 config 中获取）
-                String ip = DeviceConfigHelper.getIpAddress(device);
-                Integer port = DeviceConfigHelper.getPort(device) != null ? DeviceConfigHelper.getPort(device) : 37777;  // 大华默认端口
-                String username = "admin";  // 默认用户名
-                String password = "admin123";  // 默认密码
-                
-                // TODO: 从设备或通道配置中获取实际的端口、用户名、密码
-                
+                IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(device.getId());
+                IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(device, runtime);
+
+                // 3. 获取设备连接信息
+                String ip = net.ip;
+                int port = IbmsDeviceDahuaSdkHelper.resolveDahuaSdkPort(runtime);
+                String username = StringUtils.defaultIfBlank(net.username, "admin");
+                String password = StringUtils.defaultIfBlank(net.password, "admin123");
+
                 // 4. 转换时间格式：LocalDateTime -> String (yyyy-MM-dd HH:mm:ss)
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
                 String startTimeStr = pageReqVO.getStartTime() != null ? 
@@ -207,8 +215,7 @@ public class CameraRecordingServiceImpl implements CameraRecordingService {
     @Transactional(rollbackFor = Exception.class)
     public Long uploadRecording(Long deviceId, Integer recordingType, MultipartFile file) throws Exception {
         // 1. 验证设备
-        IotDeviceDO device = deviceService.getDevice(deviceId);
-        if (device == null) {
+        if (ibmsDeviceMapper.selectById(deviceId) == null) {
             throw new ServiceException(BAD_REQUEST.getCode(), "设备不存在");
         }
 
@@ -280,13 +287,15 @@ public class CameraRecordingServiceImpl implements CameraRecordingService {
     @Transactional(rollbackFor = Exception.class)
     public Long startRecording(Long deviceId, Integer duration, String policy) {
         // 1. 验证设备
-        IotDeviceDO device = deviceService.getDevice(deviceId);
+        IbmsDeviceDO device = ibmsDeviceMapper.selectById(deviceId);
         if (device == null) {
             throw new ServiceException(BAD_REQUEST.getCode(), "设备不存在");
         }
-        
-        if (device.getState() != 1) {
-            log.warn("[录像管理] 设备状态非在线(state={}), 仍尝试开始录像 deviceId={}", device.getState(), deviceId);
+
+        Integer st = IbmsDeviceLedgerRuntimeHelper.resolveDeviceState(device,
+                ibmsDeviceRuntimeService.getByDeviceId(deviceId));
+        if (st == null || st != 1) {
+            log.warn("[录像管理] 设备状态非在线(state={}), 仍尝试开始录像 deviceId={}", st, deviceId);
         }
         
         // 2. 创建录像记录（状态：录制中）
@@ -457,32 +466,20 @@ public class CameraRecordingServiceImpl implements CameraRecordingService {
                 return Collections.emptyList();
             }
             
-            // 2. 查询设备信息（NVR）
-            IotDeviceDO device = deviceService.getDevice(channel.getDeviceId());
+            // 2. 查询设备信息（NVR，IBMS）
+            IbmsDeviceDO device = ibmsDeviceMapper.selectById(channel.getDeviceId());
             if (device == null) {
                 log.warn("[录像查询-大华SDK] 设备不存在: deviceId={}", channel.getDeviceId());
                 return Collections.emptyList();
             }
-            
+            IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(device.getId());
+            IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(device, runtime);
+
             // 3. 获取设备连接信息
-            String ip = DeviceConfigHelper.getIpAddress(device);
-            Integer port = DeviceConfigHelper.getPort(device);
-            if (port == null) {
-                port = 37777;  // 大华默认SDK端口
-            }
-            
-            // 从设备配置中获取用户名和密码
-            String username = "admin";
-            String password = "admin123";
-            if (device.getConfig() != null) {
-                Map<String, Object> configMap = device.getConfig().toMap();
-                if (configMap.get("username") != null) {
-                    username = configMap.get("username").toString();
-                }
-                if (configMap.get("password") != null) {
-                    password = configMap.get("password").toString();
-                }
-            }
+            String ip = net.ip;
+            int port = IbmsDeviceDahuaSdkHelper.resolveDahuaSdkPort(runtime);
+            String username = StringUtils.defaultIfBlank(net.username, "admin");
+            String password = StringUtils.defaultIfBlank(net.password, "admin123");
             
             // 4. 生成请求ID并构建命令参数
             String requestId = UUID.randomUUID().toString();

@@ -6,15 +6,15 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**
- * IoT 设备激活 - 激活请求 Request VO
+ * 设备激活请求（台账写入 IBMS）
  *
  * @author 长辉信息科技有限公司
  */
-@Schema(description = "管理后台 - IoT 设备激活请求 Request VO")
+@Schema(description = "管理后台 - 设备激活请求（IBMS 产品 + 发现设备）")
 @Data
 public class DeviceActivationReqVO {
     
-    @Schema(description = "产品ID", required = true, example = "1")
+    @Schema(description = "IBMS 产品主键（ibms_product.id）", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     @NotNull(message = "产品ID不能为空")
     private Long productId;
     

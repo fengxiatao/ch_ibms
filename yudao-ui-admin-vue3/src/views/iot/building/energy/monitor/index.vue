@@ -143,7 +143,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import * as EnergyApi from '@/api/iot/building/energy'
 import type { IbmsEnergyMeterVO, IbmsEnergyOverviewVO } from '@/api/iot/building/energy'
-import * as echarts from 'echarts'
+import echarts from '@/plugins/echarts'
 import { formatDate } from '@/utils/formatTime'
 
 defineOptions({ name: 'BuildingEnergyMonitor' })

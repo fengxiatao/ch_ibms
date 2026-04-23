@@ -1,0 +1,1 @@
+UPDATE system_dict_data SET deleted=b'1', updater='excel_v22', update_time=NOW() WHERE deleted=b'0' AND dict_type IN ('ibms_device_model','ibms_device_type','ibms_group','ibms_point_type','ibms_region','ibms_system');

@@ -6,17 +6,20 @@ import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.iot.controller.admin.product.vo.product.IotProductPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.product.vo.product.IotProductSaveReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
-import cn.iocoder.yudao.module.iot.dal.mysql.product.IotProductMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsProductDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsProductExtra;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsProductMapper;
 import cn.iocoder.yudao.module.iot.dal.redis.RedisKeyConstants;
 import cn.iocoder.yudao.module.iot.enums.product.IotProductStatusEnum;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
 import cn.iocoder.yudao.module.iot.service.device.property.IotDevicePropertyService;
+import cn.iocoder.yudao.module.iot.service.ibms.product.IbmsProductExtraHelper;
 import com.baomidou.dynamic.datasource.annotation.DSTransactional;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +27,9 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
+
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -52,116 +58,97 @@ import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.*;
 public class IotProductServiceImpl implements IotProductService {
 
     @Resource
-    private IotProductMapper productMapper;
+    private IbmsProductMapper ibmsProductMapper;
 
     @Resource
     private IotDevicePropertyService devicePropertyDataService;
+
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
     
     @Resource
     private FileApi fileApi;
 
     @Override
     public Long createProduct(IotProductSaveReqVO createReqVO) {
-        // 1. 校验 ProductKey
-        if (productMapper.selectByProductKey(createReqVO.getProductKey()) != null) {
-            throw exception(PRODUCT_KEY_EXISTS);
-        }
-        // 2. 校验图片格式（禁止 base64，必须先通过 infra 模块上传）
-        validateImageUrl(createReqVO.getPicUrl(), "产品图片");
-        validateImageUrl(createReqVO.getIcon(), "产品图标");
-
-        // 3. 自动生成小图标（如果 icon 为空且 picUrl 不为空）
-        if (StrUtil.isEmpty(createReqVO.getIcon()) && StrUtil.isNotEmpty(createReqVO.getPicUrl())) {
-            String iconUrl = generateIconFromPicUrl(createReqVO.getPicUrl());
-            if (iconUrl != null) {
-                createReqVO.setIcon(iconUrl);
-                log.info("[createProduct] 自动生成产品图标成功: {}", iconUrl);
-            }
-        }
-
-        // 4. 插入
-        IotProductDO product = BeanUtils.toBean(createReqVO, IotProductDO.class)
-                .setStatus(IotProductStatusEnum.UNPUBLISHED.getStatus());
-        
-        // 5. 自动设置 primary_menu_id 为第一个 menuId
-        autoSetPrimaryMenuId(product);
-        
-        productMapper.insert(product);
-        return product.getId();
+        throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(
+                410, "已废弃：请改用 `/iot/ibms/product` 对应接口（权限 `iot:ibms-product:*`）。");
     }
 
     @Override
     @CacheEvict(value = RedisKeyConstants.PRODUCT, key = "#updateReqVO.id", beforeInvocation = true)
     public void updateProduct(IotProductSaveReqVO updateReqVO) {
-        updateReqVO.setProductKey(null); // 不更新产品标识
-        // 1.1 校验存在
-        IotProductDO iotProductDO = validateProductExists(updateReqVO.getId());
-        // 1.2 发布状态不可更新
-        validateProductStatus(iotProductDO);
-        // 1.3 校验图片格式（禁止 base64，必须先通过 infra 模块上传）
-        validateImageUrl(updateReqVO.getPicUrl(), "产品图片");
-        validateImageUrl(updateReqVO.getIcon(), "产品图标");
-
-        // 1.4 自动生成小图标（如果 icon 为空且 picUrl 不为空）
-        if (StrUtil.isEmpty(updateReqVO.getIcon()) && StrUtil.isNotEmpty(updateReqVO.getPicUrl())) {
-            String iconUrl = generateIconFromPicUrl(updateReqVO.getPicUrl());
-            if (iconUrl != null) {
-                updateReqVO.setIcon(iconUrl);
-                log.info("[updateProduct] 自动生成产品图标成功: {}", iconUrl);
-            }
-        }
-
-        // 2. 更新
-        IotProductDO updateObj = BeanUtils.toBean(updateReqVO, IotProductDO.class);
-        
-        // 3. 自动设置 primary_menu_id 为第一个 menuId
-        autoSetPrimaryMenuId(updateObj);
-        
-        productMapper.updateById(updateObj);
-        
-        // 4. 记录图标更新日志（方便排查缓存问题）
-        if (StrUtil.isNotEmpty(updateReqVO.getIcon()) || StrUtil.isNotEmpty(updateReqVO.getPicUrl())) {
-            log.info("[updateProduct] 产品图标已更新 - 产品ID: {}, icon: {}, picUrl: {}", 
-                    updateReqVO.getId(), updateReqVO.getIcon(), updateReqVO.getPicUrl());
-        }
+        throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(
+                410, "已废弃：请改用 `/iot/ibms/product` 对应接口（权限 `iot:ibms-product:*`）。");
     }
 
     @Override
     @CacheEvict(value = RedisKeyConstants.PRODUCT, key = "#id")
     public void deleteProduct(Long id) {
-        // 1.1 校验存在
-        IotProductDO product = validateProductExists(id);
-        // 1.2 发布状态不可删除
-        validateProductStatus(product);
-        // 1.3 校验是否有设备
-        if (deviceService.getDeviceCountByProductId(id) > 0) {
-            throw exception(PRODUCT_DELETE_FAIL_HAS_DEVICE);
-        }
-
-        // 2. 删除
-        productMapper.deleteById(id);
+        throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(
+                410, "已废弃：请改用 `/iot/ibms/product` 对应接口（权限 `iot:ibms-product:*`）。");
     }
 
     @Override
     public IotProductDO validateProductExists(Long id) {
-        IotProductDO product = productMapper.selectById(id);
-        if (product == null) {
+        IbmsProductDO ibmsProduct = ibmsProductMapper.selectById(id);
+        if (ibmsProduct == null) {
             throw exception(PRODUCT_NOT_EXISTS);
         }
-        return product;
+        return toIotProductShell(ibmsProduct);
     }
 
     @Override
     public IotProductDO validateProductExists(String productKey) {
-        IotProductDO product = productMapper.selectByProductKey(productKey);
-        if (product == null) {
+        IbmsProductDO ibmsProduct = ibmsProductMapper.selectByExtraLegacyProductKey(productKey);
+        if (ibmsProduct == null) {
             throw exception(PRODUCT_NOT_EXISTS);
         }
-        return product;
+        return toIotProductShell(ibmsProduct);
     }
 
+    /**
+     * 把 {@code ibms_product + ibms_product.extra} 转成 legacy {@link IotProductDO} 壳对象。
+     * <p>
+     * 主要用于兼容：定时任务调度（解析 {@code jobConfig}）/ 设备激活流程（校验产品存在）。
+     * </p>
+     */
+    private IotProductDO toIotProductShell(IbmsProductDO ibmsProduct) {
+        if (ibmsProduct == null) {
+            return null;
+        }
+
+        IbmsProductExtra e = IbmsProductExtraHelper.parse(ibmsProduct.getExtra());
+        IotProductDO shell = new IotProductDO();
+        shell.setId(ibmsProduct.getId());
+        shell.setTenantId(ibmsProduct.getTenantId());
+
+        shell.setName(ibmsProduct.getProductName());
+        shell.setProductKey(e.getProductKey());
+
+        shell.setIcon(ibmsProduct.getIcon());
+        shell.setPicUrl(e.getPicUrl());
+        shell.setDescription(ibmsProduct.getDescription());
+
+        shell.setMenuIds(e.getMenuIds());
+        shell.setPrimaryMenuId(e.getPrimaryMenuId());
+
+        shell.setStatus(e.getStatus());
+        shell.setDeviceType(e.getDeviceType());
+        shell.setNetType(e.getNetType());
+        shell.setLocationType(e.getLocationType());
+        shell.setCodecType(e.getCodecType());
+        shell.setJobConfig(e.getJobConfig());
+
+        // 兼容：有的迁移数据只配置了 menuIds，但 primaryMenuId 为空。
+        if (shell.getPrimaryMenuId() == null) {
+            autoSetPrimaryMenuId(shell);
+        }
+
+        return shell;
+    }
+
+    @SuppressWarnings("unused")
     private void validateProductStatus(IotProductDO product) {
         if (Objects.equals(product.getStatus(), IotProductStatusEnum.PUBLISHED.getStatus())) {
             throw exception(PRODUCT_STATUS_NOT_DELETE);
@@ -178,6 +165,7 @@ public class IotProductServiceImpl implements IotProductService {
      * @param url       图片 URL
      * @param fieldName 字段名称（用于错误提示）
      */
+    @SuppressWarnings("unused")
     private void validateImageUrl(String url, String fieldName) {
         if (StrUtil.isEmpty(url)) {
             return; // 允许为空
@@ -210,6 +198,7 @@ public class IotProductServiceImpl implements IotProductService {
      * @param picUrl 产品图片 URL
      * @return 图标 URL，失败时返回 null
      */
+    @SuppressWarnings("unused")
     private String generateIconFromPicUrl(String picUrl) {
         if (StrUtil.isEmpty(picUrl)) {
             return null;
@@ -365,24 +354,42 @@ public class IotProductServiceImpl implements IotProductService {
 
     @Override
     public IotProductDO getProduct(Long id) {
-        return productMapper.selectById(id);
+        IbmsProductDO ibmsProduct = ibmsProductMapper.selectById(id);
+        return toIotProductShell(ibmsProduct);
     }
 
     @Override
     @Cacheable(value = RedisKeyConstants.PRODUCT, key = "#id", unless = "#result == null")
     @TenantIgnore // 忽略租户信息
     public IotProductDO getProductFromCache(Long id) {
-        return productMapper.selectById(id);
+        IbmsProductDO ibmsProduct = ibmsProductMapper.selectById(id);
+        return toIotProductShell(ibmsProduct);
     }
 
     @Override
     public IotProductDO getProductByProductKey(String productKey) {
-        return productMapper.selectByProductKey(productKey);
+        IbmsProductDO ibmsProduct = ibmsProductMapper.selectByExtraLegacyProductKey(productKey);
+        return toIotProductShell(ibmsProduct);
     }
 
     @Override
     public PageResult<IotProductDO> getProductPage(IotProductPageReqVO pageReqVO) {
-        return productMapper.selectPage(pageReqVO);
+        LambdaQueryWrapperX<IbmsProductDO> wrapper = new LambdaQueryWrapperX<IbmsProductDO>()
+                .likeIfPresent(IbmsProductDO::getProductName, pageReqVO.getName())
+                .orderByDesc(IbmsProductDO::getId);
+
+        if (StrUtil.isNotBlank(pageReqVO.getProductKey())) {
+            // product_key 历史字段被迁移到 ibms_product.extra.productKey
+            wrapper.apply("LOWER(JSON_UNQUOTE(JSON_EXTRACT(extra, '$.productKey'))) = {0}",
+                    pageReqVO.getProductKey().trim().toLowerCase());
+        }
+
+        PageResult<IbmsProductDO> ibmsPage = ibmsProductMapper.selectPage(pageReqVO, wrapper);
+        List<IotProductDO> list = ibmsPage.getList().stream()
+                .map(this::toIotProductShell)
+                .filter(Objects::nonNull)
+                .toList();
+        return new PageResult<>(list, ibmsPage.getTotal());
     }
 
     @Override
@@ -398,19 +405,35 @@ public class IotProductServiceImpl implements IotProductService {
             devicePropertyDataService.defineDevicePropertyData(id);
         }
 
-        // 3. 更新
-        IotProductDO updateObj = IotProductDO.builder().id(id).status(status).build();
-        productMapper.updateById(updateObj);
+        // 3. 更新：status 落到 ibms_product.extra.status
+        IbmsProductDO ibmsProduct = ibmsProductMapper.selectById(id);
+        if (ibmsProduct == null) {
+            throw exception(PRODUCT_NOT_EXISTS);
+        }
+
+        IbmsProductExtra patch = new IbmsProductExtra();
+        patch.setStatus(status);
+        String newExtra = IbmsProductExtraHelper.merge(ibmsProduct.getExtra(), patch);
+        ibmsProduct.setExtra(newExtra);
+        ibmsProductMapper.updateById(ibmsProduct);
     }
 
     @Override
     public List<IotProductDO> getProductList() {
-        return productMapper.selectList();
+        List<IbmsProductDO> ibmsProducts = ibmsProductMapper.selectList();
+        if (ibmsProducts == null || ibmsProducts.isEmpty()) {
+            return List.of();
+        }
+        return ibmsProducts.stream()
+                .map(this::toIotProductShell)
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     @Override
     public Long getProductCount(LocalDateTime createTime) {
-        return productMapper.selectCountByCreateTime(createTime);
+        return ibmsProductMapper.selectCount(new LambdaQueryWrapperX<IbmsProductDO>()
+                .geIfPresent(IbmsProductDO::getCreateTime, createTime));
     }
 
     @Override
@@ -418,7 +441,8 @@ public class IotProductServiceImpl implements IotProductService {
         if (CollUtil.isEmpty(ids)) {
             return;
         }
-        List<IotProductDO> products = productMapper.selectByIds(ids);
+        List<IbmsProductDO> products = ibmsProductMapper.selectList(new LambdaQueryWrapperX<IbmsProductDO>()
+                .in(IbmsProductDO::getId, ids));
         if (products.size() != ids.size()) {
             throw exception(PRODUCT_NOT_EXISTS);
         }
@@ -426,16 +450,44 @@ public class IotProductServiceImpl implements IotProductService {
 
     @Override
     public List<IotProductDO> getProductsWithJobConfig() {
-        return productMapper.selectProductsWithJobConfig();
+        List<IbmsProductDO> products = ibmsProductMapper.selectList(new LambdaQueryWrapperX<IbmsProductDO>()
+                // 兼容：extra.jobConfig 允许为 NULL/""，不参与调度
+                .apply("JSON_UNQUOTE(JSON_EXTRACT(extra, '$.jobConfig')) IS NOT NULL")
+                .apply("TRIM(JSON_UNQUOTE(JSON_EXTRACT(extra, '$.jobConfig'))) <> ''"));
+
+        return products.stream()
+                .map(this::toIotProductShell)
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     @Override
     public void updateProductJobConfig(Long id, String jobConfig) {
         validateProductExists(id);
-        IotProductDO updateObj = new IotProductDO();
-        updateObj.setId(id);
-        updateObj.setJobConfig(jobConfig);
-        productMapper.updateById(updateObj);
+
+        IbmsProductDO ibmsProduct = ibmsProductMapper.selectById(id);
+        if (ibmsProduct == null) {
+            throw exception(PRODUCT_NOT_EXISTS);
+        }
+
+        JSONObject o;
+        try {
+            o = StrUtil.isBlank(ibmsProduct.getExtra())
+                    ? new JSONObject()
+                    : JSONUtil.parseObj(ibmsProduct.getExtra().trim());
+        } catch (Exception ignored) {
+            o = new JSONObject();
+        }
+
+        if (StrUtil.isBlank(jobConfig)) {
+            o.remove("jobConfig");
+        } else {
+            o.set("jobConfig", jobConfig);
+        }
+
+        String newExtra = o.isEmpty() ? null : o.toString();
+        ibmsProduct.setExtra(newExtra);
+        ibmsProductMapper.updateById(ibmsProduct);
     }
 
     /**
@@ -474,7 +526,12 @@ public class IotProductServiceImpl implements IotProductService {
         if (CollUtil.isEmpty(productIds)) {
             return Map.of();
         }
-        List<IotProductDO> products = productMapper.selectBatchIds(productIds);
+        List<IbmsProductDO> ibmsProducts = ibmsProductMapper.selectList(new LambdaQueryWrapperX<IbmsProductDO>()
+                .in(IbmsProductDO::getId, productIds));
+        List<IotProductDO> products = ibmsProducts.stream()
+                .map(this::toIotProductShell)
+                .filter(Objects::nonNull)
+                .toList();
         return convertMap(products, IotProductDO::getId);
     }
 

@@ -6,7 +6,9 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.mq.producer.DeviceCommandPublisher;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,8 @@ import java.util.concurrent.TimeoutException;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.*;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
 
 /**
  * 门禁卡信息管理 Service 实现类
@@ -61,10 +65,13 @@ public class IotAccessCardServiceImpl implements IotAccessCardService {
     private DeviceCommandResponseManager responseManager;
 
     @Resource
-    private IotDeviceMapper deviceMapper;
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @Resource
     private DeviceCommandPublisher deviceCommandPublisher;
+
+    @Resource
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
 
     /**
      * 根据设备配置获取设备类型
@@ -265,11 +272,16 @@ public class IotAccessCardServiceImpl implements IotAccessCardService {
     }
 
     private IotDeviceDO validateAccessDevice(Long deviceId) {
-        IotDeviceDO device = deviceMapper.selectById(deviceId);
-        if (device == null) {
+        IbmsDeviceDO ibmsDevice = ibmsDeviceMapper.selectById(deviceId);
+        if (ibmsDevice == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
-        if (!"access".equals(device.getSubsystemCode())) {
+        if (!"access".equals(ibmsDevice.getSubsystemCode())) {
+            throw exception(ACCESS_DEVICE_NOT_EXISTS);
+        }
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(deviceId);
+        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibmsDevice, runtime);
+        if (device == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
         return device;
