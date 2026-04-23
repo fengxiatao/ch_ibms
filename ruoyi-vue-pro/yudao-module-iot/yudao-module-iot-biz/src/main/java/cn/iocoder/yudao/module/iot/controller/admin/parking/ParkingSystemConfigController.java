@@ -28,7 +28,7 @@ public class ParkingSystemConfigController {
     @GetMapping("/get")
     @Operation(summary = "获得停车系统配置")
     @Parameter(name = "lotId", description = "停车场ID", required = false)
-    @PreAuthorize("@ss.hasPermission('iot:parking:system:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:system:query-btn')")
     public CommonResult<ParkingSystemConfigRespVO> getConfig(
             @RequestParam(value = "lotId", required = false) Long lotId) {
         return success(BeanUtils.toBean(parkingSystemConfigService.getConfig(lotId),

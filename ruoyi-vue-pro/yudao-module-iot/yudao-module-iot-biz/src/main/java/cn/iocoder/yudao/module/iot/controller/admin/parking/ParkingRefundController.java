@@ -58,7 +58,7 @@ public class ParkingRefundController {
     @PostMapping("/sync")
     @Operation(summary = "同步退款状态")
     @Parameter(name = "id", description = "退款记录ID", required = true)
-    @PreAuthorize("@ss.hasPermission('iot:parking:refund:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:refund:query-btn')")
     public CommonResult<Boolean> syncRefundStatus(@RequestParam("id") Long id) {
         parkingRefundService.syncRefundStatus(id);
         return success(true);
@@ -66,7 +66,7 @@ public class ParkingRefundController {
 
     @GetMapping("/page")
     @Operation(summary = "获取退款记录分页")
-    @PreAuthorize("@ss.hasPermission('iot:parking:refund:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:refund:query-btn')")
     public CommonResult<PageResult<ParkingRefundRecordRespVO>> getRefundRecordPage(@Valid ParkingRefundRecordPageReqVO pageReqVO) {
         PageResult<ParkingRefundRecordDO> pageResult = parkingRefundService.getRefundRecordPage(pageReqVO);
         return success(BeanUtils.toBean(pageResult, ParkingRefundRecordRespVO.class));
@@ -75,7 +75,7 @@ public class ParkingRefundController {
     @GetMapping("/get")
     @Operation(summary = "获取退款记录详情")
     @Parameter(name = "id", description = "退款记录ID", required = true)
-    @PreAuthorize("@ss.hasPermission('iot:parking:refund:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:refund:query-btn')")
     public CommonResult<ParkingRefundRecordRespVO> getRefundRecord(@RequestParam("id") Long id) {
         ParkingRefundRecordDO refundRecord = parkingRefundService.getRefundRecord(id);
         return success(BeanUtils.toBean(refundRecord, ParkingRefundRecordRespVO.class));

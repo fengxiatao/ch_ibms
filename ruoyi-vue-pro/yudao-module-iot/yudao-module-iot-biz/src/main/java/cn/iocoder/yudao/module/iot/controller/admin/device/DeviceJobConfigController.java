@@ -1,7 +1,8 @@
 package cn.iocoder.yudao.module.iot.controller.admin.device;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,16 +18,15 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class DeviceJobConfigController {
 
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
 
     @GetMapping("/get/{id}")
     @Operation(summary = "获取设备的定时任务配置")
     @Parameter(name = "id", description = "设备ID", required = true, example = "1024")
     @PreAuthorize("@ss.hasPermission('iot:device:query')")
     public CommonResult<String> getDeviceJobConfig(@PathVariable("id") Long id) {
-        // 查询设备列表，找到对应的设备
-        var device = deviceService.getDevice(id);
-        return success(device != null ? device.getJobConfig() : null);
+        IbmsDeviceRuntimeDO rt = ibmsDeviceRuntimeService.getByDeviceId(id);
+        return success(rt != null ? rt.getJobConfig() : null);
     }
 
     @PutMapping("/save/{id}")
@@ -36,10 +36,7 @@ public class DeviceJobConfigController {
     public CommonResult<Boolean> saveDeviceJobConfig(
             @PathVariable("id") Long id,
             @RequestBody String jobConfig) {
-
-        // 更新配置
-        deviceService.updateDeviceJobConfig(id, jobConfig);
-
+        ibmsDeviceRuntimeService.updateJobConfig(id, jobConfig);
         return success(true);
     }
 
@@ -48,10 +45,7 @@ public class DeviceJobConfigController {
     @Parameter(name = "id", description = "设备ID", required = true, example = "1024")
     @PreAuthorize("@ss.hasPermission('iot:device:delete')")
     public CommonResult<Boolean> deleteJobConfig(@PathVariable("id") Long id) {
-
-        // 删除配置（设置为NULL）
-        deviceService.updateDeviceJobConfig(id, null);
-
+        ibmsDeviceRuntimeService.updateJobConfig(id, null);
         return success(true);
     }
 }

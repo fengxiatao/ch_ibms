@@ -100,12 +100,16 @@ export interface SecurityData {
   channelOnlineRate: number
   channelOnline: number
   channelOffline: number
+  ipcTotal?: number
+  ipcOnline?: number
+  ipcOffline?: number
   storageOnlineRate: number
   storageOnline: number
   storageOffline: number
   serverOnlineRate: number | null
   serverOnline: number
   serverOffline: number
+  alarmTypeDistribution?: Array<{ name: string; value: number }>
   unhandledAlarms: number
   alarmTrend: number[]
   recentAlarms: AlarmItem[]
@@ -196,7 +200,6 @@ export interface HomeScreenVO {
 export const getHomeScreenData = () => {
   return request.get<HomeScreenVO>({ url: '/iot/dashboard/home-screen' })
 }
-
 
 
 

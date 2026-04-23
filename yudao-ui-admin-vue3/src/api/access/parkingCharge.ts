@@ -1,4 +1,5 @@
 import request from '@/config/axios'
+import dayjs from 'dayjs'
 
 export interface ParkingChargeRuleVO {
   id?: number
@@ -51,6 +52,74 @@ export interface ParkingRecordRespVO {
   remark?: string
 }
 
+type BackendParkingRecordPageReq = {
+  pageNo: number
+  pageSize: number
+  plateNumber?: string
+  paymentStatus?: number
+  entryTime?: [string, string]
+}
+
+type BackendParkingRecordResp = {
+  id: number
+  lotId: number
+  plateNumber: string
+  vehicleCategory?: string
+  entryTime?: string
+  entryOperator?: string
+  exitTime?: string
+  exitOperator?: string
+  parkingDuration?: number
+  paidAmount?: number
+  paymentMethod?: string
+  paymentTime?: string
+  paymentStatus?: number
+  remark?: string
+}
+
+type PageResult<T> = { list: T[]; total: number }
+
+const normalizeDateTime = (value?: string | number) => {
+  if (value === undefined || value === null || value === '') return ''
+  const raw = String(value).trim()
+  if (/^\d+$/.test(raw)) {
+    const num = Number(raw)
+    const ms = raw.length <= 10 ? num * 1000 : num
+    return dayjs(ms).isValid() ? dayjs(ms).format('YYYY-MM-DD HH:mm:ss') : raw
+  }
+  return dayjs(raw).isValid() ? dayjs(raw).format('YYYY-MM-DD HH:mm:ss') : raw
+}
+
+const mapRecordRow = (row: BackendParkingRecordResp): ParkingRecordRespVO => {
+  const ioType: 'in' | 'out' = row.exitTime ? 'out' : 'in'
+  const operator = row.exitTime ? row.exitOperator : row.entryOperator
+  return {
+    id: row.id,
+    lotId: row.lotId,
+    plateNo: row.plateNumber,
+    vehicleType:
+      row.vehicleCategory === 'temporary'
+        ? 'temp'
+        : row.vehicleCategory === 'monthly'
+          ? 'monthly'
+          : row.vehicleCategory === 'free'
+            ? 'inner'
+            : 'temp',
+    ioType,
+    inTime: normalizeDateTime(row.entryTime),
+    outTime: row.exitTime ? normalizeDateTime(row.exitTime) : undefined,
+    durationMinutes: row.parkingDuration || 0,
+    gateName: '-',
+    feePaid: Number(row.paidAmount || 0),
+    payStatus: row.paymentStatus ?? 0,
+    payChannel: row.paymentMethod || undefined,
+    payTime: row.paymentTime ? normalizeDateTime(row.paymentTime) : undefined,
+    operator: operator || undefined,
+    abnormal: false,
+    remark: row.remark || undefined
+  }
+}
+
 export interface ParkingRecordManualPayReqVO {
   lotId?: number
   plateNo: string
@@ -98,10 +167,23 @@ export const ParkingChargeApi = {
 
   // 出入场记录（用于缴费记录查询）
   getRecordPage: (params: ParkingRecordPageReqVO) => {
-    return request.get<{ list: ParkingRecordRespVO[]; total: number }>({
-      url: '/iot/parking/record/page',
-      params
-    })
+    const backendParams: BackendParkingRecordPageReq = {
+      pageNo: params.pageNo,
+      pageSize: params.pageSize,
+      plateNumber: params.plateNo || undefined,
+      paymentStatus: params.payStatus,
+      entryTime:
+        params.beginInTime && params.endInTime ? [params.beginInTime, params.endInTime] : undefined
+    }
+    return request
+      .get<PageResult<BackendParkingRecordResp>>({
+        url: '/iot/parking/record/page',
+        params: backendParams
+      })
+      .then((page) => ({
+        list: (page.list || []).map(mapRecordRow),
+        total: page.total || 0
+      }))
   },
   manualPay: (data: ParkingRecordManualPayReqVO) => {
     return request.post<number>({

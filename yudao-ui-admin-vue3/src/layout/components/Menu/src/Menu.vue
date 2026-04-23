@@ -29,6 +29,7 @@ export default defineComponent({
     const { push, currentRoute } = useRouter()
 
     const permissionStore = usePermissionStore()
+    const directoryActiveIndex = ref<string>()
 
     const menuMode = computed((): 'vertical' | 'horizontal' => {
       // 竖
@@ -51,17 +52,23 @@ export default defineComponent({
 
     const activeMenu = computed(() => {
       const { meta, path } = unref(currentRoute)
-      // if set path, the sidebar will highlight the path you set
-      if (meta.activeMenu) {
-        return meta.activeMenu as string
+      const normalizePrefix = (v: string) => (v !== '/' && v.endsWith('/') ? v.slice(0, -1) : v)
+      const isWithinPrefix = (prefix: string, v: string) => {
+        const p = normalizePrefix(prefix)
+        const x = normalizePrefix(v)
+        return x === p || x.startsWith(`${p}/`)
       }
-      return path
+      // if set path, the sidebar will highlight the path you set
+      const baseActive = meta.activeMenu ? (meta.activeMenu as string) : path
+      const override = unref(directoryActiveIndex)
+      return override && isWithinPrefix(override, baseActive) ? override : baseActive
     })
 
     const menuSelect = (index: string) => {
       if (props.menuSelect) {
         props.menuSelect(index)
       }
+      directoryActiveIndex.value = undefined
       // 自定义事件
       if (isUrl(index)) {
         window.open(index)
@@ -99,7 +106,11 @@ export default defineComponent({
         >
           {{
             default: () => {
-              const { renderMenuItem } = useRenderMenuItem(unref(menuMode))
+              const { renderMenuItem } = useRenderMenuItem({
+                onDirectoryTitleActivate: (index) => {
+                  directoryActiveIndex.value = index
+                }
+              })
               return renderMenuItem(unref(routers))
             }
           }}

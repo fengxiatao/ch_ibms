@@ -158,7 +158,8 @@ const shortcutDateRangePicker = ref()
 /** 折线图配置 */
 const lineChartOptions = reactive<EChartsOption>({
   dataset: {
-    dimensions: ['time', 'browseCount', 'browseUserCount', 'orderPayPrice', 'afterSaleRefundPrice'],
+    // 后端返回字段为 day（见 ProductStatisticsVO.day）
+    dimensions: ['day', 'browseCount', 'browseUserCount', 'orderPayPrice', 'afterSaleRefundPrice'],
     source: []
   },
   grid: {

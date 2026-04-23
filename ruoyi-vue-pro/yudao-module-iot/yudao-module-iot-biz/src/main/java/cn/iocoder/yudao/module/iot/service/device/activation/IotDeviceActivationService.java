@@ -5,7 +5,7 @@ import cn.iocoder.yudao.module.iot.service.device.discovery.dto.DiscoveredDevice
 import java.util.Map;
 
 /**
- * IoT 设备激活服务接口
+ * 设备激活服务（台账仅写 IBMS：{@code ibms_device} / {@code ibms_channel}，网关 {@code deviceId} = {@code ibms_device.id}）
  *
  * @author 长辉信息科技有限公司
  */
@@ -15,7 +15,7 @@ public interface IotDeviceActivationService {
      * 激活设备
      * 
      * @param discoveredDevice 发现的设备信息
-     * @param productId 产品ID
+     * @param productId IBMS 产品主键（{@code ibms_product.id}）
      * @param username 设备用户名
      * @param password 设备密码
      * @return 激活请求ID
@@ -34,7 +34,7 @@ public interface IotDeviceActivationService {
      * 获取激活结果
      * 
      * @param activationId 激活请求ID
-     * @return 设备ID，如果激活未完成返回null
+     * @return IBMS 设备 ID（{@code ibms_device.id}），如果激活未完成返回 null
      */
     Long getActivationResult(String activationId);
     

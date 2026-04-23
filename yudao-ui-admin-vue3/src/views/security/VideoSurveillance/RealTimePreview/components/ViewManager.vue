@@ -95,6 +95,7 @@ import {
   deleteVideoViewGroup
 } from '@/api/iot/video/videoView'
 import type { VideoView, VideoViewGroup } from '../types'
+import type { ViewManagerProtocol, ViewSaveDialogPayload } from '../viewProtocol'
 
 // 扩展分组类型
 interface ViewGroupData {
@@ -120,6 +121,7 @@ const emit = defineEmits<{
   (e: 'load-view', view: VideoView): void
   (e: 'save-view', viewInfo: { id?: number; name: string; groupIds: number[] }): void
   (e: 'groups-loaded', groups: VideoViewGroup[]): void
+  (e: 'current-view-cleared', viewId: number): void
 }>()
 
 // 状态
@@ -203,6 +205,7 @@ const handleDeleteView = async (view: ViewItemData) => {
     await deleteVideoView(view.id)
     if (currentViewId.value === view.id) {
       currentViewId.value = null
+      emit('current-view-cleared', view.id)
     }
     await loadViewGroups()
     ElMessage.success('视图已删除')
@@ -267,6 +270,10 @@ const openSaveDialog = (currentViewId?: number, currentViewName?: string, curren
   saveDialogVisible.value = true
 }
 
+const openViewSaveDialog = (payload?: ViewSaveDialogPayload) => {
+  openSaveDialog(payload?.id, payload?.name, payload?.groupIds)
+}
+
 // 保存视图提交
 const handleSaveSubmit = async () => {
   if (!saveForm.value.name?.trim()) {
@@ -284,14 +291,43 @@ const handleSaveSubmit = async () => {
   saveDialogVisible.value = false
 }
 
+const syncCurrentView = (viewId: number | null) => {
+  currentViewId.value = viewId
+}
+
 // 清除当前视图选中状态
 const clearCurrentView = () => {
-  currentViewId.value = null
+  syncCurrentView(null)
+}
+
+const reloadViews = async () => {
+  await loadViewGroups()
 }
 
 // 设置当前视图（外部调用）
 const setCurrentView = (viewId: number | null) => {
-  currentViewId.value = viewId
+  syncCurrentView(viewId)
+}
+
+const protocol: ViewManagerProtocol = {
+  syncCurrentView,
+  reloadViews,
+  openViewSaveDialog
+}
+
+const legacyExpose = {
+  loadViewGroups: protocol.reloadViews,
+  reloadViews: protocol.reloadViews,
+  openViewSaveDialog: protocol.openViewSaveDialog,
+  openSaveDialog: (currentViewId?: number, currentViewName?: string, currentGroupIds?: number[]) =>
+    protocol.openViewSaveDialog({
+      id: currentViewId,
+      name: currentViewName,
+      groupIds: currentGroupIds
+    }),
+  clearCurrentView: () => protocol.syncCurrentView(null),
+  setCurrentView: protocol.syncCurrentView,
+  syncCurrentView: protocol.syncCurrentView
 }
 
 // 生命周期
@@ -301,10 +337,8 @@ onMounted(() => {
 
 // 暴露方法
 defineExpose({
-  loadViewGroups,
-  openSaveDialog,
-  clearCurrentView,
-  setCurrentView,
+  protocol,
+  ...legacyExpose,
   currentViewId
 })
 </script>

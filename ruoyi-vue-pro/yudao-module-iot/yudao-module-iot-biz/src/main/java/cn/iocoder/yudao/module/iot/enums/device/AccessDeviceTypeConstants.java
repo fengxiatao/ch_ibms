@@ -1,8 +1,12 @@
 package cn.iocoder.yudao.module.iot.enums.device;
 
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 
 /**
  * 门禁设备类型常量
@@ -104,5 +108,25 @@ public final class AccessDeviceTypeConstants {
         }
 
         return resolveDeviceType(configDeviceType, supportVideo);
+    }
+
+    /**
+     * 从 {@code ibms_device.extra} JSON 解析门禁插件 deviceType（与 {@link #getAccessDeviceType(IotDeviceDO)} 语义对齐）。
+     */
+    public static String getAccessDeviceType(IbmsDeviceDO device) {
+        if (device == null || StrUtil.isBlank(device.getExtra())) {
+            return ACCESS_GEN1;
+        }
+        try {
+            JSONObject o = JSONUtil.parseObj(device.getExtra().trim());
+            String configDeviceType = o.getStr("accessDeviceType");
+            if (configDeviceType == null) {
+                configDeviceType = o.getStr("deviceType");
+            }
+            Boolean supportVideo = o.getBool("supportVideo");
+            return resolveDeviceType(configDeviceType, supportVideo);
+        } catch (Exception e) {
+            return ACCESS_GEN1;
+        }
     }
 }

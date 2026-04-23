@@ -8,10 +8,12 @@ import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageBus;
 import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageEnvelope;
 import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageSubscriber;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.apache.rocketmq.client.consumer.DefaultMQPushConsumer;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
 import org.apache.rocketmq.client.consumer.listener.MessageListenerConcurrently;
@@ -38,11 +40,18 @@ import java.util.UUID;
 @Slf4j
 public class IotRocketMQMessageBus implements IotMessageBus {
 
+    private static final String METRIC_CONSUME_FAILURE = "iot.messagebus.consume.failure";
+
     private final IotMessageBusProperties messageBusProperties;
 
     private final RocketMQProperties rocketMQProperties;
 
     private final RocketMQTemplate rocketMQTemplate;
+
+    /**
+     * 无 Actuator / 无全局 MeterRegistry 时不打点（例如单元测试）
+     */
+    private final ObjectProvider<MeterRegistry> meterRegistryProvider;
 
     /**
      * 主题对应的消费者映射
@@ -150,9 +159,15 @@ public class IotRocketMQMessageBus implements IotMessageBus {
                     log.debug("[onMessage][topic({}/{}) msgId({}) 消息处理完成]",
                             subscriber.getTopic(), subscriber.getGroup(), messageExt.getMsgId());
                 } catch (Exception ex) {
-                    log.error("[onMessage][topic({}/{}) msgId({}) 消费者({}) 处理异常, reconsumeTimes={}]",
+                    int reconsumeTimes = messageExt.getReconsumeTimes();
+                    int maxReconsume = consumer.getMaxReconsumeTimes();
+                    String dlqHint = reconsumeTimes >= maxReconsume - 1
+                            ? "，下次失败将进入死信队列(DLQ)"
+                            : "";
+                    log.error("[onMessage][topic({}/{}) msgId({}) 消费者({}) 处理异常, reconsumeTimes={}{}]",
                             subscriber.getTopic(), subscriber.getGroup(), messageExt.getMsgId(),
-                            subscriber.getClass().getName(), messageExt.getReconsumeTimes(), ex);
+                            subscriber.getClass().getName(), reconsumeTimes, dlqHint, ex);
+                    recordConsumeFailure(subscriber, reconsumeTimes, maxReconsume);
                     return ConsumeConcurrentlyStatus.RECONSUME_LATER;
                 }
             }
@@ -236,6 +251,17 @@ public class IotRocketMQMessageBus implements IotMessageBus {
         } catch (Exception ignored) {
         }
         return null;
+    }
+
+    private void recordConsumeFailure(IotMessageSubscriber<?> subscriber, int reconsumeTimes, int maxReconsume) {
+        meterRegistryProvider.ifAvailable(registry -> {
+            boolean nearDlq = maxReconsume > 0 && reconsumeTimes >= maxReconsume - 1;
+            registry.counter(METRIC_CONSUME_FAILURE,
+                    "topic", subscriber.getTopic(),
+                    "consumer_group", subscriber.getGroup(),
+                    "subscriber", subscriber.getClass().getSimpleName(),
+                    "near_dlq", Boolean.toString(nearDlq)).increment();
+        });
     }
 
     private void runWithTenant(Long tenantId, Runnable runnable) {

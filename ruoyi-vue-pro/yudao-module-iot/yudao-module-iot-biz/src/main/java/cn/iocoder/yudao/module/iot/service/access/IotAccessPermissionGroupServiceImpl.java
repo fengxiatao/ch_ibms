@@ -7,6 +7,11 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.access.IotAccessPermissionGrou
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPermissionGroupDeviceMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPermissionGroupMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPermissionGroupPersonMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,10 +44,13 @@ public class IotAccessPermissionGroupServiceImpl implements IotAccessPermissionG
     private IotAccessPermissionGroupPersonMapper groupPersonMapper;
 
     @Resource
-    private cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper deviceMapper;
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @Resource
-    private cn.iocoder.yudao.module.iot.dal.mysql.channel.IotDeviceChannelMapper channelMapper;
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
+
+    @Resource
+    private cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService iotDeviceChannelService;
 
     @Resource
     private cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPersonMapper personMapper;
@@ -282,20 +290,21 @@ public class IotAccessPermissionGroupServiceImpl implements IotAccessPermissionG
             vo.setChannelId(device.getChannelId());
             // 查询设备信息
             if (device.getDeviceId() != null) {
-                cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO deviceDO = deviceMapper.selectById(device.getDeviceId());
-                if (deviceDO != null) {
-                    vo.setDeviceName(deviceDO.getDeviceName());
-                    // 从config中获取IP（需要转换为AccessDeviceConfig）
-                    if (deviceDO.getConfig() != null && deviceDO.getConfig() instanceof cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig) {
-                        cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig accessConfig = 
-                            (cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig) deviceDO.getConfig();
-                        vo.setDeviceIp(accessConfig.getIpAddress());
+                IbmsDeviceDO ibmsDevice = ibmsDeviceMapper.selectById(device.getDeviceId());
+                if (ibmsDevice != null) {
+                    cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO deviceDO =
+                            IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(
+                                    ibmsDevice,
+                                    ibmsDeviceRuntimeService.getByDeviceId(device.getDeviceId()));
+                    if (deviceDO != null) {
+                        vo.setDeviceName(deviceDO.getDeviceName());
+                        vo.setDeviceIp(DeviceConfigHelper.getIpAddress(deviceDO));
                     }
                 }
             }
             // 查询通道信息
             if (device.getChannelId() != null) {
-                cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO channelDO = channelMapper.selectById(device.getChannelId());
+                cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO channelDO = iotDeviceChannelService.getChannel(device.getChannelId());
                 if (channelDO != null) {
                     vo.setChannelNo(channelDO.getChannelNo());
                     vo.setChannelName(channelDO.getChannelName());

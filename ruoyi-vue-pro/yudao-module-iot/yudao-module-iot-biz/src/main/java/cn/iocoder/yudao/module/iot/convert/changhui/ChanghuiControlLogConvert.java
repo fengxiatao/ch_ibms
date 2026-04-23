@@ -3,8 +3,6 @@ package cn.iocoder.yudao.module.iot.convert.changhui;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.changhui.vo.control.ChanghuiControlLogRespVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.changhui.ChanghuiControlLogDO;
-import org.mapstruct.Mapper;
-import org.mapstruct.factory.Mappers;
 
 import java.util.List;
 
@@ -13,10 +11,9 @@ import java.util.List;
  *
  * @author 长辉信息科技有限公司
  */
-@Mapper
 public interface ChanghuiControlLogConvert {
 
-    ChanghuiControlLogConvert INSTANCE = Mappers.getMapper(ChanghuiControlLogConvert.class);
+    ChanghuiControlLogConvert INSTANCE = new ChanghuiControlLogConvertImpl();
 
     /**
      * DO转响应VO

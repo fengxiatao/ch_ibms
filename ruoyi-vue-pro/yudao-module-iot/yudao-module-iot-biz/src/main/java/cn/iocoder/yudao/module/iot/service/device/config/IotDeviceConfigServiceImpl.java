@@ -8,13 +8,16 @@ import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageBus;
 import cn.iocoder.yudao.module.iot.core.device.OnvifConfigMessage;
 import cn.iocoder.yudao.module.iot.core.messagebus.topics.IotMessageTopics;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
 
 import java.util.Arrays;
 import java.util.UUID;
@@ -34,7 +37,9 @@ import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.DEVICE_NOT_EX
 public class IotDeviceConfigServiceImpl implements IotDeviceConfigService {
 
     @Resource
-    private IotDeviceMapper deviceMapper;
+    private IbmsDeviceMapper ibmsDeviceMapper;
+    @Resource
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
     @Resource
     private IotMessageBus messageBus;
     @Resource
@@ -48,7 +53,12 @@ public class IotDeviceConfigServiceImpl implements IotDeviceConfigService {
     @Override
     public DeviceConfigRespVO getDeviceConfig(Long deviceId) {
         // 1. 校验设备存在
-        IotDeviceDO device = deviceMapper.selectById(deviceId);
+        IbmsDeviceDO ibmsDevice = ibmsDeviceMapper.selectById(deviceId);
+        if (ibmsDevice == null) {
+            throw exception(DEVICE_NOT_EXISTS);
+        }
+        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(
+                ibmsDevice, ibmsDeviceRuntimeService.getByDeviceId(deviceId));
         if (device == null) {
             throw exception(DEVICE_NOT_EXISTS);
         }
@@ -153,14 +163,19 @@ public class IotDeviceConfigServiceImpl implements IotDeviceConfigService {
         log.info("[syncConfigFromDevice] 从设备同步配置: deviceId={}", deviceId);
 
         // 1. 校验设备存在
-        IotDeviceDO device = deviceMapper.selectById(deviceId);
-        if (device == null) {
+        IbmsDeviceDO ibmsDevice = ibmsDeviceMapper.selectById(deviceId);
+        if (ibmsDevice == null) {
             throw exception(DEVICE_NOT_EXISTS);
         }
 
         // 2. 发布配置同步请求到Gateway
         OnvifConfigMessage syncRequest = new OnvifConfigMessage();
         syncRequest.setRequestId(UUID.randomUUID().toString());
+        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(
+                ibmsDevice, ibmsDeviceRuntimeService.getByDeviceId(deviceId));
+        if (device == null) {
+            throw exception(DEVICE_NOT_EXISTS);
+        }
         syncRequest.setTenantId(device.getTenantId());
         syncRequest.setDeviceId(deviceId);
         syncRequest.setAction("sync_from_device");
@@ -205,10 +220,14 @@ public class IotDeviceConfigServiceImpl implements IotDeviceConfigService {
         stringRedisTemplate.delete(REDIS_KEY_DEVICE_CONFIG + deviceId);
 
         // 2. 重新构建默认配置
-        IotDeviceDO device = deviceMapper.selectById(deviceId);
-        if (device != null) {
+        IbmsDeviceDO ibmsDevice = ibmsDeviceMapper.selectById(deviceId);
+        if (ibmsDevice != null) {
+            IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(
+                    ibmsDevice, ibmsDeviceRuntimeService.getByDeviceId(deviceId));
+            if (device != null) {
             DeviceConfigRespVO defaultConfig = buildDefaultConfig(device);
             updateConfigCache(deviceId, defaultConfig);
+            }
         }
 
         log.info("[resetDeviceConfig] 设备配置已重置: deviceId={}", deviceId);
@@ -219,7 +238,12 @@ public class IotDeviceConfigServiceImpl implements IotDeviceConfigService {
         log.info("[getDeviceCapabilities] 获取设备能力集: deviceId={}", deviceId);
 
         // 1. 校验设备存在
-        IotDeviceDO device = deviceMapper.selectById(deviceId);
+        IbmsDeviceDO ibmsDevice = ibmsDeviceMapper.selectById(deviceId);
+        if (ibmsDevice == null) {
+            throw exception(DEVICE_NOT_EXISTS);
+        }
+        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(
+                ibmsDevice, ibmsDeviceRuntimeService.getByDeviceId(deviceId));
         if (device == null) {
             throw exception(DEVICE_NOT_EXISTS);
         }

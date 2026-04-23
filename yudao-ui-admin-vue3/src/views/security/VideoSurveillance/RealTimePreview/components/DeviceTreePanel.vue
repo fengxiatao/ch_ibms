@@ -36,10 +36,10 @@
           </el-tooltip>
         </div>
 
-        <!-- 建筑树 -->
+        <!-- 空间树 -->
         <el-tree
           ref="treeRef"
-          :data="buildingTreeData"
+          :data="deviceTreeData"
           :props="treeProps"
           lazy
           :load="loadTreeNode"
@@ -56,14 +56,9 @@
               @dblclick="handleTreeNodeDoubleClick(data)"
             >
               <Icon
-                v-if="data.type === 'building'"
+                v-if="data.type === 'space'"
                 icon="ep:office-building"
                 style="color: #409eff"
-              />
-              <Icon
-                v-else-if="data.type === 'floor'"
-                icon="ep:tickets"
-                style="color: #67c23a"
               />
               <Icon
                 v-else-if="data.type === 'channel'"
@@ -107,9 +102,9 @@ import { ref, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { Icon } from '@/components/Icon'
-import { getBuildingList } from '@/api/iot/spatial/building'
-import { getFloorListByBuildingId } from '@/api/iot/spatial/floor'
-import { getChannelPage, syncAllNvrChannels } from '@/api/iot/channel'
+import { syncAllNvrChannels } from '@/api/iot/channel'
+import { getSpaceTree, type IbmsSpaceTreeNodeRespVO } from '@/api/iot/ibms/space'
+import { getChannelPage as getIbmsChannelPage } from '@/api/iot/ibms/channel'
 import type { DeviceTreeNode, IbmsChannel } from '../types'
 
 // Props
@@ -149,8 +144,8 @@ const searchKeyword = ref('')
 const treeRef = ref()
 const syncLoading = ref(false)
 
-// 建筑树数据
-const buildingTreeData = ref<DeviceTreeNode[]>([])
+const deviceTreeData = ref<DeviceTreeNode[]>([])
+const spaceTreeChildrenMap = new Map<number, IbmsSpaceTreeNodeRespVO[]>()
 
 // 通道缓存 (channelNo -> IbmsChannel)，用于视图加载时快速查找
 const channelCache = new Map<number, IbmsChannel>()
@@ -161,62 +156,135 @@ const treeProps = {
   label: 'name',
   isLeaf: (data: DeviceTreeNode) => data.type === 'channel'
 }
+const MAX_PAGE_SIZE = 100
 
-// ==================== 建筑树加载 ====================
-
-const loadBuildingTree = async () => {
-  try {
-    const buildings = await getBuildingList()
-    buildingTreeData.value = buildings.map((b: any) => ({
-      id: `building-${b.id}`,
-      name: b.name,
-      type: 'building',
-      buildingId: b.id
-    }))
-  } catch (e: any) {
-    console.error('[建筑树] 加载失败:', e)
-    ElMessage.error('加载建筑列表失败')
+const mapStatusToOnlineStatus = (status?: string) => {
+  if (status === 'online') {
+    return 1
   }
+  if (status === 'offline') {
+    return 0
+  }
+  return undefined
+}
+
+const mapChannelRowToIbmsChannel = (row: Record<string, any>): IbmsChannel => {
+  let extra: Record<string, any> = {}
+  if (row?.extra) {
+    try {
+      extra = JSON.parse(row.extra)
+    } catch {
+      extra = {}
+    }
+  }
+  return {
+    id: row.id,
+    deviceId: row.deviceId,
+    channelNo: row.channelNo,
+    channelName: row.name || `通道${row.channelNo}`,
+    channelCode: row.code,
+    targetIp: row.ip,
+    targetPort: extra.targetPort,
+    rtspPort: extra.rtspPort,
+    targetChannelNo: extra.targetChannelNo,
+    username: extra.username,
+    password: extra.password,
+    streamUrlMain: extra.streamUrlMain,
+    streamUrlSub: extra.streamUrlSub,
+    ptzSupport: extra.ptzSupport,
+    hasAudio: extra.hasAudio,
+    onlineStatus: mapStatusToOnlineStatus(row.status),
+    enableStatus: extra.enableStatus,
+    spaceId: row.spaceId,
+    gbChannelId: extra.gbChannelId,
+    gbDeviceId: extra.gbDeviceId
+  }
+}
+
+const mapSpaceNode = (space: IbmsSpaceTreeNodeRespVO): DeviceTreeNode => {
+  return {
+    id: `space-${space.id}`,
+    name: space.name,
+    type: 'space',
+    spaceId: space.id
+  }
+}
+
+const buildSpaceNodeIndex = (nodes: IbmsSpaceTreeNodeRespVO[]) => {
+  spaceTreeChildrenMap.clear()
+  const walk = (list: IbmsSpaceTreeNodeRespVO[]) => {
+    for (const item of list) {
+      spaceTreeChildrenMap.set(item.id, item.children || [])
+      if (item.children?.length) {
+        walk(item.children)
+      }
+    }
+  }
+  walk(nodes)
+}
+
+const loadSpaceTree = async () => {
+  try {
+    const spaces = await getSpaceTree()
+    buildSpaceNodeIndex(spaces || [])
+    deviceTreeData.value = (spaces || []).map(mapSpaceNode)
+    channelCache.clear()
+  } catch (e: any) {
+    console.error('[空间树] 加载失败:', e)
+    ElMessage.error('加载空间列表失败')
+  }
+}
+
+const loadChannelsBySpace = async (spaceId: number) => {
+  const channels: any[] = []
+  let pageNo = 1
+  let total = 0
+  do {
+    const res = await getIbmsChannelPage({
+      pageNo,
+      pageSize: MAX_PAGE_SIZE,
+      business: 'security',
+      typeCode: 'VT',
+      spaceId
+    })
+    const page = (res && (res as any).list) ? res : (res as any)?.data
+    const list = page?.list || []
+    total = Number(page?.total || 0)
+    channels.push(...list)
+    if (!list.length || channels.length >= total) {
+      break
+    }
+    pageNo += 1
+  } while (true)
+
+  return channels.map((row: any) => {
+    const ibmsChannel = mapChannelRowToIbmsChannel(row)
+    if (ibmsChannel.channelNo) {
+      channelCache.set(ibmsChannel.channelNo, ibmsChannel)
+    }
+    return {
+      id: `channel-${row.id}`,
+      name: ibmsChannel.channelName || `通道${ibmsChannel.channelNo}`,
+      type: 'channel' as const,
+      channelId: row.id,
+      channelNo: ibmsChannel.channelNo,
+      ibmsChannel
+    } as DeviceTreeNode
+  })
 }
 
 const loadTreeNode = async (node: any, resolve: Function) => {
   try {
     const data = node.data as DeviceTreeNode
-    let children: DeviceTreeNode[] = []
-
-    if (data.type === 'building') {
-      // 只加载楼层
-      const floors = await getFloorListByBuildingId(data.buildingId!)
-      children = floors.map((f: any) => ({
-        id: `floor-${f.id}`,
-        name: f.name,
-        type: 'floor' as const,
-        floorId: f.id,
-        buildingId: data.buildingId
-      }))
-    } else if (data.type === 'floor') {
-      // 直接加载该楼层的视频通道
-      const params = { pageNo: 1, pageSize: 100, channelType: 'video', floorId: data.floorId }
-      const channelsRes = await getChannelPage(params)
-      const channels = channelsRes.list || []
-
-      children = channels.map((ch: any) => {
-        const ibmsChannel = ch as IbmsChannel
-        // 缓存通道数据（用于视图加载）
-        if (ibmsChannel.channelNo) {
-          channelCache.set(ibmsChannel.channelNo, ibmsChannel)
-        }
-        return {
-          id: `channel-${ch.id}`,
-          name: ch.channelName || `通道${ch.channelNo}`,
-          type: 'channel' as const,
-          channelId: ch.id,
-          ibmsChannel
-        }
-      })
+    if (!data || data.type !== 'space' || !data.spaceId) {
+      resolve([])
+      return
     }
 
-    resolve(children)
+    const childSpaces = (spaceTreeChildrenMap.get(data.spaceId) || []).map(mapSpaceNode)
+    const channels = await loadChannelsBySpace(data.spaceId)
+
+    resolve([...childSpaces, ...channels])
   } catch (e: any) {
     console.error('[树节点] 加载失败:', e)
     ElMessage.error('加载节点失败')
@@ -245,8 +313,7 @@ const handleSyncAllChannels = async () => {
       ElMessage.success(
         `同步完成：共 ${result.nvrCount} 台NVR，成功 ${result.successCount} 台，耗时 ${result.duration}ms`
       )
-      // 刷新树
-      await loadBuildingTree()
+      await loadSpaceTree()
     }
   } catch (error) {
     console.error('[同步通道] 失败:', error)
@@ -299,10 +366,17 @@ const findIbmsChannelByChannelNo = async (channelNo: number | string): Promise<I
   
   // 缓存未命中，从 API 查询
   try {
-    const result = await getChannelPage({ pageNo: 1, pageSize: 100, channelNo: no, channelType: 'video' })
-    const channel = result.list?.find((ch: any) => ch.channelNo === no)
+    const result = await getIbmsChannelPage({
+      pageNo: 1,
+      pageSize: MAX_PAGE_SIZE,
+      business: 'security',
+      typeCode: 'VT',
+      keyword: String(no)
+    })
+    const page = (result && (result as any).list) ? result : (result as any)?.data
+    const channel = page?.list?.find((ch: any) => ch.channelNo === no)
     if (channel) {
-      const ibmsChannel = channel as IbmsChannel
+      const ibmsChannel = mapChannelRowToIbmsChannel(channel)
       channelCache.set(no, ibmsChannel)
       return ibmsChannel
     }
@@ -316,12 +390,16 @@ const findIbmsChannelByChannelNo = async (channelNo: number | string): Promise<I
 // ==================== 生命周期 ====================
 
 onMounted(async () => {
-  // 加载建筑树
-  loadBuildingTree()
+  loadSpaceTree()
 })
+
+const loadBuildingTree = async () => {
+  await loadSpaceTree()
+}
 
 // 暴露方法给父组件
 defineExpose({
+  loadSpaceTree,
   loadBuildingTree,
   findIbmsChannelByChannelNo,
   channelCache

@@ -5,8 +5,11 @@ import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.quartz.core.enums.JobBusinessType;
 import cn.iocoder.yudao.framework.quartz.core.enums.JobPriority;
+import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
+import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceRuntimeMapper;
 import cn.iocoder.yudao.module.iot.framework.job.IotBusinessJobHandler;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsIotDualTrackDeviceResolver;
 import jakarta.annotation.Resource;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -14,8 +17,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * IoT 设备数据采集任务
@@ -47,7 +53,9 @@ import java.util.Map;
 public class IotDeviceDataCollectJob extends IotBusinessJobHandler {
     
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsIotDualTrackDeviceResolver dualTrackDeviceResolver;
+    @Resource
+    private IbmsDeviceRuntimeMapper ibmsDeviceRuntimeMapper;
     
     @Override
     public JobBusinessType getBusinessType() {
@@ -179,20 +187,20 @@ public class IotDeviceDataCollectJob extends IotBusinessJobHandler {
         // 2. 如果指定了产品ID，获取该产品下的所有在线设备
         if (param.getProductId() != null) {
             log.info("采集产品ID为 {} 的所有在线设备", param.getProductId());
-            // TODO: 需要在 IotDeviceService 中实现 getOnlineDeviceIdsByProduct 方法
-            // return deviceService.getOnlineDeviceIdsByProduct(param.getProductId());
-            
-            // 这里先返回空列表
-            return new ArrayList<>();
+            return dualTrackDeviceResolver.listDeviceShellsByProductIdPreferIbmsThenIot(param.getProductId()).stream()
+                    .filter(d -> d.getState() != null && IotDeviceStateEnum.isOnline(d.getState()))
+                    .map(IotDeviceDO::getId)
+                    .collect(Collectors.toList());
         }
         
-        // 3. 默认采集所有在线设备
+        // 3. 默认采集所有在线设备（仅 ibms_device_runtime 在线态）
         log.info("采集所有在线设备");
-        // TODO: 需要在 IotDeviceService 中实现 getAllOnlineDeviceIds 方法
-        // return deviceService.getAllOnlineDeviceIds();
-        
-        // 这里先返回空列表
-        return new ArrayList<>();
+        Set<Long> ids = new LinkedHashSet<>();
+        List<Long> ibmsOnline = ibmsDeviceRuntimeMapper.selectOnlineDeviceIds();
+        if (ibmsOnline != null) {
+            ids.addAll(ibmsOnline);
+        }
+        return new ArrayList<>(ids);
     }
     
     /**

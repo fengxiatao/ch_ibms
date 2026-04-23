@@ -3,8 +3,8 @@ package cn.iocoder.yudao.module.iot.service.device.discovery;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.iot.service.device.discovery.dto.DiscoveredDeviceDTO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDiscoveredDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDiscoveredDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDiscoveredDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDiscoveredDeviceMapper;
 import cn.iocoder.yudao.module.iot.enums.device.DiscoveredDeviceStatusEnum;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -24,13 +24,13 @@ import java.util.stream.Collectors;
 public class DiscoveredDeviceServiceImpl implements DiscoveredDeviceService {
     
     @Resource
-    private IotDiscoveredDeviceMapper discoveredDeviceMapper;
+    private IbmsDiscoveredDeviceMapper discoveredDeviceMapper;
     
     @Override
     @TenantIgnore
     public boolean saveDiscoveredDevice(DiscoveredDeviceDTO device, boolean added) {
         try {
-            IotDiscoveredDeviceDO existing = discoveredDeviceMapper.selectByIp(device.getIpAddress());
+            IbmsDiscoveredDeviceDO existing = discoveredDeviceMapper.selectByIp(device.getIpAddress());
             
             if (existing != null) {
                 if (Boolean.TRUE.equals(existing.getActivated())) {
@@ -54,7 +54,7 @@ public class DiscoveredDeviceServiceImpl implements DiscoveredDeviceService {
                 return false;
             }
             
-            IotDiscoveredDeviceDO record = convertToEntity(device, added);
+            IbmsDiscoveredDeviceDO record = convertToEntity(device, added);
             discoveredDeviceMapper.insert(record);
             
             log.info("[saveDiscoveredDevice][保存新发现记录: {} ({})]", 
@@ -72,7 +72,7 @@ public class DiscoveredDeviceServiceImpl implements DiscoveredDeviceService {
     @TenantIgnore
     public List<DiscoveredDeviceDTO> getRecentDiscoveredDevices(Integer hours) {
         LocalDateTime since = LocalDateTime.now().minusHours(hours);
-        List<IotDiscoveredDeviceDO> records = discoveredDeviceMapper.selectRecentDevices(since);
+        List<IbmsDiscoveredDeviceDO> records = discoveredDeviceMapper.selectRecentDevices(since);
         return records.stream()
             .map(this::convertToDTO)
             .collect(Collectors.toList());
@@ -81,14 +81,14 @@ public class DiscoveredDeviceServiceImpl implements DiscoveredDeviceService {
     @Override
     @TenantIgnore
     public List<DiscoveredDeviceDTO> getUnaddedDevices() {
-        List<IotDiscoveredDeviceDO> records = discoveredDeviceMapper.selectUnaddedDevices();
+        List<IbmsDiscoveredDeviceDO> records = discoveredDeviceMapper.selectUnaddedDevices();
         return records.stream()
             .map(this::convertToDTO)
             .collect(Collectors.toList());
     }
     
-    private IotDiscoveredDeviceDO convertToEntity(DiscoveredDeviceDTO device, boolean added) {
-        IotDiscoveredDeviceDO entity = new IotDiscoveredDeviceDO();
+    private IbmsDiscoveredDeviceDO convertToEntity(DiscoveredDeviceDTO device, boolean added) {
+        IbmsDiscoveredDeviceDO entity = new IbmsDiscoveredDeviceDO();
         entity.setIpAddress(device.getIpAddress());
         entity.setMac(device.getMac());
         entity.setVendor(device.getVendor());
@@ -102,7 +102,7 @@ public class DiscoveredDeviceServiceImpl implements DiscoveredDeviceService {
         return entity;
     }
     
-    private DiscoveredDeviceDTO convertToDTO(IotDiscoveredDeviceDO entity) {
+    private DiscoveredDeviceDTO convertToDTO(IbmsDiscoveredDeviceDO entity) {
         return DiscoveredDeviceDTO.builder()
             .ipAddress(entity.getIpAddress())
             .mac(entity.getMac())
@@ -119,7 +119,7 @@ public class DiscoveredDeviceServiceImpl implements DiscoveredDeviceService {
     @Override
     public void ignoreDevice(Long id, Integer ignoreDays, String reason) {
         try {
-            IotDiscoveredDeviceDO device = discoveredDeviceMapper.selectById(id);
+            IbmsDiscoveredDeviceDO device = discoveredDeviceMapper.selectById(id);
             if (device == null) {
                 log.warn("[ignoreDevice][设备不存在: {}]", id);
                 return;
@@ -149,7 +149,7 @@ public class DiscoveredDeviceServiceImpl implements DiscoveredDeviceService {
     @Override
     public void unignoreDevice(Long id) {
         try {
-            IotDiscoveredDeviceDO device = discoveredDeviceMapper.selectById(id);
+            IbmsDiscoveredDeviceDO device = discoveredDeviceMapper.selectById(id);
             if (device == null) {
                 log.warn("[unignoreDevice][设备不存在: {}]", id);
                 return;
@@ -173,7 +173,7 @@ public class DiscoveredDeviceServiceImpl implements DiscoveredDeviceService {
     @Override
     public void markAsPending(Long id) {
         try {
-            IotDiscoveredDeviceDO device = discoveredDeviceMapper.selectById(id);
+            IbmsDiscoveredDeviceDO device = discoveredDeviceMapper.selectById(id);
             if (device == null) {
                 log.warn("[markAsPending][设备不存在: {}]", id);
                 return;
@@ -193,7 +193,7 @@ public class DiscoveredDeviceServiceImpl implements DiscoveredDeviceService {
     @TenantIgnore
     public void markAsActivated(String ip, Long deviceId) {
         try {
-            IotDiscoveredDeviceDO device = discoveredDeviceMapper.selectByIp(ip);
+            IbmsDiscoveredDeviceDO device = discoveredDeviceMapper.selectByIp(ip);
             if (device == null) {
                 log.warn("[markAsActivated][设备记录不存在: ip={}]", ip);
                 return;
@@ -217,7 +217,7 @@ public class DiscoveredDeviceServiceImpl implements DiscoveredDeviceService {
     @Override
     @TenantIgnore
     public List<DiscoveredDeviceDTO> getUnactivatedDevices() {
-        List<IotDiscoveredDeviceDO> records = discoveredDeviceMapper.selectUnactivatedDevices();
+        List<IbmsDiscoveredDeviceDO> records = discoveredDeviceMapper.selectUnactivatedDevices();
         return records.stream()
             .map(this::convertToDTO)
             .collect(Collectors.toList());

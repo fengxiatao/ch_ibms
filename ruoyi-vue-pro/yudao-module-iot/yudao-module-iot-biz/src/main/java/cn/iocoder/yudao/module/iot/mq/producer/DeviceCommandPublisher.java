@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.iot.mq.producer;
 import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageBus;
 import cn.iocoder.yudao.module.iot.core.messagebus.topics.IotMessageTopics;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
+import cn.iocoder.yudao.module.iot.mq.support.DeviceCommandBrandEnricher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -39,6 +40,11 @@ public class DeviceCommandPublisher {
     private final IotMessageBus messageBus;
 
     /**
+     * params 未带 brand 时按 ibms_device / iot_device.config 补全
+     */
+    private final DeviceCommandBrandEnricher brandEnricher;
+
+    /**
      * 发布设备命令
      * 
      * <p>所有设备命令通过此方法发送到 DEVICE_SERVICE_INVOKE 主题。</p>
@@ -51,8 +57,16 @@ public class DeviceCommandPublisher {
      * @return requestId  请求ID，用于关联响应
      * @throws IllegalArgumentException 如果 deviceType、deviceId 或 commandType 为空
      */
-    public String publishCommand(String deviceType, Long deviceId, 
+    public String publishCommand(String deviceType, Long deviceId,
                                   String commandType, Map<String, Object> params) {
+        return publishCommand(deviceType, deviceId, commandType, params, null);
+    }
+
+    /**
+     * 发布设备命令（可指定 requestId，用于与 {@link cn.iocoder.yudao.module.iot.mq.manager.DeviceCommandResponseManager} 预先注册一致）
+     */
+    public String publishCommand(String deviceType, Long deviceId,
+                                  String commandType, Map<String, Object> params, String fixedRequestId) {
         // 参数校验
         if (deviceType == null || deviceType.isEmpty()) {
             throw new IllegalArgumentException("deviceType 不能为空");
@@ -64,15 +78,32 @@ public class DeviceCommandPublisher {
             throw new IllegalArgumentException("commandType 不能为空");
         }
 
-        // 生成请求ID
-        String requestId = UUID.randomUUID().toString();
+        String requestId = (fixedRequestId != null && !fixedRequestId.isEmpty())
+                ? fixedRequestId
+                : UUID.randomUUID().toString();
 
         // 构建消息参数，确保包含 deviceType 和 commandType
         Map<String, Object> messageParams = buildParams(deviceType, commandType, params);
+        brandEnricher.enrichIfAbsent(deviceId, messageParams);
 
         // 构建 IotDeviceMessage
         IotDeviceMessage message = IotDeviceMessage.requestOf(requestId, commandType, messageParams);
         message.setDeviceId(deviceId);
+        message.setMessageVersion(1);
+        if (messageParams != null) {
+            Object brand = messageParams.get("brand");
+            if (brand != null) {
+                message.setBrand(brand.toString());
+            }
+            Object vk = messageParams.get("vendorKey");
+            if (vk != null) {
+                message.setVendorKey(vk.toString());
+            }
+            Object pid = messageParams.get("pluginId");
+            if (pid != null) {
+                message.setPluginId(pid.toString());
+            }
+        }
 
         // 发送到统一主题 DEVICE_SERVICE_INVOKE
         try {

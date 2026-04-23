@@ -2,12 +2,10 @@ package cn.iocoder.yudao.module.iot.service.access;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.dal.dataobject.access.IotAccessEventLogDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessEventLogMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
 import cn.iocoder.yudao.module.iot.websocket.DeviceMessagePushService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,7 +40,7 @@ public class IotAccessEventLogServiceImpl implements IotAccessEventLogService {
     private DeviceMessagePushService deviceMessagePushService;
 
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @Override
     public Long saveEventLog(IotAccessEventLogDO eventLog) {
@@ -99,39 +97,18 @@ public class IotAccessEventLogServiceImpl implements IotAccessEventLogService {
     }
 
     /**
-     * 解析门禁设备类型（优先使用 iot_device.config.deviceType）
+     * 解析门禁设备类型（IBMS 台账 {@code ibms_device.extra}，与 {@link AccessDeviceTypeConstants#getAccessDeviceType(IbmsDeviceDO)} 对齐）
      */
     private String resolveAccessDeviceType(Long deviceId) {
         try {
-            if (deviceId == null || deviceService == null) {
+            if (deviceId == null) {
                 return AccessDeviceTypeConstants.ACCESS_GEN2;
             }
-            IotDeviceDO device = deviceService.getDevice(deviceId);
+            IbmsDeviceDO device = ibmsDeviceMapper.selectById(deviceId);
             if (device == null) {
                 return AccessDeviceTypeConstants.ACCESS_GEN2;
             }
-
-            Boolean supportVideo = null;
-            String configDeviceType = null;
-            if (device.getConfig() instanceof AccessDeviceConfig) {
-                AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
-                supportVideo = config.getSupportVideo();
-                // AccessDeviceConfig 可能包含 deviceType（若没有则忽略）
-                try {
-                    configDeviceType = (String) AccessDeviceConfig.class.getMethod("getDeviceType").invoke(config);
-                } catch (Throwable ignored) {
-                    // ignored
-                }
-            } else if (device.getConfig() instanceof GenericDeviceConfig) {
-                GenericDeviceConfig config = (GenericDeviceConfig) device.getConfig();
-                Object supportVideoObj = config.get("supportVideo");
-                if (supportVideoObj instanceof Boolean) {
-                    supportVideo = (Boolean) supportVideoObj;
-                }
-                Object deviceTypeObj = config.get("deviceType");
-                configDeviceType = deviceTypeObj != null ? deviceTypeObj.toString() : null;
-            }
-            return AccessDeviceTypeConstants.resolveDeviceType(configDeviceType, supportVideo);
+            return AccessDeviceTypeConstants.getAccessDeviceType(device);
         } catch (Exception e) {
             log.debug("[resolveAccessDeviceType] 解析设备类型失败: deviceId={}, error={}", deviceId, e.getMessage());
             return AccessDeviceTypeConstants.ACCESS_GEN2;

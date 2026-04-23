@@ -19,6 +19,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -67,9 +69,11 @@ public class IotMessageBusAutoConfiguration {
         @Bean
         public IotRocketMQMessageBus iotRocketMQMessageBus(IotMessageBusProperties messageBusProperties,
                                                            RocketMQProperties rocketMQProperties,
-                                                           RocketMQTemplate rocketMQTemplate) {
+                                                           RocketMQTemplate rocketMQTemplate,
+                                                           ObjectProvider<MeterRegistry> meterRegistry) {
             log.info("[iotRocketMQMessageBus][创建 IoT RocketMQ 消息总线]");
-            return new IotRocketMQMessageBus(messageBusProperties, rocketMQProperties, rocketMQTemplate);
+            return new IotRocketMQMessageBus(messageBusProperties, rocketMQProperties, rocketMQTemplate,
+                    meterRegistry);
         }
 
     }

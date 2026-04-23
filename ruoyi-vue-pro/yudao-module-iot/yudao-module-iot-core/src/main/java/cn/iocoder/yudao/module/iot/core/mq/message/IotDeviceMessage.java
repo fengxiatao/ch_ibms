@@ -56,6 +56,26 @@ public class IotDeviceMessage {
     private Long tenantId;
 
     /**
+     * IBMS/台账品牌码（HIK、DAH 等），可选；缺省时网关按插件默认厂商处理
+     */
+    private String brand;
+
+    /**
+     * 厂商/协议键，可选
+     */
+    private String vendorKey;
+
+    /**
+     * 显式插件 id，可选
+     */
+    private String pluginId;
+
+    /**
+     * 消息契约版本（可选，默认由发送端填 1）
+     */
+    private Integer messageVersion;
+
+    /**
      * 服务编号，该消息由哪个 server 发送
      */
     private String serverId;

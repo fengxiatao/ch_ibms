@@ -6,12 +6,12 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.property.IotDevicePropertyDetailRespVO;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.property.IotDevicePropertyHistoryListReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.property.IotDevicePropertyRespVO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.thingmodel.model.ThingModelProperty;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDevicePropertyDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.thingmodel.IotThingModelDO;
 import cn.iocoder.yudao.module.iot.enums.thingmodel.IotThingModelTypeEnum;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.service.device.property.IotDevicePropertyService;
 import cn.iocoder.yudao.module.iot.service.thingmodel.IotThingModelService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,7 +48,7 @@ public class IotDevicePropertyController {
     @Resource
     private IotThingModelService thingModelService;
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @GetMapping("/get-latest")
     @Operation(summary = "获取设备属性最新属性")
@@ -57,14 +57,14 @@ public class IotDevicePropertyController {
     public CommonResult<List<IotDevicePropertyDetailRespVO>> getLatestDeviceProperties(
             @RequestParam("deviceId") Long deviceId) {
         // 1.1 获取设备信息
-        IotDeviceDO device = deviceService.getDevice(deviceId);
+        IbmsDeviceDO device = ibmsDeviceMapper.selectById(deviceId);
         Assert.notNull(device, "设备不存在");
         // 1.2 获取设备最新属性
         Map<String, IotDevicePropertyDO> properties = devicePropertyService.getLatestDeviceProperties(deviceId);
         // 1.3 根据 productId + type 查询属性类型的物模型
         Integer propertyType = IotThingModelTypeEnum.PROPERTY != null ? IotThingModelTypeEnum.PROPERTY.getType() : 1;
         List<IotThingModelDO> thingModels = thingModelService.getThingModelListByProductIdAndType(
-                device.getProductId(), propertyType);
+                device.getIbmsProductId(), propertyType);
 
         // 2. 基于 thingModels 遍历，拼接 properties
         return success(convertList(thingModels, thingModel -> {

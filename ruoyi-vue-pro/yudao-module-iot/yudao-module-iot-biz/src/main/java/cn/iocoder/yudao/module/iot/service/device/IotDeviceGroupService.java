@@ -94,4 +94,9 @@ public interface IotDeviceGroupService {
      */
     List<IotDeviceGroupDO> getDeviceGroupListByStatus(Integer status);
 
+    /**
+     * 分组下设备总数：{@code iot_device.group_id} + {@code ibms_device.group_ids}（双轨合计）。
+     */
+    Long countDevicesAssignedToGroup(Long groupId);
+
 }

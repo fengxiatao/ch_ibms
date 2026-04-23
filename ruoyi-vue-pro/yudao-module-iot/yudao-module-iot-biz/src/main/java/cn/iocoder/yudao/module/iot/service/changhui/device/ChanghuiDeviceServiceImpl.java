@@ -12,16 +12,23 @@ import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
 import cn.iocoder.yudao.module.iot.dal.dataobject.changhui.ChanghuiDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.ChanghuiDeviceConfig;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
+import cn.iocoder.yudao.module.iot.controller.admin.device.vo.device.IotDeviceSaveReqVO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceRuntimeMapper;
 import cn.iocoder.yudao.module.iot.enums.changhui.ChanghuiDeviceTypeEnum;
+import cn.iocoder.yudao.module.iot.service.device.support.IbmsLegacyIotDeviceAdapterService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
-import java.time.LocalDateTime;
+import cn.hutool.json.JSONUtil;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -51,7 +58,16 @@ public class ChanghuiDeviceServiceImpl implements ChanghuiDeviceService {
     private static final Long CHANGHUI_PRODUCT_ID = 100L;
 
     @Resource
-    private IotDeviceMapper iotDeviceMapper;
+    private IbmsLegacyIotDeviceAdapterService legacyIotDeviceAdapterService;
+
+    @Resource
+    private IbmsDeviceMapper ibmsDeviceMapper;
+
+    @Resource
+    private IbmsDeviceRuntimeMapper ibmsDeviceRuntimeMapper;
+
+    @Resource
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -62,9 +78,9 @@ public class ChanghuiDeviceServiceImpl implements ChanghuiDeviceService {
             throw exception(STATION_CODE_INVALID);
         }
         
-        // 检查测站编码是否已存在
-        IotDeviceDO existDevice = getIotDeviceByStationCode(stationCode);
-        if (existDevice != null) {
+        // 检查测站编码（legacy serialNumber）是否已存在
+        IbmsDeviceDO existIbmsDevice = ibmsDeviceMapper.selectBySn(stationCode);
+        if (existIbmsDevice != null) {
             throw exception(STATION_CODE_EXISTS);
         }
         
@@ -72,22 +88,18 @@ public class ChanghuiDeviceServiceImpl implements ChanghuiDeviceService {
         ChanghuiDeviceConfig config = buildConfig(reqVO);
         config.validate();
         
-        // 创建 IotDeviceDO
-        // 重要：德通协议规定 deviceKey = stationCode（测站编码）
-        // Gateway 通过 deviceKey 查询设备，确保设备能被正确识别
-        IotDeviceDO device = IotDeviceDO.builder()
-                .deviceName(reqVO.getDeviceName())
-                .deviceKey(stationCode) // 强制 deviceKey = stationCode
-                .productId(CHANGHUI_PRODUCT_ID)
-                .deviceType(reqVO.getDeviceType())
-                .state(IotDeviceStateEnum.INACTIVE.getState()) // 默认未激活
-                .config(config)
-                .build();
-        
-        iotDeviceMapper.insert(device);
-        log.info("[registerDevice] 设备注册成功: deviceKey(stationCode)={}, deviceName={}", 
+        // 单台账：仅创建 IBMS 设备 + 回填运行态配置
+        IotDeviceSaveReqVO req = new IotDeviceSaveReqVO();
+        req.setDeviceName(reqVO.getDeviceName());
+        req.setProductId(CHANGHUI_PRODUCT_ID);
+        req.setSerialNumber(stationCode);
+        req.setConfig(JSONUtil.toJsonStr(config.toMap()));
+        Long deviceId = legacyIotDeviceAdapterService.createDevice(req);
+        legacyIotDeviceAdapterService.updateDeviceConfig(deviceId, config);
+
+        log.info("[registerDevice] 设备注册成功(IBMS): sn(stationCode)={}, deviceName={}",
                 stationCode, reqVO.getDeviceName());
-        return device.getId();
+        return deviceId;
     }
     
     /**
@@ -109,48 +121,54 @@ public class ChanghuiDeviceServiceImpl implements ChanghuiDeviceService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateDevice(ChanghuiDeviceUpdateReqVO reqVO) {
-        // 检查设备是否存在
-        IotDeviceDO existDevice = iotDeviceMapper.selectById(reqVO.getId());
-        if (existDevice == null) {
+        Long deviceId = reqVO.getId();
+        IbmsDeviceDO exist = ibmsDeviceMapper.selectById(deviceId);
+        if (exist == null) {
             throw exception(DEVICE_NOT_EXISTS);
         }
-        
-        // 更新设备配置
-        ChanghuiDeviceConfig config = buildConfigFromUpdate(reqVO, existDevice);
+
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeMapper.selectById(deviceId);
+        ChanghuiDeviceConfig existConfig = runtime != null && runtime.getConfig() instanceof ChanghuiDeviceConfig
+                ? (ChanghuiDeviceConfig) runtime.getConfig()
+                : null;
+
+        // 更新设备运行态配置（写 ibms_device_runtime）
+        ChanghuiDeviceConfig config = buildConfigFromUpdate(reqVO, existConfig);
         config.validate();
-        
-        // 更新设备
-        IotDeviceDO updateDevice = new IotDeviceDO();
-        updateDevice.setId(reqVO.getId());
-        updateDevice.setDeviceName(reqVO.getDeviceName());
-        if (reqVO.getDeviceType() != null) {
-            updateDevice.setDeviceType(reqVO.getDeviceType());
+        legacyIotDeviceAdapterService.updateDeviceConfig(deviceId, config);
+
+        // stationCode 如有变更：更新 sn（台账唯一标识）+ extra legacyIotConfig
+        if (reqVO.getStationCode() != null && !reqVO.getStationCode().trim().isEmpty()) {
+            IotDeviceSaveReqVO updateReq = new IotDeviceSaveReqVO();
+            updateReq.setId(deviceId);
+            updateReq.setSerialNumber(reqVO.getStationCode());
+            updateReq.setConfig(JSONUtil.toJsonStr(config.toMap()));
+            legacyIotDeviceAdapterService.updateDevice(updateReq);
         }
-        // stationCode 作为 deviceKey 的唯一标识，保持同步（如果前端允许修改 stationCode）
-        if (config != null && config.getStationCode() != null) {
-            updateDevice.setDeviceKey(config.getStationCode());
-        }
-        updateDevice.setConfig(config);
-        
-        iotDeviceMapper.updateById(updateDevice);
-        log.info("[updateDevice] 设备更新成功: id={}", reqVO.getId());
+
+        log.info("[updateDevice] 设备更新成功(IBMS): id={}", reqVO.getId());
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteDevice(Long id) {
-        // 检查设备是否存在
-        IotDeviceDO existDevice = iotDeviceMapper.selectById(id);
-        if (existDevice == null) {
+        // 直接删除 IBMS 台账（含运行态与通道引用清理）
+        IbmsDeviceDO exist = ibmsDeviceMapper.selectById(id);
+        if (exist == null) {
             throw exception(DEVICE_NOT_EXISTS);
         }
-        iotDeviceMapper.deleteById(id);
-        log.info("[deleteDevice] 设备删除成功: id={}", id);
+        legacyIotDeviceAdapterService.deleteDevice(id);
+        log.info("[deleteDevice] 设备删除成功(IBMS): id={}", id);
     }
 
     @Override
     public ChanghuiDeviceRespVO getDevice(Long id) {
-        IotDeviceDO device = iotDeviceMapper.selectById(id);
+        IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(id);
+        if (ibms == null) {
+            return null;
+        }
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeMapper.selectById(id);
+        IotDeviceDO device = buildLegacyChanghuiDeviceShell(ibms, runtime);
         return enrichDeviceRespVO(convertToRespVO(device));
     }
 
@@ -162,75 +180,135 @@ public class ChanghuiDeviceServiceImpl implements ChanghuiDeviceService {
 
     @Override
     public PageResult<ChanghuiDeviceRespVO> getDevicePage(ChanghuiDevicePageReqVO reqVO) {
-        // 查询长辉设备（通过产品ID或设备类型过滤）
-        PageParam pageParam = new PageParam();
-        pageParam.setPageNo(reqVO.getPageNo());
-        pageParam.setPageSize(reqVO.getPageSize());
-        
-        LambdaQueryWrapperX<IotDeviceDO> wrapper = new LambdaQueryWrapperX<IotDeviceDO>()
-                .eq(IotDeviceDO::getProductId, CHANGHUI_PRODUCT_ID)
-                .likeIfPresent(IotDeviceDO::getDeviceName, reqVO.getDeviceName())
-                .eqIfPresent(IotDeviceDO::getDeviceType, reqVO.getDeviceType())
-                .eqIfPresent(IotDeviceDO::getState, reqVO.getStatus())
-                .orderByDesc(IotDeviceDO::getId);
-        
-        // 如果有测站编码过滤，需要在内存中过滤（因为stationCode在config JSON中）
-        PageResult<IotDeviceDO> pageResult = iotDeviceMapper.selectPage(pageParam, wrapper);
-        
-        // 转换为响应VO
-        List<ChanghuiDeviceRespVO> respList = pageResult.getList().stream()
-                .filter(device -> filterByStationCode(device, reqVO.getStationCode()))
-                .map(this::convertToRespVO)
-                .map(this::enrichDeviceRespVO)
-                .collect(Collectors.toList());
-        
-        return new PageResult<>(respList, pageResult.getTotal());
+        // 单台账：通过 ibms_device + ibms_device_runtime 组装 legacy 壳对象
+        List<IbmsDeviceDO> ibmsDevices = ibmsDeviceMapper.selectList(
+                new LambdaQueryWrapperX<IbmsDeviceDO>()
+                        .eq(IbmsDeviceDO::getIbmsProductId, CHANGHUI_PRODUCT_ID)
+                        .likeIfPresent(IbmsDeviceDO::getName, reqVO.getDeviceName())
+                        .eqIfPresent(IbmsDeviceDO::getDeviceType, reqVO.getDeviceType())
+                        .orderByDesc(IbmsDeviceDO::getId));
+
+        if (ibmsDevices == null || ibmsDevices.isEmpty()) {
+            return PageResult.empty();
+        }
+
+        List<Long> ids = ibmsDevices.stream()
+                .map(IbmsDeviceDO::getId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        Map<Long, IbmsDeviceRuntimeDO> runtimeMap = ibmsDeviceRuntimeMapper.selectList(
+                        new LambdaQueryWrapperX<IbmsDeviceRuntimeDO>().in(IbmsDeviceRuntimeDO::getDeviceId, ids))
+                .stream()
+                .collect(Collectors.toMap(IbmsDeviceRuntimeDO::getDeviceId, r -> r, (a, b) -> a));
+
+        List<ChanghuiDeviceRespVO> respList = new java.util.ArrayList<>();
+        for (IbmsDeviceDO ibms : ibmsDevices) {
+            if (ibms == null) {
+                continue;
+            }
+            IbmsDeviceRuntimeDO runtime = runtimeMap.get(ibms.getId());
+            IotDeviceDO device = buildLegacyChanghuiDeviceShell(ibms, runtime);
+            if (device == null) {
+                continue;
+            }
+
+            if (reqVO.getStatus() != null) {
+                boolean online = IotDeviceStateEnum.isOnline(device.getState());
+                if (reqVO.getStatus() == 1 && !online) {
+                    continue;
+                }
+                if (reqVO.getStatus() == 0 && online) {
+                    continue;
+                }
+            }
+
+            // stationCode 在 config JSON 中：需要内存过滤
+            if (!filterByStationCode(device, reqVO.getStationCode())) {
+                continue;
+            }
+
+            respList.add(enrichDeviceRespVO(convertToRespVO(device)));
+        }
+
+        int total = respList.size();
+        int pageNo = reqVO.getPageNo();
+        int pageSize = reqVO.getPageSize();
+        int fromIndex = Math.max(0, (pageNo - 1) * pageSize);
+        int toIndex = Math.min(fromIndex + pageSize, total);
+        List<ChanghuiDeviceRespVO> pageList = fromIndex >= total ? List.of() : respList.subList(fromIndex, toIndex);
+
+        return new PageResult<>(pageList, (long) total);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateDeviceStatus(String stationCode, Integer status) {
-        IotDeviceDO device = getIotDeviceByStationCode(stationCode);
-        if (device != null) {
-            IotDeviceDO updateDevice = new IotDeviceDO();
-            updateDevice.setId(device.getId());
-            updateDevice.setState(status == 1 ? IotDeviceStateEnum.ONLINE.getState() : IotDeviceStateEnum.OFFLINE.getState());
-            iotDeviceMapper.updateById(updateDevice);
-            log.info("[updateDeviceStatus] 设备状态更新: stationCode={}, status={}", stationCode, status);
+        IbmsDeviceDO device = ibmsDeviceMapper.selectBySn(stationCode);
+        if (device == null) {
+            return;
         }
+        Integer newState = status == 1 ? IotDeviceStateEnum.ONLINE.getState() : IotDeviceStateEnum.OFFLINE.getState();
+        ibmsDeviceRuntimeService.patchGatewayState(device.getId(), device.getTenantId(), newState, System.currentTimeMillis());
+        log.info("[updateDeviceStatus] 设备状态更新(IBMS): stationCode={}, status={}", stationCode, status);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateDeviceHeartbeat(String stationCode) {
-        IotDeviceDO device = getIotDeviceByStationCode(stationCode);
-        if (device != null) {
-            IotDeviceDO updateDevice = new IotDeviceDO();
-            updateDevice.setId(device.getId());
-            updateDevice.setOnlineTime(LocalDateTime.now());
-            updateDevice.setState(IotDeviceStateEnum.ONLINE.getState());
-            iotDeviceMapper.updateById(updateDevice);
-            log.debug("[updateDeviceHeartbeat] 设备心跳更新: stationCode={}", stationCode);
+        IbmsDeviceDO device = ibmsDeviceMapper.selectBySn(stationCode);
+        if (device == null) {
+            return;
         }
+        ibmsDeviceRuntimeService.patchGatewayState(
+                device.getId(),
+                device.getTenantId(),
+                IotDeviceStateEnum.ONLINE.getState(),
+                System.currentTimeMillis());
+        log.debug("[updateDeviceHeartbeat] 设备心跳更新(IBMS): stationCode={}", stationCode);
     }
 
     @Override
     public List<ChanghuiDeviceRespVO> getOnlineDevices() {
-        // 查询在线的长辉设备
-        List<IotDeviceDO> devices = iotDeviceMapper.selectList(
-                new LambdaQueryWrapperX<IotDeviceDO>()
-                        .eq(IotDeviceDO::getProductId, CHANGHUI_PRODUCT_ID)
-                        .eq(IotDeviceDO::getState, IotDeviceStateEnum.ONLINE.getState()));
-        
-        return devices.stream()
-                .map(this::convertToRespVO)
-                .map(this::enrichDeviceRespVO)
-                .collect(Collectors.toList());
+        // 查询在线的长辉设备（单台账收口）
+        List<IbmsDeviceDO> ibmsDevices = ibmsDeviceMapper.selectList(
+                new LambdaQueryWrapperX<IbmsDeviceDO>()
+                        .eq(IbmsDeviceDO::getIbmsProductId, CHANGHUI_PRODUCT_ID)
+                        .orderByDesc(IbmsDeviceDO::getId));
+
+        if (ibmsDevices == null || ibmsDevices.isEmpty()) {
+            return java.util.List.of();
+        }
+
+        List<Long> ids = ibmsDevices.stream()
+                .map(IbmsDeviceDO::getId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        Map<Long, IbmsDeviceRuntimeDO> runtimeMap = ibmsDeviceRuntimeMapper.selectList(
+                        new LambdaQueryWrapperX<IbmsDeviceRuntimeDO>().in(IbmsDeviceRuntimeDO::getDeviceId, ids))
+                .stream()
+                .collect(Collectors.toMap(IbmsDeviceRuntimeDO::getDeviceId, r -> r, (a, b) -> a));
+
+        List<ChanghuiDeviceRespVO> respList = new java.util.ArrayList<>();
+        for (IbmsDeviceDO ibms : ibmsDevices) {
+            IbmsDeviceRuntimeDO runtime = runtimeMap.get(ibms.getId());
+            IotDeviceDO device = buildLegacyChanghuiDeviceShell(ibms, runtime);
+            if (device != null && IotDeviceStateEnum.isOnline(device.getState())) {
+                respList.add(enrichDeviceRespVO(convertToRespVO(device)));
+            }
+        }
+        return respList;
     }
 
     @Override
     public ChanghuiDeviceDO getDeviceDO(Long id) {
-        IotDeviceDO device = iotDeviceMapper.selectById(id);
+        IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(id);
+        if (ibms == null) {
+            return null;
+        }
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeMapper.selectById(id);
+        IotDeviceDO device = buildLegacyChanghuiDeviceShell(ibms, runtime);
         return convertToChanghuiDeviceDO(device);
     }
 
@@ -238,6 +316,40 @@ public class ChanghuiDeviceServiceImpl implements ChanghuiDeviceService {
     public ChanghuiDeviceDO getDeviceDOByStationCode(String stationCode) {
         IotDeviceDO device = getIotDeviceByStationCode(stationCode);
         return convertToChanghuiDeviceDO(device);
+    }
+
+    /**
+     * 把 {@code ibms_device + ibms_device_runtime} 转成 Changhui 旧逻辑仍消费的 legacy 壳对象。
+     * <p>Changhui 特有配置直接来自 {@code runtime.config}（反序列化为 {@link ChanghuiDeviceConfig}）。</p>
+     */
+    private IotDeviceDO buildLegacyChanghuiDeviceShell(IbmsDeviceDO ibms, IbmsDeviceRuntimeDO runtime) {
+        if (ibms == null) {
+            return null;
+        }
+
+        IotDeviceDO device = new IotDeviceDO();
+        device.setId(ibms.getId());
+        device.setTenantId(ibms.getTenantId());
+        device.setSubsystemCode(ibms.getSubsystemCode());
+        device.setDeviceName(ibms.getName());
+        device.setNickname(ibms.getNickname());
+        device.setDeviceKey(ibms.getDeviceKey());
+        device.setDeviceType(ibms.getDeviceType());
+
+        device.setProductId(ibms.getIbmsProductId());
+        device.setProductKey(ibms.getProductKey());
+
+        if (runtime != null) {
+            device.setState(runtime.getState());
+            device.setOnlineTime(runtime.getOnlineTime());
+            device.setOfflineTime(runtime.getOfflineTime());
+            device.setActiveTime(runtime.getActiveTime());
+            device.setFirmwareId(runtime.getFirmwareId());
+            device.setGatewayId(runtime.getGatewayId());
+            device.setConfig(runtime.getConfig());
+        }
+
+        return device;
     }
 
     // ==================== 私有方法 ====================
@@ -252,12 +364,16 @@ public class ChanghuiDeviceServiceImpl implements ChanghuiDeviceService {
         if (stationCode == null || stationCode.trim().isEmpty()) {
             return null;
         }
-        
-        // 直接通过 deviceKey 查询（deviceKey = stationCode）
-        return iotDeviceMapper.selectOne(
-                new LambdaQueryWrapperX<IotDeviceDO>()
-                        .eq(IotDeviceDO::getProductId, CHANGHUI_PRODUCT_ID)
-                        .eq(IotDeviceDO::getDeviceKey, stationCode));
+
+        // 单台账：deviceKey = stationCode（德通协议约定）
+        IbmsDeviceDO ibms = ibmsDeviceMapper.selectOne(
+                new LambdaQueryWrapperX<IbmsDeviceDO>()
+                        .eq(IbmsDeviceDO::getDeviceKey, stationCode));
+        if (ibms == null) {
+            return null;
+        }
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeMapper.selectById(ibms.getId());
+        return buildLegacyChanghuiDeviceShell(ibms, runtime);
     }
 
     /**
@@ -307,32 +423,30 @@ public class ChanghuiDeviceServiceImpl implements ChanghuiDeviceService {
     /**
      * 从更新请求构建配置（保留原有值）
      */
-    private ChanghuiDeviceConfig buildConfigFromUpdate(ChanghuiDeviceUpdateReqVO reqVO, IotDeviceDO existDevice) {
-        ChanghuiDeviceConfig existConfig = getChanghuiConfig(existDevice);
-        
+    private ChanghuiDeviceConfig buildConfigFromUpdate(ChanghuiDeviceUpdateReqVO reqVO, ChanghuiDeviceConfig existConfig) {
         return ChanghuiDeviceConfig.builder()
-                .stationCode(reqVO.getStationCode() != null ? reqVO.getStationCode() : 
-                        (existConfig != null ? existConfig.getStationCode() : null))
-                .teaKey(reqVO.getTeaKey() != null ? reqVO.getTeaKey() : 
-                        (existConfig != null ? existConfig.getTeaKey() : null))
-                .password(reqVO.getPassword() != null ? reqVO.getPassword() : 
-                        (existConfig != null ? existConfig.getPassword() : null))
-                .provinceCode(reqVO.getProvinceCode() != null ? reqVO.getProvinceCode() : 
-                        (existConfig != null ? existConfig.getProvinceCode() : null))
-                .managementCode(reqVO.getManagementCode() != null ? reqVO.getManagementCode() : 
-                        (existConfig != null ? existConfig.getManagementCode() : null))
-                .stationCodePart(reqVO.getStationCodePart() != null ? reqVO.getStationCodePart() : 
-                        (existConfig != null ? existConfig.getStationCodePart() : null))
-                .pileFront(reqVO.getPileFront() != null ? reqVO.getPileFront() : 
-                        (existConfig != null ? existConfig.getPileFront() : null))
-                .pileBack(reqVO.getPileBack() != null ? reqVO.getPileBack() : 
-                        (existConfig != null ? existConfig.getPileBack() : null))
-                .manufacturer(reqVO.getManufacturer() != null ? reqVO.getManufacturer() : 
-                        (existConfig != null ? existConfig.getManufacturer() : null))
-                .sequenceNo(reqVO.getSequenceNo() != null ? reqVO.getSequenceNo() : 
-                        (existConfig != null ? existConfig.getSequenceNo() : null))
-                .changhuiDeviceType(reqVO.getDeviceType() != null ? reqVO.getDeviceType() : 
-                        (existConfig != null ? existConfig.getChanghuiDeviceType() : null))
+                .stationCode(reqVO.getStationCode() != null ? reqVO.getStationCode()
+                        : (existConfig != null ? existConfig.getStationCode() : null))
+                .teaKey(reqVO.getTeaKey() != null ? reqVO.getTeaKey()
+                        : (existConfig != null ? existConfig.getTeaKey() : null))
+                .password(reqVO.getPassword() != null ? reqVO.getPassword()
+                        : (existConfig != null ? existConfig.getPassword() : null))
+                .provinceCode(reqVO.getProvinceCode() != null ? reqVO.getProvinceCode()
+                        : (existConfig != null ? existConfig.getProvinceCode() : null))
+                .managementCode(reqVO.getManagementCode() != null ? reqVO.getManagementCode()
+                        : (existConfig != null ? existConfig.getManagementCode() : null))
+                .stationCodePart(reqVO.getStationCodePart() != null ? reqVO.getStationCodePart()
+                        : (existConfig != null ? existConfig.getStationCodePart() : null))
+                .pileFront(reqVO.getPileFront() != null ? reqVO.getPileFront()
+                        : (existConfig != null ? existConfig.getPileFront() : null))
+                .pileBack(reqVO.getPileBack() != null ? reqVO.getPileBack()
+                        : (existConfig != null ? existConfig.getPileBack() : null))
+                .manufacturer(reqVO.getManufacturer() != null ? reqVO.getManufacturer()
+                        : (existConfig != null ? existConfig.getManufacturer() : null))
+                .sequenceNo(reqVO.getSequenceNo() != null ? reqVO.getSequenceNo()
+                        : (existConfig != null ? existConfig.getSequenceNo() : null))
+                .changhuiDeviceType(reqVO.getDeviceType() != null ? reqVO.getDeviceType()
+                        : (existConfig != null ? existConfig.getChanghuiDeviceType() : null))
                 .build();
     }
 

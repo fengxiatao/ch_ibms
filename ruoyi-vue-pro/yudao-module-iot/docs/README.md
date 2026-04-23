@@ -3,9 +3,15 @@
 ## 📚 文档导航
 
 ### 🎯 快速开始
+- [NewGateway × Biz 单文档分步落地指南](./iot-newgateway-biz-mq-landing-plan.md) ⭐ **唯一主文档** - 按步骤 0→12 落地，勾选即进度
 - [消息通信架构说明](./消息通信架构说明.md) ⭐ **必读** - 理解 RocketMQ 和 MQTT 的使用场景
 - [RocketMQ Topic命名紧急修正说明](./RocketMQ_Topic命名紧急修正说明.md) 🚨 **重要** - Topic 命名规则修正
 - [错误记录索引](./errors/INDEX.md) 🔧 **问题排查** - 常见错误及解决方案
+
+### IBMS 台账收敛（iot_* → ibms_*）
+- [双轨模型收敛与进展总览](./ibms-iot-model-convergence-plan.md) — 状态表、DoD、变更记录
+- [单一 ibms_* 实施计划（工单级）](./ibms-single-ledger-implementation-plan.md) — 工作包 WP-A～F、验收与迭代切片
+- [IBMS 与网关路线图 P0–P5（摘录）](./ibms-roadmap-p0-p5.md)
 
 ### 📋 Topic 规范文档
 

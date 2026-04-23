@@ -380,9 +380,9 @@ public class OpcControlService {
 ### 6.1 设备管理（复用现有接口）
 
 ```
-POST   /iot/device/create        - 创建设备
-PUT    /iot/device/update        - 更新设备
-DELETE /iot/device/delete        - 删除设备
+POST   /iot/ibms/device/create  - 创建设备
+PUT    /iot/ibms/device/update  - 更新设备
+DELETE /iot/ibms/device/delete  - 删除设备
 GET    /iot/device/get           - 获取设备详情
 GET    /iot/device/page          - 获取设备分页列表
 ```

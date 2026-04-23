@@ -6,6 +6,7 @@ DROP TABLE IF EXISTS `iot_device_event_log`;
 CREATE TABLE `iot_device_event_log` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号，主键自增',
   `device_id` bigint NOT NULL COMMENT '设备编号',
+  `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
   `product_id` bigint NULL DEFAULT NULL COMMENT '产品编号',
   `product_key` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '产品标识',
   `device_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '设备名称',
@@ -25,6 +26,7 @@ CREATE TABLE `iot_device_event_log` (
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_device_id`(`device_id`) USING BTREE COMMENT '设备ID索引',
+  INDEX `idx_tenant_id`(`tenant_id`) USING BTREE COMMENT '租户ID索引',
   INDEX `idx_product_id`(`product_id`) USING BTREE COMMENT '产品ID索引',
   INDEX `idx_event_identifier`(`event_identifier`) USING BTREE COMMENT '事件标识符索引',
   INDEX `idx_event_type`(`event_type`) USING BTREE COMMENT '事件类型索引',

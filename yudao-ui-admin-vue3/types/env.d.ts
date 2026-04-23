@@ -26,6 +26,13 @@ interface ImportMetaEnv {
   readonly VITE_SOURCEMAP: string
   readonly VITE_OUT_DIR: string
   readonly VITE_GOVIEW_URL: string
+  /** 将播放 URL 中的私网地址改写为此公网主机名（内网打开后台时仍走该域拉流）；不配置则用当前页 hostname */
+  readonly VITE_STREAM_PUBLIC_HOST?: string
+  /** 与 VITE_STREAM_PUBLIC_HOST 同时使用时指定端口；不设则不在 host 后追加端口（适用于反代 80/443） */
+  readonly VITE_STREAM_PUBLIC_PORT?: string
+  readonly VITE_ZLM_RTC_HOST?: string
+  readonly VITE_ZLM_RTC_PORT?: string
+  readonly VITE_ZLM_SECRET?: string
 }
 
 declare global {

@@ -215,7 +215,7 @@
 <script setup lang="ts">
 import * as EnergyApi from '@/api/iot/building/energy'
 import type { IbmsEnergyMeterVO, IbmsEnergyOverviewVO } from '@/api/iot/building/energy'
-import * as echarts from 'echarts'
+import echarts from '@/plugins/echarts'
 
 defineOptions({ name: 'BuildingEnergy' })
 

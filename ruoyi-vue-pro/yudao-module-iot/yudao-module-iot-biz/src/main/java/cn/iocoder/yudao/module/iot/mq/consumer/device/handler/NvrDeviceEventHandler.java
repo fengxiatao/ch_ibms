@@ -2,7 +2,9 @@ package cn.iocoder.yudao.module.iot.mq.consumer.device.handler;
 
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceEventLogDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceEventLogMapper;
 import cn.iocoder.yudao.module.iot.enums.device.NvrDeviceTypeConstants;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +43,7 @@ public class NvrDeviceEventHandler implements DeviceEventHandler {
     private static final String DEVICE_TYPE = NvrDeviceTypeConstants.NVR;
 
     private final IotDeviceEventLogMapper eventLogMapper;
+    private final IbmsDeviceMapper ibmsDeviceMapper;
 
     @Override
     public String getDeviceType() {
@@ -111,8 +114,12 @@ public class NvrDeviceEventHandler implements DeviceEventHandler {
                 .processed(false)
                 .build();
 
-            // 保存事件（使用忽略租户模式，因为设备事件可能没有租户上下文）
-            TenantUtils.executeIgnore(() -> eventLogMapper.insert(eventDO));
+            // 保存事件：NVR 设备事件可能没有租户上下文，这里从 `ibms_device` 台账补齐 tenantId
+            IbmsDeviceDO device = TenantUtils.executeIgnore(() -> ibmsDeviceMapper.selectById(deviceId));
+            if (device != null && device.getTenantId() != null) {
+                eventDO.setTenantId(device.getTenantId());
+            }
+            eventLogMapper.insert(eventDO);
             log.info("{} NVR 事件已记录: deviceId={}, eventType={}, eventName={}, channelNo={}",
                     LOG_PREFIX, deviceId, eventType, eventName, channelNo);
         } catch (Exception e) {

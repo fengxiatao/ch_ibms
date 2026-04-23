@@ -1,0 +1,85 @@
+<h2>智慧工厂驾驶舱同步克隆</h2>
+<p class="subtitle">先快速确认这次“完整同步克隆”的深度，我再按同一个边界推进改造。</p>
+
+<div class="section">
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">当前项目页面</div>
+      <div class="mockup-body">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+          <div class="placeholder" style="height:60px;">指标卡 1</div>
+          <div class="placeholder" style="height:60px;">指标卡 2</div>
+          <div class="placeholder" style="height:60px;">指标卡 3</div>
+          <div class="placeholder" style="height:60px;">指标卡 4</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1.05fr 1.6fr 1.1fr;gap:10px;">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="placeholder" style="height:90px;">楼层切换</div>
+            <div class="placeholder" style="height:140px;">设备状态</div>
+            <div class="placeholder" style="height:140px;">告警事件</div>
+          </div>
+          <div class="placeholder" style="height:390px;">主视图区</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="placeholder" style="height:160px;">实时视频</div>
+            <div class="placeholder" style="height:120px;">能耗趋势</div>
+            <div class="placeholder" style="height:100px;">环境快照</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mockup">
+      <div class="mockup-header">产品原型页面</div>
+      <div class="mockup-body">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+          <div class="placeholder" style="height:72px;">在线率</div>
+          <div class="placeholder" style="height:72px;">告警数</div>
+          <div class="placeholder" style="height:72px;">环境合格率</div>
+          <div class="placeholder" style="height:72px;">今日能耗</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:10px;">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="placeholder" style="height:92px;">楼层切换</div>
+            <div class="placeholder" style="height:150px;">设备状态</div>
+            <div class="placeholder" style="height:150px;">告警事件</div>
+          </div>
+          <div class="placeholder" style="height:402px;">3D 工厂 + 底部工具栏</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="placeholder" style="height:170px;">实时视频</div>
+            <div class="placeholder" style="height:125px;">能耗趋势</div>
+            <div class="placeholder" style="height:107px;">环境监测</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>你更希望我按哪种“克隆深度”推进？</h3>
+  <p class="subtitle">可直接点击选择，也可以在终端里回复你的偏好。</p>
+
+  <div class="options">
+    <div class="option" data-choice="a" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>推荐：高保真落地</h3>
+        <p>视觉布局、模块层级、按钮区和卡片风格尽量 1:1，对接现有真实数据；原型里的假交互改成真实可用或安全降级。</p>
+      </div>
+    </div>
+    <div class="option" data-choice="b" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>极致克隆</h3>
+        <p>连原型中的视觉细节、占位信息、工具栏状态和演示交互都尽量完整复刻，哪怕部分能力先用占位态承接。</p>
+      </div>
+    </div>
+    <div class="option" data-choice="c" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>结构对齐</h3>
+        <p>只对齐大区块布局和模块顺序，具体卡片样式、细节表现和交互动效保持当前项目风格。</p>
+      </div>
+    </div>
+  </div>
+</div>

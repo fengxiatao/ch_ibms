@@ -11,7 +11,6 @@ import cn.iocoder.yudao.module.iot.controller.admin.device.vo.message.IotDeviceM
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceMessageDO;
 import cn.iocoder.yudao.module.iot.dal.tdengine.IotDeviceMessageMapper;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
 import cn.iocoder.yudao.module.iot.service.device.message.IotDeviceMessageService;
 import cn.iocoder.yudao.module.iot.service.thingmodel.IotThingModelService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,8 +36,6 @@ public class IotDeviceMessageController {
 
     @Resource
     private IotDeviceMessageService deviceMessageService;
-    @Resource
-    private IotDeviceService deviceService;
     @Resource
     private IotThingModelService thingModelService;
     @Resource

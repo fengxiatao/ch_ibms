@@ -6,9 +6,7 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.iot.controller.admin.product.vo.category.IotProductCategoryPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.product.vo.category.IotProductCategorySaveReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductCategoryDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.product.IotProductCategoryMapper;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -17,8 +15,6 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
-import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.filterList;
-import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.getSumValue;
 import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.PRODUCT_CATEGORY_NOT_EXISTS;
 
 /**
@@ -35,9 +31,6 @@ public class IotProductCategoryServiceImpl implements IotProductCategoryService 
 
     @Resource
     private IotProductService productService;
-
-    @Resource
-    private IotDeviceService deviceService;
 
     public Long createProductCategory(IotProductCategorySaveReqVO createReqVO) {
         // 插入

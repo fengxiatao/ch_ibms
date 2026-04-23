@@ -58,9 +58,9 @@
           <!-- 未播放时显示提示信息 -->
           <div v-else-if="!pane.isPlaying" class="overlay-center idle">
             <Icon icon="ep:video-pause" :size="64" />
-            <p class="window-label">窗口 {{ idx + 1 }}</p>
-            <p class="tip-text">拖拽通道到此处播放实时视频</p>
-            <p class="tip-text">或双击通道选择窗口播放</p>
+            <p class="window-label">{{ idleTitle || `窗口 ${idx + 1}` }}</p>
+            <p class="tip-text">{{ idleDescription }}</p>
+            <p v-if="idleSecondaryDescription" class="tip-text">{{ idleSecondaryDescription }}</p>
           </div>
 
           <!-- 错误状态 -->
@@ -76,7 +76,7 @@
           </div>
 
           <!-- 悬停工具栏（仅在播放时显示，轮巡时隐藏） -->
-          <div v-if="pane.isPlaying && !isPatrolling" class="pane-toolbar">
+          <div v-if="pane.isPlaying && !isPatrolling && showPaneToolbar" class="pane-toolbar">
             <el-button size="small" @click.stop="emit('stop', idx)" title="停止播放" type="danger">
               <Icon icon="ep:video-camera-filled" />
             </el-button>
@@ -129,7 +129,7 @@
     </div>
 
     <!-- 底部控制栏 -->
-    <div class="playback-controls">
+    <div v-if="showFooter" class="playback-controls">
       <div class="controls-left">
         <!-- 当前视图显示 -->
         <div class="current-view-info" v-if="currentViewName">
@@ -143,14 +143,14 @@
         </div>
 
         <!-- 视图操作按钮 -->
-        <el-button-group size="small" v-if="!currentViewName">
+        <el-button-group size="small" v-if="showViewControls && !currentViewName">
           <!-- 未加载视图时：显示"保存为视图" -->
           <el-button @click="emit('view-save-as')" :disabled="!hasPlayingPanes" title="保存当前画面为视图">
             <Icon icon="ep:document-add" />
             保存为视图
           </el-button>
         </el-button-group>
-        <el-button-group size="small" v-else>
+        <el-button-group size="small" v-else-if="showViewControls">
           <!-- 已加载视图时：显示"更新当前视图"和"另存新视图" -->
           <el-button @click="emit('view-update')" :disabled="!hasPlayingPanes" title="更新当前视图">
             <Icon icon="ep:refresh" />
@@ -163,8 +163,10 @@
         </el-button-group>
 
         <!-- 轮巡控制 -->
-        <el-divider direction="vertical" />
-        <slot name="patrol-controls"></slot>
+        <template v-if="showPatrolControls">
+          <el-divider direction="vertical" />
+          <slot name="patrol-controls"></slot>
+        </template>
       </div>
 
       <div class="controls-right">
@@ -178,6 +180,7 @@
 
         <!-- 停止所有 -->
         <el-button
+          v-if="showStopAllControl"
           size="small"
           @click="emit('stop-all')"
           type="danger"
@@ -190,6 +193,7 @@
 
         <!-- 分屏布局 -->
         <el-select
+          v-if="showLayoutSelector"
           :model-value="gridLayout"
           size="small"
           style="width: 96px"
@@ -205,7 +209,7 @@
         </el-select>
 
         <!-- 全屏 -->
-        <el-button size="small" @click="handleFullscreen" title="全屏">
+        <el-button v-if="showGridFullscreen" size="small" @click="handleFullscreen" title="全屏">
           <Icon icon="ep:full-screen" />
         </el-button>
       </div>
@@ -227,12 +231,32 @@ interface Props {
   currentViewName?: string
   isPatrolling?: boolean
   areaZoomActive?: boolean  // 区域放大模式
+  showFooter?: boolean
+  showViewControls?: boolean
+  showPatrolControls?: boolean
+  showStopAllControl?: boolean
+  showLayoutSelector?: boolean
+  showGridFullscreen?: boolean
+  showPaneToolbar?: boolean
+  idleTitle?: string
+  idleDescription?: string
+  idleSecondaryDescription?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   currentViewName: '',
   isPatrolling: false,
-  areaZoomActive: false
+  areaZoomActive: false,
+  showFooter: true,
+  showViewControls: true,
+  showPatrolControls: true,
+  showStopAllControl: true,
+  showLayoutSelector: true,
+  showGridFullscreen: true,
+  showPaneToolbar: true,
+  idleTitle: '',
+  idleDescription: '拖拽通道到此处播放实时视频',
+  idleSecondaryDescription: '或双击通道选择窗口播放'
 })
 
 // Emits

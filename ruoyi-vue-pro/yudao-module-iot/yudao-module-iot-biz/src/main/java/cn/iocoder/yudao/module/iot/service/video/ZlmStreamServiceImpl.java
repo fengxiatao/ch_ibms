@@ -1,13 +1,18 @@
 package cn.iocoder.yudao.module.iot.service.video;
 
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.module.iot.client.ZlmApiClient;
 import cn.iocoder.yudao.module.iot.controller.admin.security.vo.PlayUrlRespVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsChannelDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsChannelMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +41,9 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
 
     private final ZlmApiClient zlmApiClient;
     private final IotDeviceChannelService channelService;
-    private final IotDeviceService deviceService;
+    private final IbmsChannelMapper ibmsChannelMapper;
+    private final IbmsDeviceMapper ibmsDeviceMapper;
+    private final IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
 
     /** 应用名常量 */
     private static final String APP_LIVE = "live";
@@ -52,16 +59,17 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
         }
         
         // 1. 查询通道信息
-        IotDeviceChannelDO channel = channelService.getChannel(channelId);
+        IotDeviceChannelDO channel = loadChannel(channelId);
         if (channel == null) {
             throw new ServiceException(BAD_REQUEST.getCode(), "通道不存在: channelId=" + channelId);
         }
 
-        // 2. 查询设备信息
-        IotDeviceDO device = deviceService.getDevice(channel.getDeviceId());
+        // 2. 查询 IBMS 台账与运行态（config 在运行态表）
+        IbmsDeviceDO device = ibmsDeviceMapper.selectById(channel.getDeviceId());
         if (device == null) {
             throw new ServiceException(BAD_REQUEST.getCode(), "设备不存在: deviceId=" + channel.getDeviceId());
         }
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(channel.getDeviceId());
 
         // 3. 构建流标识（包含码流类型，避免主/子码流冲突）
         String streamKey = buildStreamKey(channelId, subtype);
@@ -71,9 +79,11 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
             log.info("[ZLM流服务] 流不存在，开始拉流: channelId={}, streamKey={}, subtype={}", 
                     channelId, streamKey, subtype);
             
-            String rtspUrl = buildRtspUrl(device, channel, subtype);
+            String rtspUrl = buildRtspUrl(device, runtime, channel, subtype);
             if (StrUtil.isBlank(rtspUrl)) {
-                throw new ServiceException(BAD_REQUEST.getCode(), "无法构建 RTSP 地址: channelId=" + channelId);
+                throw new ServiceException(BAD_REQUEST.getCode(),
+                        "无法构建 RTSP 地址: channelId=" + channelId
+                                + "（请检查：设备/台账 IP、通道 extra 的 targetIp/ip/host、或配置 streamUrlMain 完整拉流地址）");
             }
 
             String proxyKey = zlmApiClient.addStreamProxy(APP_LIVE, streamKey, rtspUrl);
@@ -137,20 +147,21 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
 
         try {
             // 查询通道和设备信息
-            IotDeviceChannelDO channel = channelService.getChannel(channelId);
+            IotDeviceChannelDO channel = loadChannel(channelId);
             if (channel == null) {
                 log.warn("[ZLM Hook] 通道不存在: channelId={}", channelId);
                 return;
             }
 
-            IotDeviceDO device = deviceService.getDevice(channel.getDeviceId());
+            IbmsDeviceDO device = ibmsDeviceMapper.selectById(channel.getDeviceId());
             if (device == null) {
                 log.warn("[ZLM Hook] 设备不存在: deviceId={}", channel.getDeviceId());
                 return;
             }
+            IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(channel.getDeviceId());
 
             // 构建 RTSP 并拉流（Hook 回调默认使用主码流）
-            String rtspUrl = buildRtspUrl(device, channel, 0);
+            String rtspUrl = buildRtspUrl(device, runtime, channel, 0);
             String proxyKey = zlmApiClient.addStreamProxy(app, stream, rtspUrl);
 
             if (proxyKey != null) {
@@ -196,8 +207,11 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
      */
     private Long parseChannelIdFromStreamKey(String streamKey) {
         if (streamKey != null && streamKey.startsWith("channel_")) {
+            String rest = streamKey.substring("channel_".length());
+            int idx = rest.indexOf('_');
+            String numPart = idx > 0 ? rest.substring(0, idx) : rest;
             try {
-                return Long.parseLong(streamKey.substring("channel_".length()));
+                return Long.parseLong(numPart);
             } catch (NumberFormatException e) {
                 return null;
             }
@@ -222,11 +236,23 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
      *     <li>通用：rtsp://user:pass@ip:554/stream1</li>
      * </ul>
      */
-    private String buildRtspUrl(IotDeviceDO device, IotDeviceChannelDO channel, Integer subtype) {
+    private String buildRtspUrl(IbmsDeviceDO device, IbmsDeviceRuntimeDO runtime, IotDeviceChannelDO channel, Integer subtype) {
         // 默认主码流
         if (subtype == null) {
             subtype = 0;
         }
+
+        // 优先使用通道 extra 中已配置的完整 RTSP（无需设备/通道 IP 拼模板；与类注释一致）
+        if (subtype == 1 && StrUtil.isNotBlank(channel.getStreamUrlSub())) {
+            log.info("[ZLM] 使用通道配置的子码流 RTSP: channelId={}", channel.getId());
+            return StrUtil.trim(channel.getStreamUrlSub());
+        }
+        if (subtype == 0 && StrUtil.isNotBlank(channel.getStreamUrlMain())) {
+            log.info("[ZLM] 使用通道配置的主码流 RTSP: channelId={}", channel.getId());
+            return StrUtil.trim(channel.getStreamUrlMain());
+        }
+
+        IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(device, runtime);
         
         // 📍 确定目标 IP
         // 关键逻辑：NVR 通道需要使用 NVR 的 IP（设备 IP），而不是 IPC 的 IP（targetIp）
@@ -235,13 +261,13 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
         String deviceType = channel.getDeviceType();
         if ("NVR".equalsIgnoreCase(deviceType)) {
             // NVR 通道：使用设备 IP（NVR 的 IP）
-            ip = DeviceConfigHelper.getIpAddress(device);
+            ip = net.ip;
             log.debug("[ZLM] NVR 通道，使用 NVR IP: {}", ip);
         } else {
             // IPC 直连场景：优先使用 targetIp，否则使用设备 IP
             ip = channel.getTargetIp();
             if (StrUtil.isBlank(ip)) {
-                ip = DeviceConfigHelper.getIpAddress(device);
+                ip = net.ip;
             }
         }
         if (StrUtil.isBlank(ip)) {
@@ -253,11 +279,17 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
         String username = channel.getUsername();
         String password = channel.getPassword();
         
-        // 如果通道没有配置，尝试从设备配置中解析
+        // 如果通道没有配置，尝试从台账/运行态解析（与 DhVideoController 一致）
+        if (StrUtil.isBlank(username)) {
+            username = net.username;
+        }
+        if (StrUtil.isBlank(password)) {
+            password = net.password;
+        }
         if (StrUtil.isBlank(username) || StrUtil.isBlank(password)) {
-            if (device.getConfig() != null) {
+            if (runtime != null && runtime.getConfig() != null) {
                 try {
-                    var configMap = device.getConfig().toMap();
+                    var configMap = runtime.getConfig().toMap();
                     if (StrUtil.isBlank(username)) {
                         Object u = configMap.get("username");
                         if (u != null) username = u.toString();
@@ -295,16 +327,19 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
 
         // 🏭 根据设备品牌构建 RTSP URL
         String productKey = device.getProductKey();
-        String deviceName = device.getDeviceName();
+        String deviceName = device.getName();
         
-        // 📡 从设备配置中获取 RTSP 端口，默认使用 80（大华 NVR 通常使用 80 端口）
-        int rtspPort = 80; // 大华 NVR 默认使用 80 端口而非标准 554
-        if (device.getConfig() != null) {
+        // RTSP 端口：台账/运行态解析优先，其次运行态 config 覆盖；默认 554（历史上误用 80 会导致地址异常）
+        int rtspPort = net.rtspPort > 0 ? net.rtspPort : 554;
+        if (runtime != null && runtime.getConfig() != null) {
             try {
-                var configMap = device.getConfig().toMap();
+                var configMap = runtime.getConfig().toMap();
                 Object portObj = configMap.get("rtspPort");
                 if (portObj != null) {
-                    rtspPort = Integer.parseInt(portObj.toString());
+                    int p = Integer.parseInt(portObj.toString());
+                    if (p > 0) {
+                        rtspPort = p;
+                    }
                 }
             } catch (Exception ignored) {}
         }
@@ -347,6 +382,70 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
         return rtspUrl;
     }
 
+    private IotDeviceChannelDO loadChannel(Long channelId) {
+        IbmsChannelDO channel = ibmsChannelMapper.selectById(channelId);
+        if (channel == null) {
+            return null;
+        }
+        JSONObject extra = parseExtra(channel.getExtra());
+        return IotDeviceChannelDO.builder()
+                .id(channel.getId())
+                .deviceId(channel.getDeviceId())
+                .deviceType(resolveDeviceType(channel, extra))
+                .channelNo(channel.getChannelNo())
+                .channelName(channel.getName())
+                .channelCode(channel.getCode())
+                .channelType(channel.getBusiness())
+                .channelSubType(channel.getTypeCode())
+                .location(channel.getSpace())
+                .spaceId(channel.getSpaceId())
+                // 与 DhVideo / 现场配置对齐：IPC 或 NVR 下挂通道的可达 IP 常写在 extra.ip / host
+                .targetIp(firstNonBlank(
+                        extra.getStr("targetIp"),
+                        extra.getStr("ipcIp"),
+                        extra.getStr("ip"),
+                        extra.getStr("host"),
+                        channel.getIp()))
+                .targetPort(extra.getInt("targetPort"))
+                .targetChannelNo(extra.getInt("targetChannelNo"))
+                .protocol(extra.getStr("protocol"))
+                .username(extra.getStr("username"))
+                .password(extra.getStr("password"))
+                .streamUrlMain(extra.getStr("streamUrlMain"))
+                .streamUrlSub(extra.getStr("streamUrlSub"))
+                .ptzSupport(extra.getBool("ptzSupport"))
+                .build();
+    }
+
+    private JSONObject parseExtra(String extra) {
+        if (StrUtil.isBlank(extra)) {
+            return new JSONObject();
+        }
+        try {
+            return JSONUtil.parseObj(extra);
+        } catch (Exception ignored) {
+            return new JSONObject();
+        }
+    }
+
+    private String resolveDeviceType(IbmsChannelDO channel, JSONObject extra) {
+        return firstNonBlank(
+                extra.getStr("deviceType"),
+                extra.getStr("dataSource"),
+                channel.getDataSource(),
+                channel.getCategory()
+        );
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (StrUtil.isNotBlank(value)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
     private boolean isDahuaDevice(String deviceType, String productKey) {
         if (deviceType != null) {
             String lower = deviceType.toLowerCase();
@@ -380,16 +479,17 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
     @Override
     public PlayUrlRespVO getPlaybackUrl(Long channelId, String startTime, String endTime, String playId) {
         // 1. 查询通道信息
-        IotDeviceChannelDO channel = channelService.getChannel(channelId);
+        IotDeviceChannelDO channel = loadChannel(channelId);
         if (channel == null) {
             throw new RuntimeException("通道不存在: channelId=" + channelId);
         }
 
-        // 2. 查询设备信息
-        IotDeviceDO device = deviceService.getDevice(channel.getDeviceId());
+        // 2. 查询 IBMS 台账与运行态
+        IbmsDeviceDO device = ibmsDeviceMapper.selectById(channel.getDeviceId());
         if (device == null) {
             throw new RuntimeException("设备不存在: deviceId=" + channel.getDeviceId());
         }
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(channel.getDeviceId());
 
         // 3. 构建回放流标 hookup: 同一窗口使用固定 playId，点击时间轴会复用 streamKey 并强制刷新
         String streamKey = buildPlaybackStreamKey(channelId, startTime, endTime, playId);
@@ -403,7 +503,7 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
         if (!zlmApiClient.isStreamOnline(APP_PLAYBACK, streamKey)) {
             log.info("[ZLM流服务] 回放流不存在，开始拉流: channelId={}, streamKey={}", channelId, streamKey);
 
-            String rtspUrl = buildPlaybackRtspUrl(device, channel, startTime, endTime);
+            String rtspUrl = buildPlaybackRtspUrl(device, runtime, channel, startTime, endTime);
             if (StrUtil.isBlank(rtspUrl)) {
                 throw new RuntimeException("无法构建回放 RTSP 地址: channelId=" + channelId);
             }
@@ -474,20 +574,18 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
      *     <li>海康 NVR：rtsp://user:pass@ip:554/Streaming/tracks/501?starttime=20260116t100000z&endtime=20260116t110000z</li>
      * </ul>
      */
-    private String buildPlaybackRtspUrl(IotDeviceDO device, IotDeviceChannelDO channel, String startTime, String endTime) {
+    private String buildPlaybackRtspUrl(IbmsDeviceDO device, IbmsDeviceRuntimeDO runtime, IotDeviceChannelDO channel, String startTime, String endTime) {
+        IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(device, runtime);
         // 📍 确定目标 IP（与实时流逻辑保持一致）
-        // NVR 通道需要使用 NVR 的 IP，而不是 IPC 的 IP
         String ip;
         String deviceType = channel.getDeviceType();
         if ("NVR".equalsIgnoreCase(deviceType)) {
-            // NVR 通道：使用设备 IP（NVR 的 IP）
-            ip = DeviceConfigHelper.getIpAddress(device);
+            ip = net.ip;
             log.debug("[ZLM] NVR 通道回放，使用 NVR IP: {}", ip);
         } else {
-            // IPC 直连场景：优先使用 targetIp，否则使用设备 IP
             ip = channel.getTargetIp();
             if (StrUtil.isBlank(ip)) {
-                ip = DeviceConfigHelper.getIpAddress(device);
+                ip = net.ip;
             }
         }
         if (StrUtil.isBlank(ip)) {
@@ -495,13 +593,18 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
             return null;
         }
 
-        // 获取认证信息
         String username = channel.getUsername();
         String password = channel.getPassword();
+        if (StrUtil.isBlank(username)) {
+            username = net.username;
+        }
+        if (StrUtil.isBlank(password)) {
+            password = net.password;
+        }
         if (StrUtil.isBlank(username) || StrUtil.isBlank(password)) {
-            if (device.getConfig() != null) {
+            if (runtime != null && runtime.getConfig() != null) {
                 try {
-                    var configMap = device.getConfig().toMap();
+                    var configMap = runtime.getConfig().toMap();
                     if (StrUtil.isBlank(username)) {
                         Object u = configMap.get("username");
                         if (u != null) username = u.toString();
@@ -533,11 +636,10 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
             }
         }
 
-        // 📡 从设备配置中获取 RTSP 端口，默认使用 554（标准 RTSP 端口）
         int rtspPort = 554;
-        if (device.getConfig() != null) {
+        if (runtime != null && runtime.getConfig() != null) {
             try {
-                var configMap = device.getConfig().toMap();
+                var configMap = runtime.getConfig().toMap();
                 Object portObj = configMap.get("rtspPort");
                 if (portObj != null) {
                     rtspPort = Integer.parseInt(portObj.toString());
@@ -545,7 +647,7 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
             } catch (Exception ignored) {}
         }
         String productKey = device.getProductKey();
-        String deviceName = device.getDeviceName();
+        String deviceName = device.getName();
 
         String rtspUrl;
         // 大华设备/NVR - 使用大华回放格式

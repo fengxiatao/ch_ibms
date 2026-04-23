@@ -1,0 +1,3479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IBMS智慧物联管理平台 · 设备管理系统 V3.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .glass-card {
+            background: rgba(51, 65, 85, 0.4);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            background: rgba(51, 65, 85, 0.6);
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .sidebar-item {
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), transparent);
+            transition: width 0.3s;
+        }
+
+        .sidebar-item:hover::before, .sidebar-item.active::before {
+            width: 100%;
+        }
+
+        .sidebar-item:hover, .sidebar-item.active {
+            border-left-color: #3b82f6;
+            color: #60a5fa;
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            position: relative;
+        }
+
+        .status-online { background: #10b981; box-shadow: 0 0 8px #10b981; }
+        .status-offline { background: #ef4444; }
+        .status-warning { background: #f59e0b; }
+        .status-maintenance { background: #8b5cf6; }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.3);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.5);
+            border-radius: 3px;
+        }
+
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-enter {
+            animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes modalSlideIn {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .data-table th {
+            background: rgba(30, 41, 59, 0.8);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            color: #94a3b8;
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .data-table td {
+            padding: 16px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.05);
+            transition: background 0.2s;
+        }
+
+        .data-table tr:hover td {
+            background: rgba(59, 130, 246, 0.03);
+        }
+
+        .professional-tab {
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+        }
+
+        .professional-tab:hover {
+            color: #60a5fa;
+        }
+
+        .professional-tab.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
+
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .search-input {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px -5px rgba(59, 130, 246, 0.4);
+        }
+
+        .batch-bar {
+            transform: translateY(100%);
+            transition: transform 0.3s;
+        }
+
+        .batch-bar.show {
+            transform: translateY(0);
+        }
+
+        .device-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-online { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .badge-offline { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .badge-warning { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .badge-maintenance { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); }
+
+        .form-input {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: white;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+
+        .form-input.error {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            color: #94a3b8;
+            margin-bottom: 0.25rem;
+        }
+
+        .error-message {
+            color: #ef4444;
+            font-size: 0.75rem;
+            margin-top: 0.25rem;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .device-row.selected {
+            background: rgba(59, 130, 246, 0.1) !important;
+        }
+
+        .tab-btn {
+            padding: 0.75rem 1rem;
+            color: #94a3b8;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-btn:hover {
+            color: #e2e8f0;
+        }
+
+        .tab-btn.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
+
+        .point-detail-row {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        .point-detail-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.75rem;
+        }
+        .point-detail-table th {
+            background: rgba(30, 41, 59, 0.8);
+            padding: 8px 12px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+        .point-detail-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .space-tree {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .space-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .space-item:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        .space-item.selected {
+            background: rgba(59, 130, 246, 0.2);
+            border-left: 3px solid #3b82f6;
+        }
+
+        .product-key {
+            font-family: monospace;
+            font-size: 0.7rem;
+            color: #60a5fa;
+        }
+
+        .hidden-field {
+            display: none !important;
+        }
+
+        .protocol-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.65rem;
+            background: rgba(59, 130, 246, 0.1);
+            color: #93c5fd;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .brand-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.65rem;
+            background: rgba(139, 92, 246, 0.1);
+            color: #a78bfa;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+
+        .access-type-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.65rem;
+            background: rgba(16, 185, 129, 0.1);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .channel-config {
+            background: rgba(30, 41, 59, 0.3);
+            border-radius: 0.5rem;
+            padding: 1rem;
+        }
+
+        /* Toast 样式 */
+        .toast {
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 0.5rem;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+            animation: toastSlideIn 0.3s ease;
+        }
+
+        @keyframes toastSlideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .toast.success { border-left: 4px solid #10b981; }
+        .toast.error { border-left: 4px solid #ef4444; }
+        .toast.warning { border-left: 4px solid #f59e0b; }
+        .toast.info { border-left: 4px solid #3b82f6; }
+
+        /* 加载动画 */
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* 确认对话框 */
+        .confirm-dialog {
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .confirm-dialog h4 {
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+
+        .confirm-dialog p {
+            color: #94a3b8;
+            margin-bottom: 1.5rem;
+        }
+
+        .confirm-dialog .btn-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex">
+
+    <!-- 左侧导航栏 -->
+    <aside class="w-64 glass-panel flex flex-col border-r border-slate-700/30 z-20">
+        <div class="p-6 border-b border-slate-700/30">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <i class="fas fa-network-wired text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white tracking-tight">IBMS平台</h1>
+                    <p class="text-xs text-slate-400">V3.0 重构版</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto py-4">
+            <div class="px-4 mb-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">核心功能</div>
+            <a href="#" onclick="switchModule('dashboard')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-dashboard"><i class="fas fa-th-large w-5 text-center"></i><span>系统总览</span></a>
+            <a href="#" onclick="switchModule('device-mgmt')" class="sidebar-item active flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-device-mgmt"><i class="fas fa-microchip w-5 text-center"></i><span>设备管理</span><span class="ml-auto bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded-full" id="device-count-badge">0</span></a>
+            <a href="#" onclick="switchModule('space-mgmt')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-space-mgmt"><i class="fas fa-map-marked-alt w-5 text-center"></i><span>空间管理</span></a>
+            <a href="#" onclick="switchModule('product-catalog')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-product-catalog"><i class="fas fa-box-open w-5 text-center"></i><span>产品目录</span></a>
+            <a href="#" onclick="switchModule('type-mgmt')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-type-mgmt"><i class="fas fa-tags w-5 text-center"></i><span>类型管理</span></a>
+            <div class="px-4 mt-6 mb-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">业务配置</div>
+            <a href="#" onclick="switchModule('linkage-rules')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-linkage-rules"><i class="fas fa-project-diagram w-5 text-center"></i><span>联动规则</span></a>
+            <a href="#" onclick="switchModule('workflow')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-workflow"><i class="fas fa-tasks w-5 text-center"></i><span>接入流程</span></a>
+            <div class="px-4 mt-6 mb-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">运营中心</div>
+            <a href="#" onclick="switchModule('events')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-slate-300" id="nav-events"><i class="fas fa-bell w-5 text-center"></i><span>事件中心</span><span class="ml-auto bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded-full" id="event-badge">3</span></a>
+        </nav>
+
+        <div class="p-4 border-t border-slate-700/30">
+            <div class="glass-card rounded-xl p-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-sm font-bold text-white">A</div>
+                    <div class="flex-1 min-w-0"><p class="text-sm font-medium text-white truncate">系统管理员</p><p class="text-xs text-slate-400">admin@ibms.com</p></div>
+                    <button class="text-slate-400 hover:text-white transition-colors"><i class="fas fa-cog"></i></button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 flex flex-col overflow-hidden relative bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800">
+        <!-- 顶部栏 -->
+        <header class="h-16 glass-panel border-b border-slate-700/30 flex items-center justify-between px-6 z-10">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 text-sm text-slate-400"><span>IBMS平台</span><i class="fas fa-chevron-right text-xs"></i><span id="breadcrumb-module">设备管理</span></div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 px-4 py-2 glass-card rounded-lg"><span class="status-dot status-online"></span><span class="text-sm text-slate-300">系统运行正常</span><span class="text-xs text-slate-500 ml-2">| 在线率 98.5%</span></div>
+                <div class="relative"><button class="p-2 text-slate-400 hover:text-white transition-colors relative"><i class="fas fa-bell"></i><span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span></button></div>
+                <button class="p-2 text-slate-400 hover:text-white transition-colors"><i class="fas fa-expand"></i></button>
+            </div>
+        </header>
+
+        <!-- 内容滚动区 -->
+        <div class="flex-1 overflow-y-auto p-6 relative" id="main-content">
+            <!-- 模块1: 系统总览 (略) -->
+            <div id="module-dashboard" class="tab-content">...</div>
+
+            <!-- 模块2: 设备管理（重构版） -->
+            <div id="module-device-mgmt" class="tab-content active">
+
+                <!-- 专业分组标签页 -->
+                <div class="flex gap-6 mb-6 border-b border-slate-700">
+                    <button class="professional-tab active px-4 py-2 text-sm font-medium" onclick="switchProfessionalTab('all')">全部设备</button>
+                    <button class="professional-tab px-4 py-2 text-sm font-medium text-slate-400" onclick="switchProfessionalTab('SA')"><i class="fas fa-shield-alt mr-1 text-blue-400"></i>智慧安防 SA</button>
+                    <button class="professional-tab px-4 py-2 text-sm font-medium text-slate-400" onclick="switchProfessionalTab('ST')"><i class="fas fa-door-open mr-1 text-purple-400"></i>智慧通行 ST</button>
+                    <button class="professional-tab px-4 py-2 text-sm font-medium text-slate-400" onclick="switchProfessionalTab('SB')"><i class="fas fa-building mr-1 text-cyan-400"></i>智慧建筑 SB</button>
+                    <button class="professional-tab px-4 py-2 text-sm font-medium text-slate-400" onclick="switchProfessionalTab('SE')"><i class="fas fa-bolt mr-1 text-amber-400"></i>智慧能源 SE</button>
+                    <button class="professional-tab px-4 py-2 text-sm font-medium text-slate-400" onclick="switchProfessionalTab('SF')"><i class="fas fa-fire-extinguisher mr-1 text-rose-400"></i>消防安全 SF</button>
+                    <button class="professional-tab px-4 py-2 text-sm font-medium text-slate-400" onclick="switchProfessionalTab('GW')"><i class="fas fa-globe mr-1 text-indigo-400"></i>协议网关 GW</button>
+                </div>
+
+                <!-- 统计卡片 -->
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                    <div class="glass-card rounded-xl p-4 flex items-center gap-3"><div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center"><i class="fas fa-server text-blue-400"></i></div><div><p class="text-2xl font-bold text-white" id="dm-total">0</p><p class="text-xs text-slate-400">全部设备</p></div></div>
+                    <div class="glass-card rounded-xl p-4 flex items-center gap-3"><div class="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center"><i class="fas fa-check-circle text-emerald-400"></i></div><div><p class="text-2xl font-bold text-emerald-400" id="dm-online">0</p><p class="text-xs text-slate-400">设备在线</p></div></div>
+                    <div class="glass-card rounded-xl p-4 flex items-center gap-3"><div class="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center"><i class="fas fa-map-pin text-indigo-400"></i></div><div><p class="text-2xl font-bold text-indigo-400" id="dm-points-total">0</p><p class="text-xs text-slate-400">总通道</p></div></div>
+                    <div class="glass-card rounded-xl p-4 flex items-center gap-3"><div class="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center"><i class="fas fa-check-double text-green-400"></i></div><div><p class="text-2xl font-bold text-green-400" id="dm-points-online">0</p><p class="text-xs text-slate-400">通道在线</p></div></div>
+                    <div class="glass-card rounded-xl p-4 flex items-center gap-3"><div class="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center"><i class="fas fa-exclamation-triangle text-yellow-400"></i></div><div><p class="text-2xl font-bold text-yellow-400" id="dm-points-alarm">0</p><p class="text-xs text-slate-400">通道告警</p></div></div>
+                </div>
+
+                <!-- 操作栏 -->
+                <div class="glass-card rounded-xl p-4 mb-4">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-center gap-3 flex-1 min-w-[300px]">
+                            <div class="relative flex-1 max-w-md">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                                <input type="text" id="dm-search" placeholder="搜索设备名称、编码、通道..." 
+                                       class="search-input w-full rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500"
+                                       oninput="filterDevices()">
+                            </div>
+                            <button onclick="toggleAdvancedFilter()" class="px-3 py-2.5 glass-card rounded-lg text-slate-400 hover:text-white transition-colors"><i class="fas fa-filter mr-2"></i>高级筛选</button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openBatchModal()" class="px-4 py-2.5 glass-card rounded-lg text-slate-300 hover:text-white transition-colors hidden" id="btn-batch"><i class="fas fa-layer-group mr-2"></i>批量操作 (<span id="batch-count">0</span>)</button>
+                            <button onclick="openDeviceWizard()" class="btn-primary px-4 py-2.5 rounded-lg text-white font-medium flex items-center gap-2"><i class="fas fa-plus"></i><span>添加设备</span></button>
+                            <button onclick="openBatchAddWizard()" class="btn-primary px-4 py-2.5 rounded-lg text-white font-medium flex items-center gap-2" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);"><i class="fas fa-layer-plus"></i><span>批量添加</span></button>
+                            <button onclick="exportDevices()" class="px-4 py-2.5 glass-card rounded-lg text-slate-300 hover:text-white transition-colors"><i class="fas fa-download"></i></button>
+                        </div>
+                    </div>
+                    <!-- 编码规则提示 -->
+                    <div class="mt-3 text-xs text-slate-400 border-t border-slate-700/30 pt-3 flex items-center gap-2">
+                        <i class="fas fa-tag text-blue-400"></i>
+                        <span>编码规则(6段): 区域-子区域-系统码-设备类型-品牌码-序号 例: F01-LBY-VI-CAM-HIK-001 | 序列号(sn): 设备添加后从设备自动获取</span>
+                    </div>
+                    <!-- 高级筛选面板 -->
+                    <div id="advanced-filter" class="hidden mt-4 pt-4 border-t border-slate-700/30">
+                        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                            <div><label class="block text-xs text-slate-400 mb-1">专业分组</label><select id="filter-group" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" onchange="filterDevices()"><option value="">全部</option><option value="SA">智慧安防</option><option value="ST">智慧通行</option><option value="SB">智慧建筑</option><option value="SE">智慧能源</option><option value="SF">消防安全</option><option value="GW">协议网关</option></select></div>
+                            <div><label class="block text-xs text-slate-400 mb-1">系统</label><select id="filter-system" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" onchange="filterDevices()"><option value="">全部系统</option></select></div>
+                            <div><label class="block text-xs text-slate-400 mb-1">设备类型</label><select id="filter-devtype" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" onchange="filterDevices()"><option value="">全部类型</option></select></div>
+                            <div><label class="block text-xs text-slate-400 mb-1">品牌</label><select id="filter-brand" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" onchange="filterDevices()"><option value="">全部品牌</option></select></div>
+                            <div><label class="block text-xs text-slate-400 mb-1">接入类型</label><select id="filter-access-type" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" onchange="filterDevices()"><option value="">全部</option><option value="以太网">IP</option><option value="RS485">RS485</option><option value="韦根">韦根</option><option value="消防二总线">消防二总线</option><option value="无线">无线</option><option value="M-Bus">M-Bus</option><option value="KNX">KNX</option><option value="CAN">CAN</option><option value="DALI">DALI</option><option value="模拟量">模拟量</option><option value="开关量">开关量</option></select></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 设备表格 -->
+                <div class="glass-card rounded-xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th class="w-10"><input type="checkbox" id="select-all" class="rounded border-slate-600 bg-slate-800 text-blue-600" onchange="toggleSelectAll()"></th>
+                                    <th>设备信息 / 编码</th>
+                                    <th>专业分组</th>
+                                    <th>系统</th>
+                                    <th>设备类型</th>
+                                    <th>产品型号</th>
+                                    <th>品牌</th>
+                                    <th>接入类型</th>
+                                    <th>IP地址</th>
+                                    <th>接入协议</th>
+                                    <th>序列号</th>
+                                    <th>ProductKey</th>
+                                    <th>通道数</th>
+                                    <th>空间位置</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="device-table-body"></tbody>
+                        </table>
+                    </div>
+                    <!-- 分页 -->
+                    <div class="p-4 border-t border-slate-700/30 flex items-center justify-between">
+                        <div class="text-sm text-slate-400">显示 <span id="page-start">1</span>-<span id="page-end">10</span> 共 <span id="page-total">0</span></div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="changePage(-1)" class="px-3 py-1.5 glass-card rounded text-slate-400 hover:text-white disabled:opacity-50" id="btn-prev-page"><i class="fas fa-chevron-left"></i></button>
+                            <span class="px-3 py-1.5 text-white" id="page-current">1</span>
+                            <button onclick="changePage(1)" class="px-3 py-1.5 glass-card rounded text-slate-400 hover:text-white disabled:opacity-50" id="btn-next-page"><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 批量操作栏 -->
+    <div class="fixed bottom-0 left-64 right-0 glass-panel border-t border-slate-700/30 p-4 batch-bar z-40 flex items-center justify-between" id="batch-bar">
+        <div class="flex items-center gap-4">
+            <span class="text-white font-medium">已选择 <span id="batch-selected-count" class="text-blue-400">0</span> 个设备</span>
+            <button onclick="clearSelection()" class="text-slate-400 hover:text-white text-sm"><i class="fas fa-times mr-1"></i>清除选择</button>
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="batchAction('move')" class="px-4 py-2 glass-card rounded-lg text-slate-300 hover:text-white"><i class="fas fa-map-marker-alt mr-2"></i>批量移动</button>
+            <button onclick="batchAction('status')" class="px-4 py-2 glass-card rounded-lg text-slate-300 hover:text-white"><i class="fas fa-toggle-on mr-2"></i>状态变更</button>
+            <button onclick="batchAction('export')" class="px-4 py-2 glass-card rounded-lg text-slate-300 hover:text-white"><i class="fas fa-file-export mr-2"></i>导出</button>
+            <button onclick="batchAction('delete')" class="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30"><i class="fas fa-trash mr-2"></i>删除</button>
+        </div>
+    </div>
+
+    <!-- 模态框: 设备表单 -->
+    <div id="modal-device-form" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50">
+        <div class="glass-panel rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden modal-enter flex flex-col">
+            <div class="p-6 border-b border-slate-700/30 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white" id="device-form-title">添加新设备</h3>
+                <button onclick="closeModal('modal-device-form')" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6">
+                <form id="device-form" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="form-label">专业分组 <span class="text-red-400">*</span></label>
+                            <select id="form-group" class="form-input" onchange="onGroupChange()">
+                                <option value="">请选择</option>
+                            </select>
+                            <span class="error-message" id="error-group">请选择专业分组</span>
+                        </div>
+                        <div>
+                            <label class="form-label">系统 <span class="text-red-400">*</span></label>
+                            <select id="form-system" class="form-input" onchange="onSystemChange()" disabled>
+                                <option value="">先选分组</option>
+                            </select>
+                            <span class="error-message" id="error-system">请选择系统</span>
+                        </div>
+                        <div>
+                            <label class="form-label">设备类型 <span class="text-red-400">*</span></label>
+                            <select id="form-model" class="form-input" onchange="onModelChange()" disabled>
+                                <option value="">先选系统</option>
+                            </select>
+                            <span class="error-message" id="error-model">请选择设备类型</span>
+                        </div>
+                        <div>
+                            <label class="form-label">品牌 <span class="text-red-400">*</span></label>
+                            <select id="form-brand" class="form-input">
+                                <option value="">请选择品牌</option>
+                            </select>
+                            <span class="error-message" id="error-brand">请选择品牌</span>
+                        </div>
+                        <div>
+                            <label class="form-label">产品型号</label>
+                            <input type="text" id="form-product-model" class="form-input" placeholder="如 DS-2CD3T26">
+                        </div>
+                        <div>
+                            <label class="form-label">设备类型码</label>
+                            <input type="text" id="form-devtype" class="form-input bg-slate-700/50" readonly>
+                        </div>
+                        <div>
+                            <label class="form-label">接入类型 <span class="text-xs text-slate-400" id="access-type-hint">(根据型号自动设置，可多选时手动调整)</span></label>
+                            <select id="form-access-type" class="form-input" onchange="onAccessTypeChange()">
+                                <option value="">请选择</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">设备名称 <span class="text-red-400">*</span></label>
+                            <input type="text" id="form-name" class="form-input" required>
+                            <span class="error-message" id="error-name">请输入设备名称</span>
+                        </div>
+                        <div>
+                            <label class="form-label">序号(3位) <span class="text-red-400">*</span></label>
+                            <input type="text" id="form-sn" class="form-input" value="001" placeholder="001" maxlength="3">
+                            <span class="error-message" id="error-sn">请输入3位序号</span>
+                        </div>
+                    </div>
+
+                    <!-- 协议选择 -->
+                    <div class="grid grid-cols-1 gap-2">
+                        <label class="form-label font-semibold">协议选择 <span class="text-xs text-slate-400">(根据型号自动加载)</span></label>
+                        <select id="form-protocol-select" class="form-input" onchange="onProtocolChange()">
+                            <option value="">请选择协议</option>
+                        </select>
+                        <div id="form-protocol-desc" class="text-xs text-slate-400 mt-1 p-2 bg-slate-800/50 rounded hidden"></div>
+                    </div>
+
+                    <!-- ProductKey -->
+                    <div class="grid grid-cols-1 gap-2 border-t border-slate-700 pt-4">
+                        <label class="form-label font-semibold">ProductKey <span class="text-xs text-slate-400">(系统自动生成，唯一标识)</span></label>
+                        <div class="flex gap-2">
+                            <input type="text" id="form-product-key" class="form-input bg-slate-700/50 font-mono text-xs" readonly>
+                            <button type="button" onclick="refreshProductKey()" class="px-3 py-2 glass-card rounded-lg text-sm" title="重新生成"><i class="fas fa-sync-alt"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- RS485参数 -->
+                    <div id="rs485-params-field" class="hidden grid grid-cols-2 gap-4 border-t border-slate-700 pt-4">
+                        <div><label class="form-label">波特率</label><input type="text" id="form-baudrate" class="form-input" value="9600"></div>
+                        <div><label class="form-label">数据位</label><input type="text" id="form-databits" class="form-input" value="8"></div>
+                        <div><label class="form-label">停止位</label><input type="text" id="form-stopbits" class="form-input" value="1"></div>
+                        <div><label class="form-label">校验位</label><select id="form-parity" class="form-input"><option value="无">无</option><option value="奇校验">奇校验</option><option value="偶校验">偶校验</option></select></div>
+                    </div>
+
+                    <!-- Modbus参数 -->
+                    <div id="modbus-params-field" class="hidden grid grid-cols-2 gap-4 border-t border-slate-700 pt-4">
+                        <div><label class="form-label">Modbus地址 <span class="text-red-400">*</span></label><input type="number" id="form-modbus-addr" class="form-input" value="1" min="1" max="247"></div>
+                        <div><label class="form-label">功能码</label><select id="form-function-code" class="form-input"><option value="03">03 - 读保持寄存器</option><option value="04">04 - 读输入寄存器</option><option value="01">01 - 读线圈</option></select></div>
+                    </div>
+
+                    <!-- M-Bus参数 -->
+                    <div id="mbus-params-field" class="hidden grid grid-cols-2 gap-4 border-t border-slate-700 pt-4">
+                        <div><label class="form-label">M-Bus地址 <span class="text-red-400">*</span></label><input type="number" id="form-mbus-addr" class="form-input" value="1" min="1" max="250"></div>
+                        <div><label class="form-label">波特率</label><input type="text" id="form-mbus-baudrate" class="form-input" value="2400"></div>
+                    </div>
+
+                    <!-- 无线参数 -->
+                    <div id="wireless-params-field" class="hidden grid grid-cols-2 gap-4 border-t border-slate-700 pt-4">
+                        <div><label class="form-label">无线类型</label><select id="form-wireless-type" class="form-input"><option value="LoRa">LoRa</option><option value="NB-IoT">NB-IoT</option><option value="Zigbee">Zigbee</option><option value="433MHz">433MHz</option><option value="蓝牙">蓝牙</option></select></div>
+                        <div><label class="form-label">设备地址 <span class="text-red-400">*</span></label><input type="text" id="form-wireless-addr" class="form-input" value="001"></div>
+                    </div>
+
+                    <!-- 模拟量参数 -->
+                    <div id="analog-params-field" class="hidden grid grid-cols-2 gap-4 border-t border-slate-700 pt-4">
+                        <div><label class="form-label">信号类型</label><select id="form-analog-type" class="form-input"><option value="4-20mA">4-20mA</option><option value="0-10V">0-10V</option><option value="0-5V">0-5V</option></select></div>
+                        <div><label class="form-label">量程</label><input type="text" id="form-analog-range" class="form-input" value="0-100"></div>
+                    </div>
+
+                    <!-- 开关量参数 -->
+                    <div id="digital-params-field" class="hidden grid grid-cols-1 gap-2 border-t border-slate-700 pt-4">
+                        <div><label class="form-label">开关量类型</label><select id="form-digital-type" class="form-input"><option value="DI">数字输入(DI)</option><option value="DO">数字输出(DO)</option></select></div>
+                    </div>
+
+                    <!-- 通道数量配置 -->
+                    <div id="channel-count-field" class="hidden border-t border-slate-700 pt-4">
+                        <label class="form-label font-semibold">通道数量配置 <span class="text-xs text-slate-400">(可手动调整)</span></label>
+                        <div id="channel-config-container" class="mt-2 space-y-3">
+                            <!-- 动态生成通道数量输入框 -->
+                        </div>
+                    </div>
+
+                    <!-- IP设备网络参数 - 移动到空间位置之前 -->
+                    <div id="ip-network-fields" class="hidden border-t border-slate-700 pt-4">
+                        <label class="form-label font-semibold">IP网络配置 <span class="text-xs text-slate-400">(IP接入设备)</span></label>
+                        <div class="grid grid-cols-3 gap-4 mt-2">
+                            <div>
+                                <label class="form-label text-xs">IP地址 <span class="text-red-400">*</span></label>
+                                <input type="text" id="form-ip" class="form-input" placeholder="192.168.1.100">
+                                <span class="error-message" id="error-ip">请输入有效IP地址</span>
+                            </div>
+                            <div>
+                                <label class="form-label text-xs">子网掩码 <span class="text-red-400">*</span></label>
+                                <input type="text" id="form-netmask" class="form-input" value="255.255.255.0" placeholder="255.255.255.0">
+                                <span class="error-message" id="error-netmask">请输入有效子网掩码</span>
+                            </div>
+                            <div>
+                                <label class="form-label text-xs">默认网关 <span class="text-red-400">*</span></label>
+                                <input type="text" id="form-gateway" class="form-input" value="192.168.1.1" placeholder="192.168.1.1">
+                                <span class="error-message" id="error-gateway">请输入有效网关</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 空间关联 -->
+                    <div class="border-t border-slate-700 pt-4">
+                        <label class="form-label font-semibold">空间位置 <span class="text-xs text-slate-400">(用于生成设备编码) <span class="text-red-400">*</span></span></label>
+                        <div class="space-tree glass-card p-3 mt-2" id="space-tree-container"></div>
+                        <span class="error-message" id="error-space">请选择空间位置</span>
+                        <div class="grid grid-cols-2 gap-4 mt-3">
+                            <div><label class="form-label text-xs">区域码(自动)</label><input type="text" id="form-area" class="form-input bg-slate-700/50" readonly placeholder="由空间选择生成"></div>
+                            <div><label class="form-label text-xs">子区域码(自动)</label><input type="text" id="form-subarea" class="form-input bg-slate-700/50" readonly placeholder="由空间选择生成"></div>
+                        </div>
+                    </div>
+
+                    <!-- 通道配置预览 -->
+                    <div class="border-t border-slate-700 pt-4">
+                        <label class="form-label font-semibold">通道生成预览</label>
+                        <div id="point-types-preview" class="mt-2 p-3 glass-card text-sm">
+                            <div class="text-slate-400">请先选择设备类型</div>
+                        </div>
+                    </div>
+
+                    <!-- 编码预览 -->
+                    <div class="bg-blue-900/20 p-3 rounded">
+                        <span class="text-sm text-blue-300">预览编码: </span><span id="preview-code" class="font-mono text-xs text-white">-</span>
+                    </div>
+                </form>
+            </div>
+            <div class="p-6 border-t border-slate-700/30 flex justify-end gap-3">
+                <button onclick="closeModal('modal-device-form')" class="px-6 py-2 glass-card rounded-lg">取消</button>
+                <button onclick="saveSingleDevice()" class="btn-primary px-6 py-2 rounded-lg">保存设备</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框: 批量添加 -->
+    <div id="modal-batch-add" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50">
+        <div class="glass-panel rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden modal-enter flex flex-col">
+            <div class="p-6 border-b border-slate-700/30 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white">批量添加设备</h3>
+                <button onclick="closeModal('modal-batch-add')" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6">
+                <p class="text-slate-300 mb-4">基于同一模板生成多个设备（自动递增序号）</p>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label">专业分组 <span class="text-red-400">*</span></label>
+                        <select id="batch-group" class="form-input" onchange="onBatchGroupChange()"><option value="">请选择</option></select>
+                    </div>
+                    <div>
+                        <label class="form-label">系统 <span class="text-red-400">*</span></label>
+                        <select id="batch-system" class="form-input" onchange="onBatchSystemChange()" disabled><option value="">先选分组</option></select>
+                    </div>
+                    <div>
+                        <label class="form-label">设备类型 <span class="text-red-400">*</span></label>
+                        <select id="batch-model" class="form-input" onchange="onBatchModelChange()" disabled><option value="">先选系统</option></select>
+                    </div>
+                    <div>
+                        <label class="form-label">品牌 <span class="text-red-400">*</span></label>
+                        <select id="batch-brand" class="form-input">
+                            <option value="">请选择品牌</option>
+                        </select>
+                    </div>
+                    <div><label class="form-label">产品型号</label><input type="text" id="batch-product-model" class="form-input" value="DS-2CD3T26"></div>
+                    <div><label class="form-label">设备类型码</label><input type="text" id="batch-devtype" class="form-input bg-slate-700/50" readonly></div>
+                    <div>
+                        <label class="form-label">接入类型 <span class="text-xs text-slate-400">(根据型号自动设置，可多选时手动调整)</span></label>
+                        <select id="batch-access-type" class="form-input" onchange="onBatchAccessTypeChange()">
+                            <option value="">请选择</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 协议选择 -->
+                <div class="mt-4">
+                    <label class="form-label font-semibold">协议选择 <span class="text-xs text-slate-400">(根据型号自动加载)</span></label>
+                    <select id="batch-protocol-select" class="form-input" onchange="onBatchProtocolChange()">
+                        <option value="">请选择协议</option>
+                    </select>
+                    <div id="batch-protocol-desc" class="text-xs text-slate-400 mt-1 p-2 bg-slate-800/50 rounded hidden"></div>
+                </div>
+
+                <!-- ProductKey前缀 -->
+                <div class="mt-4 grid grid-cols-1 gap-2">
+                    <label class="form-label">ProductKey前缀</label>
+                    <input type="text" id="batch-product-key-prefix" class="form-input" value="PK-2024-">
+                </div>
+
+                <!-- Modbus起始地址 -->
+                <div id="batch-modbus-field" class="mt-4 hidden">
+                    <label class="form-label">Modbus起始地址</label>
+                    <input type="number" id="batch-modbus-start" class="form-input" value="1" min="1" max="247">
+                </div>
+
+                <!-- M-Bus起始地址 -->
+                <div id="batch-mbus-field" class="mt-4 hidden">
+                    <label class="form-label">M-Bus起始地址</label>
+                    <input type="number" id="batch-mbus-start" class="form-input" value="1" min="1" max="250">
+                </div>
+
+                <!-- 无线参数 -->
+                <div id="batch-wireless-field" class="mt-4 hidden">
+                    <label class="form-label">无线类型</label>
+                    <select id="batch-wireless-type" class="form-input"><option value="LoRa">LoRa</option><option value="NB-IoT">NB-IoT</option><option value="Zigbee">Zigbee</option></select>
+                </div>
+
+                <!-- 通道数量配置 (批量) -->
+                <div id="batch-channel-count-field" class="mt-4 hidden border-t border-slate-700 pt-4">
+                    <label class="form-label font-semibold">通道数量配置 <span class="text-xs text-slate-400">(可手动调整)</span></label>
+                    <div id="batch-channel-config-container" class="mt-2 space-y-3">
+                        <!-- 动态生成通道数量输入框 -->
+                    </div>
+                </div>
+
+                <!-- IP网络参数起始值 - 移动到空间关联之前 -->
+                <div id="batch-ip-network-field" class="mt-4 hidden border-t border-slate-700 pt-4">
+                    <label class="form-label font-semibold">IP网络配置起始值</label>
+                    <div class="grid grid-cols-3 gap-4 mt-2">
+                        <div>
+                            <label class="form-label text-xs">IP起始地址 <span class="text-red-400">*</span></label>
+                            <input type="text" id="batch-ip-start" class="form-input" value="192.168.1.100" placeholder="192.168.1.100">
+                        </div>
+                        <div>
+                            <label class="form-label text-xs">子网掩码</label>
+                            <input type="text" id="batch-netmask" class="form-input" value="255.255.255.0">
+                        </div>
+                        <div>
+                            <label class="form-label text-xs">默认网关</label>
+                            <input type="text" id="batch-gateway" class="form-input" value="192.168.1.1">
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">IP地址将自动递增，支持跨网段</p>
+                </div>
+
+                <!-- 空间关联 -->
+                <div class="mt-4 border-t border-slate-700 pt-4">
+                    <label class="form-label font-semibold">空间位置 <span class="text-xs text-slate-400">(用于生成编码) <span class="text-red-400">*</span></span></label>
+                    <div class="space-tree glass-card p-3 mt-2" id="batch-space-tree-container"></div>
+                    <div class="grid grid-cols-2 gap-4 mt-3">
+                        <div><input type="text" id="batch-area" class="form-input bg-slate-700/50" readonly placeholder="区域码自动"></div>
+                        <div><input type="text" id="batch-subarea" class="form-input bg-slate-700/50" readonly placeholder="子区域自动"></div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <label class="form-label">设备名称前缀</label>
+                    <input type="text" id="batch-name-prefix" class="form-input" value="设备">
+                </div>
+                <div class="mt-4">
+                    <label class="form-label">起始序号 & 数量 <span class="text-red-400">*</span></label>
+                    <div class="flex gap-4 items-center">
+                        <input type="number" id="batch-start" class="form-input w-24" value="1" min="1" max="999"> 
+                        <span class="text-slate-400">至</span>
+                        <input type="number" id="batch-end" class="form-input w-24" value="5" min="1" max="999">
+                        <span class="text-xs text-slate-500">最多批量添加100个</span>
+                    </div>
+                </div>
+
+                <div class="mt-4 border-t border-slate-700 pt-4">
+                    <label class="form-label font-semibold">通道生成预览</label>
+                    <div id="batch-points-preview" class="mt-2 p-3 glass-card text-sm">
+                        <div class="text-slate-400">请先选择设备类型</div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-6 border-t border-slate-700/30 flex justify-end gap-3">
+                <button onclick="closeModal('modal-batch-add')" class="px-6 py-2 glass-card rounded-lg">取消</button>
+                <button onclick="saveBatchDevices()" class="btn-primary px-6 py-2 rounded-lg">生成设备</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框: 通道编辑 -->
+    <div id="modal-point-edit" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50">
+        <div class="glass-panel rounded-2xl w-full max-w-md modal-enter">
+            <div class="p-6 border-b border-slate-700/30">
+                <h3 class="text-xl font-bold text-white" id="point-edit-title">编辑通道</h3>
+            </div>
+            <div class="p-6">
+                <form id="point-edit-form" class="space-y-4">
+                    <input type="hidden" id="point-edit-device-id">
+                    <input type="hidden" id="point-edit-point-id">
+                    <input type="hidden" id="point-edit-access-type">
+                    <input type="hidden" id="point-edit-dev-type">
+
+                    <div><label class="form-label">通道名称</label><input type="text" id="point-edit-name" class="form-input"></div>
+                    <div><label class="form-label">通道号</label><input type="text" id="point-edit-number" class="form-input bg-slate-700/50" readonly></div>
+
+                    <!-- 视频监控通道SN码显示 -->
+                    <div id="point-edit-sn-field" class="hidden">
+                        <label class="form-label">前端设备序列号</label>
+                        <input type="text" id="point-edit-sn" class="form-input" placeholder="请输入前端IPC序列号">
+                        <span class="text-xs text-slate-500 mt-1 block">从接入的前端IPC设备获取</span>
+                    </div>
+
+                    <!-- MAC地址编辑字段 -->
+                    <div id="point-edit-mac-field" class="hidden">
+                        <label class="form-label">MAC地址</label>
+                        <input type="text" id="point-edit-mac" class="form-input" placeholder="如 00:1B:44:11:3A:B7" pattern="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$">
+                        <span class="text-xs text-slate-500 mt-1 block">格式：XX:XX:XX:XX:XX:XX</span>
+                    </div>
+
+                    <!-- IP设备通道字段 - 增强版，包含子网掩码和网关 -->
+                    <div id="point-edit-ip-fields" class="space-y-4 hidden">
+                        <div class="grid grid-cols-1 gap-4">
+                            <div>
+                                <label class="form-label" id="point-ip-label">IP地址</label>
+                                <input type="text" id="point-edit-ip" class="form-input" placeholder="192.168.1.100">
+                                <span class="text-xs text-slate-500 mt-1 block" id="point-ip-hint">请输入通道的IP地址</span>
+                            </div>
+                            <div>
+                                <label class="form-label">子网掩码</label>
+                                <input type="text" id="point-edit-netmask" class="form-input" value="255.255.255.0" placeholder="255.255.255.0">
+                            </div>
+                            <div>
+                                <label class="form-label">默认网关</label>
+                                <input type="text" id="point-edit-gateway" class="form-input" value="192.168.1.1" placeholder="192.168.1.1">
+                            </div>
+                            <div>
+                                <label class="form-label">端口</label>
+                                <input type="text" id="point-edit-port" class="form-input" value="80">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 串行设备通道字段 -->
+                    <div id="point-edit-serial-fields" class="space-y-4 hidden">
+                        <div><label class="form-label">Modbus地址</label><input type="text" id="point-edit-modbus-addr" class="form-input" value="1"></div>
+                        <div><label class="form-label">寄存器地址</label><input type="text" id="point-edit-register" class="form-input" value="40001"></div>
+                    </div>
+
+                    <!-- M-Bus通道字段 -->
+                    <div id="point-edit-mbus-fields" class="space-y-4 hidden">
+                        <div><label class="form-label">M-Bus地址</label><input type="text" id="point-edit-mbus-addr" class="form-input" value="1"></div>
+                        <div><label class="form-label">仪表类型</label><input type="text" id="point-edit-meter-type" class="form-input" value="水表"></div>
+                    </div>
+
+                    <!-- 模拟量通道字段 -->
+                    <div id="point-edit-analog-fields" class="space-y-4 hidden">
+                        <div><label class="form-label">量程</label><input type="text" id="point-edit-range" class="form-input" value="4-20mA"></div>
+                        <div><label class="form-label">单位</label><input type="text" id="point-edit-unit" class="form-input" value="°C"></div>
+                    </div>
+
+                    <!-- 开关量通道字段 -->
+                    <div id="point-edit-digital-fields" class="space-y-4 hidden">
+                        <div><label class="form-label">输入/输出</label><select id="point-edit-dir" class="form-input"><option value="DI">数字输入(DI)</option><option value="DO">数字输出(DO)</option></select></div>
+                    </div>
+
+                    <!-- 空间位置 -->
+                    <div>
+                        <label class="form-label">空间位置</label>
+                        <div class="space-tree glass-card p-2" id="point-space-tree" style="max-height:150px"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="p-6 border-t border-slate-700/30 flex justify-end gap-3">
+                <button onclick="closeModal('modal-point-edit')" class="px-4 py-2 glass-card rounded-lg">取消</button>
+                <button onclick="savePointEdit()" class="btn-primary px-4 py-2 rounded-lg">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 容器 -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <!-- 确认对话框容器 -->
+    <div id="confirm-container" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50"></div>
+
+    <script>
+        // ==================== IBMS V3.0 重构版核心逻辑 ====================
+
+        // 严格模式
+        'use strict';
+
+        // ==================== 1. 数据字典 (DICT) ====================
+        const DICT = {
+            profGroups: [
+                { code: "SA", name: "智慧安防", icon: "fa-shield-alt", color: "blue", systems: ["VI","AL","GR"] },
+                { code: "ST", name: "智慧通行", icon: "fa-door-open", color: "purple", systems: ["AC","IC","CA"] },
+                { code: "SB", name: "智慧建筑", icon: "fa-building", color: "cyan", systems: ["BA","LI","EL"] },
+                { code: "SE", name: "智慧能源", icon: "fa-bolt", color: "amber", systems: ["EP","EN"] },
+                { code: "SF", name: "消防安全", icon: "fa-fire-extinguisher", color: "rose", systems: ["FD","PA"] },
+                { code: "GW", name: "协议网关", icon: "fa-globe", color: "indigo", systems: ["GT"] }
+            ],
+            systems: [
+                { code: "VI", name: "视频监控", group: "SA" },
+                { code: "AL", name: "入侵报警", group: "SA" },
+                { code: "GR", name: "巡更系统", group: "SA" },
+                { code: "AC", name: "门禁系统", group: "ST" },
+                { code: "IC", name: "智能对讲", group: "ST" },
+                { code: "CA", name: "停车场", group: "ST" },
+                { code: "BA", name: "楼宇自控", group: "SB" },
+                { code: "LI", name: "智能照明", group: "SB" },
+                { code: "EL", name: "电梯控制", group: "SB" },
+                { code: "EP", name: "变配电", group: "SE" },
+                { code: "EN", name: "能源管理", group: "SE" },
+                { code: "FD", name: "火灾报警", group: "SF" },
+                { code: "PA", name: "公共广播", group: "SF" },
+                { code: "GT", name: "协议网关", group: "GW" }
+            ],
+            brands: [
+                { code: "HIK", name: "海康威视" },
+                { code: "DAH", name: "大华" },
+                { code: "UNV", name: "宇视" },
+                { code: "HONE", name: "霍尼韦尔" },
+                { code: "SIE", name: "西门子" },
+                { code: "ABB", name: "ABB" },
+                { code: "SCH", name: "施耐德" },
+                { code: "JOH", name: "江森自控" },
+                { code: "YH", name: "英飞拓" },
+                { code: "ZKT", name: "中控" },
+                { code: "DAL", name: "达实" },
+                { code: "TC", name: "同方" },
+                { code: "HW", name: "华为" },
+                { code: "ZK", name: "中兴" },
+                { code: "DL", name: "德力西" },
+                { code: "CHNT", name: "正泰" },
+                { code: "GREE", name: "格力" },
+                { code: "MD", name: "美的" },
+                { code: "SIEM", name: "西门子" },
+                { code: "PHIL", name: "飞利浦" },
+                { code: "OSR", name: "欧司朗" },
+                { code: "LEGR", name: "罗格朗" },
+                { code: "PAN", name: "松下" },
+                { code: "TOS", name: "东芝" },
+                { code: "HIT", name: "日立" },
+                { code: "FUJI", name: "富士" },
+                { code: "MIT", name: "三菱" },
+                { code: "OMR", name: "欧姆龙" },
+                { code: "KEY", name: "基恩士" },
+                { code: "SICK", name: "西克" },
+                { code: "BALL", name: "巴鲁夫" },
+                { code: "IFM", name: "易福门" },
+                { code: "TURCK", name: "图尔克" },
+                { code: "PEP", name: "倍加福" },
+                { code: "AUT", name: "奥托尼克斯" },
+                { code: "DEL", name: "台达" },
+                { code: "FST", name: "富士通" },
+                { code: "NEC", name: "NEC" },
+                { code: "LEN", name: "联想" },
+                { code: "HP", name: "惠普" },
+                { code: "DELL", name: "戴尔" },
+                { code: "CIS", name: "思科" },
+                { code: "H3C", name: "华三" },
+                { code: "TP", name: "TP-LINK" },
+                { code: "MERC", name: " Mercury" },
+                { code: "TEN", name: "腾达" }
+            ],
+            models: [
+                // 智慧安防
+                { code: "DS", name: "枪机", system: "VI", devType: "CAM", accessType: "以太网", protocol: "百兆/千兆网线、光纤；协议：TCP/IP、ONVIF、PSIA、厂家私有视频协议", scene: "园区、楼宇公共区域定点视频监控、安防录像留存", multiChannel: false },
+                { code: "DP", name: "球机", system: "VI", devType: "CAM", accessType: "以太网", protocol: "百兆/千兆网线、光纤；协议：TCP/IP、ONVIF、云台控制协议、厂家私有协议", scene: "重点区域全景监控、云台旋转巡航、变焦细节抓拍", multiChannel: false },
+                { code: "HP", name: "半球", system: "VI", devType: "CAM", accessType: "以太网", protocol: "百兆/千兆网线；协议：TCP/IP、ONVIF、厂家私有视频协议", scene: "电梯、走廊、楼道、室内小空间视频监控", multiChannel: false },
+                { code: "NV", name: "NVR网络录像机", system: "VI", devType: "NVR", accessType: "以太网", protocol: "交换机级联、IP网络存储；协议：iSCSI、ONVIF、厂家私有存储协议", scene: "视频集中存储、录像回放、监控画面管理", multiChannel: true, defaultChannels: 8 },
+                { code: "AH", name: "报警主机", system: "AL", devType: "ALARMPANEL", accessType: "RS485/IP/消防二总线", protocol: "总线型：RS485；IP型：以太网；协议：Modbus-RTU、FECbus、厂家私有报警协议", scene: "入侵防区管控、探测器联动报警、安防告警上报", multiChannel: true, defaultChannels: 8 },
+                { code: "IR", name: "红外探测器", system: "AL", devType: "DETECTOR", accessType: "无线/RS485", protocol: "无线：433MHz/2.4G/Zigbee；有线：RS485；协议：红外感应协议、Modbus-RTU", scene: "门窗入侵检测、周界安防、室内非法闯入告警", multiChannel: false },
+                { code: "EZ", name: "电子围栏", system: "AL", devType: "DETECTOR", accessType: "RS485/IP", protocol: "RS485总线/以太网；协议：Modbus-RTU、厂家周界安防协议", scene: "园区周界、围墙防翻越、入侵预警与报警", multiChannel: true, defaultChannels: 4 },
+                { code: "GR", name: "巡更点", system: "GR", devType: "SENSOR", accessType: "离线/无线", protocol: "RFID/NFC感应；无线型：LoRa/NB-IoT；无需外网，离线采集上传", scene: "园区、楼宇巡检打卡、巡检轨迹追溯、安保管理", multiChannel: false },
+
+                // 智慧通行
+                { code: "CR", name: "IC卡读卡器", system: "AC", devType: "READER", accessType: "韦根/RS485", protocol: "与控制器：韦根信号线；联网型：RS485；协议：韦根26/34、门禁私有协议", scene: "门禁刷卡、闸机通行、人员权限核验", multiChannel: false },
+                { code: "FR", name: "指纹读卡器", system: "AC", devType: "READER", accessType: "韦根/RS485", protocol: "与控制器：韦根信号线；联网型：RS485；协议：韦根协议、生物识别协议", scene: "高安全区域门禁、生物识别通行管控", multiChannel: false },
+                { code: "LR", name: "人脸识别终端", system: "AC", devType: "READER", accessType: "韦根/RS485/IP", protocol: "以太网/RS485；协议：TCP/IP、门禁私有协议、人脸比对协议", scene: "无感通行、人脸门禁、人员快速核验", multiChannel: false },
+                { code: "CC", name: "单门控制器", system: "AC", devType: "CONTR", accessType: "RS485/IP", protocol: "主干：TCP/IP；子系统：RS485级联读卡器；协议：门禁管控协议", scene: "单扇门权限管理、开锁控制、门禁记录上传", multiChannel: true, defaultChannels: 1 },
+                { code: "DC", name: "双门控制器", system: "AC", devType: "CONTR", accessType: "RS485/IP", protocol: "主干：TCP/IP；子系统：RS485级联读卡器；协议：门禁管控协议", scene: "双门互锁、通道管理、双门权限集中管控", multiChannel: true, defaultChannels: 2 },
+                { code: "QC", name: "四门控制器", system: "AC", devType: "CONTR", accessType: "RS485/IP", protocol: "主干：TCP/IP；子系统：RS485级联读卡器；协议：门禁管控协议", scene: "多门集中管理、权限批量下发、门禁数据汇总", multiChannel: true, defaultChannels: 4 },
+                { code: "ML", name: "门禁锁具", system: "AC", devType: "ACTUATOR", accessType: "开关量/RS485", protocol: "开关量信号/RS485；协议：开关量控制、门禁锁控协议", scene: "配合门禁控制器，实现门锁开关管控", multiChannel: false },
+                { code: "IT", name: "对讲终端", system: "IC", devType: "READER", accessType: "IP对讲(SIP)", protocol: "以太网；协议：SIP、楼宇对讲私有协议、音视频传输协议", scene: "楼宇可视对讲、紧急呼叫、园区广播对讲", multiChannel: false },
+                { code: "LP", name: "车牌识别终端", system: "CA", devType: "READER", accessType: "以太网", protocol: "网线/光纤；协议：TCP/IP、车牌识别算法、道闸联动协议", scene: "停车场出入口、车牌抓拍、道闸自动联动", multiChannel: false },
+                { code: "BJ", name: "闸机", system: "CA", devType: "ACTUATOR", accessType: "RS485/IP", protocol: "RS485/以太网；协议：Modbus-RTU、闸机控制协议、门禁联动协议", scene: "园区出入口、办公楼大厅、人员通行限流管控", multiChannel: false },
+
+                // 智慧建筑
+                { code: "TS", name: "温控器", system: "BA", devType: "SENSOR", accessType: "RS485/IP", protocol: "壁挂式：RS485(Modbus-RTU)；主机端：BACnet/IP/Modbus-TCP", scene: "风机盘管、新风机组温度调节、空调联动控制", multiChannel: false },
+                { code: "DD", name: "DDC控制器", system: "BA", devType: "DDC", accessType: "现场总线/IP", protocol: "接入层：RS485(Modbus/BACnet MS/TP)；上行：IP(BACnet/IP)", scene: "楼宇自控核心，风/水/电/暖通系统集中控制", multiChannel: true, defaultChannels: 16 },
+                { code: "TH", name: "温湿度传感器", system: "BA", devType: "SENSOR", accessType: "RS485/模拟量", protocol: "数字型：RS485(Modbus-RTU)；模拟型：4-20mA/0-10V", scene: "室内环境温湿度监测、空调/新风联动调节", multiChannel: false },
+                { code: "CO2", name: "CO₂传感器", system: "BA", devType: "SENSOR", accessType: "RS485/模拟量", protocol: "数字型：RS485(Modbus-RTU)；模拟型：4-20mA", scene: "室内CO₂浓度监测、新风系统联动启停", multiChannel: false },
+                { code: "AQ", name: "多参数空气质量传感器", system: "BA", devType: "SENSOR", accessType: "RS485/IP/LoRa/NB-IoT", protocol: "有线：RS485(Modbus-RTU)、以太网(Modbus-TCP/MQTT)；无线：LoRa/NB-IoT；支持PM2.5/PM10/甲醛/TVOC/CO₂多指标采集", scene: "公共区域空气质量监测、新风/净化设备联动", multiChannel: true, defaultChannels: 6 },
+                { code: "PIR", name: "人体感应传感器", system: "BA", devType: "SENSOR", accessType: "无线/RS485", protocol: "无线：433MHz/Zigbee/Bluetooth；有线：RS485(Modbus-RTU)", scene: "智能照明联动、安防入侵检测、无人节能管控", multiChannel: false },
+                { code: "CH4", name: "甲烷传感器", system: "BA", devType: "SENSOR", accessType: "RS485/模拟量", protocol: "数字型：RS485(Modbus-RTU)；模拟型：4-20mA/0-5V；气体检测专用协议", scene: "厨房/锅炉房/地下车库可燃气体泄漏监测", multiChannel: false },
+                { code: "LC", name: "照明控制器", system: "LI", devType: "LIGHTCONTR", accessType: "RS485/CAN/KNX/DALI/IP", protocol: "RS485(Modbus-RTU/照明私有协议)；专业总线：CAN/KNX/DALI；IP型：以太网(Modbus-TCP/BACnet/IP/照明私有协议)", scene: "智能照明场景控制、开关调光、照明节能管控", multiChannel: true, defaultChannels: 8 },
+                { code: "CL", name: "窗帘控制器", system: "LI", devType: "ACTUATOR", accessType: "RS485/KNX/IP", protocol: "RS485/KNX总线/以太网；协议：Modbus-RTU、KNX协议、窗帘控制协议", scene: "室内窗帘自动开合、遮阳联动、照明配套管控", multiChannel: false },
+                { code: "EL", name: "电梯控制器", system: "EL", devType: "CONTR", accessType: "RS485/IP", protocol: "与电梯板卡：RS485(电梯专用协议)；与IBMS：TCP/IP", scene: "电梯门禁、运行状态监控、故障告警上报", multiChannel: true, defaultChannels: 8 },
+
+                // 智慧能源
+                { code: "PM", name: "电能表", system: "EP", devType: "METER", accessType: "RS485/M-Bus", protocol: "RS485总线；协议：DL/T645、Modbus-RTU、IEC61850", scene: "配电柜电参量采集、用电计量、能耗统计", multiChannel: false },
+                { code: "KK", name: "智能空开", system: "EP", devType: "METER", accessType: "RS485/IP", protocol: "RS485(Modbus-RTU)/以太网；协议：Modbus、电力监控协议", scene: "电路通断控制、漏电监测、过流保护、用电管控", multiChannel: true, defaultChannels: 3 },
+                { code: "WM", name: "水表", system: "EN", devType: "METER", accessType: "M-Bus/RS485/无线", protocol: "有线：M-Bus/RS485；无线：LoRa/NB-IoT；水表远传协议", scene: "分户用水计量、远程抄表、用水能耗监测", multiChannel: false },
+                { code: "GM", name: "燃气表", system: "EN", devType: "METER", accessType: "M-Bus/RS485/无线", protocol: "有线：M-Bus/RS485；无线：LoRa/NB-IoT；燃气表远传协议", scene: "分户用气计量、远程抄表、用气能耗监测", multiChannel: false },
+                { code: "EM", name: "能耗监测终端", system: "EN", devType: "GATEWAY", accessType: "以太网", protocol: "采集网关上行：TCP/IP；协议：MQTT、OPC UA、Modbus-TCP", scene: "综合能耗数据汇总、分析、平台上报", multiChannel: true, defaultChannels: 20 },
+                { code: "CD", name: "充电桩", system: "EN", devType: "METER", accessType: "IP/4G", protocol: "网线/4G物联网；协议：MQTT、充电桩国标协议", scene: "园区/停车场电动车充电、计费与状态监测", multiChannel: false },
+
+                // 消防安全
+                { code: "SM", name: "烟感探测器", system: "FD", devType: "DETECTOR", accessType: "消防二总线/无线", protocol: "消防主机：二总线；智能型：LoRa/NB-IoT；协议：FECbus、消防私有协议", scene: "室内烟雾探测、火灾预警、消防告警上报", multiChannel: false },
+                { code: "HM", name: "手动报警按钮", system: "FD", devType: "DETECTOR", accessType: "消防二总线/无线", protocol: "消防主机：二总线；智能型：LoRa/NB-IoT；协议：FECbus、消防私有协议", scene: "手动火灾报警、紧急呼叫、消防联动触发", multiChannel: false },
+                { code: "FM", name: "防火门监控模块", system: "FD", devType: "DETECTOR", accessType: "消防二总线/RS485", protocol: "消防二总线/RS485；协议：消防监控协议", scene: "防火门开关状态监测、故障告警、消防联动", multiChannel: false },
+                { code: "YJ", name: "应急照明控制器", system: "FD", devType: "CONTR", accessType: "消防二总线/RS485", protocol: "消防二总线/RS485；协议：应急照明消防协议", scene: "火灾时应急照明启停、疏散指示管控", multiChannel: true, defaultChannels: 8 },
+
+                // 协议网关
+                { code: "WG485", name: "RS485转IP网关", system: "GT", devType: "GATEWAY", accessType: "以太网", protocol: "RS485转TCP/IP；协议：Modbus-RTU/TCP、透明传输", scene: "总线设备联网、IBMS平台对接、数据上传", multiChannel: true, defaultChannels: 10 },
+                { code: "WGBAC", name: "BACnet网关", system: "GT", devType: "GATEWAY", accessType: "以太网", protocol: "BACnet MS/TP转BACnet/IP；协议：BACnet全协议", scene: "楼宇BACnet设备联网、平台集成对接", multiChannel: true, defaultChannels: 50 },
+                { code: "WGKNX", name: "KNX网关", system: "GT", devType: "GATEWAY", accessType: "以太网", protocol: "KNX总线转IP；协议：KNX/IP、Modbus-TCP", scene: "KNX智能照明/楼宇设备联网对接", multiChannel: true, defaultChannels: 20 }
+            ],
+            deviceTypes: [
+                { code: "CAM", name: "摄像机" },
+                { code: "NVR", name: "网络录像机" },
+                { code: "READER", name: "读卡器" },
+                { code: "CONTR", name: "控制器" },
+                { code: "DDC", name: "DDC控制器" },
+                { code: "SENSOR", name: "传感器" },
+                { code: "DETECTOR", name: "探测器" },
+                { code: "METER", name: "仪表" },
+                { code: "AMPLIFIER", name: "功放" },
+                { code: "LIGHTCONTR", name: "照明控制器" },
+                { code: "ALARMPANEL", name: "报警主机" },
+                { code: "ACTUATOR", name: "执行器" },
+                { code: "GATEWAY", name: "网关" }
+            ],
+            pointTypes: [
+                { code: "VT", name: "视频通道", dataType: "视频流" },
+                { code: "AI", name: "报警输入", dataType: "DI" },
+                { code: "AO", name: "报警输出", dataType: "DO" },
+                { code: "DR", name: "门禁点", dataType: "逻辑点" },
+                { code: "DI", name: "数字输入", dataType: "DI" },
+                { code: "DO", name: "数字输出", dataType: "DO" },
+                { code: "AI_AN", name: "模拟输入", dataType: "AI" },
+                { code: "AO_AN", name: "模拟输出", dataType: "AO" },
+                { code: "LT", name: "照明回路", dataType: "DO/AO" },
+                { code: "PM", name: "电能监测", dataType: "AI" },
+                { code: "BC", name: "广播通道", dataType: "音频" },
+                { code: "DT", name: "数据点", dataType: "通用" }
+            ],
+            devicePointMapping: {
+                "CAM": ["VT"],
+                "NVR": ["VT"],
+                "READER": ["DR"],
+                "CONTR": ["DI", "DO"],
+                "DDC": ["DI", "DO", "AI_AN", "AO_AN"],
+                "SENSOR": ["AI_AN"],
+                "DETECTOR": ["AI"],
+                "METER": ["PM"],
+                "AMPLIFIER": ["BC"],
+                "LIGHTCONTR": ["LT"],
+                "ALARMPANEL": ["AI", "AO"],
+                "ACTUATOR": ["DO"],
+                "GATEWAY": ["DT"]
+            },
+            spaces: [
+                { id: "F01", code: "F01", name: "地上1层", type: "floor", children: [
+                    { id: "F01-LBY", code: "LBY", name: "大堂", type: "area" },
+                    { id: "F01-DT", code: "DT", name: "大厅", type: "area" },
+                    { id: "F01-OFA", code: "OFA", name: "办公A区", type: "area" },
+                    { id: "F01-FM", code: "FM", name: "弱电井", type: "area" }
+                ]},
+                { id: "F02", code: "F02", name: "地上2层", type: "floor", children: [
+                    { id: "F02-OFA", code: "OFA", name: "办公A区", type: "area" },
+                    { id: "F02-OFB", code: "OFB", name: "办公B区", type: "area" },
+                    { id: "F02-FM", code: "FM", name: "弱电井", type: "area" }
+                ]},
+                { id: "B01", code: "B01", name: "地下1层", type: "floor", children: [
+                    { id: "B01-PK", code: "PK", name: "停车场", type: "area" },
+                    { id: "B01-FM", code: "FM", name: "配电房", type: "area" },
+                    { id: "B01-FD", code: "FD", name: "消防控制室", type: "area" }
+                ]},
+                { id: "ROOF", code: "ROOF", name: "屋面", type: "floor", children: [] }
+            ]
+        };
+
+
+        // 设备协议字典（从清单导入）
+        const PROTOCOL_DICT = {
+            "DS": {
+                protocols: ["TCP/IP", "ONVIF", "PSIA", "厂家私有视频协议"],
+                description: "ONVIF：开放网络视频接口协议，实现设备发现、视频流获取；PSIA：物理安防互操作性联盟标准；支持RTSP/RTP视频流传输，H.264/H.265编码..."
+            },
+            "DP": {
+                protocols: ["TCP/IP", "ONVIF", "云台控制协议", "厂家私有协议"],
+                description: "ONVIF Profile S/C：支持PTZ控制、预置位、巡航轨迹；云台控制协议：Pelco-D/P、VISCA等；支持变倍、聚焦、光圈控制..."
+            },
+            "HP": {
+                protocols: ["TCP/IP", "ONVIF", "厂家私有视频协议"],
+                description: "ONVIF Profile S：标准视频流传输；支持走廊模式、宽动态、背光补偿；POE供电，即插即用..."
+            },
+            "NV": {
+                protocols: ["iSCSI", "ONVIF", "厂家私有存储协议"],
+                description: "ONVIF Profile G：录像检索与回放；iSCSI：IP存储协议，支持块级数据传输；RAID存储管理；支持N+1冗余备份..."
+            },
+            "AH": {
+                protocols: ["Modbus-RTU", "FECbus", "厂家私有报警协议"],
+                description: "Modbus-RTU：报警分区状态寄存器读取；FECbus：消防电子编码总线，支持设备自动注册；支持防区布撤防、报警联动..."
+            },
+            "IR": {
+                protocols: ["红外感应协议", "Modbus-RTU"],
+                description: "红外感应协议：PIR信号处理，触发阈值可调；Modbus-RTU：灵敏度、延时时间参数配置；支持防拆报警、电池低电压告警..."
+            },
+            "GR": {
+                protocols: ["RFID/NFC", "LoRa", "NB-IoT"],
+                description: "RFID/NFC：ISO14443A/B、ISO15693标准；LoRa：扩频通信，传输距离远；NB-IoT：蜂窝物联网，广覆盖低功耗；支持离线数据缓存..."
+            },
+            "EZ": {
+                protocols: ["Modbus-RTU", "厂家周界安防协议"],
+                description: "Modbus-RTU：防区状态、电压值读取；周界安防协议：张力值、断线报警、短路报警；支持多防区独立配置..."
+            },
+            "CR": {
+                protocols: ["韦根26/34", "门禁私有协议"],
+                description: "韦根26/34：数据线D0/D1传输，支持卡号、校验位；门禁私有协议：加密通信，防复制；支持Mifare、CPU卡、身份证读取..."
+            },
+            "FR": {
+                protocols: ["韦根协议", "生物识别协议"],
+                description: "韦根协议：指纹特征值/模板ID传输；生物识别协议：ISO/IEC 19794-2指纹模板标准；支持1:N比对、活体检测..."
+            },
+            "LR": {
+                protocols: ["TCP/IP", "门禁私有协议", "人脸比对协议"],
+                description: "TCP/IP：HTTP/HTTPS接口，JSON/XML数据格式；人脸比对协议：特征值提取、相似度计算；支持口罩检测、活体检测、人脸库管理..."
+            },
+            "CC": {
+                protocols: ["门禁管控协议"],
+                description: "门禁管控协议：门磁、读卡器、出门按钮输入；继电器输出控制电锁；支持反潜回、多卡开门、首卡开门..."
+            },
+            "DC": {
+                protocols: ["门禁管控协议"],
+                description: "门禁管控协议：双门互锁、反潜回；支持32个时段、64个节假日配置；事件记录缓存10万条..."
+            },
+            "QC": {
+                protocols: ["门禁管控协议"],
+                description: "门禁管控协议：四门独立控制；支持主从控制器级联；TCP/IP或RS485上行通信..."
+            },
+            "IT": {
+                protocols: ["SIP", "楼宇对讲私有协议", "音视频传输协议"],
+                description: "SIP：会话初始协议，支持音视频呼叫、对讲；RTP/RTCP：实时传输协议；支持广播、监听、录音、视频联动..."
+            },
+            "LP": {
+                protocols: ["TCP/IP", "车牌识别算法", "道闸联动协议"],
+                description: "车牌识别算法：支持蓝牌、黄牌、绿牌、新能源牌；道闸联动协议：开闸信号、关闸信号、地感线圈触发；支持黑名单、白名单管理..."
+            },
+            "BJ": {
+                protocols: ["Modbus-RTU", "闸机控制协议", "门禁联动协议"],
+                description: "Modbus-RTU：运行状态、故障代码读取；闸机控制协议：开闸、关闸、常开、常闭模式；门禁联动：刷卡/人脸识别后开闸..."
+            },
+            "ML": {
+                protocols: ["开关量控制", "门禁锁控协议"],
+                description: "开关量控制：继电器干接点输出，NC/NO可选；门禁锁控协议：锁状态监测、门磁反馈；支持延时上锁、断电开锁/关锁配置..."
+            },
+            "TS": {
+                protocols: ["Modbus-RTU", "BACnet/IP", "Modbus-TCP"],
+                description: "Modbus-RTU：温度设定值、当前温度、模式读取；BACnet/IP：对象模型，AI/AO/AV/BV对象；支持时间表、设定点重置、风机调速..."
+            },
+            "DD": {
+                protocols: ["Modbus-RTU", "BACnet MS/TP", "BACnet/IP"],
+                description: "BACnet MS/TP：主从令牌传递，主控制器通信；Modbus-RTU：从设备数据采集；BACnet/IP：B-BC、B-AAC设备配置文件；支持逻辑编程、PID控制..."
+            },
+            "LC": {
+                protocols: ["Modbus-RTU", "Modbus-TCP", "BACnet/IP", "KNX", "DALI", "照明私有协议"],
+                description: "Modbus-RTU/TCP：回路开关、调光值(0-100%)；KNX：组地址通信，场景控制；DALI：数字可寻址照明接口，单灯控制；支持光感联动、人体感应联动..."
+            },
+            "CL": {
+                protocols: ["Modbus-RTU", "KNX协议", "窗帘控制协议"],
+                description: "Modbus-RTU：开合百分比、位置反馈；KNX：窗帘位置、角度控制；支持场景联动、定时控制、风光雨传感器联动..."
+            },
+            "EL": {
+                protocols: ["Modbus-RTU", "电梯专用协议", "TCP/IP"],
+                description: "电梯专用协议：运行方向、当前楼层、开关门状态；TCP/IP：群控调度、派梯协议；支持VIP乘梯、访客联动、消防迫降..."
+            },
+            "TH": {
+                protocols: ["Modbus-RTU", "4-20mA"],
+                description: "Modbus-RTU：温度、湿度寄存器读取；4-20mA：温度/湿度模拟量输出；支持温湿度上下限报警、校准参数配置..."
+            },
+            "CO2": {
+                protocols: ["Modbus-RTU", "4-20mA"],
+                description: "Modbus-RTU：CO₂浓度值(PPM)读取；4-20mA：模拟量输出；支持NDIR红外传感技术，自动基线校准..."
+            },
+            "AQ": {
+                protocols: ["Modbus-RTU", "Modbus-TCP", "MQTT"],
+                description: "Modbus-RTU：PM2.5、PM10、HCHO、TVOC、CO₂等多参数；MQTT：JSON格式数据上报；支持空气质量指数(AQI)计算、多级预警..."
+            },
+            "PIR": {
+                protocols: ["433MHz", "Zigbee", "Bluetooth", "Modbus-RTU"],
+                description: "433MHz/Zigbee：无线PIR信号传输；Modbus-RTU：感应状态、灵敏度配置；支持光照度感应、延时时间可调..."
+            },
+            "CH4": {
+                protocols: ["Modbus-RTU", "4-20mA", "气体检测专用协议"],
+                description: "Modbus-RTU：甲烷浓度(%LEL)读取；4-20mA：模拟量输出；支持催化燃烧或红外传感，声光报警联动..."
+            },
+            "TVOC": {
+                protocols: ["Modbus-RTU", "MQTT", "Modbus-TCP"],
+                description: "Modbus-RTU：TVOC浓度(mg/m³)读取；MQTT：物联网平台对接；支持PID光离子检测技术，自动零点校准..."
+            },
+            "CO": {
+                protocols: ["Modbus-RTU", "4-20mA"],
+                description: "Modbus-RTU：CO浓度(PPM)读取；4-20mA：模拟量输出；支持电化学传感器，高灵敏度，长寿命..."
+            },
+            "ZS": {
+                protocols: ["Modbus", "MQTT"],
+                description: "Modbus-RTU：噪声值(dB)读取；MQTT：云端数据上报；支持A计权、C计权，实时监测、超标报警..."
+            },
+            "ZD": {
+                protocols: ["Modbus-RTU"],
+                description: "Modbus-RTU：照度值(Lux)读取；4-20mA：模拟量输出；支持光照度阈值设置，联动照明控制..."
+            },
+            "FS": {
+                protocols: ["Modbus-RTU"],
+                description: "Modbus-RTU：风速(m/s)、风压(Pa)读取；4-20mA：模拟量输出；支持管道风速、面风速测量..."
+            },
+            "YW": {
+                protocols: ["Modbus-RTU"],
+                description: "Modbus-RTU：液位高度(m)、液位百分比读取；4-20mA：模拟量输出；支持投入式、超声波液位测量..."
+            },
+            "YC": {
+                protocols: ["Modbus-RTU"],
+                description: "Modbus-RTU：压差值(Pa)读取；4-20mA：模拟量输出；支持房间压差、过滤器压差监测..."
+            },
+            "FD": {
+                protocols: ["Modbus", "阀控协议"],
+                description: "Modbus-RTU：阀门开度反馈、开/关到位信号；阀控协议：开关控制、调节控制；支持手动/自动切换、故障报警..."
+            },
+            "PM": {
+                protocols: ["DL/T645", "Modbus-RTU", "IEC61850"],
+                description: "DL/T645：多功能电能表通信规约，支持正向有功、反向有功、电压、电流、功率因数读取；Modbus-RTU：寄存器映射；IEC61850：变电站通信标准..."
+            },
+            "WM": {
+                protocols: ["M-Bus", "Modbus-RTU", "LoRa", "NB-IoT"],
+                description: "M-Bus：仪表总线，两线制供电与通信；Modbus-RTU：寄存器读取；LoRa/NB-IoT：无线远传；支持累计流量、瞬时流量、历史用量查询..."
+            },
+            "GM": {
+                protocols: ["M-Bus", "Modbus-RTU", "LoRa", "NB-IoT"],
+                description: "M-Bus：总线通信；Modbus-RTU：寄存器读取；LoRa/NB-IoT：无线远传；支持累计用气量、剩余气量、阀门控制、异常报警..."
+            },
+            "EM": {
+                protocols: ["MQTT", "OPC UA", "Modbus-TCP"],
+                description: "MQTT：JSON格式能耗数据上报；OPC UA：工业互操作性标准；Modbus-TCP：采集器数据读取；支持分项计量、能耗分析、碳排放计算..."
+            },
+            "KK": {
+                protocols: ["Modbus", "电力监控协议"],
+                description: "Modbus-RTU：电压、电流、功率、电量、开关状态读取；电力监控协议：过载保护、短路保护、漏电保护参数配置；支持远程分合闸..."
+            },
+            "LD": {
+                protocols: ["Modbus-RTU"],
+                description: "Modbus-RTU：漏电流值(mA)、报警状态读取；4-20mA：模拟量输出；支持剩余电流监测，分级报警、跳闸保护..."
+            },
+            "UPS": {
+                protocols: ["Modbus", "UPS私有监控协议"],
+                description: "Modbus-RTU：输入电压、输出电压、电池电压、负载率、剩余时间读取；UPS私有协议：SNMP Trap告警、远程开关机；支持电池管理、自检功能..."
+            },
+            "CD": {
+                protocols: ["MQTT", "充电桩国标协议"],
+                description: "充电桩国标协议：GB/T 27930-2015充电通信协议；MQTT：运营平台对接；支持充电启停、电量计量、费用结算、故障上报..."
+            },
+            "SM": {
+                protocols: ["FECbus", "消防私有协议"],
+                description: "FECbus：消防电子编码总线，设备自动编址；消防私有协议：烟感浓度值、污染程度、故障状态；支持灵敏度可调、漂移补偿..."
+            },
+            "HM": {
+                protocols: ["FECbus", "消防私有协议"],
+                description: "FECbus：手动报警按钮地址识别；消防私有协议：按下报警、复位状态；支持电话插孔通信..."
+            },
+            "AMP": {
+                protocols: ["RTP", "RTSP", "消防广播协议"],
+                description: "消防广播协议：应急广播优先级控制；RTP/RTSP：IP音频流传输；支持预录语音、实时语音、分区广播、消防强切..."
+            },
+            "XF": {
+                protocols: ["消防专用协议", "FECbus"],
+                description: "消防专用协议：消火栓按钮按下状态、水流指示器水流状态；FECbus：设备地址识别；支持启泵联动、信号反馈..."
+            },
+            "FM": {
+                protocols: ["消防监控协议"],
+                description: "消防监控协议：防火门开/关/故障状态；支持常开式、常闭式防火门监控；联动闭门器、电磁释放器..."
+            },
+            "YJ": {
+                protocols: ["应急照明消防协议"],
+                description: "应急照明消防协议：灯具故障、主电故障、充电状态；支持集中控制型、自带电源型；应急启动、强启控制..."
+            },
+            "XD": {
+                protocols: ["消防电源监控协议"],
+                description: "消防电源监控协议：主电电压、备电电压、主备电状态、过压/欠压/缺相/错相报警；支持消防设备电源实时监控..."
+            },
+            "WG485": {
+                protocols: ["Modbus-RTU/TCP", "透明传输"],
+                description: "Modbus-RTU/TCP：串口到网口协议转换；透明传输：原始数据透传模式；支持多主站访问、串口服务器功能..."
+            },
+            "WGBAC": {
+                protocols: ["BACnet全协议"],
+                description: "BACnet全协议：MS/TP到IP路由、BBMD广播管理；支持BACnet设备发现、对象浏览、属性读写..."
+            },
+            "WGKNX": {
+                protocols: ["KNX/IP", "Modbus-TCP"],
+                description: "KNX/IP：KNXnet/IP隧道、路由；Modbus-TCP：协议转换；支持ETS配置导入、组地址映射..."
+            },
+            "WGMbus": {
+                protocols: ["M-Bus", "Modbus-TCP"],
+                description: "M-Bus：主站功能，支持多从站轮询；Modbus-TCP：协议转换；支持M-Bus设备供电、总线短路保护..."
+            },
+            "WGLORA": {
+                protocols: ["MQTT", "厂家私有物联网协议"],
+                description: "MQTT：物联网平台对接，JSON数据格式；LoRaWAN：终端设备接入；支持边缘计算、数据预处理、断点续传..."
+            },
+        };
+
+        // ==================== 2. 状态管理 (State Management) ====================
+        const State = {
+            devices: [],
+            currentModule: 'device-mgmt',
+            currentDeviceTab: 'all',
+            selectedDevices: [],
+            currentPage: 1,
+            pageSize: 5,
+            filteredDevices: [],
+            currentEditDevice: null,
+            currentEditPoint: null,
+            currentModelObj: null,
+            expandedDeviceId: null
+        };
+
+        // ==================== 3. 工具函数 (Utilities) ====================
+
+        /**
+         * 生成唯一ID
+         */
+        function generateId() {
+            return 'DEV-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
+        }
+
+        /**
+         * 生成ProductKey
+         */
+        function generateProductKey(prefix) {
+            prefix = prefix || 'PK';
+            const timestamp = Date.now().toString(36).toUpperCase();
+            const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+            return `${prefix}-${timestamp}-${random}`;
+        }
+
+        /**
+         * 生成通道唯一ID
+         */
+        function generatePointId() {
+            return 'PT-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
+        }
+
+        /**
+         * 编码生成函数 - 加入品牌字段
+         */
+        function generateDeviceCode(area, subArea, system, devType, brand, sn) {
+            // 过滤空值和占位符
+            const parts = [area, subArea, system, devType, brand, sn].filter(p => p && p !== 'XXX' && p.trim() !== '');
+            return parts.join('-');
+        }
+
+        /**
+         * IP递增算法 - 修复超255不进位问题
+         */
+        function incrementIP(ip, increment) {
+            const parts = ip.split('.').map(Number);
+            if (parts.length !== 4) throw new Error('无效IP格式');
+
+            // 从最后一位开始加
+            parts[3] += increment;
+
+            // 处理进位
+            for (let i = 3; i > 0; i--) {
+                if (parts[i] > 255) {
+                    parts[i] -= 256;
+                    parts[i - 1] += 1;
+                }
+                if (parts[i] < 0) {
+                    parts[i] += 256;
+                    parts[i - 1] -= 1;
+                }
+            }
+
+            // 检查有效性
+            if (parts[0] > 255 || parts[0] < 0) {
+                throw new Error('IP地址超出范围');
+            }
+
+            // 验证每个段
+            if (parts.some(p => p < 0 || p > 255)) {
+                throw new Error('IP地址段无效');
+            }
+
+            return parts.join('.');
+        }
+
+        /**
+         * IP地址验证
+         */
+        function isValidIP(ip) {
+            const pattern = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+            return pattern.test(ip);
+        }
+
+        /**
+         * 子网掩码验证
+         */
+        function isValidNetmask(mask) {
+            const pattern = /^(255|254|252|248|240|224|192|128|0)\.(255|254|252|248|240|224|192|128|0)\.(255|254|252|248|240|224|192|128|0)\.(255|254|252|248|240|224|192|128|0)$/;
+            return pattern.test(mask);
+        }
+
+        /**
+         * 显示Toast消息
+         */
+        function showToast(message, type = 'info', duration = 3000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            const icons = {
+                success: 'fa-check-circle text-green-400',
+                error: 'fa-times-circle text-red-400',
+                warning: 'fa-exclamation-triangle text-yellow-400',
+                info: 'fa-info-circle text-blue-400'
+            };
+
+            toast.innerHTML = `
+                <i class="fas ${icons[type]} text-lg"></i>
+                <span class="text-white">${message}</span>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
+        /**
+         * 显示确认对话框
+         */
+        function showConfirm(title, message, onConfirm, onCancel) {
+            const container = document.getElementById('confirm-container');
+            container.innerHTML = `
+                <div class="confirm-dialog modal-enter">
+                    <h4>${title}</h4>
+                    <p>${message}</p>
+                    <div class="btn-group">
+                        <button onclick="closeConfirm(false)" class="px-4 py-2 glass-card rounded-lg text-slate-300 hover:text-white">取消</button>
+                        <button onclick="closeConfirm(true)" class="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30">确认</button>
+                    </div>
+                </div>
+            `;
+            container.classList.remove('hidden');
+            container.classList.add('flex');
+
+            window.confirmCallback = (result) => {
+                container.classList.add('hidden');
+                container.classList.remove('flex');
+                if (result && onConfirm) onConfirm();
+                if (!result && onCancel) onCancel();
+            };
+        }
+
+        function closeConfirm(result) {
+            if (window.confirmCallback) window.confirmCallback(result);
+        }
+
+        /**
+         * 表单验证
+         */
+        function validateForm(formId) {
+            let isValid = true;
+            const form = document.getElementById(formId);
+
+            // 清除所有错误状态
+            form.querySelectorAll('.form-input').forEach(input => {
+                input.classList.remove('error');
+            });
+            form.querySelectorAll('.error-message').forEach(msg => {
+                msg.classList.remove('show');
+            });
+
+            // 验证必填字段
+            const requiredFields = form.querySelectorAll('[required]');
+            requiredFields.forEach(field => {
+                if (!field.value.trim()) {
+                    isValid = false;
+                    field.classList.add('error');
+                    const errorId = 'error-' + field.id.replace('form-', '');
+                    const errorEl = document.getElementById(errorId);
+                    if (errorEl) errorEl.classList.add('show');
+                }
+            });
+
+            // 验证IP字段
+            const ipFields = ['form-ip', 'batch-ip-start'];
+            ipFields.forEach(id => {
+                const field = document.getElementById(id);
+                if (field && field.value && !isValidIP(field.value)) {
+                    isValid = false;
+                    field.classList.add('error');
+                    showToast('请输入有效的IP地址', 'error');
+                }
+            });
+
+            // 验证子网掩码
+            const netmaskFields = ['form-netmask', 'batch-netmask'];
+            netmaskFields.forEach(id => {
+                const field = document.getElementById(id);
+                if (field && field.value && !isValidNetmask(field.value)) {
+                    isValid = false;
+                    field.classList.add('error');
+                    showToast('请输入有效的子网掩码', 'error');
+                }
+            });
+
+            // 验证序号唯一性
+            if (formId === 'device-form') {
+                const area = document.getElementById('form-area').value;
+                const subArea = document.getElementById('form-subarea').value;
+                const system = document.getElementById('form-system').value;
+                const model = document.getElementById('form-model').value;
+                const brand = document.getElementById('form-brand').value;
+                const devType = document.getElementById('form-devtype').value;
+                const sn = document.getElementById('form-sn').value;
+
+                if (area && system && model && brand && devType && sn) {
+                    const newCode = generateDeviceCode(area, subArea, system, devType, brand, sn);
+                    const exists = State.devices.some(d => 
+                        d.code === newCode && (!State.currentEditDevice || d.id !== State.currentEditDevice.id)
+                    );
+                    if (exists) {
+                        isValid = false;
+                        showToast('设备编码已存在，请修改序号', 'error');
+                        document.getElementById('form-sn').classList.add('error');
+                    }
+                }
+
+                // 验证空间选择
+                if (!document.getElementById('form-area').value) {
+                    isValid = false;
+                    document.getElementById('error-space').classList.add('show');
+                }
+            }
+
+            return isValid;
+        }
+
+        // ==================== 4. 设备工厂 (Device Factory) ====================
+
+        /**
+         * 创建设备对象
+         */
+        function createDevice(config) {
+            const device = {
+                id: config.id || generateId(),
+                name: config.name,
+                code: config.code,
+                group: config.group,
+                system: config.system,
+                model: config.model,
+                brand: config.brand,
+                productModel: config.productModel,
+                devType: config.devType,
+                accessType: config.accessType,
+                protocol: config.protocol,
+                selectedProtocol: config.selectedProtocol || null,
+                spaceId: config.spaceId,
+                spaceCode: config.spaceCode,
+                subSpaceCode: config.subSpaceCode,
+                status: config.status || 'online',
+                productKey: config.productKey || generateProductKey(),
+                ip: config.ip || null,
+                netmask: config.netmask || null,
+                gateway: config.gateway || null,
+                sn: config.sn || null,
+                multiChannel: config.multiChannel || false,
+                channelCounts: config.channelCounts || {},
+                points: []
+            };
+
+            // 生成通道
+            device.points = generateDevicePoints(device);
+
+            return device;
+        }
+
+        /**
+         * 生成设备通道
+         */
+        function generateDevicePoints(device) {
+            const points = [];
+            const pointTypes = DICT.devicePointMapping[device.devType] || ["DT"];
+
+            if (device.multiChannel && device.channelCounts) {
+                // 多通道设备
+                for (const [ptCode, count] of Object.entries(device.channelCounts)) {
+                    for (let i = 1; i <= count; i++) {
+                        points.push(createPoint(device, i, ptCode));
+                    }
+                }
+            } else {
+                // 单通道设备
+                pointTypes.forEach((ptCode, idx) => {
+                    points.push(createPoint(device, idx + 1, ptCode));
+                });
+            }
+
+            return points;
+        }
+
+        /**
+         * 创建通道对象
+         */
+        function createPoint(device, index, pointType) {
+            const pointTypeInfo = DICT.pointTypes.find(p => p.code === pointType) || { name: pointType, dataType: '未知' };
+            const isVideoDevice = device.devType === "CAM" || device.devType === "NVR";
+
+            const point = {
+                id: generatePointId(),
+                pointCode: device.code + '-' + pointType + index.toString().padStart(2, '0'),
+                pointType: pointType,
+                pointTypeName: pointTypeInfo.name,
+                name: pointTypeInfo.name + index,
+                number: index.toString(),
+                deviceId: device.id,
+                spaceId: device.spaceId,
+                spaceCode: device.spaceCode,
+                subSpaceCode: device.subSpaceCode,
+                accessType: device.accessType,
+                dataType: pointTypeInfo.dataType,
+                value: index === 1 ? '正常' : '0',
+                status: device.status,
+                mac: generateMockMacAddress(device.id + pointType + index),
+                netmask: device.netmask,
+                gateway: device.gateway
+            };
+
+            // 根据接入类型设置通道特定参数
+            setPointParamsByAccessType(point, device, index);
+
+            // 视频监控设备通道IP初始为空，需要手动设置前端IPC地址
+            if (isVideoDevice && pointType === "VT") {
+                point.ip = null;
+                point.port = calculatePort(device, pointType, index);
+            }
+
+            return point;
+        }
+
+        /**
+         * 生成模拟MAC地址
+         */
+        function generateMockMacAddress(id) {
+            const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            const hex = hash.toString(16).padStart(12, '0').slice(0, 12);
+            return hex.match(/.{2}/g).join(':').toUpperCase();
+        }
+
+        /**
+         * 根据接入类型设置通道参数
+         */
+        function setPointParamsByAccessType(point, device, index) {
+            if (!device.accessType) return;
+
+            const isVideoDevice = device.devType === "CAM" || device.devType === "NVR";
+
+            if (device.accessType.includes("IP") || device.accessType.includes("以太网")) {
+                if (!isVideoDevice || point.pointType !== "VT") {
+                    point.ip = device.ip;
+                }
+                point.port = calculatePort(device, point.pointType, index);
+            } else if (device.accessType.includes("RS485") || device.accessType.includes("Modbus")) {
+                point.modbusAddr = index;
+                point.register = 40000 + index;
+            } else if (device.accessType.includes("M-Bus")) {
+                point.mbusAddr = index;
+                point.meterType = "水表";
+            } else if (device.accessType.includes("模拟量")) {
+                point.range = "4-20mA";
+                point.unit = "°C";
+            } else if (device.accessType.includes("消防二总线")) {
+                point.firebusAddr = index;
+                point.deviceType = "探测器";
+            } else if (device.accessType.includes("无线")) {
+                point.wirelessAddr = index.toString().padStart(3, '0');
+            }
+        }
+
+        /**
+         * 计算端口号
+         */
+        function calculatePort(device, pointType, index) {
+            if (device.devType === "NVR") {
+                return (554 + index - 1).toString();
+            }
+            if (device.devType === "CAM") {
+                return "554";
+            }
+            if (device.devType === "CONTR" || device.devType === "DDC") {
+                return "502";
+            }
+            return "80";
+        }
+
+        // ==================== 5. 初始化数据 ====================
+        function initSampleData() {
+            const sampleConfigs = [
+                {
+                    name: "1楼大堂枪机1",
+                    group: "SA", system: "VI", model: "DS", brand: "HIK", productModel: "DS-2CD3T26",
+                    devType: "CAM", accessType: "以太网",
+                    protocol: "百兆/千兆网线、光纤；协议：TCP/IP、ONVIF、PSIA、厂家私有视频协议",
+                    spaceCode: "F01", subSpaceCode: "LBY",
+                    ip: "192.168.1.101", netmask: "255.255.255.0", gateway: "192.168.1.1",
+                    sn: "SN123456789"
+                },
+                {
+                    name: "B1停车场球机2",
+                    group: "SA", system: "VI", model: "DP", brand: "DAH", productModel: "DS-2DE4425",
+                    devType: "CAM", accessType: "以太网",
+                    protocol: "百兆/千兆网线、光纤；协议：TCP/IP、ONVIF、云台控制协议、厂家私有协议",
+                    spaceCode: "B01", subSpaceCode: "PK",
+                    ip: "192.168.1.102", netmask: "255.255.255.0", gateway: "192.168.1.1",
+                    status: "warning",
+                    sn: "SN987654321"
+                },
+                {
+                    name: "B1消防控制室NVR",
+                    group: "SA", system: "VI", model: "NV", brand: "HIK", productModel: "DS-7608",
+                    devType: "NVR", accessType: "以太网",
+                    protocol: "交换机级联、IP网络存储；协议：iSCSI、ONVIF、厂家私有存储协议",
+                    spaceCode: "B01", subSpaceCode: "FD",
+                    ip: "192.168.1.103", netmask: "255.255.255.0", gateway: "192.168.1.1",
+                    multiChannel: true, channelCounts: { "VT": 8 },
+                    sn: "SN456789123"
+                },
+                {
+                    name: "1楼大厅人脸识别终端",
+                    group: "ST", system: "AC", model: "LR", brand: "ZKT", productModel: "ZK-FACE7",
+                    devType: "READER", accessType: "韦根/RS485/以太网",
+                    protocol: "以太网/RS485；协议：TCP/IP、门禁私有协议、人脸比对协议",
+                    spaceCode: "F01", subSpaceCode: "DT",
+                    ip: "192.168.1.104", netmask: "255.255.255.0", gateway: "192.168.1.1",
+                    sn: "SN789123456"
+                },
+                {
+                    name: "2楼弱电井DDC控制器",
+                    group: "SB", system: "BA", model: "DD", brand: "SIE", productModel: "DDC-1000",
+                    devType: "DDC", accessType: "现场总线/以太网",
+                    protocol: "接入层：RS485(Modbus/BACnet MS/TP)；上行：IP(BACnet/IP)",
+                    spaceCode: "F02", subSpaceCode: "FM",
+                    ip: "192.168.1.105", netmask: "255.255.255.0", gateway: "192.168.1.1",
+                    multiChannel: true, channelCounts: { "DI": 8, "DO": 4, "AI_AN": 4 },
+                    sn: "SN321654987"
+                },
+                {
+                    name: "B1停车场车牌识别",
+                    group: "ST", system: "CA", model: "LP", brand: "UNV", productModel: "ETC-P1",
+                    devType: "READER", accessType: "以太网",
+                    protocol: "网线/光纤；协议：TCP/IP、车牌识别算法、道闸联动协议",
+                    spaceCode: "B01", subSpaceCode: "PK",
+                    ip: "192.168.1.106", netmask: "255.255.255.0", gateway: "192.168.1.1",
+                    sn: "SN147258369"
+                },
+                {
+                    name: "1楼大堂照明控制器",
+                    group: "SB", system: "LI", model: "LC", brand: "ABB", productModel: "LCX-8",
+                    devType: "LIGHTCONTR", accessType: "RS485/KNX",
+                    protocol: "RS485(Modbus-RTU/照明私有协议)；专业总线：KNX",
+                    spaceCode: "F01", subSpaceCode: "LBY",
+                    ip: "192.168.1.107", netmask: "255.255.255.0", gateway: "192.168.1.1",
+                    multiChannel: true, channelCounts: { "LT": 8 },
+                    sn: "SN963258741"
+                },
+                {
+                    name: "B1配电房电能表",
+                    group: "SE", system: "EP", model: "PM", brand: "CHNT", productModel: "DTS666",
+                    devType: "METER", accessType: "RS485",
+                    protocol: "RS485总线；协议：DL/T645、Modbus-RTU",
+                    spaceCode: "B01", subSpaceCode: "FM",
+                    sn: "SN741852963"
+                },
+                {
+                    name: "F02办公区温湿度传感器",
+                    group: "SB", system: "BA", model: "TH", brand: "SIE", productModel: "QFM2160",
+                    devType: "SENSOR", accessType: "RS485",
+                    protocol: "数字型：RS485(Modbus-RTU)",
+                    spaceCode: "F02", subSpaceCode: "OFA",
+                    sn: "SN159753456"
+                },
+                {
+                    name: "B01停车场烟感探测器",
+                    group: "SF", system: "FD", model: "SM", brand: "HONE", productModel: "2351E",
+                    devType: "DETECTOR", accessType: "消防二总线",
+                    protocol: "消防主机：二总线；协议：FECbus",
+                    spaceCode: "B01", subSpaceCode: "PK",
+                    sn: "SN357951852"
+                }
+            ];
+
+            sampleConfigs.forEach(config => {
+                config.code = generateDeviceCode(
+                    config.spaceCode, 
+                    config.subSpaceCode, 
+                    config.system, 
+                    config.devType, 
+                    config.brand,
+                    String(State.devices.length + 1).padStart(3, '0')
+                );
+                config.spaceId = config.subSpaceCode ? 
+                    `${config.spaceCode}-${config.subSpaceCode}` : config.spaceCode;
+
+                State.devices.push(createDevice(config));
+            });
+
+            State.filteredDevices = [...State.devices];
+        }
+
+
+        // ==================== 6. UI渲染函数 ====================
+
+        /**
+         * 更新统计信息
+         */
+        function updateStats() {
+            document.getElementById('dm-total').innerText = State.devices.length;
+            document.getElementById('dm-online').innerText = State.devices.filter(d => d.status === 'online').length;
+
+            const totalPoints = State.devices.reduce((sum, d) => sum + d.points.length, 0);
+            document.getElementById('dm-points-total').innerText = totalPoints;
+
+            const onlinePoints = State.devices.reduce((sum, d) => 
+                sum + d.points.filter(p => p.status === 'online').length, 0
+            );
+            document.getElementById('dm-points-online').innerText = onlinePoints;
+
+            const alarmPoints = State.devices.reduce((sum, d) => 
+                sum + d.points.filter(p => p.status === 'warning').length, 0
+            );
+            document.getElementById('dm-points-alarm').innerText = alarmPoints;
+            document.getElementById('device-count-badge').innerText = State.devices.length;
+        }
+
+        /**
+         * 渲染空间树
+         */
+        function renderSpaceTree(containerId, selectedId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const searchId = containerId + '-search';
+            const treeId = containerId + '-tree';
+
+            let html = `
+                <div class="mb-3">
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                        <input type="text" id="${searchId}" placeholder="搜索楼层、区域..." 
+                               class="search-input w-full rounded-lg pl-8 pr-3 py-2 text-sm text-white placeholder-slate-500"
+                               oninput="filterSpaceTree('${containerId}', this.value)">
+                    </div>
+                </div>
+                <div id="${treeId}" class="space-tree-content"></div>
+            `;
+            container.innerHTML = html;
+
+            renderSpaceTreeContent(treeId, selectedId, '');
+        }
+
+        /**
+         * 渲染空间树内容（支持搜索过滤）
+         */
+        function renderSpaceTreeContent(treeId, selectedId, filterText) {
+            const treeContainer = document.getElementById(treeId);
+            if (!treeContainer) return;
+
+            const lowerFilter = filterText.toLowerCase();
+            let html = '';
+            let hasMatch = false;
+
+            DICT.spaces.forEach(floor => {
+                const floorMatch = !lowerFilter || 
+                    floor.name.toLowerCase().includes(lowerFilter) || 
+                    floor.code.toLowerCase().includes(lowerFilter);
+
+                const matchingChildren = floor.children.filter(area => 
+                    !lowerFilter || 
+                    area.name.toLowerCase().includes(lowerFilter) || 
+                    area.code.toLowerCase().includes(lowerFilter)
+                );
+
+                if (floorMatch || matchingChildren.length > 0) {
+                    hasMatch = true;
+                    html += `<div class="space-item font-semibold" data-id="${floor.id}" data-code="${floor.code}" data-sub="">📁 ${floor.name} (${floor.code})</div>`;
+
+                    const childrenToShow = floorMatch ? floor.children : matchingChildren;
+                    childrenToShow.forEach(area => {
+                        const cls = (selectedId === area.id) ? 'selected' : '';
+                        html += `<div class="space-item ml-4 ${cls}" data-id="${area.id}" data-code="${floor.code}" data-sub="${area.code}">📄 ${area.name} (${area.code})</div>`;
+                    });
+                }
+            });
+
+            if (!hasMatch) {
+                html = '<div class="text-slate-500 text-sm p-2">未找到匹配的位置</div>';
+            }
+
+            treeContainer.innerHTML = html;
+
+            treeContainer.querySelectorAll('.space-item').forEach(el => {
+                el.addEventListener('click', function() {
+                    treeContainer.querySelectorAll('.space-item').forEach(i => i.classList.remove('selected'));
+                    this.classList.add('selected');
+
+                    const areaCode = this.dataset.code;
+                    const subCode = this.dataset.sub || '';
+
+                    const container = treeContainer.closest('.space-tree');
+                    const isBatch = container && container.id === 'batch-space-tree-container';
+                    const isPoint = container && container.id === 'point-space-tree';
+
+                    if (isBatch) {
+                        document.getElementById('batch-area').value = areaCode;
+                        document.getElementById('batch-subarea').value = subCode;
+                    } else if (isPoint) {
+                        if (State.currentEditPoint) {
+                            State.currentEditPoint.spaceCode = areaCode;
+                            State.currentEditPoint.subSpaceCode = subCode;
+                            State.currentEditPoint.spaceId = this.dataset.id;
+                        }
+                    } else {
+                        document.getElementById('form-area').value = areaCode;
+                        document.getElementById('form-subarea').value = subCode;
+                        updatePreview();
+                    }
+                });
+            });
+        }
+
+        /**
+         * 过滤空间树
+         */
+        function filterSpaceTree(containerId, filterText) {
+            const treeId = containerId + '-tree';
+            const treeContainer = document.getElementById(treeId);
+            if (!treeContainer) return;
+
+            let selectedId = null;
+            const selectedEl = treeContainer.querySelector('.space-item.selected');
+            if (selectedEl) {
+                selectedId = selectedEl.dataset.id;
+            }
+
+            renderSpaceTreeContent(treeId, selectedId, filterText);
+        }
+
+        /**
+         * 获取空间显示文本
+         */
+        function getSpaceDisplay(item) {
+            if (!item.spaceId) return '未指派';
+            const floor = DICT.spaces.find(f => f.id === item.spaceCode);
+            const floorName = floor ? floor.name : item.spaceCode;
+
+            let areaName = '';
+            if (item.subSpaceCode && floor) {
+                const area = floor.children.find(c => c.code === item.subSpaceCode);
+                areaName = area ? area.name : item.subSpaceCode;
+            }
+            return `${floorName}${areaName ? '-' + areaName : ''}`;
+        }
+
+        /**
+         * 获取品牌名称
+         */
+        function getBrandName(brandCode) {
+            if (!brandCode) return '-';
+            const brand = DICT.brands.find(b => b.code === brandCode);
+            return brand ? brand.name : brandCode;
+        }
+
+        /**
+         * 渲染设备表格
+         */
+        function renderDeviceTable() {
+            const tbody = document.getElementById('device-table-body');
+            if (!tbody) return;
+
+            const start = (State.currentPage - 1) * State.pageSize;
+            const end = Math.min(start + State.pageSize, State.filteredDevices.length);
+            const pageData = State.filteredDevices.slice(start, end);
+
+            document.getElementById('page-start').innerText = State.filteredDevices.length ? start + 1 : 0;
+            document.getElementById('page-end').innerText = end;
+            document.getElementById('page-total').innerText = State.filteredDevices.length;
+            document.getElementById('page-current').innerText = State.currentPage;
+            document.getElementById('btn-prev-page').disabled = State.currentPage === 1;
+            document.getElementById('btn-next-page').disabled = end >= State.filteredDevices.length;
+
+            if (pageData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="16" class="text-center py-8 text-slate-500">暂无设备</td></tr>';
+                return;
+            }
+
+            let html = '';
+            pageData.forEach(dev => {
+                const group = DICT.profGroups.find(g => g.code === dev.group) || { name: dev.group, color: 'slate', icon: 'fa-cog' };
+                const system = DICT.systems.find(s => s.code === dev.system) || { name: dev.system };
+                const model = DICT.models.find(m => m.code === dev.model) || { name: '-' };
+                const brandName = getBrandName(dev.brand);
+                const pointCount = dev.points?.length || 0;
+
+                const statusClass = {
+                    online: 'badge-online',
+                    offline: 'badge-offline',
+                    warning: 'badge-warning',
+                    maintenance: 'badge-maintenance'
+                }[dev.status] || 'badge-offline';
+
+                const statusText = {
+                    online: '在线',
+                    offline: '离线',
+                    warning: '故障',
+                    maintenance: '维护'
+                }[dev.status];
+
+                const selected = State.selectedDevices.includes(dev.id) ? 'selected' : '';
+                const expandIcon = State.expandedDeviceId === dev.id ? 'fa-chevron-down' : 'fa-chevron-right';
+                const spaceDisplay = getSpaceDisplay(dev);
+
+                const ipDisplay = (dev.accessType && (dev.accessType.includes("IP") || dev.accessType.includes("以太网"))) ? (dev.ip || '-') : '-';
+                const protocolDisplay = dev.selectedProtocol || '-';
+                const snDisplay = dev.sn || '-';
+                const productModelDisplay = dev.productModel || '-';
+
+                html += `<tr class="device-row ${selected}" data-id="${dev.id}">
+                    <td onclick="event.stopPropagation()"><input type="checkbox" class="device-checkbox" value="${dev.id}" ${State.selectedDevices.includes(dev.id) ? 'checked' : ''} onchange="toggleDeviceSelect('${dev.id}')"></td>
+                    <td><div class="flex items-center gap-2"><i class="fas ${expandIcon} text-slate-500 w-4 cursor-pointer" onclick="toggleExpand('${dev.id}')"></i><div><div class="font-medium text-white">${dev.name}</div><div class="text-xs text-slate-400">${dev.code}</div></div></div></td>
+                    <td><span class="px-2 py-1 bg-${group.color}-500/20 text-${group.color}-400 rounded text-xs"><i class="fas ${group.icon} mr-1"></i>${group.name}</span></td>
+                    <td><span class="text-slate-300">${system.name}</span></td>
+                    <td><span class="text-slate-300">${model.name}</span></td>
+                    <td><span class="text-slate-300 text-xs">${productModelDisplay}</span></td>
+                    <td><span class="brand-badge">${brandName}</span></td>
+                    <td><span class="protocol-badge">${dev.accessType || '-'}</span></td>
+                    <td><span class="font-mono text-xs ${ipDisplay !== '-' ? 'text-blue-400' : 'text-slate-500'}">${ipDisplay}</span></td>
+                    <td><span class="text-xs text-slate-400" title="${dev.protocol || ''}">${protocolDisplay.length > 20 ? protocolDisplay.substring(0, 20) + '...' : protocolDisplay}</span></td>
+                    <td><span class="text-xs text-slate-300">${snDisplay}</span></td>
+                    <td><span class="product-key text-xs" title="${dev.productKey}">${dev.productKey?.substring(0, 12)}...</span></td>
+                    <td><span class="text-slate-300 font-mono">${pointCount}</span></td>
+                    <td><span class="text-slate-300 text-sm">${spaceDisplay}</span></td>
+                    <td><span class="device-badge ${statusClass}"><span class="status-dot status-${dev.status}"></span>${statusText}</span></td>
+                    <td onclick="event.stopPropagation()"><div class="flex gap-2">
+                        <button onclick="editDevice('${dev.id}')" class="text-green-400 hover:text-green-300" title="编辑"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteDevice('${dev.id}')" class="text-red-400 hover:text-red-300" title="删除"><i class="fas fa-trash"></i></button>
+                    </div></td>
+                </tr>`;
+
+                if (State.expandedDeviceId === dev.id) {
+                    html += renderPointDetailTable(dev);
+                }
+            });
+            tbody.innerHTML = html;
+            updateBatchBar();
+        }
+
+        /**
+         * 渲染通道明细表格 - 更新表头为指定顺序和名称
+         */
+        function renderPointDetailTable(dev) {
+            const accessType = dev.accessType;
+            const isVideoDevice = dev.devType === "CAM" || dev.devType === "NVR";
+
+            let html = `<tr class="point-detail-row"><td colspan="16" class="p-0"><div class="p-4 bg-slate-800/50">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-semibold text-white">通道明细 (${dev.points.length}个通道)</span>
+                    <button onclick="syncPoints('${dev.id}')" class="text-xs bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full hover:bg-blue-500/30"><i class="fas fa-sync mr-1"></i>同步通道</button>
+                </div>
+                <div class="overflow-x-auto">
+                <table class="point-detail-table">`;
+
+            // 按照要求的顺序定义表头
+            let headers = [
+                '通道编码', 
+                '通道号', 
+                '通道名称', 
+                '通道类型', 
+                '通道类别', 
+                '系统类型', 
+                '数据源',
+                'IP地址', 
+                'MAC地址', 
+                '设备序列号', 
+                '所属设备', 
+                '空间位置', 
+                '当前值', 
+                '状态', 
+                '操作'
+            ];
+
+            html += '<thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+
+            dev.points.forEach(p => {
+                // 获取系统类型名称
+                const systemName = DICT.systems.find(s => s.code === dev.system)?.name || dev.system;
+                
+                // 获取通道类型名称
+                const pointTypeInfo = DICT.pointTypes.find(pt => pt.code === p.pointType) || { name: p.pointType, dataType: '未知' };
+                
+                // 获取所属设备名称
+                const deviceName = dev.name || '-';
+                
+                // 获取MAC地址
+                const macAddress = p.mac || '-';
+                
+                // 获取设备序列号
+                const deviceSn = dev.sn || '-';
+                
+                // 获取IP地址（根据设备类型和接入类型处理）
+                let ipAddress = '-';
+                if (isVideoDevice && p.pointType === "VT") {
+                    ipAddress = p.ip || '-';
+                } else if (accessType && (accessType.includes("IP") || accessType.includes("以太网"))) {
+                    ipAddress = p.ip || dev.ip || '-';
+                } else {
+                    ipAddress = '-';
+                }
+
+                // 数据源字段 - 可以从协议或接入类型获取
+                const dataSource = p.dataType || dev.accessType || '-';
+
+                // 构建行数据 - 按照新的表头顺序
+                let cells = [
+                    `<td class="font-mono text-xs">${p.pointCode || '-'}</td>`,                          // 通道编码
+                    `<td>${p.number || '-'}</td>`,                                                       // 通道号
+                    `<td>${p.name || '-'}</td>`,                                                          // 通道名称
+                    `<td>${pointTypeInfo.name}</td>`,                                                     // 通道类型（名称）
+                    `<td>${p.pointType || '-'}</td>`,                                                     // 通道类别（代码）
+                    `<td>${systemName}</td>`,                                                              // 系统类型
+                    `<td>${dataSource}</td>`,                                                              // 数据源
+                    `<td class="font-mono text-xs ${ipAddress !== '-' ? 'text-blue-400' : 'text-slate-500'}">${ipAddress}</td>`, // IP地址
+                    `<td class="font-mono text-xs text-purple-400">${macAddress}</td>`,                   // MAC地址
+                    `<td class="text-xs text-slate-300">${deviceSn}</td>`,                                 // 设备序列号
+                    `<td>${deviceName}</td>`,                                                              // 所属设备
+                    `<td class="text-slate-300 text-sm">${getSpaceDisplay(p)}</td>`,                       // 空间位置
+                    `<td>${p.value || '0'}</td>`,                                                          // 当前值
+                    `<td><span class="status-dot status-${p.status}"></span> ${p.status === 'online' ? '在线' : '离线'}</td>`, // 状态
+                    `<td><button class="text-blue-400 text-xs" onclick="editPoint('${dev.id}','${p.id}')" title="编辑"><i class="fas fa-edit"></i></button></td>` // 操作
+                ];
+
+                html += '<tr>' + cells.join('') + '</tr>';
+            });
+
+            html += '</tbody></table></div></div></td></tr>';
+            return html;
+        }
+
+        /**
+         * 更新批量操作栏
+         */
+        function updateBatchBar() {
+            const bar = document.getElementById('batch-bar');
+            const btn = document.getElementById('btn-batch');
+            const cnt = document.getElementById('batch-count');
+            const selCnt = document.getElementById('batch-selected-count');
+
+            if (State.selectedDevices.length > 0) {
+                bar?.classList.add('show');
+                if (btn) {
+                    btn.classList.remove('hidden');
+                    cnt.innerText = State.selectedDevices.length;
+                    selCnt.innerText = State.selectedDevices.length;
+                }
+            } else {
+                bar?.classList.remove('show');
+                if (btn) btn.classList.add('hidden');
+            }
+        }
+
+        // ==================== 7. 事件处理函数 ====================
+
+        function toggleDeviceSelect(id) {
+            const idx = State.selectedDevices.indexOf(id);
+            if (idx === -1) {
+                State.selectedDevices.push(id);
+            } else {
+                State.selectedDevices.splice(idx, 1);
+            }
+            renderDeviceTable();
+        }
+
+        function toggleSelectAll() {
+            const cb = document.getElementById('select-all');
+            const start = (State.currentPage - 1) * State.pageSize;
+            const end = Math.min(start + State.pageSize, State.filteredDevices.length);
+            const ids = State.filteredDevices.slice(start, end).map(d => d.id);
+
+            if (cb.checked) {
+                State.selectedDevices = [...new Set([...State.selectedDevices, ...ids])];
+            } else {
+                State.selectedDevices = State.selectedDevices.filter(id => !ids.includes(id));
+            }
+            renderDeviceTable();
+        }
+
+        function clearSelection() {
+            State.selectedDevices = [];
+            renderDeviceTable();
+        }
+
+        function toggleExpand(devId) {
+            State.expandedDeviceId = State.expandedDeviceId === devId ? null : devId;
+            renderDeviceTable();
+        }
+
+        function syncPoints(devId) {
+            showToast('正在同步通道信息...', 'info');
+            setTimeout(() => {
+                showToast('通道同步完成', 'success');
+            }, 1000);
+        }
+
+        function filterDevices() {
+            const search = document.getElementById('dm-search').value.toLowerCase();
+            const group = document.getElementById('filter-group').value;
+            const system = document.getElementById('filter-system').value;
+            const devType = document.getElementById('filter-devtype').value;
+            const brand = document.getElementById('filter-brand').value;
+            const accessType = document.getElementById('filter-access-type').value;
+
+            State.filteredDevices = State.devices.filter(d => {
+                if (search && !d.name.toLowerCase().includes(search) && !d.code.toLowerCase().includes(search)) return false;
+                if (group && d.group !== group) return false;
+                if (State.currentDeviceTab !== 'all' && d.group !== State.currentDeviceTab) return false;
+                if (system && d.system !== system) return false;
+                if (devType && d.model !== devType) return false;
+                if (brand && d.brand !== brand) return false;
+                if (accessType && d.accessType !== accessType) return false;
+                return true;
+            });
+
+            State.currentPage = 1;
+            renderDeviceTable();
+        }
+
+        function switchProfessionalTab(tab) {
+            document.querySelectorAll('#module-device-mgmt .professional-tab').forEach(t => {
+                t.classList.remove('active');
+                t.classList.add('text-slate-400');
+            });
+            event.target.closest('.professional-tab').classList.add('active');
+            event.target.closest('.professional-tab').classList.remove('text-slate-400');
+            State.currentDeviceTab = tab;
+            filterDevices();
+        }
+
+        function changePage(dir) {
+            const totalPages = Math.ceil(State.filteredDevices.length / State.pageSize);
+            const np = State.currentPage + dir;
+            if (np >= 1 && np <= totalPages) {
+                State.currentPage = np;
+                renderDeviceTable();
+            }
+        }
+
+        function switchModule(mod) {
+            document.querySelectorAll('[id^="module-"]').forEach(el => el.classList.remove('active'));
+            document.getElementById('module-' + mod).classList.add('active');
+            document.querySelectorAll('[id^="nav-"]').forEach(el => el.classList.remove('active'));
+            document.getElementById('nav-' + mod).classList.add('active');
+            if (mod === 'device-mgmt') renderDeviceTable();
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+            document.getElementById(id).classList.add('flex');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+            document.getElementById(id).classList.remove('flex');
+        }
+
+        function toggleAdvancedFilter() {
+            document.getElementById('advanced-filter').classList.toggle('hidden');
+        }
+
+        function exportDevices() {
+            let csv = "\uFEFF设备名称,设备编码,专业分组,系统,设备类型,产品型号,品牌,接入类型,协议说明,ProductKey,IP地址,子网掩码,网关,空间,状态,通道数\n";
+            State.devices.forEach(d => {
+                const brandName = getBrandName(d.brand);
+                const spaceName = d.spaceId || '';
+                const productModel = d.productModel || '';
+                csv += `${d.name},${d.code},${d.group},${d.system},${d.model || ''},${productModel},${brandName},${d.accessType || ''},${(d.protocol || '').replace(/,/g, ';')},${d.productKey || ''},${d.ip || ''},${d.netmask || ''},${d.gateway || ''},${spaceName},${d.status},${d.points.length}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'devices.csv';
+            a.click();
+            showToast('导出成功', 'success');
+        }
+
+
+        // ==================== 8. 表单处理函数 ====================
+
+        function initFilters() {
+            const sysSel = document.getElementById('filter-system');
+            DICT.systems.forEach(s => {
+                sysSel.add(new Option(s.name, s.code));
+            });
+            
+            const devTypeSel = document.getElementById('filter-devtype');
+            const uniqueDevTypes = [...new Set(DICT.models.map(m => m.code))];
+            uniqueDevTypes.forEach(code => {
+                const model = DICT.models.find(m => m.code === code);
+                if (model) {
+                    devTypeSel.add(new Option(model.name, model.code));
+                }
+            });
+
+            const brandSel = document.getElementById('filter-brand');
+            DICT.brands.forEach(b => {
+                brandSel.add(new Option(b.name, b.code));
+            });
+        }
+
+        function refreshProductKey() {
+            document.getElementById('form-product-key').value = generateProductKey("PK");
+        }
+
+        function hideAllParamFields() {
+            document.getElementById('ip-network-fields').classList.add('hidden');
+            document.getElementById('rs485-params-field').classList.add('hidden');
+            document.getElementById('modbus-params-field').classList.add('hidden');
+            document.getElementById('mbus-params-field').classList.add('hidden');
+            document.getElementById('wireless-params-field').classList.add('hidden');
+            document.getElementById('analog-params-field').classList.add('hidden');
+            document.getElementById('digital-params-field').classList.add('hidden');
+            document.getElementById('channel-count-field').classList.add('hidden');
+        }
+
+        function showFieldsByAccessType(accessType) {
+            hideAllParamFields();
+            if (!accessType) return;
+
+            if (accessType.includes("IP") || accessType.includes("以太网")) {
+                document.getElementById('ip-network-fields').classList.remove('hidden');
+            }
+            if (accessType.includes("RS485")) {
+                document.getElementById('rs485-params-field').classList.remove('hidden');
+            }
+            if (accessType.includes("Modbus")) {
+                document.getElementById('modbus-params-field').classList.remove('hidden');
+            }
+            if (accessType.includes("M-Bus")) {
+                document.getElementById('mbus-params-field').classList.remove('hidden');
+            }
+            if (accessType.includes("无线") || accessType.includes("LoRa") || accessType.includes("NB-IoT")) {
+                document.getElementById('wireless-params-field').classList.remove('hidden');
+            }
+            if (accessType.includes("模拟量")) {
+                document.getElementById('analog-params-field').classList.remove('hidden');
+            }
+            if (accessType.includes("开关量")) {
+                document.getElementById('digital-params-field').classList.remove('hidden');
+            }
+        }
+
+        function updateChannelCountConfig() {
+            const modelObj = State.currentModelObj;
+            if (!modelObj || !modelObj.multiChannel) {
+                document.getElementById('channel-count-field').classList.add('hidden');
+                return;
+            }
+
+            document.getElementById('channel-count-field').classList.remove('hidden');
+            const container = document.getElementById('channel-config-container');
+            const devType = modelObj.devType;
+            const pointTypes = DICT.devicePointMapping[devType] || ["DT"];
+
+            let html = '';
+            pointTypes.forEach(ptCode => {
+                const ptName = DICT.pointTypes.find(p => p.code === ptCode)?.name || ptCode;
+                const defaultCount = modelObj.defaultChannels || 1;
+                html += `
+                    <div class="flex items-center gap-4">
+                        <span class="text-sm text-slate-300 w-24">${ptName} (${ptCode})</span>
+                        <input type="number" id="channel-count-${ptCode}" class="form-input w-24" value="${defaultCount}" min="0" max="999" onchange="updateChannelPreview()">
+                        <span class="text-xs text-slate-400">个通道</span>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            updateChannelPreview();
+        }
+
+        function updateChannelPreview() {
+            const modelObj = State.currentModelObj;
+            if (!modelObj) return;
+
+            const devType = modelObj.devType;
+            const pointTypes = DICT.devicePointMapping[devType] || ["DT"];
+            let html = '<div class="space-y-1">';
+
+            pointTypes.forEach(ptCode => {
+                const ptName = DICT.pointTypes.find(p => p.code === ptCode)?.name || ptCode;
+                const countInput = document.getElementById(`channel-count-${ptCode}`);
+                const count = countInput ? parseInt(countInput.value) || 0 : 0;
+                if (count > 0) {
+                    html += `<div class="flex items-center gap-2"><span class="text-blue-400">${ptName} (${ptCode})</span> <span class="text-slate-400">× ${count}</span></div>`;
+                }
+            });
+
+            html += '</div>';
+            document.getElementById('point-types-preview').innerHTML = html;
+        }
+
+        function updatePreview() {
+            const area = document.getElementById('form-area').value;
+            const sub = document.getElementById('form-subarea').value;
+            const sys = document.getElementById('form-system').value;
+            const devType = document.getElementById('form-devtype').value;
+            const brand = document.getElementById('form-brand').value;
+            const sn = document.getElementById('form-sn').value;
+
+            const preview = generateDeviceCode(area, sub, sys, devType, brand, sn);
+            document.getElementById('preview-code').innerText = preview || '请完善选择';
+        }
+
+        // ==================== 9. 单设备添加/编辑 ====================
+
+        function openDeviceWizard() {
+            State.currentEditDevice = null;
+            State.currentModelObj = null;
+            document.getElementById('device-form-title').innerText = '添加新设备';
+            document.getElementById('device-form').reset();
+
+            document.querySelectorAll('.form-input').forEach(input => input.classList.remove('error'));
+            document.querySelectorAll('.error-message').forEach(msg => msg.classList.remove('show'));
+
+            document.getElementById('form-product-key').value = generateProductKey("PK");
+            hideAllParamFields();
+            
+            document.getElementById('point-types-preview').innerHTML = '<div class="text-slate-400">请先选择设备类型</div>';
+
+            const groupSel = document.getElementById('form-group');
+            groupSel.innerHTML = '<option value="">请选择</option>' + 
+                DICT.profGroups.map(g => `<option value="${g.code}">${g.name}</option>`).join('');
+
+            const brandSel = document.getElementById('form-brand');
+            brandSel.innerHTML = '<option value="">请选择品牌</option>' + 
+                DICT.brands.map(b => `<option value="${b.code}">${b.name}</option>`).join('');
+
+            renderSpaceTree('space-tree-container', null);
+            openModal('modal-device-form');
+        }
+
+        function onGroupChange() {
+            const group = document.getElementById('form-group').value;
+            const sysSel = document.getElementById('form-system');
+            sysSel.disabled = !group;
+            sysSel.innerHTML = '<option value="">请选择</option>';
+            if (group) {
+                DICT.systems.filter(s => s.group === group).forEach(s => sysSel.add(new Option(s.name, s.code)));
+            }
+            updatePreview();
+        }
+
+        function onSystemChange() {
+            const sys = document.getElementById('form-system').value;
+            const modelSel = document.getElementById('form-model');
+            modelSel.disabled = !sys;
+            modelSel.innerHTML = '<option value="">请选择</option>';
+            if (sys) {
+                DICT.models.filter(m => m.system === sys).forEach(m => 
+                    modelSel.add(new Option(m.name + ' - ' + (m.protocol || '').substring(0, 20), m.code))
+                );
+            }
+            updateDeviceType();
+        }
+
+        function onModelChange() {
+            updateDeviceType();
+        }
+
+        function updateDeviceType() {
+            const model = document.getElementById('form-model').value;
+            const modelObj = DICT.models.find(m => m.code === model);
+            State.currentModelObj = modelObj;
+
+            if (modelObj) {
+                document.getElementById('form-devtype').value = modelObj.devType || '';
+
+                const accessTypeSelect = document.getElementById('form-access-type');
+                accessTypeSelect.innerHTML = '<option value="">请选择</option>';
+
+                const accessTypes = parseAccessTypes(modelObj.accessType);
+                accessTypes.forEach(type => {
+                    accessTypeSelect.add(new Option(type, type));
+                });
+
+                if (accessTypes.length > 0) {
+                    accessTypeSelect.value = accessTypes[0];
+                    document.getElementById('access-type-hint').innerText = 
+                        accessTypes.length > 1 ? '(检测到多种通信方式，请手动选择)' : '(根据型号自动设置)';
+                }
+
+                onAccessTypeChange();
+
+                loadProtocolSelect(model, 'form-protocol-select', 'form-protocol-desc');
+
+                if (modelObj.multiChannel) {
+                    updateChannelCountConfig();
+                } else {
+                    document.getElementById('channel-count-field').classList.add('hidden');
+                    const devType = modelObj.devType;
+                    const pointTypes = DICT.devicePointMapping[devType] || ["DT"];
+                    let html = '<div class="space-y-1">';
+                    pointTypes.forEach(ptCode => {
+                        const ptName = DICT.pointTypes.find(p => p.code === ptCode)?.name || ptCode;
+                        html += `<div class="flex items-center gap-2"><span class="text-blue-400">${ptName} (${ptCode})</span> <span class="text-slate-400">× 1</span></div>`;
+                    });
+                    html += '</div>';
+                    document.getElementById('point-types-preview').innerHTML = html;
+                }
+            }
+
+            updatePreview();
+        }
+
+        function loadProtocolSelect(modelCode, selectId, descId) {
+            const select = document.getElementById(selectId);
+            const descDiv = document.getElementById(descId);
+
+            select.innerHTML = '<option value="">请选择协议</option>';
+            descDiv.classList.add('hidden');
+
+            const protocolInfo = PROTOCOL_DICT[modelCode];
+            if (protocolInfo && protocolInfo.protocols) {
+                protocolInfo.protocols.forEach(protocol => {
+                    select.add(new Option(protocol, protocol));
+                });
+
+                if (protocolInfo.protocols.length > 0) {
+                    select.value = protocolInfo.protocols[0];
+                    if (protocolInfo.description) {
+                        descDiv.innerText = protocolInfo.description;
+                        descDiv.classList.remove('hidden');
+                    }
+                }
+            }
+        }
+
+        function onProtocolChange() {
+            const model = document.getElementById('form-model').value;
+            const selectedProtocol = document.getElementById('form-protocol-select').value;
+            const descDiv = document.getElementById('form-protocol-desc');
+
+            const protocolInfo = PROTOCOL_DICT[model];
+            if (protocolInfo && protocolInfo.description) {
+                descDiv.innerText = protocolInfo.description;
+                descDiv.classList.remove('hidden');
+            }
+        }
+
+        function onBatchProtocolChange() {
+            const model = document.getElementById('batch-model').value;
+            const selectedProtocol = document.getElementById('batch-protocol-select').value;
+            const descDiv = document.getElementById('batch-protocol-desc');
+
+            const protocolInfo = PROTOCOL_DICT[model];
+            if (protocolInfo && protocolInfo.description) {
+                descDiv.innerText = protocolInfo.description;
+                descDiv.classList.remove('hidden');
+            }
+        }
+
+        function parseAccessTypes(accessTypeStr) {
+            if (!accessTypeStr) return [];
+            return accessTypeStr.split(/[\/，,]/).map(s => s.trim()).filter(s => s);
+        }
+
+        function onAccessTypeChange() {
+            const accessType = document.getElementById('form-access-type').value;
+
+            // 隐藏所有参数字段
+            hideAllParamFields();
+
+            // 根据接入类型显示相应字段
+            if (accessType && (accessType.includes("IP") || accessType.includes("以太网"))) {
+                document.getElementById('ip-network-fields').classList.remove('hidden');
+            }
+            if (accessType && accessType.includes("RS485")) {
+                document.getElementById('rs485-params-field').classList.remove('hidden');
+            }
+            if (accessType && accessType.includes("Modbus")) {
+                document.getElementById('modbus-params-field').classList.remove('hidden');
+            }
+            if (accessType && accessType.includes("M-Bus")) {
+                document.getElementById('mbus-params-field').classList.remove('hidden');
+            }
+            if (accessType && (accessType.includes("无线") || accessType.includes("LoRa") || accessType.includes("NB-IoT"))) {
+                document.getElementById('wireless-params-field').classList.remove('hidden');
+            }
+            if (accessType && accessType.includes("模拟量")) {
+                document.getElementById('analog-params-field').classList.remove('hidden');
+            }
+            if (accessType && accessType.includes("开关量")) {
+                document.getElementById('digital-params-field').classList.remove('hidden');
+            }
+        }
+
+        function onBatchAccessTypeChange() {
+            const accessType = document.getElementById('batch-access-type').value;
+
+            document.getElementById('batch-ip-network-field').classList.add('hidden');
+            document.getElementById('batch-modbus-field').classList.add('hidden');
+            document.getElementById('batch-mbus-field').classList.add('hidden');
+            document.getElementById('batch-wireless-field').classList.add('hidden');
+
+            if (accessType && (accessType.includes("IP") || accessType.includes("以太网"))) {
+                document.getElementById('batch-ip-network-field').classList.remove('hidden');
+            }
+            if (accessType && (accessType.includes("RS485") || accessType.includes("Modbus"))) {
+                document.getElementById('batch-modbus-field').classList.remove('hidden');
+            }
+            if (accessType && accessType.includes("M-Bus")) {
+                document.getElementById('batch-mbus-field').classList.remove('hidden');
+            }
+            if (accessType && (accessType.includes("无线") || accessType.includes("LoRa") || accessType.includes("NB-IoT"))) {
+                document.getElementById('batch-wireless-field').classList.remove('hidden');
+            }
+        }
+
+        function saveSingleDevice() {
+            if (!validateForm('device-form')) return;
+
+            const formGroup = document.getElementById('form-group').value;
+            const formSys = document.getElementById('form-system').value;
+            const formModel = document.getElementById('form-model').value;
+            const formBrand = document.getElementById('form-brand').value;
+            const formProductModel = document.getElementById('form-product-model').value;
+            const formDevType = document.getElementById('form-devtype').value;
+            const formAccessType = document.getElementById('form-access-type').value;
+
+            const formArea = document.getElementById('form-area').value;
+            const formSub = document.getElementById('form-subarea').value;
+            const formName = document.getElementById('form-name').value;
+            const formSn = document.getElementById('form-sn').value.padStart(3, '0');
+            const formProductKey = document.getElementById('form-product-key').value;
+            const formIp = document.getElementById('form-ip')?.value || null;
+            const formNetmask = document.getElementById('form-netmask')?.value || null;
+            const formGateway = document.getElementById('form-gateway')?.value || null;
+
+            const formSpaceId = formSub ? `${formArea}-${formSub}` : formArea;
+            const formCode = generateDeviceCode(formArea, formSub, formSys, formDevType, formBrand, formSn);
+
+            const modelObj = DICT.models.find(m => m.code === formModel);
+            let channelCounts = {};
+            if (modelObj && modelObj.multiChannel) {
+                const pointTypes = DICT.devicePointMapping[formDevType] || ["DT"];
+                pointTypes.forEach(ptCode => {
+                    const input = document.getElementById(`channel-count-${ptCode}`);
+                    if (input) {
+                        const count = parseInt(input.value) || 0;
+                        if (count > 0) channelCounts[ptCode] = count;
+                    }
+                });
+            }
+
+            if (State.currentEditDevice && State.originalDeviceData) {
+                const original = State.originalDeviceData;
+                const changes = [];
+
+                if (original.name !== formName) changes.push(`名称: "${original.name}" → "${formName}"`);
+                if (original.code !== formCode) changes.push(`编码: "${original.code}" → "${formCode}"`);
+                if (original.group !== formGroup) changes.push(`分组: "${original.group}" → "${formGroup}"`);
+                if (original.system !== formSys) changes.push(`系统: "${original.system}" → "${formSys}"`);
+                if (original.model !== formModel) changes.push(`设备类型: "${original.model}" → "${formModel}"`);
+                if (original.brand !== formBrand) changes.push(`品牌: "${getBrandName(original.brand)}" → "${getBrandName(formBrand)}"`);
+                if (original.productModel !== formProductModel) changes.push(`产品型号: "${original.productModel || '-'}" → "${formProductModel || '-'}"`);
+                if (original.accessType !== formAccessType) changes.push(`接入类型: "${original.accessType}" → "${formAccessType}"`);
+                if (original.ip !== formIp) changes.push(`IP: "${original.ip || '-'}" → "${formIp || '-'}"`);
+                if (original.netmask !== formNetmask) changes.push(`子网掩码: "${original.netmask || '-'}" → "${formNetmask || '-'}"`);
+                if (original.gateway !== formGateway) changes.push(`网关: "${original.gateway || '-'}" → "${formGateway || '-'}"`);
+                if (original.spaceCode !== formArea || original.subSpaceCode !== formSub) {
+                    const oldSpace = getSpaceDisplay(original);
+                    const newSpace = getSpaceDisplay({ spaceCode: formArea, subSpaceCode: formSub, spaceId: formSpaceId });
+                    changes.push(`空间位置: "${oldSpace}" → "${newSpace}"`);
+                }
+
+                if (changes.length > 0) {
+                    const changesText = changes.slice(0, 5).join('<br>');
+                    const moreText = changes.length > 5 ? `<br>...还有${changes.length - 5}项修改` : '';
+
+                    showConfirm(
+                        '确认修改设备',
+                        `<div class="text-left"><p class="mb-2">您已对以下设置进行修改：</p><div class="bg-slate-800/50 p-3 rounded text-sm text-slate-300 space-y-1">${changesText}${moreText}</div><p class="mt-3 text-slate-400">确认保存这些更改吗？</p></div>`,
+                        () => {
+                            performDeviceSave(formGroup, formSys, formModel, formBrand, formProductModel, formDevType, formAccessType, formArea, formSub, formName, formSn, formProductKey, formIp, formNetmask, formGateway, formSpaceId, formCode, modelObj, channelCounts);
+                        },
+                        () => {
+                            showToast('已取消保存', 'info');
+                        }
+                    );
+                    return;
+                }
+            }
+
+            performDeviceSave(formGroup, formSys, formModel, formBrand, formProductModel, formDevType, formAccessType, formArea, formSub, formName, formSn, formProductKey, formIp, formNetmask, formGateway, formSpaceId, formCode, modelObj, channelCounts);
+        }
+
+        function performDeviceSave(group, sys, model, brand, productModel, devType, accessType, area, sub, name, sn, productKey, ip, netmask, gateway, spaceId, code, modelObj, channelCounts) {
+            const selectedProtocol = document.getElementById('form-protocol-select').value;
+
+            const deviceConfig = {
+                id: State.currentEditDevice ? State.currentEditDevice.id : generateId(),
+                name: name, 
+                code: code, 
+                group: group, 
+                system: sys, 
+                model: model, 
+                brand: brand,
+                productModel: productModel,
+                devType: devType, 
+                accessType: accessType, 
+                protocol: modelObj ? modelObj.protocol : '', 
+                spaceId: spaceId, 
+                spaceCode: area, 
+                subSpaceCode: sub,
+                status: State.currentEditDevice ? State.currentEditDevice.status : 'online',
+                productKey: productKey, 
+                ip: ip, 
+                netmask: netmask, 
+                gateway: gateway,
+                selectedProtocol: selectedProtocol,
+                multiChannel: modelObj ? modelObj.multiChannel : false,
+                channelCounts: channelCounts
+            };
+
+            const newDev = createDevice(deviceConfig);
+
+            if (State.currentEditDevice) {
+                const oldIndex = State.devices.findIndex(d => d.id === State.currentEditDevice.id);
+                if (oldIndex !== -1) {
+                    State.devices[oldIndex] = newDev;
+                }
+                showToast('设备更新成功', 'success');
+            } else {
+                State.devices.push(newDev);
+                showToast('设备添加成功', 'success');
+            }
+
+            State.filteredDevices = [...State.devices];
+            updateStats();
+            renderDeviceTable();
+            closeModal('modal-device-form');
+            State.currentEditDevice = null;
+            State.currentModelObj = null;
+            State.originalDeviceData = null;
+        }
+
+        function editDevice(devId) {
+            const dev = State.devices.find(d => d.id === devId);
+            if (!dev) return;
+
+            State.originalDeviceData = JSON.parse(JSON.stringify(dev));
+            State.currentEditDevice = dev;
+            document.getElementById('device-form-title').innerText = '编辑设备';
+
+            const groupSel = document.getElementById('form-group');
+            groupSel.innerHTML = '<option value="">请选择</option>' + 
+                DICT.profGroups.map(g => `<option value="${g.code}">${g.name}</option>`).join('');
+            groupSel.value = dev.group;
+
+            const brandSel = document.getElementById('form-brand');
+            brandSel.innerHTML = '<option value="">请选择品牌</option>' + 
+                DICT.brands.map(b => `<option value="${b.code}">${b.name}</option>`).join('');
+            brandSel.value = dev.brand || '';
+
+            onGroupChange();
+
+            setTimeout(() => {
+                document.getElementById('form-system').value = dev.system;
+                onSystemChange();
+                setTimeout(() => {
+                    const modelObj = DICT.models.find(m => m.code === dev.model);
+                    State.currentModelObj = modelObj;
+
+                    document.getElementById('form-model').value = dev.model || '';
+                    document.getElementById('form-product-model').value = dev.productModel || '';
+                    document.getElementById('form-devtype').value = dev.devType || '';
+                    
+                    document.getElementById('form-name').value = dev.name;
+                    document.getElementById('form-sn').value = dev.code.split('-').pop() || '001';
+                    document.getElementById('form-product-key').value = dev.productKey || generateProductKey();
+
+                    const accessTypeSelect = document.getElementById('form-access-type');
+                    accessTypeSelect.innerHTML = '<option value="">请选择</option>';
+
+                    if (modelObj) {
+                        const accessTypes = parseAccessTypes(modelObj.accessType);
+                        accessTypes.forEach(type => {
+                            accessTypeSelect.add(new Option(type, type));
+                        });
+
+                        if (dev.accessType) {
+                            accessTypeSelect.value = dev.accessType;
+                        } else if (accessTypes.length > 0) {
+                            accessTypeSelect.value = accessTypes[0];
+                        }
+
+                        document.getElementById('access-type-hint').innerText = 
+                            accessTypes.length > 1 ? '(检测到多种通信方式，可手动调整)' : '(根据型号自动设置)';
+                    }
+
+                    if (dev.ip) document.getElementById('form-ip').value = dev.ip;
+                    if (dev.netmask) document.getElementById('form-netmask').value = dev.netmask;
+                    if (dev.gateway) document.getElementById('form-gateway').value = dev.gateway;
+
+                    document.getElementById('form-area').value = dev.spaceCode || '';
+                    document.getElementById('form-subarea').value = dev.subSpaceCode || '';
+
+                    showFieldsByAccessType(dev.accessType);
+
+                    if (modelObj && modelObj.multiChannel) {
+                        updateChannelCountConfig();
+                        if (dev.channelCounts) {
+                            for (const [ptCode, count] of Object.entries(dev.channelCounts)) {
+                                const input = document.getElementById(`channel-count-${ptCode}`);
+                                if (input) input.value = count;
+                            }
+                        }
+                        updateChannelPreview();
+                    }
+
+                    renderSpaceTree('space-tree-container', dev.spaceId);
+                    updatePreview();
+                }, 100);
+            }, 100);
+
+            openModal('modal-device-form');
+        }
+
+        function deleteDevice(devId) {
+            showConfirm('确认删除', '确定要删除该设备吗？此操作不可恢复。', () => {
+                State.devices = State.devices.filter(d => d.id !== devId);
+                State.filteredDevices = State.filteredDevices.filter(d => d.id !== devId);
+                State.selectedDevices = State.selectedDevices.filter(id => id !== devId);
+                updateStats();
+                renderDeviceTable();
+                showToast('设备已删除', 'success');
+            });
+        }
+
+
+        // ==================== 10. 批量添加功能 ====================
+
+        function onBatchGroupChange() {
+            const group = document.getElementById('batch-group').value;
+            const sysSel = document.getElementById('batch-system');
+            sysSel.disabled = !group;
+            sysSel.innerHTML = '<option value="">请选择</option>';
+            if (group) {
+                DICT.systems.filter(s => s.group === group).forEach(s => sysSel.add(new Option(s.name, s.code)));
+            }
+        }
+
+        function onBatchSystemChange() {
+            const sys = document.getElementById('batch-system').value;
+            const modelSel = document.getElementById('batch-model');
+            modelSel.disabled = !sys;
+            modelSel.innerHTML = '<option value="">请选择</option>';
+            if (sys) {
+                DICT.models.filter(m => m.system === sys).forEach(m => 
+                    modelSel.add(new Option(m.name, m.code))
+                );
+            }
+            updateBatchDeviceType();
+        }
+
+        function onBatchModelChange() {
+            updateBatchDeviceType();
+        }
+
+        function updateBatchDeviceType() {
+            const model = document.getElementById('batch-model').value;
+            const modelObj = DICT.models.find(m => m.code === model);
+
+            if (modelObj) {
+                document.getElementById('batch-devtype').value = modelObj.devType || '';
+
+                const accessTypeSelect = document.getElementById('batch-access-type');
+                accessTypeSelect.innerHTML = '<option value="">请选择</option>';
+
+                const accessTypes = parseAccessTypes(modelObj.accessType);
+                accessTypes.forEach(type => {
+                    accessTypeSelect.add(new Option(type, type));
+                });
+
+                if (accessTypes.length > 0) {
+                    accessTypeSelect.value = accessTypes[0];
+                }
+
+                onBatchAccessTypeChange();
+
+                loadProtocolSelect(model, 'batch-protocol-select', 'batch-protocol-desc');
+
+                document.getElementById('batch-channel-count-field').classList.add('hidden');
+
+                if (modelObj.multiChannel) {
+                    document.getElementById('batch-channel-count-field').classList.remove('hidden');
+                    const container = document.getElementById('batch-channel-config-container');
+                    const devType = modelObj.devType;
+                    const pointTypes = DICT.devicePointMapping[devType] || ["DT"];
+
+                    let html = '';
+                    pointTypes.forEach(ptCode => {
+                        const ptName = DICT.pointTypes.find(p => p.code === ptCode)?.name || ptCode;
+                        const defaultCount = modelObj.defaultChannels || 1;
+                        html += `
+                            <div class="flex items-center gap-4">
+                                <span class="text-sm text-slate-300 w-24">${ptName} (${ptCode})</span>
+                                <input type="number" id="batch-channel-count-${ptCode}" class="form-input w-24" value="${defaultCount}" min="0" max="999">
+                                <span class="text-xs text-slate-400">个通道/设备</span>
+                            </div>
+                        `;
+                    });
+                    container.innerHTML = html;
+                }
+
+                const devType = modelObj.devType;
+                const pointTypes = DICT.devicePointMapping[devType] || ["DT"];
+                let html = '<div class="space-y-1">';
+                pointTypes.forEach(ptCode => {
+                    const ptName = DICT.pointTypes.find(p => p.code === ptCode)?.name || ptCode;
+                    const count = modelObj.multiChannel ? (modelObj.defaultChannels || 1) : 1;
+                    html += `<div class="flex items-center gap-2"><span class="text-blue-400">${ptName} (${ptCode})</span> <span class="text-slate-400">× ${count}</span></div>`;
+                });
+                html += '</div>';
+                document.getElementById('batch-points-preview').innerHTML = html;
+            }
+        }
+
+        function openBatchAddWizard() {
+            const groupSel = document.getElementById('batch-group');
+            groupSel.innerHTML = '<option value="">请选择</option>' + 
+                DICT.profGroups.map(g => `<option value="${g.code}">${g.name}</option>`).join('');
+
+            const brandSel = document.getElementById('batch-brand');
+            brandSel.innerHTML = '<option value="">请选择品牌</option>' + 
+                DICT.brands.map(b => `<option value="${b.code}">${b.name}</option>`).join('');
+
+            renderSpaceTree('batch-space-tree-container', null);
+            openModal('modal-batch-add');
+        }
+
+        function saveBatchDevices() {
+            const group = document.getElementById('batch-group').value;
+            const sys = document.getElementById('batch-system').value;
+            const model = document.getElementById('batch-model').value;
+            const brand = document.getElementById('batch-brand').value;
+            const productModel = document.getElementById('batch-product-model').value;
+            const devType = document.getElementById('batch-devtype').value;
+            const accessType = document.getElementById('batch-access-type').value;
+            const selectedProtocol = document.getElementById('batch-protocol-select').value;
+            
+            const area = document.getElementById('batch-area').value;
+            const sub = document.getElementById('batch-subarea').value;
+            const prefix = document.getElementById('batch-name-prefix').value;
+            const start = parseInt(document.getElementById('batch-start').value);
+            const end = parseInt(document.getElementById('batch-end').value);
+            const productKeyPrefix = document.getElementById('batch-product-key-prefix').value;
+
+            const modelObj = DICT.models.find(m => m.code === model);
+            const multiChannel = modelObj ? modelObj.multiChannel : false;
+
+            if (!group || !sys || !model || !brand || !area) {
+                showToast('请填写必填项', 'error');
+                return;
+            }
+            if (start > end) {
+                showToast('起始序号不能大于结束', 'error');
+                return;
+            }
+            if (end - start > 100) {
+                showToast('单次最多批量添加100个设备', 'error');
+                return;
+            }
+
+            const spaceId = sub ? `${area}-${sub}` : area;
+
+            let ipStart = document.getElementById('batch-ip-start')?.value || '192.168.1.100';
+            const netmask = document.getElementById('batch-netmask')?.value || '255.255.255.0';
+            const gateway = document.getElementById('batch-gateway')?.value || '192.168.1.1';
+
+            if (!isValidIP(ipStart)) {
+                showToast('请输入有效的起始IP地址', 'error');
+                return;
+            }
+
+            let modbusStart = parseInt(document.getElementById('batch-modbus-start')?.value || '1');
+            let mbusStart = parseInt(document.getElementById('batch-mbus-start')?.value || '1');
+
+            let channelCounts = {};
+            if (multiChannel) {
+                const pointTypes = DICT.devicePointMapping[devType] || ["DT"];
+                pointTypes.forEach(ptCode => {
+                    const input = document.getElementById(`batch-channel-count-${ptCode}`);
+                    if (input) {
+                        const count = parseInt(input.value) || 0;
+                        if (count > 0) channelCounts[ptCode] = count;
+                    }
+                });
+            }
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (let s = start; s <= end; s++) {
+                try {
+                    const sn = s.toString().padStart(3, '0');
+                    const code = generateDeviceCode(area, sub, sys, devType, brand, sn);
+
+                    if (State.devices.some(d => d.code === code)) {
+                        errorCount++;
+                        continue;
+                    }
+
+                    let ip = null;
+                    if (accessType && (accessType.includes("IP") || accessType.includes("以太网"))) {
+                        ip = incrementIP(ipStart, s - start);
+                    }
+
+                    const deviceConfig = {
+                        name: `${prefix}${s}`,
+                        code,
+                        group,
+                        system: sys,
+                        model,
+                        brand,
+                        productModel,
+                        devType,
+                        accessType,
+                        protocol,
+                        spaceId,
+                        spaceCode: area,
+                        subSpaceCode: sub,
+                        status: 'online',
+                        productKey: generateProductKey(productKeyPrefix),
+                        ip,
+                        netmask,
+                        gateway,
+                        selectedProtocol,
+                        multiChannel,
+                        channelCounts
+                    };
+
+                    const newDev = createDevice(deviceConfig);
+
+                    if (accessType && (accessType.includes("RS485") || accessType.includes("Modbus"))) {
+                        newDev.points.forEach((p, idx) => {
+                            p.modbusAddr = modbusStart + idx;
+                            p.register = 40000 + idx + 1;
+                        });
+                    } else if (accessType && accessType.includes("M-Bus")) {
+                        newDev.points.forEach((p, idx) => {
+                            p.mbusAddr = mbusStart + idx;
+                            p.meterType = "水表";
+                        });
+                    }
+
+                    State.devices.push(newDev);
+                    successCount++;
+                } catch (error) {
+                    errorCount++;
+                    console.error('批量添加设备失败:', error);
+                }
+            }
+
+            State.filteredDevices = [...State.devices];
+            updateStats();
+            renderDeviceTable();
+            closeModal('modal-batch-add');
+
+            if (errorCount > 0) {
+                showToast(`批量添加完成: ${successCount}个成功, ${errorCount}个失败`, 'warning');
+            } else {
+                showToast(`成功批量添加${successCount}个设备`, 'success');
+            }
+        }
+
+        // ==================== 11. 通道编辑功能 ====================
+
+        function editPoint(devId, pointId) {
+            const dev = State.devices.find(d => d.id === devId);
+            if (!dev) return;
+
+            const point = dev.points.find(p => p.id === pointId);
+            if (!point) return;
+
+            State.originalPointData = JSON.parse(JSON.stringify(point));
+            State.currentEditPoint = point;
+            State.currentEditDevice = dev;
+
+            document.getElementById('point-edit-device-id').value = devId;
+            document.getElementById('point-edit-point-id').value = pointId;
+            document.getElementById('point-edit-access-type').value = point.accessType;
+            document.getElementById('point-edit-dev-type').value = dev.devType;
+            document.getElementById('point-edit-name').value = point.name;
+            document.getElementById('point-edit-number').value = point.number;
+
+            const snField = document.getElementById('point-edit-sn-field');
+            if (dev.devType === "NVR" && point.pointType === "VT") {
+                snField.classList.remove('hidden');
+                document.getElementById('point-edit-sn').value = point.sn || '';
+            } else {
+                snField.classList.add('hidden');
+            }
+
+            const macField = document.getElementById('point-edit-mac-field');
+            macField.classList.remove('hidden');
+            document.getElementById('point-edit-mac').value = point.mac || '';
+
+            document.querySelectorAll('#point-edit-form > div[id$="-fields"]').forEach(el => el.classList.add('hidden'));
+
+            const isVideoDevice = dev.devType === "CAM" || dev.devType === "NVR";
+
+            if (dev.accessType && (dev.accessType.includes("IP") || dev.accessType.includes("以太网"))) {
+                document.getElementById('point-edit-ip-fields').classList.remove('hidden');
+
+                // 加载IP地址、子网掩码、网关
+                document.getElementById('point-edit-ip').value = point.ip || dev.ip || '';
+                document.getElementById('point-edit-netmask').value = point.netmask || dev.netmask || '255.255.255.0';
+                document.getElementById('point-edit-gateway').value = point.gateway || dev.gateway || '192.168.1.1';
+                document.getElementById('point-edit-port').value = point.port || '80';
+
+                // 根据设备类型设置IP字段的可编辑性
+                if (isVideoDevice && point.pointType === "VT") {
+                    // 视频通道IP可独立编辑
+                    document.getElementById('point-edit-ip').readOnly = false;
+                    document.getElementById('point-edit-netmask').readOnly = false;
+                    document.getElementById('point-edit-gateway').readOnly = false;
+                    document.getElementById('point-ip-label').innerText = '摄像机IP地址';
+                    document.getElementById('point-ip-hint').innerText = '请输入前端IPC设备的IP地址';
+                } else {
+                    // 非视频通道或非视频设备，IP继承自主设备
+                    document.getElementById('point-edit-ip').readOnly = true;
+                    document.getElementById('point-edit-netmask').readOnly = true;
+                    document.getElementById('point-edit-gateway').readOnly = true;
+                    document.getElementById('point-ip-label').innerText = 'IP地址 (继承设备)';
+                    document.getElementById('point-ip-hint').innerText = '继承自主设备，不可修改';
+                }
+            } else if (dev.accessType && (dev.accessType.includes("RS485") || dev.accessType.includes("Modbus"))) {
+                document.getElementById('point-edit-serial-fields').classList.remove('hidden');
+                document.getElementById('point-edit-modbus-addr').value = point.modbusAddr || '1';
+                document.getElementById('point-edit-register').value = point.register || '40001';
+            } else if (dev.accessType && dev.accessType.includes("M-Bus")) {
+                document.getElementById('point-edit-mbus-fields').classList.remove('hidden');
+                document.getElementById('point-edit-mbus-addr').value = point.mbusAddr || '1';
+                document.getElementById('point-edit-meter-type').value = point.meterType || '水表';
+            } else if (dev.accessType && dev.accessType.includes("模拟量")) {
+                document.getElementById('point-edit-analog-fields').classList.remove('hidden');
+                document.getElementById('point-edit-range').value = point.range || '4-20mA';
+                document.getElementById('point-edit-unit').value = point.unit || '°C';
+            }
+
+            renderSpaceTree('point-space-tree', point.spaceId);
+            openModal('modal-point-edit');
+        }
+
+        function savePointEdit() {
+            if (!State.currentEditPoint) return;
+
+            const newName = document.getElementById('point-edit-name').value;
+            const accessType = document.getElementById('point-edit-access-type').value;
+            const dev = State.currentEditDevice;
+
+            if (State.originalPointData) {
+                const original = State.originalPointData;
+                const changes = [];
+
+                if (original.name !== newName) changes.push(`名称: "${original.name}" → "${newName}"`);
+
+                const newSpaceCode = State.currentEditPoint.spaceCode;
+                const newSubSpaceCode = State.currentEditPoint.subSpaceCode;
+                if (original.spaceCode !== newSpaceCode || original.subSpaceCode !== newSubSpaceCode) {
+                    const oldSpace = getSpaceDisplay(original);
+                    const newSpace = getSpaceDisplay(State.currentEditPoint);
+                    changes.push(`空间位置: "${oldSpace}" → "${newSpace}"`);
+                }
+
+                if (accessType && (accessType.includes("IP") || accessType.includes("以太网"))) {
+                    const newIp = document.getElementById('point-edit-ip').value;
+                    const newNetmask = document.getElementById('point-edit-netmask').value;
+                    const newGateway = document.getElementById('point-edit-gateway').value;
+                    
+                    if (original.ip !== newIp) {
+                        changes.push(`IP地址: "${original.ip || '-'}" → "${newIp || '-'}"`);
+                    }
+                    if (original.netmask !== newNetmask) {
+                        changes.push(`子网掩码: "${original.netmask || '-'}" → "${newNetmask || '-'}"`);
+                    }
+                    if (original.gateway !== newGateway) {
+                        changes.push(`网关: "${original.gateway || '-'}" → "${newGateway || '-'}"`);
+                    }
+                }
+
+                const newMac = document.getElementById('point-edit-mac').value;
+                if (original.mac !== newMac) {
+                    changes.push(`MAC地址: "${original.mac || '-'}" → "${newMac || '-'}"`);
+                }
+
+                if (accessType && (accessType.includes("RS485") || accessType.includes("Modbus"))) {
+                    const newModbusAddr = document.getElementById('point-edit-modbus-addr').value;
+                    const newRegister = document.getElementById('point-edit-register').value;
+                    if (String(original.modbusAddr) !== String(newModbusAddr)) {
+                        changes.push(`Modbus地址: "${original.modbusAddr}" → "${newModbusAddr}"`);
+                    }
+                    if (String(original.register) !== String(newRegister)) {
+                        changes.push(`寄存器: "${original.register}" → "${newRegister}"`);
+                    }
+                }
+
+                if (accessType && accessType.includes("M-Bus")) {
+                    const newMbusAddr = document.getElementById('point-edit-mbus-addr').value;
+                    const newMeterType = document.getElementById('point-edit-meter-type').value;
+                    if (String(original.mbusAddr) !== String(newMbusAddr)) {
+                        changes.push(`M-Bus地址: "${original.mbusAddr}" → "${newMbusAddr}"`);
+                    }
+                    if (original.meterType !== newMeterType) {
+                        changes.push(`仪表类型: "${original.meterType}" → "${newMeterType}"`);
+                    }
+                }
+
+                if (accessType && accessType.includes("模拟量")) {
+                    const newRange = document.getElementById('point-edit-range').value;
+                    const newUnit = document.getElementById('point-edit-unit').value;
+                    if (original.range !== newRange) {
+                        changes.push(`量程: "${original.range}" → "${newRange}"`);
+                    }
+                    if (original.unit !== newUnit) {
+                        changes.push(`单位: "${original.unit}" → "${newUnit}"`);
+                    }
+                }
+
+                if (changes.length > 0) {
+                    const changesText = changes.slice(0, 5).join('<br>');
+                    const moreText = changes.length > 5 ? `<br>...还有${changes.length - 5}项修改` : '';
+
+                    showConfirm(
+                        '确认修改通道',
+                        `<div class="text-left"><p class="mb-2">您已对以下设置进行修改：</p><div class="bg-slate-800/50 p-3 rounded text-sm text-slate-300 space-y-1">${changesText}${moreText}</div><p class="mt-3 text-slate-400">确认保存这些更改吗？</p></div>`,
+                        () => {
+                            doSavePointEdit(newName, accessType, dev);
+                        },
+                        () => {
+                            showToast('已取消保存', 'info');
+                            if (State.originalPointData && State.currentEditPoint) {
+                                Object.assign(State.currentEditPoint, State.originalPointData);
+                            }
+                            closeModal('modal-point-edit');
+                            State.currentEditPoint = null;
+                            State.currentEditDevice = null;
+                            State.originalPointData = null;
+                        }
+                    );
+                    return;
+                }
+            }
+
+            doSavePointEdit(newName, accessType, dev);
+        }
+
+        function doSavePointEdit(newName, accessType, dev) {
+            if (!State.currentEditPoint) return;
+
+            State.currentEditPoint.name = newName;
+            const isVideoDevice = dev && (dev.devType === "CAM" || dev.devType === "NVR");
+
+            // 保存MAC地址
+            const newMac = document.getElementById('point-edit-mac').value;
+            if (newMac) State.currentEditPoint.mac = newMac;
+
+            if (accessType && (accessType.includes("IP") || accessType.includes("以太网"))) {
+                // 保存IP地址、子网掩码、网关
+                State.currentEditPoint.ip = document.getElementById('point-edit-ip').value;
+                State.currentEditPoint.netmask = document.getElementById('point-edit-netmask').value;
+                State.currentEditPoint.gateway = document.getElementById('point-edit-gateway').value;
+                State.currentEditPoint.port = document.getElementById('point-edit-port').value;
+
+                if (dev.devType === "NVR" && State.currentEditPoint.pointType === "VT") {
+                    State.currentEditPoint.sn = document.getElementById('point-edit-sn').value;
+                }
+            } else if (accessType && (accessType.includes("RS485") || accessType.includes("Modbus"))) {
+                State.currentEditPoint.modbusAddr = document.getElementById('point-edit-modbus-addr').value;
+                State.currentEditPoint.register = document.getElementById('point-edit-register').value;
+            } else if (accessType && accessType.includes("M-Bus")) {
+                State.currentEditPoint.mbusAddr = document.getElementById('point-edit-mbus-addr').value;
+                State.currentEditPoint.meterType = document.getElementById('point-edit-meter-type').value;
+            } else if (accessType && accessType.includes("模拟量")) {
+                State.currentEditPoint.range = document.getElementById('point-edit-range').value;
+                State.currentEditPoint.unit = document.getElementById('point-edit-unit').value;
+            }
+
+            closeModal('modal-point-edit');
+            renderDeviceTable();
+            showToast('通道更新成功', 'success');
+            State.currentEditPoint = null;
+            State.currentEditDevice = null;
+            State.originalPointData = null;
+        }
+
+        // ==================== 12. 批量操作功能 ====================
+
+        function batchAction(action) {
+            if (State.selectedDevices.length === 0) {
+                showToast('请先选择设备', 'warning');
+                return;
+            }
+
+            if (action === 'delete') {
+                showConfirm(
+                    '确认批量删除',
+                    `确定要删除选中的${State.selectedDevices.length}个设备吗？此操作不可恢复。`,
+                    () => {
+                        State.devices = State.devices.filter(d => !State.selectedDevices.includes(d.id));
+                        State.filteredDevices = State.filteredDevices.filter(d => !State.selectedDevices.includes(d.id));
+                        State.selectedDevices = [];
+                        updateStats();
+                        renderDeviceTable();
+                        showToast('批量删除成功', 'success');
+                    }
+                );
+            } else {
+                showToast(`批量${action}功能开发中`, 'info');
+            }
+        }
+
+        // ==================== 13. 初始化 ====================
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initFilters();
+            initSampleData();
+            updateStats();
+            renderDeviceTable();
+
+            showToast('IBMS设备管理系统 V3.0 加载完成', 'success');
+        });
+
+    </script>
+</body>
+</html>

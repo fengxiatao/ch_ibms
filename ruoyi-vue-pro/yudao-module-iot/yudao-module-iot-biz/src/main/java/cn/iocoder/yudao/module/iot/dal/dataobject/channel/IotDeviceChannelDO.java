@@ -1,8 +1,6 @@
 package cn.iocoder.yudao.module.iot.dal.dataobject.channel;
 
 import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
-import com.baomidou.mybatisplus.annotation.*;
-import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -15,7 +13,6 @@ import java.util.Map;
  * 
  * @author IBMS Team
  */
-@TableName(value = "iot_device_channel", autoResultMap = true)
 @Data
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
@@ -27,7 +24,6 @@ public class IotDeviceChannelDO extends BaseDO {
     /**
      * 通道ID
      */
-    @TableId(type = IdType.AUTO)
     private Long id;
 
     // ========== 设备关联信息 ==========
@@ -160,13 +156,11 @@ public class IotDeviceChannelDO extends BaseDO {
     /**
      * 是否支持云台（视频通道）
      */
-    @TableField(typeHandler = cn.iocoder.yudao.framework.mybatis.core.type.BooleanToIntTypeHandler.class)
     private Boolean ptzSupport;
     
     /**
      * 是否支持音频（视频通道）
      */
-    @TableField(typeHandler = cn.iocoder.yudao.framework.mybatis.core.type.BooleanToIntTypeHandler.class)
     private Boolean audioSupport;
     
     /**
@@ -240,7 +234,6 @@ public class IotDeviceChannelDO extends BaseDO {
     /**
      * 通道能力（JSON格式，存储通道支持的功能列表）
      */
-    @TableField(typeHandler = JacksonTypeHandler.class)
     private Map<String, Object> capabilities;
 
     // ========== 状态信息 ==========
@@ -302,7 +295,6 @@ public class IotDeviceChannelDO extends BaseDO {
     /**
      * 扩展配置（JSON格式，存储其他自定义配置）
      */
-    @TableField(typeHandler = JacksonTypeHandler.class)
     private Map<String, Object> config;
     
     /**

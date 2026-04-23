@@ -4,10 +4,12 @@ import cn.iocoder.yudao.module.iot.controller.admin.access.vo.dashboard.AccessDa
 import cn.iocoder.yudao.module.iot.controller.admin.access.vo.dashboard.RealTimeAccessRespVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.access.AccessRecordDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.access.AccessAlarmDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.AccessRecordMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.AccessAlarmMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceRuntimeMapper;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,7 +39,9 @@ public class AccessDashboardServiceImpl implements AccessDashboardService {
     private AccessAlarmMapper accessAlarmMapper;
 
     @Resource
-    private IotDeviceMapper iotDeviceMapper;
+    private IbmsDeviceMapper ibmsDeviceMapper;
+    @Resource
+    private IbmsDeviceRuntimeMapper ibmsDeviceRuntimeMapper;
 
     @Override
     public AccessDashboardStatisticsRespVO getStatistics() {
@@ -56,15 +60,17 @@ public class AccessDashboardServiceImpl implements AccessDashboardService {
                         .between(AccessAlarmDO::getAlarmTime, startOfToday, endOfToday));
 
         // 设备统计（门禁设备）
-        List<IotDeviceDO> devices = iotDeviceMapper.selectList(
-                new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<IotDeviceDO>()
-                        .like(IotDeviceDO::getProductKey, "access") // 门禁设备
-                        .or()
-                        .like(IotDeviceDO::getProductKey, "door")); // 门禁设备
+        // 原 IoT 逻辑按 productKey/access/door 过滤，这里收口到 ibms_device 的门禁相关 systemCode 识别。
+        List<IbmsDeviceDO> devices = ibmsDeviceMapper.selectListAccessLikeDevices();
 
         Long totalDeviceCount = (long) devices.size();
+        java.util.Map<Long, Integer> stateMap = ibmsDeviceRuntimeMapper.selectStateMapByDeviceIds(
+                devices.stream().map(IbmsDeviceDO::getId).toList());
         Long onlineDeviceCount = devices.stream()
-                .filter(d -> cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum.isOnline(d.getState())) // 使用统一的状态判断方法
+                .filter(d -> {
+                    Integer state = stateMap.getOrDefault(d.getId(), IotDeviceStateEnum.INACTIVE.getState());
+                    return IotDeviceStateEnum.isOnline(state);
+                })
                 .count();
 
         // 构建响应对象

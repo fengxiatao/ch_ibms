@@ -18,6 +18,12 @@ export interface DictDataType {
   value: string | number | boolean
   colorType: ElementPlusInfoType | ''
   cssClass: string
+  /**
+   * 扩展字段（字符串，通常为 JSON）。
+   *
+   * - IBMS 码表等场景会在 remark 中存放分组/系统/图标/颜色等扩展信息
+   */
+  remark?: string
 }
 
 export interface NumberDictDataType extends DictDataType {
@@ -254,5 +260,29 @@ export enum DICT_TYPE {
   IOT_ZONE_ALARM_STATUS = 'iot_zone_alarm_status', // 防区报警状态：0无报警 1报警中 11~17各类报警
   
   // IoT 长辉设备
-  CHANGHUI_DEVICE_TYPE = 'changhui_device_type' // 长辉设备类型
+  CHANGHUI_DEVICE_TYPE = 'changhui_device_type', // 长辉设备类型
+
+  // ========== IBMS 编码规范 ==========
+  IBMS_GROUP = 'ibms_group', // 专业分组
+  IBMS_SYSTEM = 'ibms_system', // 系统码
+  IBMS_POINT_TYPE = 'ibms_point_type', // 点位类型码
+  IBMS_DEVICE_MODEL = 'ibms_device_model', // 设备型号码
+  IBMS_DEVICE_TYPE = 'ibms_device_type', // 设备类型码
+  IBMS_REGION = 'ibms_region', // 区域码
+  IBMS_BRAND = 'ibms_brand' // 厂商品牌码（与设备编码品牌段一致）
+}
+
+/**
+ * 安全解析字典 remark(JSON) 扩展字段。
+ *
+ * - remark 为空/非法 JSON 时返回 undefined
+ * - 不抛异常，避免影响页面渲染
+ */
+export const parseDictRemark = <T = any>(remark?: string | null): T | undefined => {
+  if (!remark) return undefined
+  try {
+    return JSON.parse(remark) as T
+  } catch {
+    return undefined
+  }
 }

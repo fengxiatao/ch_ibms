@@ -1,6 +1,7 @@
 import request from '@/config/axios'
 
 export interface DeviceActivationReqVO {
+  /** IBMS 产品主键 ibms_product.id */
   productId: number
   ipAddress: string
   username: string

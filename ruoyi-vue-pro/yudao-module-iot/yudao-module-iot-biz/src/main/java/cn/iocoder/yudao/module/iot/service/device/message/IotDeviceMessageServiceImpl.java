@@ -20,7 +20,9 @@ import cn.iocoder.yudao.module.iot.core.util.IotDeviceMessageUtils;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceMessageDO;
 import cn.iocoder.yudao.module.iot.dal.tdengine.IotDeviceMessageMapper;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceGatewaySupportService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsIotDualTrackDeviceResolver;
 import cn.iocoder.yudao.module.iot.service.device.property.IotDevicePropertyService;
 import cn.iocoder.yudao.module.iot.service.ota.IotOtaTaskRecordService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -44,6 +46,7 @@ import java.util.Map;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
 import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.DEVICE_DOWNSTREAM_FAILED_SERVER_ID_NULL;
+import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.DEVICE_NOT_EXISTS;
 
 /**
  * IoT 设备消息 Service 实现类
@@ -56,7 +59,11 @@ import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.DEVICE_DOWNST
 public class IotDeviceMessageServiceImpl implements IotDeviceMessageService {
 
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsIotDualTrackDeviceResolver dualTrackDeviceResolver;
+    @Resource
+    private IbmsDeviceMapper ibmsDeviceMapper;
+    @Resource
+    private IbmsDeviceGatewaySupportService ibmsDeviceGatewaySupportService;
     @Resource
     private IotDevicePropertyService devicePropertyService;
     @Resource
@@ -86,7 +93,7 @@ public class IotDeviceMessageServiceImpl implements IotDeviceMessageService {
             return;
         }
         // MySQL版本：表不存在时仅记录警告，不尝试创建（表应通过SQL脚本创建）
-        log.warn("[defineDeviceMessageStable][MySQL设备消息表不存在，请执行SQL脚本: sql/mysql/iot_device_message.sql]");
+        log.warn("[defineDeviceMessageStable][MySQL设备消息表不存在，请执行SQL脚本: sql/mysql/iot_device_message.sql] (表名: ibms_device_message)");
     }
 
     @Async
@@ -106,7 +113,10 @@ public class IotDeviceMessageServiceImpl implements IotDeviceMessageService {
 
     @Override
     public IotDeviceMessage sendDeviceMessage(IotDeviceMessage message) {
-        IotDeviceDO device = deviceService.validateDeviceExists(message.getDeviceId());
+        IotDeviceDO device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(message.getDeviceId());
+        if (device == null) {
+            throw exception(DEVICE_NOT_EXISTS);
+        }
         return sendDeviceMessage(message, device);
     }
 
@@ -204,7 +214,14 @@ public class IotDeviceMessageServiceImpl implements IotDeviceMessageService {
             String stateStr = IotDeviceMessageUtils.getIdentifier(message);
             assert stateStr != null;
             Assert.notEmpty(stateStr, "设备状态不能为空");
-            deviceService.updateDeviceState(device, Integer.valueOf(stateStr));
+            int state = Integer.parseInt(stateStr);
+            // 单台账：状态更新仅写入 IBMS（网关缓存 / 在线态）。
+            // 由于 dual resolver 已禁止回退 iot_device，这里直接要求 IBMS 必须存在。
+            if (ibmsDeviceMapper.selectById(device.getId()) == null) {
+                throw exception(DEVICE_NOT_EXISTS);
+            }
+            ibmsDeviceGatewaySupportService.updateGatewayDeviceStateWithTimestamp(
+                    device.getId(), state, System.currentTimeMillis());
             // TODO 长辉开发团队：子设备的关联
             return null;
         }

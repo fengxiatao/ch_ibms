@@ -4,9 +4,8 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.iot.controller.admin.opc.vo.*;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.opc.OpcZoneConfigDO;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.service.opc.OpcZoneConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -36,7 +35,7 @@ public class OpcZoneConfigController {
     private OpcZoneConfigService zoneConfigService;
 
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @PostMapping("/create")
     @Operation(summary = "创建防区配置")
@@ -100,9 +99,9 @@ public class OpcZoneConfigController {
 
         // 补充设备名称
         if (config.getDeviceId() != null) {
-            IotDeviceDO device = deviceService.getDevice(config.getDeviceId());
+            var device = ibmsDeviceMapper.selectById(config.getDeviceId());
             if (device != null) {
-                respVO.setDeviceName(device.getDeviceName());
+                respVO.setDeviceName(device.getName());
             }
         }
 

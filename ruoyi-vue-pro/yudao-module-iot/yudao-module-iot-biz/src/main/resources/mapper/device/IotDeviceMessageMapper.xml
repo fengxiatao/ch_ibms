@@ -7,12 +7,12 @@
     <!-- 检查表是否存在（MySQL版本） -->
     <select id="showSTable" resultType="String">
         SELECT TABLE_NAME FROM information_schema.TABLES 
-        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'iot_device_message'
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ibms_device_message'
     </select>
 
     <!-- 插入设备消息数据（MySQL版本） -->
     <insert id="insert">
-        INSERT INTO iot_device_message (
+        INSERT INTO ibms_device_message (
             id, device_id, tenant_id, server_id, report_time, ts,
             upstream, reply, identifier, request_id, method,
             params, data, code, msg
@@ -29,7 +29,7 @@
         SELECT ts, id, report_time AS reportTime, tenant_id AS tenantId, server_id AS serverId,
                device_id AS deviceId, upstream, reply, identifier, request_id AS requestId, 
                method, params, data, code, msg
-        FROM iot_device_message
+        FROM ibms_device_message
         <where>
             device_id = #{reqVO.deviceId}
             <if test="reqVO.method != null and reqVO.method != ''">
@@ -53,7 +53,7 @@
         SELECT ts, id, report_time AS reportTime, tenant_id AS tenantId, server_id AS serverId,
                device_id AS deviceId, upstream, reply, identifier, request_id AS requestId, 
                method, params, data, code, msg
-        FROM iot_device_message
+        FROM ibms_device_message
         WHERE device_id = #{deviceId}
         AND reply = #{reply}
         AND request_id IN
@@ -66,7 +66,7 @@
     <!-- 统计消息数量（MySQL版本） -->
     <select id="selectCountByCreateTime" resultType="Long">
         SELECT COUNT(*)
-        FROM iot_device_message
+        FROM ibms_device_message
         <where>
             <if test="createTime != null">
                 AND UNIX_TIMESTAMP(ts) * 1000 >= #{createTime}
@@ -80,7 +80,7 @@
             DATE_FORMAT(ts, '%Y-%m-%d %H:00:00') AS time,
             SUM(CASE WHEN upstream = 1 THEN 1 ELSE 0 END) AS upstream_count,
             SUM(CASE WHEN upstream = 0 THEN 1 ELSE 0 END) AS downstream_count
-        FROM iot_device_message
+        FROM ibms_device_message
         <where>
             <if test="startTime != null">
                 AND UNIX_TIMESTAMP(ts) * 1000 >= #{startTime}

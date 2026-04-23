@@ -62,7 +62,7 @@ class IoTDeviceAPI:
     
     def create_device(self, device_data):
         """创建设备（会触发完整的初始化流程）"""
-        url = f"{API_BASE}/iot/device/create"
+        url = f"{API_BASE}/iot/ibms/device/create"
         
         response = requests.post(url, json=device_data, headers=self.headers)
         if response.status_code == 200:

@@ -10,8 +10,12 @@ import cn.iocoder.yudao.module.iot.controller.admin.video.vo.NvrRespVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
+import cn.iocoder.yudao.module.iot.service.video.IbmsDeviceVideoNetworkResolver;
 import cn.iocoder.yudao.module.iot.service.video.nvr.NvrCommandService;
 import cn.iocoder.yudao.module.iot.service.video.nvr.NvrQueryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,6 +55,12 @@ public class NvrController {
     private NvrQueryService nvrQueryService;
 
     @Resource
+    private IbmsDeviceMapper ibmsDeviceMapper;
+
+    @Resource
+    private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
+
+    @Resource
     private NvrCommandService nvrCommandService;
 
     @Resource
@@ -60,16 +70,8 @@ public class NvrController {
     @Operation(summary = "获取NVR列表（全部）", description = "用于下拉选择等场景，不分页")
     @PreAuthorize("@ss.hasPermission('iot:camera:query')")
     public CommonResult<List<NvrRespVO>> getNvrList() {
-        List<IotDeviceDO> list = nvrQueryService.getNvrList();
-        List<NvrRespVO> result = list.stream().map(d -> {
-            NvrRespVO vo = new NvrRespVO();
-            vo.setId(d.getId());
-            vo.setName(StringUtils.defaultIfBlank(d.getDeviceName(), d.getNickname()));
-            // 从 config 中提取 IP 地址
-            vo.setIpAddress(DeviceConfigHelper.getIpAddress(d));
-            vo.setState(d.getState());
-            return vo;
-        }).collect(Collectors.toList());
+        List<IbmsDeviceDO> list = nvrQueryService.getNvrList();
+        List<NvrRespVO> result = list.stream().map(this::mapIbmsToNvrRespVO).collect(Collectors.toList());
         return success(result);
     }
 
@@ -82,16 +84,17 @@ public class NvrController {
             @RequestParam(value = "name", required = false) String name) {
         
         // 获取所有 NVR
-        List<IotDeviceDO> allList = nvrQueryService.getNvrList();
+        List<IbmsDeviceDO> allList = nvrQueryService.getNvrList();
         
         // 过滤搜索条件
-        List<IotDeviceDO> filteredList = allList;
+        List<IbmsDeviceDO> filteredList = allList;
         if (StringUtils.isNotBlank(name)) {
             filteredList = allList.stream()
                     .filter(d -> {
-                        String deviceName = StringUtils.defaultIfBlank(d.getDeviceName(), d.getNickname());
-                        String deviceIp = DeviceConfigHelper.getIpAddress(d);
-                        return deviceName.contains(name) || 
+                        String deviceName = StringUtils.defaultIfBlank(d.getName(), d.getNickname());
+                        NvrRespVO tmp = mapIbmsToNvrRespVO(d);
+                        String deviceIp = tmp.getIpAddress();
+                        return deviceName.contains(name) ||
                                (deviceIp != null && deviceIp.contains(name));
                     })
                     .collect(Collectors.toList());
@@ -106,15 +109,9 @@ public class NvrController {
         if (fromIndex >= total) {
             result = java.util.Collections.emptyList();
         } else {
-            result = filteredList.subList(fromIndex, toIndex).stream().map(d -> {
-                NvrRespVO vo = new NvrRespVO();
-                vo.setId(d.getId());
-                vo.setName(StringUtils.defaultIfBlank(d.getDeviceName(), d.getNickname()));
-                // 从 config 中提取 IP 地址
-                vo.setIpAddress(DeviceConfigHelper.getIpAddress(d));
-                vo.setState(d.getState());
-                return vo;
-            }).collect(Collectors.toList());
+            result = filteredList.subList(fromIndex, toIndex).stream()
+                    .map(this::mapIbmsToNvrRespVO)
+                    .collect(Collectors.toList());
         }
         
         return success(new cn.iocoder.yudao.framework.common.pojo.PageResult<>(result, (long) total));
@@ -153,31 +150,21 @@ public class NvrController {
         }
 
         // 3. 获取NVR设备信息（用于生成流地址）
-        IotDeviceDO nvr = nvrQueryService.getNvrList().stream()
-                .filter(d -> d.getId().equals(nvrId))
-                .findFirst()
-                .orElse(null);
+        IbmsDeviceDO nvr = resolveNvrOrNull(nvrId);
         
         if (nvr == null) {
             log.warn("[NVR通道] NVR设备不存在: nvrId={}", nvrId);
             return success(java.util.Collections.emptyList());
         }
         
-        // 4. 解析NVR配置
-        String nvrCfg = nvr.getConfig() != null ? JSONUtil.toJsonStr(nvr.getConfig().toMap()) : null;
-        // 从 config 中提取 IP 地址
-        String nvrIp = DeviceConfigHelper.getIpAddress(nvr);
-        String baseUser = extractStringFromConfig(nvrCfg, "username");
-        String basePass = extractStringFromConfig(nvrCfg, "password");
-        Integer baseRtspPort = extractIntFromConfig(nvrCfg, "rtspPort");
-        Integer baseHttpPort = extractIntFromConfig(nvrCfg, "httpPort");
-        
-        // 设置默认值
-        final String finalUser = StringUtils.defaultIfBlank(baseUser, "admin");
-        final String finalPass = StringUtils.defaultIfBlank(basePass, "admin123");
-        final int finalRtspPort = baseRtspPort != null ? baseRtspPort : 554;
-        final int finalHttpPort = baseHttpPort != null ? baseHttpPort : 80;
-        final String finalNvrIp = nvrIp;
+        // 4. 解析NVR网络参数（台账 ip + 运行态 config + extra）
+        IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(nvr,
+                ibmsDeviceRuntimeService.getByDeviceId(nvrId));
+        final String finalUser = StringUtils.defaultIfBlank(net.username, "admin");
+        final String finalPass = StringUtils.defaultIfBlank(net.password, "admin123");
+        final int finalRtspPort = net.rtspPort > 0 ? net.rtspPort : 554;
+        final int finalHttpPort = net.httpPort > 0 ? net.httpPort : 80;
+        final String finalNvrIp = net.ip;
         
         // 5. 转换为VO（基于通道表）
         List<NvrChannelRespVO> result = dbChannels.stream().map(ch -> {
@@ -277,10 +264,7 @@ public class NvrController {
         
         try {
             // 1. 获取NVR设备信息
-            IotDeviceDO nvr = nvrQueryService.getNvrList().stream()
-                    .filter(d -> d.getId().equals(nvrId))
-                    .findFirst()
-                    .orElse(null);
+            IbmsDeviceDO nvr = resolveNvrOrNull(nvrId);
             
             if (nvr == null) {
                 log.warn("[NVR截图代理] NVR设备不存在: nvrId={}", nvrId);
@@ -288,19 +272,14 @@ public class NvrController {
                 return;
             }
             
-            // 2. 解析NVR配置
-            String nvrCfg = nvr.getConfig() != null ? JSONUtil.toJsonStr(nvr.getConfig().toMap()) : null;
-            // 从 config 中提取 IP 地址
-            String nvrIp = DeviceConfigHelper.getIpAddress(nvr);
+            // 2. 解析NVR网络参数
+            IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(nvr,
+                    ibmsDeviceRuntimeService.getByDeviceId(nvrId));
+            String nvrIp = net.ip;
             
-            String username = extractStringFromConfig(nvrCfg, "username");
-            String password = extractStringFromConfig(nvrCfg, "password");
-            Integer httpPort = extractIntFromConfig(nvrCfg, "httpPort");
-            
-            // 设置默认值
-            if (StringUtils.isBlank(username)) username = "admin";
-            if (StringUtils.isBlank(password)) password = "admin123";
-            if (httpPort == null) httpPort = 80;
+            String username = StringUtils.defaultIfBlank(net.username, "admin");
+            String password = StringUtils.defaultIfBlank(net.password, "admin123");
+            int httpPort = net.httpPort > 0 ? net.httpPort : 80;
             
             // 验证IP地址
             if (StringUtils.isBlank(nvrIp)) {
@@ -801,6 +780,23 @@ public class NvrController {
         public void setY(Integer y) { this.y = y; }
         public Integer getZoom() { return zoom; }
         public void setZoom(Integer zoom) { this.zoom = zoom; }
+    }
+
+    private NvrRespVO mapIbmsToNvrRespVO(IbmsDeviceDO d) {
+        NvrRespVO vo = new NvrRespVO();
+        vo.setId(d.getId());
+        vo.setName(StringUtils.defaultIfBlank(d.getName(), d.getNickname()));
+        IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(d, null);
+        vo.setIpAddress(StringUtils.defaultIfBlank(StringUtils.trimToNull(d.getIp()), net.ip));
+        vo.setState(IbmsDeviceLedgerRuntimeHelper.parseGatewayRuntimeStateFromExtra(d.getExtra()));
+        return vo;
+    }
+
+    private IbmsDeviceDO resolveNvrOrNull(Long nvrId) {
+        return nvrQueryService.getNvrList().stream()
+                .filter(d -> d.getId().equals(nvrId))
+                .findFirst()
+                .orElseGet(() -> ibmsDeviceMapper.selectById(nvrId));
     }
 
     /**

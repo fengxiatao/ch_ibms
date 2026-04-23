@@ -1,185 +1,155 @@
 package cn.iocoder.yudao.module.iot.service.device.activation;
 
-import cn.hutool.core.util.IdUtil;
-import cn.iocoder.yudao.module.iot.service.device.discovery.DiscoveredDeviceService;
-import cn.iocoder.yudao.module.iot.service.device.discovery.dto.DiscoveredDeviceDTO;
+import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
+import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.module.iot.controller.admin.ibms.channel.vo.IbmsChannelSaveReqVO;
+import cn.iocoder.yudao.module.iot.controller.admin.ibms.product.vo.IbmsProductRespVO;
 import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
 import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageBus;
 import cn.iocoder.yudao.module.iot.core.messagebus.topics.IotMessageTopics;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
-import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.product.IotProductMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
+import cn.iocoder.yudao.module.iot.service.device.discovery.DiscoveredDeviceService;
+import cn.iocoder.yudao.module.iot.service.device.discovery.dto.DiscoveredDeviceDTO;
+import cn.iocoder.yudao.module.iot.service.ibms.channel.IbmsChannelService;
+import cn.iocoder.yudao.module.iot.service.ibms.product.IbmsProductService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.PRODUCT_NOT_EXISTS;
-import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
-
 /**
- * IoT Device Activation Service Implementation
- *
- * @author Changhui Information Technology Co., Ltd.
+ * 设备激活：仅维护 IBMS 台账（ibms_device / ibms_channel），通过消息总线下发 CONNECT。
+ * <p>
+ * 网关侧 {@code deviceId} 与 {@link IbmsDeviceDO#getId()} 一致；接入参数写入 {@code extra} JSON。
+ * </p>
  */
 @Service
 @Slf4j
 public class IotDeviceActivationServiceImpl implements IotDeviceActivationService {
-    
-    /**
-     * 激活状态管理器（统一管理激活状态，消除重复逻辑）
-     */
+
+    private static final int DEVICE_CODE_RETRY = 12;
+
     @Resource
     private DeviceActivationStateManager activationStateManager;
-    
+
     @Resource
-    private IotDeviceMapper deviceMapper;
-    
+    private IbmsDeviceMapper ibmsDeviceMapper;
+
     @Resource
-    private IotProductMapper productMapper;
-    
+    private IbmsProductService ibmsProductService;
+
     @Resource
     private IotMessageBus messageBus;
-    
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private DiscoveredDeviceService discoveredDeviceService;
-    
+
     @Resource
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
-    
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private DiscoveredDeviceService discoveredDeviceService;
+
     @Resource
-    private cn.iocoder.yudao.module.iot.dal.mysql.channel.IotDeviceChannelMapper channelMapper;
-    
-    @Resource
-    private cn.iocoder.yudao.module.iot.mq.producer.DeviceCommandPublisher deviceCommandPublisher;
-    
+    private IbmsChannelService ibmsChannelService;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public String activateDevice(DiscoveredDeviceDTO discoveredDevice, Long productId, 
-                                  String username, String password) {
-        // Generate activation ID
+    public String activateDevice(DiscoveredDeviceDTO discoveredDevice, Long productId,
+                                 String username, String password) {
         String activationId = UUID.randomUUID().toString();
-        
-        log.info("[activateDevice] Starting device activation: activationId={}, ip={}, productId={}", 
+
+        log.info("[activateDevice] IBMS 激活开始: activationId={}, ip={}, ibmsProductId={}",
                 activationId, discoveredDevice.getIpAddress(), productId);
-        
-        // 1. Verify product exists
-        IotProductDO product = productMapper.selectById(productId);
+
+        IbmsProductRespVO product = ibmsProductService.getProduct(productId);
         if (product == null) {
-            throw exception(PRODUCT_NOT_EXISTS);
+            throw ServiceExceptionUtil.exception0(404, "IBMS 产品不存在");
         }
-        
-        // 2. Device verification will be done asynchronously via message bus
+
         String vendor = discoveredDevice.getVendor();
-        String productName = product.getName();
-        
-        // Determine device type and verification method
+        String productName = product.getProductName();
         if (productName != null && (productName.contains("NVR") || productName.contains("DVR"))) {
             if ("Dahua".equalsIgnoreCase(vendor)) {
                 vendor = "dahua_sdk";
-                log.info("[activateDevice] Detected Dahua NVR/DVR, using Dahua SDK: ip={}, productName={}", 
-                        discoveredDevice.getIpAddress(), productName);
+                log.info("[activateDevice] 大华 NVR/DVR: ip={}, productName={}", discoveredDevice.getIpAddress(), productName);
             } else if ("Hikvision".equalsIgnoreCase(vendor)) {
                 vendor = "hikvision_sdk";
-                log.info("[activateDevice] Detected Hikvision NVR/DVR, using Hikvision SDK: ip={}, productName={}", 
-                        discoveredDevice.getIpAddress(), productName);
-            } else {
-                log.info("[activateDevice] NVR/DVR with unknown vendor, trying ONVIF: ip={}, vendor={}, productName={}", 
-                        discoveredDevice.getIpAddress(), vendor, productName);
+                log.info("[activateDevice] 海康 NVR/DVR: ip={}, productName={}", discoveredDevice.getIpAddress(), productName);
             }
-        } else {
-            log.info("[activateDevice] Verifying device via message bus: ip={}, productName={}", 
-                    discoveredDevice.getIpAddress(), productName);
         }
 
-        // 3. Find or create device record
-        IotDeviceDO device = findOrCreateDevice(product, discoveredDevice, username, password);
-        
-        // 4. Determine channel strategy
-        DeviceChannelStrategy strategy = determineChannelStrategy(device, discoveredDevice);
-        log.info("[activateDevice] Device channel strategy: deviceId={}, strategy={}", device.getId(), strategy);
-        
+        IbmsDeviceDO device = findOrCreateIbmsDevice(product, discoveredDevice, username, password);
+
+        DeviceChannelStrategy strategy = determineChannelStrategy(product, discoveredDevice);
+        log.info("[activateDevice] 通道策略: deviceId={}, strategy={}", device.getId(), strategy);
+
         switch (strategy) {
-            case NVR_DEVICE:
-                log.info("[activateDevice] NVR device, will sync channels after online");
-                activationStateManager.markNeedsSyncChannel(device.getId());
-                break;
-                
-            case IPC_SINGLE_CHANNEL:
-                log.info("[activateDevice] IPC device, creating single channel");
-                createSingleIpcChannel(device, discoveredDevice, username, password);
-                break;
-                
-            case PTZ_MULTI_CHANNEL:
-                log.info("[activateDevice] PTZ device, will query channels after online");
-                activationStateManager.markNeedsSyncChannel(device.getId());
-                break;
-                
-            case NO_CHANNEL:
-                log.info("[activateDevice] No channel device, skipping channel creation");
-                break;
+            case NVR_DEVICE, PTZ_MULTI_CHANNEL -> activationStateManager.markNeedsSyncChannel(device.getId());
+            case IPC_SINGLE_CHANNEL -> createSingleIbmsIpcChannel(device, discoveredDevice, username, password);
+            case NO_CHANNEL -> log.info("[activateDevice] 无需预建通道");
         }
-        
-        // 5. Mark as activated in discovery list
+
         if (discoveredDeviceService != null) {
             try {
                 discoveredDeviceService.markAsActivated(discoveredDevice.getIpAddress(), device.getId());
-                log.info("[activateDevice] Removed from discovery list: ip={}, deviceId={}", 
-                         discoveredDevice.getIpAddress(), device.getId());
+                log.info("[activateDevice] 已标记发现列表: ip={}, ibmsDeviceId={}",
+                        discoveredDevice.getIpAddress(), device.getId());
             } catch (Exception e) {
-                log.error("[activateDevice] Failed to mark as activated: ip={}, deviceId={}", 
-                          discoveredDevice.getIpAddress(), device.getId(), e);
+                log.error("[activateDevice] 标记发现失败: ip={}, deviceId={}",
+                        discoveredDevice.getIpAddress(), device.getId(), e);
             }
         }
-        
-        // 6. Record activation status（使用统一的激活状态管理器）
+
         activationStateManager.startActivation(activationId, device.getId());
-        
-        log.info("[activateDevice] Device record saved: activationId={}, deviceId={}", 
-                activationId, device.getId());
-        
-        // 7. Publish event for after transaction commit
+
+        IbmsDeviceDO latest = ibmsDeviceMapper.selectById(device.getId());
+        if (latest != null && isIbmsDeviceOnlineInExtra(latest)) {
+            log.info("[activateDevice] 设备已在 extra 中标记在线，直接完成激活: activationId={}, deviceId={}",
+                    activationId, device.getId());
+            activationStateManager.completeActivation(device.getId());
+        }
+
+        Long tenantId = resolveTenantId(discoveredDevice);
         DeviceActivationEvent event = new DeviceActivationEvent(this,
                 activationId,
                 device.getId(),
-                device.getProductId(),
+                product.getId(),
                 device.getProductKey(),
-                device.getDeviceName(),
-                DeviceConfigHelper.getIpAddress(device),
-                discoveredDevice.getVendor(),
-                discoveredDevice.getDeviceType() != null ? discoveredDevice.getDeviceType() : discoveredDevice.getModel(),
+                device.getName(),
+                discoveredDevice.getIpAddress(),
+                vendor,
+                discoveredDevice.getDeviceType() != null ? discoveredDevice.getDeviceType() : product.getDeviceTypeCode(),
                 username,
                 password,
                 37777,
                 "ACTIVE",
-                device.getTenantId());
+                tenantId);
         eventPublisher.publishEvent(event);
-        
+
         return activationId;
     }
 
-    /**
-     * Handle after transaction commit: send device connect message
-     */
+    private static Long resolveTenantId(DiscoveredDeviceDTO discoveredDevice) {
+        if (discoveredDevice.getTenantId() != null) {
+            return discoveredDevice.getTenantId();
+        }
+        Long t = TenantContextHolder.getTenantId();
+        return t != null ? t : 0L;
+    }
+
     @org.springframework.transaction.event.TransactionalEventListener(phase = org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT)
     public void handleDeviceActivationAfterCommit(DeviceActivationEvent event) {
-        log.info("[handleDeviceActivationAfterCommit] Transaction committed, sending device connect request: deviceId={}",
-                event.getDeviceId());
+        log.info("[handleDeviceActivationAfterCommit] CONNECT: ibmsDeviceId={}", event.getDeviceId());
 
-        // Build connect request message
         IotDeviceMessage message = new IotDeviceMessage();
         message.setRequestId(event.getRequestId());
         message.setDeviceId(event.getDeviceId());
@@ -198,18 +168,12 @@ public class IotDeviceActivationServiceImpl implements IotDeviceActivationServic
         params.put("connectionMode", event.getConnectionMode());
         params.put("reconnect", false);
         message.setParams(params);
-
-        // Publish device connect request to Gateway (使用统一通道)
         message.setMethod("CONNECT");
         messageBus.post(IotMessageTopics.DEVICE_SERVICE_INVOKE, message);
 
-        log.info("[handleDeviceActivationAfterCommit] Device connect request sent: deviceId={}, requestId={}",
-                event.getDeviceId(), event.getRequestId());
+        log.info("[handleDeviceActivationAfterCommit] CONNECT 已发送: deviceId={}", event.getDeviceId());
     }
 
-    /**
-     * Device Activation Event
-     */
     @lombok.Getter
     public static class DeviceActivationEvent extends org.springframework.context.ApplicationEvent {
 
@@ -228,19 +192,19 @@ public class IotDeviceActivationServiceImpl implements IotDeviceActivationServic
         private final Long tenantId;
 
         public DeviceActivationEvent(Object source,
-                                    String requestId,
-                                    Long deviceId,
-                                    Long productId,
-                                    String productKey,
-                                    String deviceName,
-                                    String ip,
-                                    String vendor,
-                                    String deviceType,
-                                    String username,
-                                    String password,
-                                    Integer port,
-                                    String connectionMode,
-                                    Long tenantId) {
+                                     String requestId,
+                                     Long deviceId,
+                                     Long productId,
+                                     String productKey,
+                                     String deviceName,
+                                     String ip,
+                                     String vendor,
+                                     String deviceType,
+                                     String username,
+                                     String password,
+                                     Integer port,
+                                     String connectionMode,
+                                     Long tenantId) {
             super(source);
             this.requestId = requestId;
             this.deviceId = deviceId;
@@ -260,473 +224,294 @@ public class IotDeviceActivationServiceImpl implements IotDeviceActivationServic
 
     @Override
     public String getActivationStatus(String activationId) {
-        // 委托给统一的激活状态管理器
         return activationStateManager.getActivationStatus(activationId);
     }
-    
+
     @Override
     public Long getActivationResult(String activationId) {
-        // 委托给统一的激活状态管理器
         return activationStateManager.getActivationResult(activationId);
     }
-    
-    /**
-     * Get activation status detail (including error message)
-     *
-     * @param activationId activation ID
-     * @return activation status and result
-     */
+
+    @Override
     public Map<String, Object> getActivationStatusDetail(String activationId) {
-        // 委托给统一的激活状态管理器
         return activationStateManager.getActivationStatusDetail(activationId);
     }
-    
+
     @Override
     public void disconnectDevice(Long deviceId) {
-        log.info("[disconnectDevice] Disconnecting device: deviceId={}", deviceId);
-        
-        // Build disconnect request message
+        log.info("[disconnectDevice] DISCONNECT: ibmsDeviceId={}", deviceId);
         IotDeviceMessage message = new IotDeviceMessage();
         message.setDeviceId(deviceId);
-        
-        // Publish device disconnect request to Gateway (使用统一通道)
         message.setMethod("DISCONNECT");
         messageBus.post(IotMessageTopics.DEVICE_SERVICE_INVOKE, message);
     }
 
-    /**
-     * Find or create device record
-     */
-    private IotDeviceDO findOrCreateDevice(IotProductDO product, DiscoveredDeviceDTO discoveredDevice,
-                                            String username, String password) {
-        // 1. Try to find existing device by IP address
-        IotDeviceDO existingDevice = findDeviceByIpInConfig(discoveredDevice.getIpAddress());
-        
-        if (existingDevice != null) {
-            log.info("[findOrCreateDevice] Found existing device: deviceId={}, ip={}", 
-                    existingDevice.getId(), discoveredDevice.getIpAddress());
-            
-            // Update device config
-            updateDeviceConfig(existingDevice, discoveredDevice, username, password);
-            deviceMapper.updateById(existingDevice);
-            
-            return existingDevice;
+    // -------------------------------------------------------------------------
+
+    private IbmsDeviceDO findOrCreateIbmsDevice(IbmsProductRespVO product, DiscoveredDeviceDTO d,
+                                                  String username, String password) {
+        Long tenantId = resolveTenantId(d);
+        String ip = d.getIpAddress();
+        IbmsDeviceDO existing = ibmsDeviceMapper.selectByTenantIdAndIp(tenantId, ip);
+        if (existing != null) {
+            applyActivationFieldsToDevice(existing, product, d, username, password);
+            ibmsDeviceMapper.updateById(existing);
+            log.info("[findOrCreateIbmsDevice] 更新已有 IBMS 设备: id={}, ip={}", existing.getId(), ip);
+            return existing;
         }
-        
-        // 2. Create new device
-        IotDeviceDO newDevice = new IotDeviceDO();
-        
-        // Basic info
-        newDevice.setDeviceName(generateDeviceName(discoveredDevice));
-        newDevice.setNickname(discoveredDevice.getVendor() + " " + discoveredDevice.getModel());
-        newDevice.setSerialNumber(discoveredDevice.getSerialNumber());
-        
-        // Product info
-        newDevice.setProductId(product.getId());
-        newDevice.setProductKey(product.getProductKey());
-        newDevice.setDeviceType(product.getDeviceType());
-        
-        // Status info
-        newDevice.setState(IotDeviceStateEnum.INACTIVE.getState());
-        newDevice.setAddress(discoveredDevice.getIpAddress());
-        
-        // Device unique identifier
-        String deviceKey = generateDeviceKey(product.getProductKey(), discoveredDevice.getSerialNumber());
-        newDevice.setDeviceKey(deviceKey);
-        
-        // Set Boolean field defaults
-        newDevice.setSubsystemOverride(false);
-        newDevice.setMenuOverride(false);
-        
-        // Build device config
-        Map<String, Object> configMap = new HashMap<>();
-        configMap.put("ipAddress", discoveredDevice.getIpAddress());
-        configMap.put("username", username);
-        configMap.put("password", password);
-        configMap.put("vendor", discoveredDevice.getVendor());
-        configMap.put("model", discoveredDevice.getModel());
-        configMap.put("firmwareVersion", discoveredDevice.getFirmwareVersion());
-        configMap.put("httpPort", discoveredDevice.getHttpPort());
-        configMap.put("rtspPort", discoveredDevice.getRtspPort());
-        configMap.put("onvifPort", discoveredDevice.getOnvifPort());
-        configMap.put("onvifSupported", discoveredDevice.getOnvifSupported());
-        AccessDeviceConfig config = new AccessDeviceConfig();
-        config.fromMap(configMap);
-        newDevice.setConfig(config);
-        
-        // Insert to database
-        deviceMapper.insert(newDevice);
-        
-        log.info("[findOrCreateDevice] Created new device: deviceId={}, deviceName={}, ip={}", 
-                newDevice.getId(), newDevice.getDeviceName(), DeviceConfigHelper.getIpAddress(newDevice));
-        
-        return newDevice;
+
+        IbmsDeviceDO created = new IbmsDeviceDO();
+        created.setTenantId(tenantId);
+        created.setName(generateDeviceName(d));
+        created.setGroupCode(product.getGroupCode());
+        created.setSystemCode(product.getSystemCode());
+        created.setDeviceTypeCode(product.getDeviceTypeCode());
+        created.setBrand(StrUtil.blankToDefault(product.getManufacturer(), "HIK"));
+        created.setProductModel(StrUtil.blankToDefault(product.getModelNumber(), product.getModelCode()));
+        created.setAccessType("IP");
+        created.setProtocol(StrUtil.blankToDefault(product.getProtocol(), "ONVIF"));
+        created.setIp(ip);
+        created.setSpace(null);
+        created.setSn("SN-" + RandomUtil.randomString(10).toUpperCase());
+        created.setProductKey("PK-" + UUID.randomUUID());
+        created.setPointCount(0);
+        created.setPointsOnline(0);
+        created.setPointsAlarm(0);
+
+        String deviceCode = allocateUniqueDeviceCode(product);
+        created.setDeviceCode(deviceCode);
+        created.setExtra(buildActivationExtraJson(new JSONObject(), d, username, password).toString());
+
+        ibmsDeviceMapper.insert(created);
+        log.info("[findOrCreateIbmsDevice] 新建 IBMS 设备: id={}, deviceCode={}, ip={}",
+                created.getId(), deviceCode, ip);
+        return created;
     }
 
-    /**
-     * Update device config
-     */
-    private void updateDeviceConfig(IotDeviceDO device, DiscoveredDeviceDTO discoveredDevice,
-                                     String username, String password) {
-        device.setAddress(discoveredDevice.getIpAddress());
-        
-        // Parse existing config
-        Map<String, Object> configMap = device.getConfig() != null 
-            ? device.getConfig().toMap()
-            : new HashMap<>();
-        
-        // Update connection info
-        configMap.put("ipAddress", discoveredDevice.getIpAddress());
-        configMap.put("username", username);
-        configMap.put("password", password);
-        configMap.put("vendor", discoveredDevice.getVendor());
-        configMap.put("model", discoveredDevice.getModel());
-        configMap.put("firmwareVersion", discoveredDevice.getFirmwareVersion());
-        configMap.put("httpPort", discoveredDevice.getHttpPort());
-        configMap.put("rtspPort", discoveredDevice.getRtspPort());
-        configMap.put("onvifPort", discoveredDevice.getOnvifPort());
-        configMap.put("onvifSupported", discoveredDevice.getOnvifSupported());
-        
-        AccessDeviceConfig config = new AccessDeviceConfig();
-        config.fromMap(configMap);
-        device.setConfig(config);
-    }
-    
-    /**
-     * Find device by IP in config
-     * 
-     * @param ip IP address
-     * @return device object, or null if not found
-     */
-    private IotDeviceDO findDeviceByIpInConfig(String ip) {
-        if (ip == null || ip.isEmpty()) {
-            return null;
+    private void applyActivationFieldsToDevice(IbmsDeviceDO device, IbmsProductRespVO product,
+                                               DiscoveredDeviceDTO d, String username, String password) {
+        device.setIp(d.getIpAddress());
+        device.setGroupCode(product.getGroupCode());
+        device.setSystemCode(product.getSystemCode());
+        device.setDeviceTypeCode(product.getDeviceTypeCode());
+        if (StrUtil.isNotBlank(product.getManufacturer())) {
+            device.setBrand(product.getManufacturer());
         }
-        
-        // Query all devices and match IP in config
-        List<IotDeviceDO> devices = deviceMapper.selectList();
-        for (IotDeviceDO device : devices) {
-            String deviceIp = DeviceConfigHelper.getIpAddress(device);
-            if (ip.equals(deviceIp)) {
-                return device;
-            }
-            
-            // Compatibility: check config.ip field
-            if (device.getConfig() != null) {
-                try {
-                    Map<String, Object> configMap = device.getConfig().toMap();
-                    Object configIp = configMap.get("ip");
-                    if (configIp != null && ip.equals(configIp.toString())) {
-                        return device;
-                    }
-                } catch (Exception ignored) {}
+        if (StrUtil.isNotBlank(product.getModelNumber())) {
+            device.setProductModel(product.getModelNumber());
+        }
+        if (StrUtil.isNotBlank(product.getProtocol())) {
+            device.setProtocol(product.getProtocol());
+        }
+        JSONObject base = new JSONObject();
+        if (StrUtil.isNotBlank(device.getExtra())) {
+            try {
+                base = JSONUtil.parseObj(device.getExtra().trim());
+            } catch (Exception ignored) {
+                // keep empty base
             }
         }
-        
-        return null;
-    }
-    
-    /**
-     * Generate device name
-     */
-    private String generateDeviceName(DiscoveredDeviceDTO discoveredDevice) {
-        // Use serial number as device name, or IP address if no serial number
-        if (discoveredDevice.getSerialNumber() != null && !discoveredDevice.getSerialNumber().isEmpty()) {
-            return discoveredDevice.getSerialNumber();
-        }
-        return "device_" + discoveredDevice.getIpAddress().replace(".", "_");
-    }
-    
-    /**
-     * Generate device unique identifier (DeviceKey)
-     * 
-     * @param productKey product key
-     * @param serialNumber serial number (can be null)
-     * @return device unique identifier
-     */
-    private String generateDeviceKey(String productKey, String serialNumber) {
-        if (serialNumber != null && !serialNumber.isEmpty()) {
-            return productKey + "_" + serialNumber;
-        } else {
-            return productKey + "_" + IdUtil.fastSimpleUUID();
-        }
+        device.setExtra(buildActivationExtraJson(base, d, username, password).toString());
     }
 
-    // ==================== 设备状态处理已迁移到 DeviceStateChangeConsumer ====================
-    // 原来的 handleDeviceOnline 方法逻辑已统一到 DeviceStateChangeConsumer.handleDeviceOnlineUnified
-    // 激活状态管理已统一到 DeviceActivationStateManager
-
-    /**
-     * Check if device is an access control device (ACCESS_GEN1 or ACCESS_GEN2)
-     * 
-     * <p>Requirements 9.6: Determine if device type is access control device
-     * 
-     * @param deviceType device type string (ACCESS_GEN1 or ACCESS_GEN2)
-     * @return true if device is ACCESS_GEN1 or ACCESS_GEN2
-     */
-    public boolean isAccessDevice(String deviceType) {
-        if (deviceType == null) {
-            return false;
+    private JSONObject buildActivationExtraJson(JSONObject base, DiscoveredDeviceDTO d,
+                                                String username, String password) {
+        base.set("username", username);
+        base.set("password", password);
+        base.set("tcpPort", 37777);
+        if (d.getHttpPort() != null) {
+            base.set("httpPort", d.getHttpPort());
         }
-        return AccessDeviceTypeConstants.ACCESS_GEN1.equals(deviceType) 
-                || AccessDeviceTypeConstants.ACCESS_GEN2.equals(deviceType);
+        if (d.getRtspPort() != null) {
+            base.set("rtspPort", d.getRtspPort());
+        }
+        if (d.getOnvifPort() != null) {
+            base.set("onvifPort", d.getOnvifPort());
+        }
+        if (StrUtil.isNotBlank(d.getVendor())) {
+            base.set("vendor", d.getVendor());
+        }
+        if (StrUtil.isNotBlank(d.getModel())) {
+            base.set("model", d.getModel());
+        }
+        if (StrUtil.isNotBlank(d.getFirmwareVersion())) {
+            base.set("firmwareVersion", d.getFirmwareVersion());
+        }
+        if (StrUtil.isNotBlank(d.getIpAddress())) {
+            base.set("ip", d.getIpAddress().trim());
+        }
+        String discoveredDeviceType = d.getDeviceType();
+        if (AccessDeviceTypeConstants.ACCESS_GEN1.equalsIgnoreCase(discoveredDeviceType)) {
+            base.set("deviceType", AccessDeviceTypeConstants.ACCESS_GEN1);
+        } else if (AccessDeviceTypeConstants.ACCESS_GEN2.equalsIgnoreCase(discoveredDeviceType)) {
+            base.set("deviceType", AccessDeviceTypeConstants.ACCESS_GEN2);
+            base.set("supportVideo", true);
+        }
+        return base;
     }
 
-    /**
-     * Get access device type from device config
-     * 
-     * <p>Requirements 9.6: Determine device type based on supportVideo flag in config
-     * <ul>
-     *   <li>supportVideo = true → ACCESS_GEN2 (二代门禁，人脸一体机)</li>
-     *   <li>supportVideo = false/null → ACCESS_GEN1 (一代门禁控制器)</li>
-     * </ul>
-     * 
-     * <p>Note: Non-access devices are filtered out by config type checks. Only devices
-     * with AccessDeviceConfig or GenericDeviceConfig containing access-related fields
-     * (supportVideo, ipAddress) will be identified as access devices.
-     * 
-     * @param device device object
-     * @return ACCESS_GEN1 or ACCESS_GEN2 if device is access device, null otherwise
-     */
-    public String getAccessDeviceType(IotDeviceDO device) {
-        if (device == null || device.getConfig() == null) {
-            return null;
-        }
-
-        // Device category filtering is handled by config type checks below.
-        // The device.getDeviceType() field is an Integer representing connection type
-        // (0=DIRECT, 1=GATEWAY_SUB, 2=GATEWAY), not the device category.
-        // Non-access devices (ALARM, NVR, etc.) will be filtered out because they
-        // don't have AccessDeviceConfig or the supportVideo flag.
-
-        Boolean supportVideo = null;
-        
-        // Try to get supportVideo and accessDeviceType from AccessDeviceConfig
-        if (device.getConfig() instanceof AccessDeviceConfig) {
-            AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
-            String configDeviceType = config.getAccessDeviceType();
-            supportVideo = config.getSupportVideo();
-            
-            // If accessDeviceType or supportVideo is set, this is an access device
-            if (configDeviceType != null || supportVideo != null) {
-                return AccessDeviceTypeConstants.resolveDeviceType(configDeviceType, supportVideo);
-            }
-            
-            // Check if config has ipAddress (access devices typically have this)
-            if (config.getIpAddress() != null && !config.getIpAddress().isEmpty()) {
-                // Default to ACCESS_GEN1 if no supportVideo flag
-                return AccessDeviceTypeConstants.ACCESS_GEN1;
+    private String allocateUniqueDeviceCode(IbmsProductRespVO product) {
+        String system = StrUtil.blankToDefault(product.getSystemCode(), "VI").trim();
+        String model = StrUtil.blankToDefault(product.getModelCode(), "UNK").trim();
+        String devType = StrUtil.blankToDefault(product.getDeviceTypeCode(), "CAM").trim();
+        String brand = StrUtil.blankToDefault(product.getManufacturer(), "HIK").trim();
+        String prefix = system + "-" + model + "-" + devType + "-" + brand + "-";
+        for (int i = 0; i < DEVICE_CODE_RETRY; i++) {
+            int seq = RandomUtil.randomInt(1, 999);
+            String code = prefix + String.format("%03d", seq);
+            if (ibmsDeviceMapper.selectByDeviceCode(code) == null) {
+                return code;
             }
         }
-        
-        // Try to get supportVideo from GenericDeviceConfig
-        if (device.getConfig() instanceof GenericDeviceConfig) {
-            GenericDeviceConfig config = (GenericDeviceConfig) device.getConfig();
-            Object deviceTypeObj = config.get("deviceType");
-            Object supportVideoObj = config.get("supportVideo");
-            String configDeviceType = deviceTypeObj != null ? deviceTypeObj.toString() : null;
-            if (supportVideoObj instanceof Boolean) {
-                supportVideo = (Boolean) supportVideoObj;
-                return AccessDeviceTypeConstants.resolveDeviceType(configDeviceType, supportVideo);
-            }
-            // 如果仅配置了 deviceType（ACCESS_GEN1/ACCESS_GEN2），也可以直接判定
-            if (configDeviceType != null && !configDeviceType.trim().isEmpty()) {
-                return AccessDeviceTypeConstants.resolveDeviceType(configDeviceType, null);
-            }
-            
-            // Check if this looks like an access device config
-            Object ipAddress = config.get("ipAddress");
-            if (ipAddress != null) {
-                // Default to ACCESS_GEN1 if no supportVideo flag
-                return AccessDeviceTypeConstants.ACCESS_GEN1;
-            }
-        }
-        
-        // Try to get from config map
-        try {
-            Map<String, Object> configMap = device.getConfig().toMap();
-            Object deviceTypeObj = configMap.get("deviceType");
-            Object supportVideoObj = configMap.get("supportVideo");
-            String configDeviceType = deviceTypeObj != null ? deviceTypeObj.toString() : null;
-            if (supportVideoObj instanceof Boolean) {
-                supportVideo = (Boolean) supportVideoObj;
-                return AccessDeviceTypeConstants.resolveDeviceType(configDeviceType, supportVideo);
-            }
-            if (configDeviceType != null && !configDeviceType.trim().isEmpty()) {
-                return AccessDeviceTypeConstants.resolveDeviceType(configDeviceType, null);
-            }
-            
-            // Check if this looks like an access device config
-            if (configMap.containsKey("ipAddress") || configMap.containsKey("ip")) {
-                // Check product type to determine if this is an access device
-                // For now, return null if we can't determine
-                return null;
-            }
-        } catch (Exception e) {
-            log.debug("[getAccessDeviceType] Failed to parse config: deviceId={}", device.getId(), e);
-        }
-        
-        return null;
+        return prefix + RandomUtil.randomString(6).toUpperCase();
     }
 
-    // 原来的 triggerAccessChannelSync 方法已迁移到 DeviceStateChangeConsumer.triggerChannelSync
+    private String generateDeviceName(DiscoveredDeviceDTO d) {
+        if (StrUtil.isNotBlank(d.getSerialNumber())) {
+            return d.getSerialNumber();
+        }
+        return "device_" + d.getIpAddress().replace(".", "_");
+    }
 
-    // 原来的 handleDeviceOffline 方法逻辑已统一到 DeviceStateChangeConsumer.handleDeviceOfflineUnified
-    
-    /**
-     * Determine device channel strategy
-     */
-    private DeviceChannelStrategy determineChannelStrategy(IotDeviceDO device, DiscoveredDeviceDTO discoveredDevice) {
-        String deviceType = discoveredDevice.getDeviceType();
-        Long productId = device.getProductId();
-        
-        // 1. NVR/DVR: need to sync channels
-        if ("NVR".equalsIgnoreCase(deviceType) || "DVR".equalsIgnoreCase(deviceType) 
-                || (productId != null && productId.equals(4L))) {
+    private DeviceChannelStrategy determineChannelStrategy(IbmsProductRespVO product, DiscoveredDeviceDTO d) {
+        String dt = d.getDeviceType();
+        String pn = product.getProductName();
+        String dtc = product.getDeviceTypeCode();
+
+        if ("NVR".equalsIgnoreCase(dt) || "DVR".equalsIgnoreCase(dt)
+                || (pn != null && (pn.toUpperCase().contains("NVR") || pn.toUpperCase().contains("DVR")))
+                || "NVR".equalsIgnoreCase(dtc)) {
             return DeviceChannelStrategy.NVR_DEVICE;
         }
-        
-        // 2. PTZ: need to query channel count
-        if (isPtzDevice(deviceType, discoveredDevice)) {
+        if (isPtzDevice(dt, d)) {
             return DeviceChannelStrategy.PTZ_MULTI_CHANNEL;
         }
-        
-        // 3. Normal IPC: single channel
-        if ("IPC".equalsIgnoreCase(deviceType) || "CAMERA".equalsIgnoreCase(deviceType) 
-                || (productId != null && productId.equals(3L))) {
+        if ("IPC".equalsIgnoreCase(dt) || "CAMERA".equalsIgnoreCase(dt) || "CAM".equalsIgnoreCase(dtc)) {
             return DeviceChannelStrategy.IPC_SINGLE_CHANNEL;
         }
-        
-        // 4. Other devices with channels
-        if (isDeviceWithChannels(deviceType)) {
+        if (isDeviceWithChannels(dt)) {
             return DeviceChannelStrategy.NVR_DEVICE;
         }
-        
-        // 5. No channel device
         return DeviceChannelStrategy.NO_CHANNEL;
     }
 
-    /**
-     * Check if device is PTZ device
-     */
-    private boolean isPtzDevice(String deviceType, DiscoveredDeviceDTO discoveredDevice) {
-        // Method 1: device type contains PTZ keywords
+    private boolean isPtzDevice(String deviceType, DiscoveredDeviceDTO d) {
         if (deviceType != null) {
-            String type = deviceType.toUpperCase();
-            if (type.contains("PTZ") || type.contains("DOME") || type.contains("SPEED_DOME")) {
+            String t = deviceType.toUpperCase();
+            if (t.contains("PTZ") || t.contains("DOME") || t.contains("SPEED_DOME")) {
                 return true;
             }
         }
-        
-        // Method 2: device name contains PTZ keywords
-        String deviceName = discoveredDevice.getDeviceName();
-        if (deviceName != null) {
-            String name = deviceName.toUpperCase();
-            if (name.contains("PTZ") || name.contains("DOME")) {
+        if (d.getDeviceName() != null) {
+            String n = d.getDeviceName().toUpperCase();
+            if (n.contains("PTZ") || n.contains("DOME")) {
                 return true;
             }
         }
-        
-        // Method 3: check device model
-        String model = discoveredDevice.getModel();
-        if (model != null) {
-            String m = model.toUpperCase();
+        if (d.getModel() != null) {
+            String m = d.getModel().toUpperCase();
             if (m.contains("PTZ") || m.contains("DOME")) {
                 return true;
             }
         }
-        
         return false;
     }
-    
-    /**
-     * Check if device needs channels
-     */
+
     private boolean isDeviceWithChannels(String deviceType) {
         if (deviceType == null) {
             return false;
         }
-        
-        return deviceType.equalsIgnoreCase("NVR") 
-            || deviceType.equalsIgnoreCase("DVR")
-            || deviceType.equalsIgnoreCase("ACCESS_CONTROLLER")
-            || deviceType.equalsIgnoreCase("FIRE_PANEL")
-            || deviceType.equalsIgnoreCase("METER")
-            || deviceType.equalsIgnoreCase("BROADCAST");
+        return deviceType.equalsIgnoreCase("NVR")
+                || deviceType.equalsIgnoreCase("DVR")
+                || deviceType.equalsIgnoreCase("ACCESS_CONTROLLER")
+                || deviceType.equalsIgnoreCase("FIRE_PANEL")
+                || deviceType.equalsIgnoreCase("METER")
+                || deviceType.equalsIgnoreCase("BROADCAST");
     }
 
-    /**
-     * Create single channel for IPC
-     */
-    private void createSingleIpcChannel(IotDeviceDO device, DiscoveredDeviceDTO discoveredDevice, 
-                                         String username, String password) {
+    private void createSingleIbmsIpcChannel(IbmsDeviceDO device, DiscoveredDeviceDTO d,
+                                            String username, String password) {
         try {
-            IotDeviceChannelDO channel = new IotDeviceChannelDO();
-            
-            // Basic info
-            channel.setDeviceId(device.getId());
-            channel.setDeviceType("IPC");
-            channel.setProductId(device.getProductId());
-            channel.setChannelNo(1);
-            channel.setChannelName(device.getDeviceName() + "-Main");
-            channel.setChannelType("VIDEO");
-            channel.setChannelSubType("IPC");
-            
-            // Connection info
-            String deviceIp = DeviceConfigHelper.getIpAddress(device);
-            channel.setTargetIp(deviceIp);
-            channel.setTargetChannelNo(1);
-            channel.setProtocol("RTSP");
-            channel.setUsername(username);
-            channel.setPassword(password);
-            
-            // Video stream URLs (generate based on vendor)
-            String vendor = discoveredDevice.getVendor();
-            Integer rtspPort = discoveredDevice.getRtspPort() != null ? discoveredDevice.getRtspPort() : 554;
-            Integer httpPort = discoveredDevice.getHttpPort() != null ? discoveredDevice.getHttpPort() : 80;
-            
+            String deviceIp = device.getIp();
+            Integer rtspPort = d.getRtspPort() != null ? d.getRtspPort() : 554;
+            Integer httpPort = d.getHttpPort() != null ? d.getHttpPort() : 80;
+            String vendor = d.getVendor();
+
+            Map<String, Object> chExtra = new HashMap<>();
+            chExtra.put("streamProtocol", "RTSP");
             if ("dahua".equalsIgnoreCase(vendor)) {
-                // Dahua IPC stream URL format
-                channel.setStreamUrlMain(String.format("rtsp://%s:%s@%s:%d/cam/realmonitor?channel=1&subtype=0", 
+                chExtra.put("streamUrlMain", String.format("rtsp://%s:%s@%s:%d/cam/realmonitor?channel=1&subtype=0",
                         username, password, deviceIp, rtspPort));
-                channel.setStreamUrlSub(String.format("rtsp://%s:%s@%s:%d/cam/realmonitor?channel=1&subtype=1", 
+                chExtra.put("streamUrlSub", String.format("rtsp://%s:%s@%s:%d/cam/realmonitor?channel=1&subtype=1",
                         username, password, deviceIp, rtspPort));
-                channel.setSnapshotUrl(String.format("http://%s:%s@%s:%d/cgi-bin/snapshot.cgi?channel=1", 
+                chExtra.put("snapshotUrl", String.format("http://%s:%s@%s:%d/cgi-bin/snapshot.cgi?channel=1",
                         username, password, deviceIp, httpPort));
             } else if ("hikvision".equalsIgnoreCase(vendor)) {
-                // Hikvision IPC stream URL format
-                channel.setStreamUrlMain(String.format("rtsp://%s:%s@%s:%d/Streaming/Channels/101", 
+                chExtra.put("streamUrlMain", String.format("rtsp://%s:%s@%s:%d/Streaming/Channels/101",
                         username, password, deviceIp, rtspPort));
-                channel.setStreamUrlSub(String.format("rtsp://%s:%s@%s:%d/Streaming/Channels/102", 
+                chExtra.put("streamUrlSub", String.format("rtsp://%s:%s@%s:%d/Streaming/Channels/102",
                         username, password, deviceIp, rtspPort));
-                channel.setSnapshotUrl(String.format("http://%s:%s@%s:%d/ISAPI/Streaming/channels/101/picture", 
+                chExtra.put("snapshotUrl", String.format("http://%s:%s@%s:%d/ISAPI/Streaming/channels/101/picture",
                         username, password, deviceIp, httpPort));
             } else {
-                // Generic ONVIF format
-                channel.setStreamUrlMain(String.format("rtsp://%s:%s@%s:%d/stream1", 
+                chExtra.put("streamUrlMain", String.format("rtsp://%s:%s@%s:%d/stream1",
                         username, password, deviceIp, rtspPort));
-                channel.setStreamUrlSub(String.format("rtsp://%s:%s@%s:%d/stream2", 
+                chExtra.put("streamUrlSub", String.format("rtsp://%s:%s@%s:%d/stream2",
                         username, password, deviceIp, rtspPort));
             }
-            
-            // Capability info (IPC usually does not support PTZ)
-            channel.setPtzSupport(false);
-            channel.setAudioSupport(false);
-            
-            // Status info
-            channel.setOnlineStatus(device.getState());
-            channel.setEnableStatus(1);
-            channel.setLastSyncTime(LocalDateTime.now());
-            
-            // Insert to database
-            channelMapper.insert(channel);
-            
-            log.info("[createSingleIpcChannel] IPC single channel created: deviceId={}, channelId={}, channelName={}", 
-                    device.getId(), channel.getId(), channel.getChannelName());
-                    
+
+            IbmsChannelSaveReqVO ch = new IbmsChannelSaveReqVO();
+            ch.setDeviceId(device.getId());
+            ch.setChannelNo(1);
+            ch.setName(device.getName() + "-Main");
+            ch.setCode(String.format("CH-%s-IPC-%03d", device.getId(), 1));
+            ch.setBusiness(resolveBusinessBySystemType(device.getSystemCode()));
+            ch.setTypeCode("VT");
+            ch.setCategory("视频通道");
+            ch.setSystemType(StrUtil.blankToDefault(device.getSystemCode(), "VI"));
+            ch.setDataSource("IPC");
+            ch.setStatus("online");
+            ch.setIp(deviceIp);
+            ch.setDeviceSn(device.getSn());
+            ch.setDeviceName(device.getName());
+            ch.setSpace(device.getSpace());
+            ch.setCurrentValue("在线");
+            ch.setExtra(JSONUtil.toJsonStr(chExtra));
+
+            ibmsChannelService.createChannel(ch);
+            log.info("[createSingleIbmsIpcChannel] 已创建 IBMS 通道: deviceId={}, channelNo=1", device.getId());
         } catch (Exception e) {
-            log.error("[createSingleIpcChannel] Failed to create IPC single channel: deviceId={}", device.getId(), e);
-            // Don't throw exception to avoid affecting device activation
+            log.error("[createSingleIbmsIpcChannel] 失败: deviceId={}", device.getId(), e);
+        }
+    }
+
+    private String resolveBusinessBySystemType(String systemType) {
+        if (systemType == null) {
+            return "security";
+        }
+        return switch (systemType) {
+            case "VI", "GR" -> "security";
+            case "AC", "IC" -> "access";
+            case "AL", "FD", "PA" -> "alarm";
+            case "CA" -> "parking";
+            case "BA" -> "building";
+            case "EL" -> "environment";
+            case "LI" -> "lighting";
+            case "EP", "EN" -> "energy";
+            default -> "security";
+        };
+    }
+
+    private boolean isIbmsDeviceOnlineInExtra(IbmsDeviceDO device) {
+        if (StrUtil.isBlank(device.getExtra())) {
+            return false;
+        }
+        try {
+            JSONObject j = JSONUtil.parseObj(device.getExtra().trim());
+            Integer state = j.getInt("gatewayRuntimeState");
+            return state != null && state.equals(IotDeviceStateEnum.ONLINE.getState());
+        } catch (Exception e) {
+            return false;
         }
     }
 }

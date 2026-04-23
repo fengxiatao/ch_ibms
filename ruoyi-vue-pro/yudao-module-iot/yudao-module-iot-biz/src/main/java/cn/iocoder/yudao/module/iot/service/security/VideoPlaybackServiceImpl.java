@@ -15,13 +15,18 @@ import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageBus;
 import cn.iocoder.yudao.module.iot.core.messagebus.topics.IotMessageTopics;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsChannelDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsChannelMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.enums.device.NvrDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.mq.manager.DeviceCommandResponseManager;
-import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceDahuaSdkHelper;
+import cn.iocoder.yudao.module.iot.service.video.IbmsDeviceVideoNetworkResolver;
 import cn.iocoder.yudao.module.iot.service.video.ZlmStreamService;
+import org.apache.commons.lang3.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -54,8 +59,9 @@ import static cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeC
 @RequiredArgsConstructor
 public class VideoPlaybackServiceImpl implements VideoPlaybackService {
 
-    private final IotDeviceChannelService channelService;
-    private final IotDeviceService deviceService;
+    private final IbmsChannelMapper ibmsChannelMapper;
+    private final IbmsDeviceMapper ibmsDeviceMapper;
+    private final IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
     private final ZlmStreamService zlmStreamService;
     private final ZlmApiClient zlmApiClient;
     private final IotMessageBus messageBus;
@@ -65,33 +71,22 @@ public class VideoPlaybackServiceImpl implements VideoPlaybackService {
 
     @Override
     public List<ChannelRecordingRespVO> queryRecordings(PlaybackQueryRecordingsReqVO reqVO) {
-        IotDeviceChannelDO channel = channelService.getChannel(reqVO.getCameraId());
+        IotDeviceChannelDO channel = loadChannel(reqVO.getCameraId());
         if (channel == null) {
             throw new ServiceException(BAD_REQUEST.getCode(), "通道不存在: channelId=" + reqVO.getCameraId());
         }
 
         // 通过 newgateway（大华 SDK）搜索录像文件列表，再转换为时间轴片段
-        IotDeviceDO device = deviceService.getDevice(channel.getDeviceId());
+        IbmsDeviceDO device = ibmsDeviceMapper.selectById(channel.getDeviceId());
         if (device == null) {
             throw new ServiceException(BAD_REQUEST.getCode(), "设备不存在: deviceId=" + channel.getDeviceId());
         }
-
-        String ip = DeviceConfigHelper.getIpAddress(device);
-        Integer port = DeviceConfigHelper.getPort(device);
-        if (port == null) {
-            port = 37777; // 大华默认 SDK 端口
-        }
-        String username = "admin";
-        String password = "admin123";
-        if (device.getConfig() != null) {
-            Map<String, Object> configMap = device.getConfig().toMap();
-            if (configMap.get("username") != null) {
-                username = configMap.get("username").toString();
-            }
-            if (configMap.get("password") != null) {
-                password = configMap.get("password").toString();
-            }
-        }
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(device.getId());
+        IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(device, runtime);
+        String ip = net.ip;
+        int port = IbmsDeviceDahuaSdkHelper.resolveDahuaSdkPort(runtime);
+        String username = StringUtils.defaultIfBlank(net.username, "admin");
+        String password = StringUtils.defaultIfBlank(net.password, "admin123");
 
         String requestId = UUID.randomUUID().toString();
         Map<String, Object> params = new HashMap<>();
@@ -168,7 +163,7 @@ public class VideoPlaybackServiceImpl implements VideoPlaybackService {
         List<Long> cameraIds = reqVO.getCameraIds();
         Map<Long, IotDeviceChannelDO> channelById = new LinkedHashMap<>();
         for (Long id : cameraIds) {
-            IotDeviceChannelDO ch = channelService.getChannel(id);
+            IotDeviceChannelDO ch = loadChannel(id);
             if (ch != null) {
                 channelById.put(id, ch);
             }
@@ -185,7 +180,7 @@ public class VideoPlaybackServiceImpl implements VideoPlaybackService {
             Long deviceId = entry.getKey();
             List<IotDeviceChannelDO> channels = entry.getValue();
 
-            IotDeviceDO device = deviceService.getDevice(deviceId);
+            IbmsDeviceDO device = ibmsDeviceMapper.selectById(deviceId);
             if (device == null) {
                 // 设备不存在：该 device 下所有通道返回空 segments
                 for (IotDeviceChannelDO ch : channels) {
@@ -194,22 +189,12 @@ public class VideoPlaybackServiceImpl implements VideoPlaybackService {
                 continue;
             }
 
-            String ip = DeviceConfigHelper.getIpAddress(device);
-            Integer port = DeviceConfigHelper.getPort(device);
-            if (port == null) {
-                port = 37777;
-            }
-            String username = "admin";
-            String password = "admin123";
-            if (device.getConfig() != null) {
-                Map<String, Object> configMap = device.getConfig().toMap();
-                if (configMap.get("username") != null) {
-                    username = configMap.get("username").toString();
-                }
-                if (configMap.get("password") != null) {
-                    password = configMap.get("password").toString();
-                }
-            }
+            IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(deviceId);
+            IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(device, runtime);
+            String ip = net.ip;
+            int port = IbmsDeviceDahuaSdkHelper.resolveDahuaSdkPort(runtime);
+            String username = StringUtils.defaultIfBlank(net.username, "admin");
+            String password = StringUtils.defaultIfBlank(net.password, "admin123");
 
             String requestId = UUID.randomUUID().toString();
             Map<String, Object> params = new HashMap<>();
@@ -298,7 +283,7 @@ public class VideoPlaybackServiceImpl implements VideoPlaybackService {
 
     @Override
     public PlaybackUrlRespVO getPlaybackUrl(PlaybackUrlReqVO reqVO) {
-        IotDeviceChannelDO channel = channelService.getChannel(reqVO.getCameraId());
+        IotDeviceChannelDO channel = loadChannel(reqVO.getCameraId());
         if (channel == null) {
             throw new ServiceException(BAD_REQUEST.getCode(), "通道不存在: channelId=" + reqVO.getCameraId());
         }
@@ -330,7 +315,7 @@ public class VideoPlaybackServiceImpl implements VideoPlaybackService {
 
     @Override
     public PlaybackClipRespVO clipRecording(PlaybackClipReqVO reqVO) {
-        IotDeviceChannelDO channel = channelService.getChannel(reqVO.getCameraId());
+        IotDeviceChannelDO channel = loadChannel(reqVO.getCameraId());
         if (channel == null) {
             throw new ServiceException(BAD_REQUEST.getCode(), "通道不存在: channelId=" + reqVO.getCameraId());
         }
@@ -343,6 +328,19 @@ public class VideoPlaybackServiceImpl implements VideoPlaybackService {
                 .endTime(reqVO.getEndTime())
                 .fileUrl(null)
                 .filePath(null)
+                .build();
+    }
+
+    private IotDeviceChannelDO loadChannel(Long channelId) {
+        IbmsChannelDO channel = ibmsChannelMapper.selectById(channelId);
+        if (channel == null) {
+            return null;
+        }
+        return IotDeviceChannelDO.builder()
+                .id(channel.getId())
+                .deviceId(channel.getDeviceId())
+                .channelNo(channel.getChannelNo())
+                .channelName(channel.getName())
                 .build();
     }
 }

@@ -149,7 +149,7 @@ const handlePreview = () => {
 
 const handleManage = () => {
   emit('manage', props.device)
-  router.push(`/iot/device/device?deviceId=${props.device.id}`)
+  router.push(`/ibms/ibms-device?deviceId=${props.device.id}`)
 }
 
 // 初始化缩略图

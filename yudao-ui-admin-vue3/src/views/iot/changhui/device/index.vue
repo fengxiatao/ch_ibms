@@ -160,7 +160,11 @@ import {
 } from '@/api/iot/changhui'
 import ChanghuiDeviceForm from './ChanghuiDeviceForm.vue'
 import ChanghuiDeviceDetail from './ChanghuiDeviceDetail.vue'
-import { useDeviceStatusWebSocket, DeviceStatusPushMessage, DeviceStateEnum } from '@/views/iot/device/device/useDeviceStatusWebSocket'
+import {
+  useDeviceStatusWebSocket,
+  DeviceStatusPushMessage,
+  DeviceStateEnum
+} from '@/hooks/iot/useDeviceStatusWebSocket'
 
 defineOptions({ name: 'ChanghuiDevice' })
 

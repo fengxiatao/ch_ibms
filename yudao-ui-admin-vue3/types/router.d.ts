@@ -44,6 +44,7 @@ declare module 'vue-router' {
     noCache?: boolean
     breadcrumb?: boolean
     affix?: boolean
+    pathKey?: boolean
     activeMenu?: string
     noTagsView?: boolean
     followAuth?: string

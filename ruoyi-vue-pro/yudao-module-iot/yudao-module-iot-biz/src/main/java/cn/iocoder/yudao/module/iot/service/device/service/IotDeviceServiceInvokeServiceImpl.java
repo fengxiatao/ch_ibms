@@ -6,9 +6,9 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.service.IotDeviceServiceInvokeReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.service.IotDeviceServiceLogPageReqVO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceServiceLogDO;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceServiceLogMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +39,7 @@ public class IotDeviceServiceInvokeServiceImpl implements IotDeviceServiceInvoke
     private final Map<String, Long> requestLogMap = new ConcurrentHashMap<>();
 
     @Resource
-    private IotDeviceMapper deviceMapper;
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @Resource
     private IotDeviceServiceLogMapper serviceLogMapper;
@@ -50,9 +50,9 @@ public class IotDeviceServiceInvokeServiceImpl implements IotDeviceServiceInvoke
         log.info("[invokeDeviceService] 调用设备服务: deviceId={}, service={}", 
                 reqVO.getDeviceId(), reqVO.getServiceIdentifier());
 
-        // 1. 验证设备是否存在
-        IotDeviceDO device = deviceMapper.selectById(reqVO.getDeviceId());
-        if (device == null) {
+        // 1. 验证设备是否存在（单台账：仅 ibms_device）
+        IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(reqVO.getDeviceId());
+        if (ibms == null) {
             throw exception(DEVICE_NOT_EXISTS);
         }
 
@@ -64,11 +64,15 @@ public class IotDeviceServiceInvokeServiceImpl implements IotDeviceServiceInvoke
         String operatorName = SecurityFrameworkUtils.getLoginUserNickname();
 
         // 4. 创建服务调用日志
+        Long logDeviceId = ibms.getId();
+        Long logProductId = ibms.getIbmsProductId();
+        String logProductKey = ibms.getProductKey();
+        String logDeviceName = ibms.getName();
         IotDeviceServiceLogDO serviceLog = IotDeviceServiceLogDO.builder()
-                .deviceId(device.getId())
-                .productId(device.getProductId())
-                .productKey(device.getProductKey())
-                .deviceName(device.getDeviceName())
+                .deviceId(logDeviceId)
+                .productId(logProductId)
+                .productKey(logProductKey)
+                .deviceName(logDeviceName)
                 .serviceIdentifier(reqVO.getServiceIdentifier())
                 .serviceName(reqVO.getServiceName())
                 .requestId(requestId)
@@ -85,7 +89,7 @@ public class IotDeviceServiceInvokeServiceImpl implements IotDeviceServiceInvoke
 
         // 6. 已移除 ONVIF 服务调用请求发布，保留日志与请求ID返回
         log.info("[invokeDeviceService] (占位) 已记录服务调用: requestId={}, deviceId={}, service={}",
-                requestId, device.getId(), reqVO.getServiceIdentifier());
+                requestId, logDeviceId, reqVO.getServiceIdentifier());
 
         return requestId;
     }

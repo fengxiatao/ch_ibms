@@ -1,16 +1,10 @@
 package cn.iocoder.yudao.module.iot.dal.dataobject.device;
 
-import cn.iocoder.yudao.framework.mybatis.core.type.LongSetTypeHandler;
 import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfig;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigTypeHandler;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaFirmwareDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
 import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
-import com.baomidou.mybatisplus.annotation.KeySequence;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -22,8 +16,6 @@ import java.util.Set;
  *
  * @author haohao
  */
-@TableName(value = "iot_device", autoResultMap = true)
-@KeySequence("iot_device_seq") // 用于 Oracle、PostgreSQL、Kingbase、DB2、H2 数据库的主键自增。如果是 MySQL 等数据库，可不写。
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Builder
@@ -39,7 +31,6 @@ public class IotDeviceDO extends TenantBaseDO {
     /**
      * 设备 ID，主键，自增
      */
-    @TableId
     private Long id;
     /**
      * 设备名称，在产品内唯一，用于标识设备
@@ -62,7 +53,6 @@ public class IotDeviceDO extends TenantBaseDO {
      *
      * 关联 {@link IotDeviceGroupDO#getId()}
      */
-    @TableField(typeHandler = LongSetTypeHandler.class)
     private Set<Long> groupIds;
 
     /**
@@ -117,7 +107,6 @@ public class IotDeviceDO extends TenantBaseDO {
      * true - 手动设置的子系统，不跟随产品变更
      * false - 继承自产品（默认）
      */
-    @TableField(typeHandler = cn.iocoder.yudao.framework.mybatis.core.type.BooleanToIntTypeHandler.class)
     private Boolean subsystemOverride;
     
     /**
@@ -145,7 +134,6 @@ public class IotDeviceDO extends TenantBaseDO {
      * false - 继承自产品（默认）
      * true - 手动设置的菜单，不跟随产品变更
      */
-    @TableField(typeHandler = cn.iocoder.yudao.framework.mybatis.core.type.BooleanToIntTypeHandler.class)
     private Boolean menuOverride;
     
     /**
@@ -287,7 +275,6 @@ public class IotDeviceDO extends TenantBaseDO {
      *   <li>长辉设备: {@link cn.iocoder.yudao.module.iot.dal.dataobject.device.config.ChanghuiDeviceConfig}</li>
      * </ul>
      */
-    @TableField(typeHandler = DeviceConfigTypeHandler.class)
     private DeviceConfig config;
 
     /**
@@ -298,5 +285,13 @@ public class IotDeviceDO extends TenantBaseDO {
      * 注意：设备级配置会覆盖产品级配置
      */
     private String jobConfig;
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getDeviceName() {
+        return deviceName;
+    }
 
 }

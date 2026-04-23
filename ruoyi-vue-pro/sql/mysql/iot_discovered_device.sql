@@ -1,6 +1,7 @@
 -- ----------------------------
--- IoT 发现设备表
--- 用于记录通过自动发现功能找到的设备
+-- IoT 发现设备表（历史脚本）
+-- 新规范：物理表名为 ibms_discovered_device，请先执行 ibms_migrate_rename_iot_discovered_device_to_ibms.sql，
+-- 或在新环境中直接使用与当前 DO 一致的 DDL 创建 ibms_discovered_device。
 -- ----------------------------
 CREATE TABLE IF NOT EXISTS `iot_discovered_device` (
     `id` BIGINT(20) NOT NULL AUTO_INCREMENT COMMENT 'ID',

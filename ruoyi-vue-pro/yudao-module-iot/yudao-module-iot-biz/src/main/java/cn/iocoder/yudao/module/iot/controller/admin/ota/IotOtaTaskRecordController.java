@@ -7,10 +7,11 @@ import cn.iocoder.yudao.framework.common.util.collection.MapUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.iot.controller.admin.ota.vo.task.record.IotOtaTaskRecordPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.ota.vo.task.record.IotOtaTaskRecordRespVO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaFirmwareDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaTaskRecordDO;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.service.ota.IotOtaFirmwareService;
 import cn.iocoder.yudao.module.iot.service.ota.IotOtaTaskRecordService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,7 +28,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
@@ -41,9 +45,9 @@ public class IotOtaTaskRecordController {
     @Resource
     private IotOtaTaskRecordService otaTaskRecordService;
     @Resource
-    private IotDeviceService deviceService;
-    @Resource
     private IotOtaFirmwareService otaFirmwareService;
+    @Resource
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @GetMapping("/get-status-statistics")
     @Operation(summary = "获得 OTA 升级记录状态统计")
@@ -71,8 +75,8 @@ public class IotOtaTaskRecordController {
          // 批量查询固件信息
          Map<Long, IotOtaFirmwareDO> firmwareMap = otaFirmwareService.getOtaFirmwareMap(
             convertSet(pageResult.getList(), IotOtaTaskRecordDO::getFromFirmwareId));
-        Map<Long, IotDeviceDO> deviceMap = deviceService.getDeviceMap(
-            convertSet(pageResult.getList(), IotOtaTaskRecordDO::getDeviceId));
+        Map<Long, IotDeviceDO> deviceMap = buildOtaRecordDeviceDisplayMap(
+                convertSet(pageResult.getList(), IotOtaTaskRecordDO::getDeviceId));
         // 转换为响应 VO
         return success(BeanUtils.toBean(pageResult, IotOtaTaskRecordRespVO.class, (vo) -> {
             MapUtils.findAndThen(firmwareMap, vo.getFromFirmwareId(), firmware ->
@@ -89,6 +93,27 @@ public class IotOtaTaskRecordController {
     public CommonResult<IotOtaTaskRecordRespVO> getOtaTaskRecord(@RequestParam("id") Long id) {
         IotOtaTaskRecordDO upgradeRecord = otaTaskRecordService.getOtaTaskRecord(id);
         return success(BeanUtils.toBean(upgradeRecord, IotOtaTaskRecordRespVO.class));
+    }
+
+    private Map<Long, cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO> buildOtaRecordDeviceDisplayMap(Set<Long> deviceIds) {
+        if (CollUtil.isEmpty(deviceIds)) {
+            return Collections.emptyMap();
+        }
+        var ibmsList = ibmsDeviceMapper.selectBatchIds(deviceIds);
+        Map<Long, cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO> map = new HashMap<>();
+        if (ibmsList != null) {
+            for (IbmsDeviceDO ibms : ibmsList) {
+                if (ibms == null || ibms.getId() == null) {
+                    continue;
+                }
+                cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO shell =
+                        new cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO();
+                shell.setId(ibms.getId());
+                shell.setDeviceName(ibms.getName());
+                map.put(ibms.getId(), shell);
+            }
+        }
+        return map;
     }
 
     @PutMapping("/cancel")

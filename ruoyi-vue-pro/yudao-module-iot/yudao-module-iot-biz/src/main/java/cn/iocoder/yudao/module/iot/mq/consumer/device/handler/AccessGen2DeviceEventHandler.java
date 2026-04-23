@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.iot.core.gateway.dto.AccessControlEventMessage;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.service.access.AccessEventHandler;
+import cn.iocoder.yudao.module.iot.service.device.activation.DeviceActivationStateManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -44,6 +45,11 @@ public class AccessGen2DeviceEventHandler implements DeviceEventHandler {
      */
     private final AccessEventHandler accessEventHandler;
 
+    /**
+     * 激活状态管理器：用于兜底 CONNECT/STATE_CHANGED 丢失场景
+     */
+    private final DeviceActivationStateManager activationStateManager;
+
     @Override
     public String getDeviceType() {
         return DEVICE_TYPE;
@@ -79,6 +85,14 @@ public class AccessGen2DeviceEventHandler implements DeviceEventHandler {
                         event.setDeviceType(dt.toString());
                     } else {
                         event.setDeviceType(getDeviceType());
+                    }
+                }
+
+                // 网关 LOGIN 事件到达时兜底完成激活（避免 DEVICE_STATE_CHANGED 消费不到导致卡在 activating）
+                if (event.getExtData() != null) {
+                    Object actionObj = event.getExtData().get("action");
+                    if (actionObj != null && "LOGIN".equalsIgnoreCase(actionObj.toString())) {
+                        activationStateManager.completeActivation(event.getDeviceId());
                     }
                 }
                 accessEventHandler.handleEvent(event);

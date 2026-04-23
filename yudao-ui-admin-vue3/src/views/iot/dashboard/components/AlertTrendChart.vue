@@ -4,7 +4,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import * as echarts from 'echarts'
+import type { ECharts, EChartsOption } from 'echarts'
+import echarts from '@/plugins/echarts'
 
 const props = defineProps({
   data: {
@@ -18,7 +19,7 @@ const props = defineProps({
 })
 
 const chartRef = ref<HTMLDivElement>()
-let chartInstance: echarts.ECharts | null = null
+let chartInstance: ECharts | null = null
 
 const initChart = () => {
   if (!chartRef.value) return
@@ -28,7 +29,7 @@ const initChart = () => {
   const dates = props.data.map((item) => item.date)
   const counts = props.data.map((item) => item.count)
 
-  const option: echarts.EChartsOption = {
+  const option: EChartsOption = {
     title: {
       text: '告警趋势（最近7天）',
       left: 'center',

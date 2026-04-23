@@ -145,7 +145,7 @@
 <script setup lang="ts" name="AccessMap">
 import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { formatDate } from '@/utils/formatTime'
-import * as echarts from 'echarts'
+import echarts from '@/plugins/echarts'
 import * as FloorApi from '@/api/iot/spatial/floor'
 import * as DeviceApi from '@/api/iot/device/device'
 import * as AccessRecordApi from '@/api/iot/access/record'
@@ -713,4 +713,3 @@ onBeforeUnmount(() => {
   }
 }
 </style>
-

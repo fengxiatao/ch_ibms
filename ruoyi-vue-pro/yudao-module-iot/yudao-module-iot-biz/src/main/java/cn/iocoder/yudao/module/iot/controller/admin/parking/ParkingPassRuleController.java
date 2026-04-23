@@ -55,7 +55,7 @@ public class ParkingPassRuleController {
     @GetMapping("/get")
     @Operation(summary = "获得放行规则")
     @Parameter(name = "id", description = "编号", required = true)
-    @PreAuthorize("@ss.hasPermission('iot:parking:pass-rule:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:pass-rule:query-btn')")
     public CommonResult<ParkingPassRuleRespVO> getPassRule(@RequestParam("id") Long id) {
         ParkingPassRuleDO passRule = parkingPassRuleService.getPassRule(id);
         return success(BeanUtils.toBean(passRule, ParkingPassRuleRespVO.class));
@@ -63,7 +63,7 @@ public class ParkingPassRuleController {
 
     @GetMapping("/page")
     @Operation(summary = "获得放行规则分页")
-    @PreAuthorize("@ss.hasPermission('iot:parking:pass-rule:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:pass-rule:query-btn')")
     public CommonResult<PageResult<ParkingPassRuleRespVO>> getPassRulePage(@Valid ParkingPassRulePageReqVO pageReqVO) {
         PageResult<ParkingPassRuleDO> pageResult = parkingPassRuleService.getPassRulePage(pageReqVO);
         return success(BeanUtils.toBean(pageResult, ParkingPassRuleRespVO.class));

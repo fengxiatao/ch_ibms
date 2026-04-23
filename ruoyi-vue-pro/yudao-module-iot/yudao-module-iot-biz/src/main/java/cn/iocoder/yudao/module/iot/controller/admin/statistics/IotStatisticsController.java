@@ -6,7 +6,7 @@ import cn.iocoder.yudao.module.iot.controller.admin.statistics.vo.IotStatisticsD
 import cn.iocoder.yudao.module.iot.controller.admin.statistics.vo.IotStatisticsDeviceMessageSummaryByDateRespVO;
 import cn.iocoder.yudao.module.iot.controller.admin.statistics.vo.IotStatisticsSummaryRespVO;
 import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.service.device.message.IotDeviceMessageService;
 import cn.iocoder.yudao.module.iot.service.product.IotProductCategoryService;
 import cn.iocoder.yudao.module.iot.service.product.IotProductService;
@@ -32,7 +32,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class IotStatisticsController {
 
     @Resource
-    private IotDeviceService deviceService;
+    private IbmsDeviceMapper ibmsDeviceMapper;
     @Resource
     private IotProductCategoryService productCategoryService;
     @Resource
@@ -47,20 +47,20 @@ public class IotStatisticsController {
         // 1.1 获取总数
         respVO.setProductCategoryCount(productCategoryService.getProductCategoryCount(null));
         respVO.setProductCount(productService.getProductCount(null));
-        respVO.setDeviceCount(deviceService.getDeviceCount(null));
+        respVO.setDeviceCount(ibmsDeviceMapper.selectCountByCreateTime(null));
         respVO.setDeviceMessageCount(deviceMessageService.getDeviceMessageCount(null));
         // 1.2 获取今日新增数量
         LocalDateTime todayStart = LocalDateTimeUtils.getToday();
         respVO.setProductCategoryTodayCount(productCategoryService.getProductCategoryCount(todayStart));
         respVO.setProductTodayCount(productService.getProductCount(todayStart));
-        respVO.setDeviceTodayCount(deviceService.getDeviceCount(todayStart));
+        respVO.setDeviceTodayCount(ibmsDeviceMapper.selectCountByCreateTime(todayStart));
         respVO.setDeviceMessageTodayCount(deviceMessageService.getDeviceMessageCount(todayStart));
 
         // 2. 获取各个品类下设备数量统计
         respVO.setProductCategoryDeviceCounts(productCategoryService.getProductCategoryDeviceCountMap());
 
         // 3. 获取设备状态数量统计
-        Map<Integer, Long> deviceCountMap = deviceService.getDeviceCountMapByState();
+        Map<Integer, Long> deviceCountMap = ibmsDeviceMapper.selectDeviceCountMapByState();
         respVO.setDeviceOnlineCount(deviceCountMap.getOrDefault(IotDeviceStateEnum.ONLINE.getState(), 0L));
         respVO.setDeviceOfflineCount(deviceCountMap.getOrDefault(IotDeviceStateEnum.OFFLINE.getState(), 0L));
         respVO.setDeviceInactiveCount(deviceCountMap.getOrDefault(IotDeviceStateEnum.INACTIVE.getState(), 0L));

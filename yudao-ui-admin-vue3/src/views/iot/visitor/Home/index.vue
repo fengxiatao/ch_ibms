@@ -198,7 +198,7 @@ const loadDashboard = () => {
   }
   NewVisitorManagementApi.getDashboard({ dateFrom, dateTo })
     .then((res: any) => {
-      const d = res?.data
+      const d = res
       if (!d) return
       hostRankList.value = (d.hostRank || []).map((r: any) => ({
         name: r.name || '',
@@ -228,12 +228,22 @@ const loadDashboard = () => {
 
 const reasonChartOption = computed<EChartsOption>(() => ({
   tooltip: { trigger: 'item' },
-  legend: { bottom: 0, type: 'scroll' },
+  legend: {
+    top: 10,
+    type: 'scroll',
+    orient: 'vertical'
+  },
   series: [
     {
       type: 'pie',
+      name: '来访事由占比',
       radius: ['40%', '65%'],
       data: reasonDistribution.value.map((r) => ({ value: r.value, name: r.name })),
+      label: {
+        show: true,
+        formatter: '{b}\n{d}%'
+      },
+      labelLine: { length: 10, length2: 10 },
       emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.2)' } }
     }
   ]
@@ -241,10 +251,15 @@ const reasonChartOption = computed<EChartsOption>(() => ({
 
 const trendChartOption = computed<EChartsOption>(() => ({
   tooltip: { trigger: 'axis' },
+  legend: {
+    top: 10,
+    type: 'scroll'
+  },
   xAxis: {
     type: 'category',
     data: trendData.value.map((t) => t.date)
   },
+  grid: { top: 55, left: 10, right: 10, bottom: 20 },
   yAxis: { type: 'value', minInterval: 1 },
   series: [
     {
@@ -258,33 +273,47 @@ const trendChartOption = computed<EChartsOption>(() => ({
 }))
 
 const abnormalChartOption = computed<EChartsOption>(() => ({
-  tooltip: { trigger: 'axis' },
-  xAxis: {
-    type: 'category',
-    data: abnormalDistribution.value.map((a) => a.name)
+  tooltip: { trigger: 'item' },
+  legend: {
+    top: 10,
+    type: 'scroll',
+    orient: 'vertical'
   },
-  yAxis: { type: 'value', minInterval: 1 },
   series: [
     {
-      type: 'bar',
-      data: abnormalDistribution.value.map((a) => a.value),
-      itemStyle: { borderRadius: [4, 4, 0, 0] }
+      name: '异常事件分布',
+      type: 'pie',
+      radius: ['40%', '65%'],
+      data: abnormalDistribution.value.map((a) => ({ value: a.value, name: a.name })),
+      label: {
+        show: true,
+        formatter: '{b}\n{d}%'
+      },
+      labelLine: { length: 10, length2: 10 },
+      emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.2)' } }
     }
   ]
 }))
 
 const timeChartOption = computed<EChartsOption>(() => ({
-  tooltip: { trigger: 'axis' },
-  xAxis: {
-    type: 'category',
-    data: timeDistribution.value.map((t) => t.name)
+  tooltip: { trigger: 'item' },
+  legend: {
+    top: 10,
+    type: 'scroll',
+    orient: 'vertical'
   },
-  yAxis: { type: 'value', minInterval: 1 },
   series: [
     {
-      type: 'bar',
-      data: timeDistribution.value.map((t) => t.value),
-      itemStyle: { borderRadius: [4, 4, 0, 0] }
+      name: '来访时段分布',
+      type: 'pie',
+      radius: ['40%', '65%'],
+      data: timeDistribution.value.map((t) => ({ value: t.value, name: t.name })),
+      label: {
+        show: true,
+        formatter: '{b}\n{d}%'
+      },
+      labelLine: { length: 10, length2: 10 },
+      emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.2)' } }
     }
   ]
 }))
@@ -292,7 +321,7 @@ const timeChartOption = computed<EChartsOption>(() => ({
 onMounted(() => {
   NewVisitorManagementApi.getStats()
     .then((res: any) => {
-      const d = res?.data
+      const d = res
       if (d) {
         stats.value = {
           pendingApproval: d.pendingApproval ?? d.pending_approval ?? 0,

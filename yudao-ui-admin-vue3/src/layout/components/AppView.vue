@@ -3,6 +3,8 @@ import { useTagsViewStore } from '@/store/modules/tagsView'
 import { useAppStore } from '@/store/modules/app'
 import { Footer } from '@/layout/components/Footer'
 import { useViewport } from '@/hooks/web/useViewport'
+import { useRoute } from 'vue-router'
+import { getRouteIdentityKey } from '@/utils/routerHelper'
 
 defineOptions({ name: 'AppView' })
 
@@ -14,6 +16,7 @@ const footer = computed(() => appStore.getFooter)
 const homeFullscreen = computed(() => appStore.getHomeFullscreen)
 
 const tagsViewStore = useTagsViewStore()
+const route = useRoute()
 
 const getCaches = computed((): string[] => {
   return tagsViewStore.getCachedViews
@@ -27,6 +30,17 @@ const containerHeight = computed(() => {
   return `${viewportHeight.value}px`
 })
 
+const contentNoPadding = computed(() => {
+  return (
+    !homeFullscreen.value &&
+    (
+      route.meta?.noPadding === true ||
+      route.path.startsWith('/factory/alarm') ||
+      route.path.startsWith('/factory/video-fusion')
+    )
+  )
+})
+
 //region 无感刷新
 const routerAlive = ref(true)
 // 无感刷新，防止出现页面闪烁白屏
@@ -38,15 +52,32 @@ const reload = () => {
 provide('reload', reload)
 //endregion
 
+const resetContentScroll = () => {
+  window.scrollTo(0, 0)
+  document.documentElement.scrollTop = 0
+  document.body.scrollTop = 0
+  const contentElement = document.querySelector('.app-view-content') as HTMLElement | null
+  if (contentElement) {
+    contentElement.scrollTop = 0
+    contentElement.scrollTo(0, 0)
+  }
+}
+
 // 确保内容区域滚动到顶部
 onMounted(() => {
   nextTick(() => {
-    const contentElement = document.querySelector('.app-view-content') as HTMLElement
-    if (contentElement) {
-      contentElement.scrollTop = 0
-    }
+    resetContentScroll()
   })
 })
+
+watch(
+  () => route.fullPath,
+  () => {
+    nextTick(() => {
+      resetContentScroll()
+    })
+  }
+)
 </script>
 
 <template>
@@ -62,14 +93,15 @@ onMounted(() => {
         {
           'bg-[var(--app-content-bg-color)] dark:bg-[var(--el-bg-color)]': !homeFullscreen,
           'pb-0': footer && !homeFullscreen,
-          'app-view-content--fullscreen': homeFullscreen
+          'app-view-content--fullscreen': homeFullscreen,
+          'app-view-content--no-padding': contentNoPadding
         }
       ]"
     >
       <router-view v-if="routerAlive">
-        <template #default="{ Component, route }">
+        <template #default="{ Component, route: currentRoute }">
           <keep-alive :include="getCaches">
-            <component :is="Component" :key="route.fullPath" />
+            <component :is="Component" :key="getRouteIdentityKey(currentRoute)" />
           </keep-alive>
         </template>
       </router-view>
@@ -106,6 +138,11 @@ onMounted(() => {
   padding: 0 !important;
   overflow: hidden;
   height: 100vh;
+}
+
+.app-view-content--no-padding {
+  padding: 0 !important;
+  padding-top: 0 !important;
 }
 
 .app-view-footer {

@@ -29,6 +29,27 @@
               inline-prompt
               @change="handleCheckedTreeExpand"
             />
+            <span class="ml-12px">显示类型:</span>
+            <el-switch v-model="showMenuTypeTag" active-text="显示" inactive-text="隐藏" inline-prompt />
+            <span class="ml-12px">提交时剔除目录/菜单:</span>
+            <el-switch v-model="stripDirAndMenuOnSubmit" active-text="仅保留按钮" inactive-text="原样保存" inline-prompt />
+            <el-select
+              v-if="stripDirAndMenuOnSubmit"
+              v-model="stripRootMenuIds"
+              class="ml-8px w-260px"
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              clearable
+              placeholder="选择要隐藏的目录（可多选）"
+            >
+              <el-option
+                v-for="opt in rootDirOptions"
+                :key="opt.id"
+                :label="opt.name"
+                :value="opt.id"
+              />
+            </el-select>
           </template>
           <el-tree
             ref="treeRef"
@@ -37,7 +58,21 @@
             empty-text="加载中，请稍候"
             node-key="id"
             show-checkbox
-          />
+          >
+            <template #default="{ data }">
+              <span class="flex items-center gap-8px">
+                <span>{{ data.name }}</span>
+                <el-tag
+                  v-if="showMenuTypeTag"
+                  size="small"
+                  effect="plain"
+                  :type="getMenuTypeTagColor(data.type)"
+                >
+                  {{ getMenuTypeLabel(data.type) }}
+                </el-tag>
+              </span>
+            </template>
+          </el-tree>
         </el-card>
       </el-form-item>
       <el-form-item label="状态" prop="status">
@@ -95,6 +130,103 @@ const menuOptions = ref<any[]>([]) // 树形结构数据
 const menuExpand = ref(false) // 展开/折叠
 const treeRef = ref<InstanceType<typeof ElTree>>() // 树组件 Ref
 const treeNodeAll = ref(false) // 全选/全不选
+const showMenuTypeTag = ref(true) // 是否显示菜单类型标签
+const stripDirAndMenuOnSubmit = ref(false) // 提交时剔除目录/菜单(type=1/2)，仅保留按钮权限（type=3）
+const stripRootMenuIds = ref<number[]>([]) // 要剔除的目录根节点（可多选）
+
+// menuId -> menu meta（用于提交时过滤）
+const menuMetaById = ref(new Map<number, { id: number; parentId: number; name: string; type: number }>())
+const rootDirOptions = ref<Array<{ id: number; name: string }>>([]) // 可选择的目录根节点列表
+
+const getMenuTypeLabel = (type: number) => {
+  // 1 目录、2 菜单、3 按钮
+  if (type === 1) return '目录'
+  if (type === 2) return '菜单'
+  if (type === 3) return '按钮'
+  return `type=${type}`
+}
+const getMenuTypeTagColor = (type: number) => {
+  if (type === 1) return 'info'
+  if (type === 2) return 'success'
+  if (type === 3) return 'warning'
+  return ''
+}
+
+const buildMenuMetaIndex = (menus: MenuApi.MenuVO[]) => {
+  const m = new Map<number, { id: number; parentId: number; name: string; type: number }>()
+  menus.forEach((it) => {
+    m.set(it.id, { id: it.id, parentId: it.parentId, name: it.name, type: it.type })
+  })
+  menuMetaById.value = m
+  // 目录根节点：type=1 且 parentId=0（多数项目约定）
+  rootDirOptions.value = menus
+    .filter((it) => it.type === 1 && (it.parentId === 0 || it.parentId === null))
+    .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+    .map((it) => ({ id: it.id, name: it.name }))
+}
+
+const collectSubTreeIds = (rootId: number) => {
+  const childrenMap = new Map<number, number[]>()
+  menuMetaById.value.forEach((meta) => {
+    if (!childrenMap.has(meta.parentId)) {
+      childrenMap.set(meta.parentId, [])
+    }
+    childrenMap.get(meta.parentId)!.push(meta.id)
+  })
+  const result: number[] = []
+  const stack: number[] = [rootId]
+  while (stack.length) {
+    const id = stack.pop()!
+    result.push(id)
+    const children = childrenMap.get(id)
+    if (children?.length) {
+      stack.push(...children)
+    }
+  }
+  return result
+}
+
+const buildStripPreview = (selectedMenuIds: number[], rootIds: number[]) => {
+  const selected = Array.from(new Set(selectedMenuIds))
+  const subTreeIdSet = new Set<number>()
+  rootIds.forEach((rootId) => {
+    collectSubTreeIds(rootId).forEach((id) => subTreeIdSet.add(id))
+  })
+
+  const inSubTreeSelected = selected.filter((id) => subTreeIdSet.has(id))
+  const willRemove = inSubTreeSelected.filter((id) => {
+    const meta = menuMetaById.value.get(id)
+    return meta && meta.type !== 3
+  })
+  const willKeepInSubTree = inSubTreeSelected.filter((id) => {
+    const meta = menuMetaById.value.get(id)
+    return meta && meta.type === 3
+  })
+  const willKeepTotal = selected.filter((id) => {
+    const meta = menuMetaById.value.get(id)
+    if (!meta) return false
+    if (!subTreeIdSet.has(id)) return true
+    return meta.type === 3
+  })
+
+  // 高风险：被剔除的节点里，存在 permission 的页面菜单(type=2)
+  const riskyRemovedMenus: Array<{ id: number; name: string; permission?: string }> = []
+  willRemove.forEach((id) => {
+    const meta = menuMetaById.value.get(id)
+    if (!meta || meta.type !== 2) return
+    // permission 不在 meta 里，临时从树节点数据上拿不到；这里用“提示可能丢权限”的形式即可
+    riskyRemovedMenus.push({ id, name: meta.name })
+  })
+
+  return {
+    selectedCount: selected.length,
+    inSubTreeSelectedCount: inSubTreeSelected.length,
+    willRemoveCount: willRemove.length,
+    willKeepInSubTreeCount: willKeepInSubTree.length,
+    willKeepTotalCount: willKeepTotal.length,
+    riskyRemovedMenus
+  }
+}
 
 /** 打开弹窗 */
 const open = async (type: string, id?: number) => {
@@ -103,7 +235,9 @@ const open = async (type: string, id?: number) => {
   formType.value = type
   resetForm()
   // 加载 Menu 列表。注意，必须放在前面，不然下面 setChecked 没数据节点
-  menuOptions.value = handleTree(await MenuApi.getSimpleMenusList())
+  const menus = (await MenuApi.getSimpleMenusList()) as unknown as MenuApi.MenuVO[]
+  buildMenuMetaIndex(menus)
+  menuOptions.value = handleTree(menus)
   // 修改时，设置数据
   if (id) {
     formLoading.value = true
@@ -137,6 +271,49 @@ const submitForm = async () => {
       ...(treeRef.value!.getCheckedKeys(false) as unknown as Array<number>), // 获得当前选中节点
       ...(treeRef.value!.getHalfCheckedKeys() as unknown as Array<number>) // 获得半选中的父节点
     ]
+
+    // 保存前检测：开启“仅保留按钮”时，先预览将被剔除的目录/菜单数量，避免误操作
+    if (stripDirAndMenuOnSubmit.value) {
+      if (stripRootMenuIds.value.length === 0) {
+        message.warning('已开启“仅保留按钮”，但未选择要隐藏的目录，请先选择目录后再保存')
+        return
+      }
+      const preview = buildStripPreview(data.menuIds, stripRootMenuIds.value)
+      const rootNames = stripRootMenuIds.value
+        .map((id) => rootDirOptions.value.find((x) => x.id === id)?.name || String(id))
+        .join('、')
+      const riskyNames = preview.riskyRemovedMenus.slice(0, 10).map((x) => x.name).join('、')
+      const riskyMore = preview.riskyRemovedMenus.length > 10 ? ` 等${preview.riskyRemovedMenus.length}项` : ''
+      const content =
+        `你已选择隐藏目录：${rootNames}\n` +
+        `本次保存会在这些目录子树中：剔除目录/菜单 ${preview.willRemoveCount} 项，仅保留按钮 ${preview.willKeepInSubTreeCount} 项。\n` +
+        `最终保存权限条目数：${preview.willKeepTotalCount}（原选择 ${preview.selectedCount}）。\n` +
+        (preview.riskyRemovedMenus.length
+          ? `注意：有 ${preview.riskyRemovedMenus.length} 个“页面菜单(type=2)”会被剔除（若这些节点承载了接口 permission，可能导致权限缺失）：${riskyNames}${riskyMore}\n`
+          : '') +
+        `确认继续保存吗？`
+      try {
+        await message.confirm(content, '保存前确认')
+      } catch {
+        return
+      }
+    }
+
+    // 通用：对选定的“目录根节点”子树，提交时剔除目录/菜单(type=1/2)，只保留按钮(type=3)，从而实现“有权限但不展示菜单入口”
+    if (stripDirAndMenuOnSubmit.value && stripRootMenuIds.value.length > 0) {
+      const subTreeIdSet = new Set<number>()
+      stripRootMenuIds.value.forEach((rootId) => {
+        collectSubTreeIds(rootId).forEach((id) => subTreeIdSet.add(id))
+      })
+      const filtered = data.menuIds.filter((id) => {
+        const meta = menuMetaById.value.get(id)
+        if (!meta) return false
+        if (!subTreeIdSet.has(id)) return true
+        return meta.type === 3
+      })
+      // 去重
+      data.menuIds = Array.from(new Set(filtered))
+    }
     if (formType.value === 'create') {
       await TenantPackageApi.createTenantPackage(data)
       message.success(t('common.createSuccess'))
@@ -157,6 +334,9 @@ const resetForm = () => {
   // 重置选项
   treeNodeAll.value = false
   menuExpand.value = false
+  showMenuTypeTag.value = true
+  stripDirAndMenuOnSubmit.value = false
+  stripRootMenuIds.value = []
   // 重置表单
   formData.value = {
     id: null,

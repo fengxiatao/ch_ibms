@@ -71,7 +71,7 @@ public class ParkingChargeRuleController {
     @GetMapping("/get")
     @Operation(summary = "获得收费规则")
     @Parameter(name = "id", description = "编号", required = true)
-    @PreAuthorize("@ss.hasPermission('iot:parking:charge-rule:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:charge-rule:query-btn')")
     public CommonResult<ParkingChargeRuleRespVO> getChargeRule(@RequestParam("id") Long id) {
         ParkingChargeRuleDO chargeRule = parkingChargeRuleService.getChargeRule(id);
         return success(BeanUtils.toBean(chargeRule, ParkingChargeRuleRespVO.class));
@@ -79,7 +79,7 @@ public class ParkingChargeRuleController {
 
     @GetMapping("/page")
     @Operation(summary = "获得收费规则分页")
-    @PreAuthorize("@ss.hasPermission('iot:parking:charge-rule:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:charge-rule:query-btn')")
     public CommonResult<PageResult<ParkingChargeRuleRespVO>> getChargeRulePage(@Valid ParkingChargeRulePageReqVO pageReqVO) {
         PageResult<ParkingChargeRuleDO> pageResult = parkingChargeRuleService.getChargeRulePage(pageReqVO);
         return success(BeanUtils.toBean(pageResult, ParkingChargeRuleRespVO.class));
@@ -87,7 +87,7 @@ public class ParkingChargeRuleController {
 
     @GetMapping("/simple-list")
     @Operation(summary = "获得收费规则精简列表")
-    @PreAuthorize("@ss.hasPermission('iot:parking:charge-rule:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:charge-rule:query-btn')")
     public CommonResult<List<ParkingChargeRuleRespVO>> getChargeRuleSimpleList() {
         List<ParkingChargeRuleDO> list = parkingChargeRuleService.getChargeRuleList();
         return success(BeanUtils.toBean(list, ParkingChargeRuleRespVO.class));

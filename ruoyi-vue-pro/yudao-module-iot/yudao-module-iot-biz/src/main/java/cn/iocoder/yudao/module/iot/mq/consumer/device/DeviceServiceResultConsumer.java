@@ -12,9 +12,10 @@ import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService.AccessChannelSyncInfo;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService.AccessChannelSyncResult;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService.NvrChannelSyncInfo;
-import cn.iocoder.yudao.module.iot.service.device.IotDeviceService;
+import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceGatewaySupportService;
 import cn.iocoder.yudao.module.iot.websocket.DeviceMessagePushService;
 import cn.iocoder.yudao.module.iot.websocket.message.unified.UnifiedCommandResultMessage;
+import cn.iocoder.yudao.module.iot.service.device.activation.DeviceActivationStateManager;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,8 +73,13 @@ public class DeviceServiceResultConsumer implements IotMessageSubscriber<IotDevi
     private final Map<String, DeviceResultHandler> handlers;
     private final IotDeviceChannelService channelService;
     private final ChannelSyncRetryTemplate channelSyncRetryTemplate;
-    private final IotDeviceService deviceService;
+    private final IbmsDeviceGatewaySupportService ibmsDeviceGatewaySupportService;
     private final DeviceCommandResponseManager responseManager;
+
+    /**
+     * 激活状态机：用于兜底（CONNECT 已在线 alreadyOnline=true 时，newgateway 可能不再触发 DEVICE_STATE_CHANGED）。
+     */
+    private final DeviceActivationStateManager activationStateManager;
 
     /**
      * 构造函数
@@ -83,7 +89,7 @@ public class DeviceServiceResultConsumer implements IotMessageSubscriber<IotDevi
      * @param handlerList 设备结果处理器列表（Spring 自动注入所有实现）
      * @param channelService 设备通道服务（用于通道同步）
      * @param channelSyncRetryTemplate 通道同步重试模板
-     * @param deviceService 设备服务
+     * @param ibmsDeviceGatewaySupportService IBMS 网关侧设备状态写入
      * @param responseManager 命令响应管理器（用于同步请求-响应模式）
      */
     @Autowired
@@ -92,14 +98,16 @@ public class DeviceServiceResultConsumer implements IotMessageSubscriber<IotDevi
                                         @Autowired(required = false) List<DeviceResultHandler> handlerList,
                                         @Autowired(required = false) IotDeviceChannelService channelService,
                                         @Autowired(required = false) ChannelSyncRetryTemplate channelSyncRetryTemplate,
-                                        @Autowired(required = false) IotDeviceService deviceService,
-                                        @Autowired(required = false) DeviceCommandResponseManager responseManager) {
+                                        @Autowired(required = false) IbmsDeviceGatewaySupportService ibmsDeviceGatewaySupportService,
+                                        @Autowired(required = false) DeviceCommandResponseManager responseManager,
+                                        @Autowired(required = false) DeviceActivationStateManager activationStateManager) {
         this.messageBus = messageBus;
         this.pushService = pushService;
         this.channelService = channelService;
         this.channelSyncRetryTemplate = channelSyncRetryTemplate;
-        this.deviceService = deviceService;
+        this.ibmsDeviceGatewaySupportService = ibmsDeviceGatewaySupportService;
         this.responseManager = responseManager;
+        this.activationStateManager = activationStateManager;
         this.handlers = new HashMap<>();
         
         // 注册所有处理器
@@ -148,6 +156,24 @@ public class DeviceServiceResultConsumer implements IotMessageSubscriber<IotDevi
                 deviceType, deviceId, requestId, success, serviceIdentifier);
 
         try {
+            // 1.1 CONNECT 兜底：
+            // - newgateway 如果在 CONNECT 返回 alreadyOnline=true，biz 可能不会再收到 DEVICE_STATE_CHANGED，
+            //   activation 会一直卡在 activating。
+            // - 另外，某些网关实现/消息结构里 alreadyOnline 字段可能取不到（extractAlreadyOnline 返回 null/false），
+            //   这时仍需要兜底把当前 activating 的激活直接标记为 completed。
+            if (success
+                    && "CONNECT".equalsIgnoreCase(serviceIdentifier)
+                    && deviceId != null) {
+                Boolean alreadyOnline = extractAlreadyOnline(message);
+                boolean isActivating = activationStateManager != null && activationStateManager.isActivating(deviceId);
+                log.info("[DeviceServiceResultConsumer] CONNECT 激活兜底检查: deviceId={}, requestId={}, alreadyOnline={}, isActivating={}, activationStateManagerPresent={}",
+                        deviceId, requestId, alreadyOnline, isActivating, activationStateManager != null);
+                if (activationStateManager != null
+                        && (Boolean.TRUE.equals(alreadyOnline) || isActivating)) {
+                    activationStateManager.completeActivation(deviceId);
+                }
+            }
+
             // 0. 通知响应管理器（用于同步请求-响应模式）
             // 这是统一的响应匹配入口，所有需要同步等待响应的服务都通过 DeviceCommandResponseManager 来等待
             if (responseManager != null && requestId != null) {
@@ -177,6 +203,46 @@ public class DeviceServiceResultConsumer implements IotMessageSubscriber<IotDevi
     }
 
     /**
+     * 从 CONNECT 返回的 data 中解析 alreadyOnline。
+     *
+     * <p>预期结构（newgateway 发送）示例：
+     * <pre>
+     * data = {
+     *   deviceInfo = { alreadyOnline = true, ... },
+     *   loginHandle = ...
+     * }
+     * </pre>
+     * </p>
+     *
+     * @return 如果无法解析则返回 null
+     */
+    private Boolean extractAlreadyOnline(IotDeviceMessage message) {
+        if (message == null || message.getData() == null) {
+            return null;
+        }
+        Object dataObj = message.getData();
+        if (!(dataObj instanceof Map<?, ?> dataMap)) {
+            return null;
+        }
+
+        Object alreadyOnlineObj = dataMap.get("alreadyOnline");
+        if (alreadyOnlineObj == null) {
+            Object deviceInfoObj = dataMap.get("deviceInfo");
+            if (deviceInfoObj instanceof Map<?, ?> deviceInfoMap) {
+                alreadyOnlineObj = deviceInfoMap.get("alreadyOnline");
+            }
+        }
+
+        if (alreadyOnlineObj instanceof Boolean b) {
+            return b;
+        }
+        if (alreadyOnlineObj != null) {
+            return Boolean.parseBoolean(alreadyOnlineObj.toString());
+        }
+        return null;
+    }
+
+    /**
      * 处理在线检测结果
      *
      * <p>场景：前端点击“刷新状态”，biz 发出 CHECK_DEVICE_ONLINE 命令。</p>
@@ -190,8 +256,8 @@ public class DeviceServiceResultConsumer implements IotMessageSubscriber<IotDevi
         if (!isSuccess(message)) {
             return;
         }
-        if (deviceService == null) {
-            log.warn("[DeviceServiceResultConsumer] IotDeviceService 未注入，跳过在线检测结果落库/推送");
+        if (ibmsDeviceGatewaySupportService == null) {
+            log.warn("[DeviceServiceResultConsumer] IbmsDeviceGatewaySupportService 未注入，跳过在线检测结果落库/推送");
             return;
         }
 
@@ -228,7 +294,7 @@ public class DeviceServiceResultConsumer implements IotMessageSubscriber<IotDevi
         boolean updated = false;
         for (int i = 0; i < 3; i++) {
             try {
-                deviceService.updateDeviceStateWithTimestamp(deviceId, newState, ts);
+                ibmsDeviceGatewaySupportService.updateGatewayDeviceStateWithTimestamp(deviceId, newState, ts);
                 updated = true;
                 break;
             } catch (CannotAcquireLockException e) {

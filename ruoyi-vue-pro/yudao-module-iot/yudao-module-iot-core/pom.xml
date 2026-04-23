@@ -32,6 +32,12 @@
             <artifactId>spring-boot-starter</artifactId>
         </dependency>
 
+        <!-- Micrometer：RocketMQ 消费失败等指标（与 Actuator 共存时自动注册到全局 Registry） -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
+
         <!-- 消息中间件相关（可选依赖） -->
         <dependency>
             <groupId>cn.iocoder.boot</groupId>

@@ -29,7 +29,7 @@ public class ParkingStatisticsController {
     @GetMapping("/present")
     @Operation(summary = "获取在场车辆统计")
     @Parameter(name = "lotId", description = "停车场ID（可选）")
-    @PreAuthorize("@ss.hasPermission('iot:parking:lot:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:lot:query-btn')")
     public CommonResult<ParkingPresentStatisticsRespVO> getPresentStatistics(
             @RequestParam(value = "lotId", required = false) Long lotId) {
         return success(parkingStatisticsService.getPresentStatistics(lotId));
@@ -37,7 +37,7 @@ public class ParkingStatisticsController {
 
     @GetMapping("/overview")
     @Operation(summary = "获取停车场概览统计")
-    @PreAuthorize("@ss.hasPermission('iot:parking:lot:query')")
+    @PreAuthorize("@ss.hasPermission('iot:parking:lot:query-btn')")
     public CommonResult<ParkingOverviewStatisticsRespVO> getOverviewStatistics() {
         return success(parkingStatisticsService.getOverviewStatistics());
     }

@@ -46,42 +46,68 @@ export interface DevicePageReqVO {
  * 查询设备列表
  */
 export const getDeviceList = (params: DevicePageReqVO) => {
-  return request.get({ url: '/iot/device/page', params })
+  return request.get({
+    url: '/iot/ibms/device/page',
+    params: {
+      pageNo: params.pageNo,
+      pageSize: params.pageSize,
+      keyword: params.name,
+      systemCode: params.deviceType
+    }
+  })
 }
 
 /**
- * 查询设备详情
+ * 查询设备详情（IBMS 台账，并兼容旧字段 deviceName / ipAddress）
  */
-export const getDevice = (id: number) => {
-  return request.get({ url: `/iot/device/get?id=${id}` })
+export const getDevice = async (id: number) => {
+  const data: any = await request.get({ url: `/iot/ibms/device/get`, params: { id } })
+  if (!data) {
+    return data
+  }
+  return {
+    ...data,
+    deviceName: data.name ?? data.deviceName,
+    ipAddress: data.ip ?? data.ipAddress,
+    deviceKey: data.deviceCode ?? data.deviceKey
+  }
 }
 
 /**
- * 新增设备
+ * 新增设备（IBMS 台账 `/iot/ibms/device/create`；请求体字段与 `api/iot/ibms/device` 中 IbmsDeviceSaveReqVO 一致）
  */
-export const createDevice = (data: DeviceVO) => {
-  return request.post({ url: '/iot/device/create', data })
+export const createDevice = (data: Record<string, any>) => {
+  return request.post({ url: '/iot/ibms/device/create', data })
 }
 
 /**
- * 修改设备
+ * 修改设备（IBMS）
  */
-export const updateDevice = (id: number, data: Partial<DeviceVO>) => {
-  return request.put({ url: '/iot/device/update', data: { id, ...data } })
+export const updateDevice = (id: number, data: Record<string, any>) => {
+  return request.put({ url: '/iot/ibms/device/update', data: { id, ...data } })
 }
 
 /**
- * 删除设备
+ * 删除设备（IBMS）
  */
 export const deleteDevice = (id: number) => {
-  return request.delete({ url: `/iot/device/delete?id=${id}` })
+  return request.delete({ url: `/iot/ibms/device/delete?id=${id}` })
 }
 
 /**
- * 导出设备 Excel
+ * 导出设备 Excel（IBMS 台账，与列表筛选字段映射一致）
  */
 export const exportDevice = (params: DevicePageReqVO) => {
-  return request.download({ url: '/iot/device/export-excel', params })
+  return request.download({
+    url: '/iot/ibms/device/export-excel',
+    params: {
+      pageNo: params.pageNo ?? 1,
+      pageSize: -1,
+      keyword: params.name,
+      systemCode: params.deviceType,
+      ibmsProductId: params.productId
+    }
+  })
 }
 
 

@@ -195,9 +195,16 @@ const showRange = computed(() => {
   return total.value > 0 ? `${start}-${end}` : '0-0'
 })
 
-const formatTime = (t: string) => {
-  if (!t) return '-'
-  return t.slice(0, 19).replace('T', ' ')
+const formatTime = (t: string | number | Date | null | undefined) => {
+  if (t === null || t === undefined || t === '') return '-'
+  const date = t instanceof Date
+    ? t
+    : typeof t === 'number'
+      ? new Date(t)
+      : new Date(String(t))
+  if (Number.isNaN(date.getTime())) return '-'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
 const getVisitStatusType = (row: any) => {
@@ -219,8 +226,8 @@ const loadData = async () => {
       pageNo: queryParams.pageNo,
       pageSize: queryParams.pageSize
     })
-    const list = res?.data?.list ?? []
-    const totalCount = res?.data?.total ?? 0
+    const list = res?.list ?? res?.data?.list ?? []
+    const totalCount = res?.total ?? res?.data?.total ?? 0
     tableData.value = list.map((it: any) => ({ ...it }))
     total.value = totalCount
   } finally {
@@ -231,7 +238,7 @@ const loadData = async () => {
 const loadStats = () => {
   NewVisitorManagementApi.getStats()
     .then((res: any) => {
-      const d = res?.data
+      const d = res
       if (d) {
         stats.value = {
           currentVisitors: d.currentVisitors ?? 0,

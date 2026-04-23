@@ -198,9 +198,16 @@ const showRange = computed(() => {
   return total.value > 0 ? `${start}-${end}` : '0-0'
 })
 
-const formatTime = (t: string) => {
-  if (!t) return '-'
-  return t.slice(0, 19).replace('T', ' ')
+const formatTime = (t: string | number | Date | null | undefined) => {
+  if (t === null || t === undefined || t === '') return '-'
+  const date = t instanceof Date
+    ? t
+    : typeof t === 'number'
+      ? new Date(t)
+      : new Date(String(t))
+  if (Number.isNaN(date.getTime())) return '-'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
 const getVisitStatusType = (row: any) => {
@@ -219,13 +226,13 @@ const loadAlerts = () => {
   // 提醒可从异常/今日在访接口组装
   NewVisitorManagementApi.getAbnormalPage({ pageNo: 1, pageSize: 10 })
     .then((res: any) => {
-      const list = res?.data?.list ?? []
+      const list = res?.list ?? res?.data?.list ?? []
       alertList.value = list.slice(0, 5).map((it: any, i: number) => ({
         id: it.id || i,
         type: it.abnormalType === 'unauthorized' ? 'unauthorized' : it.abnormalType === 'overtime' ? 'overtime_out' : 'overtime_in',
         title: it.abnormalType === 'unauthorized' ? '访客非法闯入' : it.abnormalType === 'overtime' ? '访客超时未签离' : '访客超时未签到',
         desc: `${it.visitorName || ''}（${it.visitorPhone || ''}）${it.details || ''}`,
-        time: it.eventTime ? it.eventTime.slice(0, 19).replace('T', ' ') : '',
+        time: formatTime(it.eventTime),
         icon: it.abnormalType === 'unauthorized' ? 'ep:warning-filled' : 'ep:clock',
         appointmentId: it.appointmentId
       }))
@@ -243,8 +250,8 @@ const loadData = async () => {
       pageSize: queryParams.pageSize,
       type: queryParams.visitStatus || undefined
     })
-    const list = res?.data?.list ?? []
-    const totalCount = res?.data?.total ?? 0
+    const list = res?.list ?? res?.data?.list ?? []
+    const totalCount = res?.total ?? res?.data?.total ?? 0
     tableData.value = list.map((it: any) => ({
       ...it,
       authStatus: it.signInTime && !it.signOutTime ? '已下发' : it.signOutTime ? '已回收' : '-'

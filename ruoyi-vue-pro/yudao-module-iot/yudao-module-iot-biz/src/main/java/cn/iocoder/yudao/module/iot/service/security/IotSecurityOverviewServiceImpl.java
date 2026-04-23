@@ -1,22 +1,25 @@
 package cn.iocoder.yudao.module.iot.service.security;
 
-import cn.hutool.json.JSONObject;
-import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.security.vo.PlayUrlRespVO;
 import cn.iocoder.yudao.module.iot.controller.admin.security.vo.SecurityOverviewCameraPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.security.vo.SecurityOverviewCameraRespVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceRuntimeMapper;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
 import cn.iocoder.yudao.module.iot.websocket.message.ServiceFailureMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
-import java.util.HashMap;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Comparator;
 import java.util.stream.Collectors;
 
 /**
@@ -29,7 +32,10 @@ import java.util.stream.Collectors;
 public class IotSecurityOverviewServiceImpl implements IotSecurityOverviewService {
 
     @Resource
-    private IotDeviceMapper deviceMapper;
+    private IbmsDeviceMapper ibmsDeviceMapper;
+
+    @Resource
+    private IbmsDeviceRuntimeMapper ibmsDeviceRuntimeMapper;
     
     
     @Resource
@@ -45,20 +51,56 @@ public class IotSecurityOverviewServiceImpl implements IotSecurityOverviewServic
         log.info("[安防概览] 查询摄像头列表: includeSnapshot={}, onlineOnly={}", 
                 reqVO.getIncludeSnapshot(), reqVO.getOnlineOnly());
         
-        // 1. 查询符合条件的设备（考虑菜单继承）
-        PageResult<IotDeviceDO> devicePage = deviceMapper.selectSecurityOverviewDevices(reqVO);
-        
-        log.info("[安防概览] 查询到设备数量: total={}, listSize={}", 
-                devicePage.getTotal(), devicePage.getList().size());
-        
-        // 2. 转换为VO
-        List<SecurityOverviewCameraRespVO> voList = devicePage.getList().stream()
-            .map(device -> convertToVO(device, reqVO.getIncludeSnapshot()))
-            .collect(Collectors.toList());
+        // 1. 单台账：原 iot_device 查询只查 product_id=3（网络摄像头）。
+        // 这里改为只查 ibms_device.ibms_product_id=3，并用 ibms_device_runtime 组装 legacy 壳。
+        Long ibmsProductId = 3L;
+        List<IbmsDeviceDO> ibmsDevices = ibmsDeviceMapper.selectListByIbmsProductId(ibmsProductId);
+        if (ibmsDevices == null) {
+            ibmsDevices = List.of();
+        }
+
+        List<Long> deviceIds = ibmsDevices.stream().map(IbmsDeviceDO::getId).toList();
+        List<IbmsDeviceRuntimeDO> runtimes = deviceIds.isEmpty()
+                ? List.of()
+                : ibmsDeviceRuntimeMapper.selectList(
+                new LambdaQueryWrapperX<IbmsDeviceRuntimeDO>()
+                        .in(IbmsDeviceRuntimeDO::getDeviceId, deviceIds));
+        Map<Long, IbmsDeviceRuntimeDO> runtimeMap = runtimes == null
+                ? Map.<Long, IbmsDeviceRuntimeDO>of()
+                : runtimes.stream().collect(Collectors.toMap(IbmsDeviceRuntimeDO::getDeviceId, r -> r, (a, b) -> a));
+
+        // 2. 组装 legacy 壳 + 计算状态，再按 onlineTime 倒序（nulls 最后）
+        List<IotDeviceDO> shells = ibmsDevices.stream()
+                .map(ibms -> IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(
+                        ibms, runtimeMap.get(ibms.getId())))
+                .filter(java.util.Objects::nonNull)
+                .filter(d -> {
+                    if (reqVO.getOnlineOnly() == null || !reqVO.getOnlineOnly()) {
+                        return true;
+                    }
+                    return cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum
+                            .isOnline(d.getState());
+                })
+                .sorted(Comparator.comparing(IotDeviceDO::getOnlineTime, Comparator.nullsLast(Comparator.reverseOrder())))
+                .collect(Collectors.toList());
+
+        log.info("[安防概览] 查询到设备数量: total={}, listSize={}", shells.size(), shells.size());
+
+        // 3. 分页
+        int pageNo = reqVO.getPageNo();
+        int pageSize = reqVO.getPageSize();
+        int from = Math.max(0, (pageNo - 1) * pageSize);
+        int to = Math.min(from + pageSize, shells.size());
+        List<IotDeviceDO> pageList = from >= shells.size() ? List.of() : shells.subList(from, to);
+
+        // 4. 转换为VO
+        List<SecurityOverviewCameraRespVO> voList = pageList.stream()
+                .map(device -> convertToVO(device, reqVO.getIncludeSnapshot()))
+                .collect(Collectors.toList());
         
         log.info("[安防概览] 转换后VO数量: {}", voList.size());
         
-        return new PageResult<>(voList, devicePage.getTotal());
+        return new PageResult<>(voList, (long) shells.size());
     }
 
     @Override
@@ -66,7 +108,13 @@ public class IotSecurityOverviewServiceImpl implements IotSecurityOverviewServic
         log.info("[安防概览] 获取设备快照: deviceId={}", deviceId);
         
         // 1. 查询设备信息
-        IotDeviceDO device = deviceMapper.selectById(deviceId);
+        IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(deviceId);
+        if (ibms == null) {
+            log.warn("[安防概览] 设备不存在: deviceId={}", deviceId);
+            return null;
+        }
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeMapper.selectById(deviceId);
+        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(ibms, runtime);
         if (device == null) {
             log.warn("[安防概览] 设备不存在: deviceId={}", deviceId);
             return null;
@@ -200,6 +248,7 @@ public class IotSecurityOverviewServiceImpl implements IotSecurityOverviewServic
      * @deprecated 此方法已废弃，请使用 {@link #invokeSnapshotService(IotDeviceDO)} 替代
      */
     @Deprecated
+    @SuppressWarnings("unused")
     private String getDeviceSnapshotInternal(IotDeviceDO device) {
         try {
             // 解析配置
@@ -276,7 +325,13 @@ public class IotSecurityOverviewServiceImpl implements IotSecurityOverviewServic
         log.info("[安防概览] 获取播放地址: deviceId={}", deviceId);
         
         // 1. 查询设备信息
-        IotDeviceDO device = deviceMapper.selectById(deviceId);
+        IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(deviceId);
+        if (ibms == null) {
+            log.warn("[安防概览] 设备不存在: deviceId={}", deviceId);
+            throw new RuntimeException("设备不存在: deviceId=" + deviceId);
+        }
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeMapper.selectById(deviceId);
+        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(ibms, runtime);
         if (device == null) {
             log.warn("[安防概览] 设备不存在: deviceId={}", deviceId);
             throw new RuntimeException("设备不存在: deviceId=" + deviceId);

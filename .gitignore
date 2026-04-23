@@ -95,3 +95,7 @@ Thumbs.db
 # ===== 不纳入主仓库的嵌套项目 =====
 /ibms-server/
 /ibms-ui-admin/
+
+# Ignore large 3D assets (avoid GitHub 100MB limit)
+���ֳ���/*.glb
+

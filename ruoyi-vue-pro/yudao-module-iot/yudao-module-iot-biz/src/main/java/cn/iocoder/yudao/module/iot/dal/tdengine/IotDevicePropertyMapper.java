@@ -18,7 +18,7 @@ import java.util.Map;
  * 注意：已从 TDEngine 迁移到 MySQL，保留原有包路径以减少代码改动
  * 
  * MySQL版本存储策略：
- * - 使用统一的 iot_device_property_history 表存储所有设备的属性历史
+ * - 使用统一的 ibms_device_property_history 表存储所有设备的属性历史
  * - 通过 device_id、product_id 和 identifier 字段区分不同属性
  * - 属性值以原始类型存储在 value 字段中
  */

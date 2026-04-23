@@ -22,4 +22,7 @@ public class DictDataSimpleRespVO {
     @Schema(description = "css 样式", example = "btn-visible")
     private String cssClass;
 
+    @Schema(description = "扩展备注，一般为 JSON 字符串，用于 IBMS 码表等扩展字段", example = "{\"system\":\"VI\"}")
+    private String remark;
+
 }

@@ -1,14 +1,18 @@
 package cn.iocoder.yudao.module.iot.service.camera;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.iot.controller.admin.camera.vo.IotCameraForGatewayRespVO;
 import cn.iocoder.yudao.module.iot.controller.admin.camera.vo.IotCameraPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.camera.vo.IotCameraSaveReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.camera.IotCameraDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.camera.IotCameraMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceRuntimeMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +28,7 @@ import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.CAMERA_NOT_EXISTS;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
 
 /**
  * IoT 摄像头管理 Service实现类
@@ -39,7 +44,10 @@ public class IotCameraServiceImpl implements IotCameraService {
     private IotCameraMapper cameraMapper;
     
     @Resource
-    private IotDeviceMapper deviceMapper;
+    private IbmsDeviceMapper ibmsDeviceMapper;
+
+    @Resource
+    private IbmsDeviceRuntimeMapper ibmsDeviceRuntimeMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -192,9 +200,19 @@ public class IotCameraServiceImpl implements IotCameraService {
             return new ArrayList<>();
         }
         
-        // 批量查询设备信息（获取IP地址）
-        List<IotDeviceDO> devices = deviceMapper.selectList("id", deviceIds);
-        Map<Long, IotDeviceDO> deviceMap = devices.stream()
+        // 批量查询设备信息（获取 IP 地址等连接配置）
+        List<IbmsDeviceDO> ibmsDevices = ibmsDeviceMapper.selectBatchIds(deviceIds);
+
+        Map<Long, IbmsDeviceRuntimeDO> runtimeMap = ibmsDeviceRuntimeMapper.selectList(
+                        new LambdaQueryWrapperX<IbmsDeviceRuntimeDO>()
+                                .in(IbmsDeviceRuntimeDO::getDeviceId, deviceIds))
+                .stream()
+                .collect(Collectors.toMap(IbmsDeviceRuntimeDO::getDeviceId, r -> r, (a, b) -> a));
+
+        Map<Long, IotDeviceDO> deviceMap = ibmsDevices.stream()
+                .map(ibms -> IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(
+                        ibms, runtimeMap.get(ibms.getId())))
+                .filter(Objects::nonNull)
                 .collect(Collectors.toMap(IotDeviceDO::getId, device -> device));
         
         // 组装返回结果

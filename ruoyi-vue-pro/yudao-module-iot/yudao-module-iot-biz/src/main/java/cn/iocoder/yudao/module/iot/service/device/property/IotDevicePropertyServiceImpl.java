@@ -41,7 +41,7 @@ import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.
 /**
  * IoT 设备【属性】数据 Service 实现类
  * 
- * 注意：已从 TDEngine 迁移到 MySQL，使用统一的 iot_device_property_history 表存储属性历史
+ * 注意：已从 TDEngine 迁移到 MySQL，使用统一的 ibms_device_property_history 表存储属性历史
  *
  * @author 长辉信息科技有限公司
  */
@@ -75,7 +75,7 @@ public class IotDevicePropertyServiceImpl implements IotDevicePropertyService {
 
     @Override
     public void defineDevicePropertyData(Long productId) {
-        // MySQL版本：使用统一的 iot_device_property_history 表，无需动态创建表结构
+        // MySQL版本：使用统一的 ibms_device_property_history 表，无需动态创建表结构
         // 此方法保留为兼容接口，仅做日志记录
         try {
             // 验证产品存在
@@ -134,7 +134,7 @@ public class IotDevicePropertyServiceImpl implements IotDevicePropertyService {
 
     @Override
     public void saveDevicePropertyToTDengine(IotDeviceDO device, Map<String, Object> properties, LocalDateTime reportTime) {
-        // MySQL版本：直接插入到统一的 iot_device_property_history 表
+        // MySQL版本：直接插入到统一的 ibms_device_property_history 表
         if (CollUtil.isEmpty(properties)) {
             log.warn("[saveDevicePropertyToTDengine][属性为空，跳过存储]");
             return;

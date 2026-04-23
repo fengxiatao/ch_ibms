@@ -5,8 +5,10 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.status.DeviceStatusPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.status.DeviceStatusRespVO;
 import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceRuntimeMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,11 +33,14 @@ import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.
 public class DeviceStatusServiceImpl implements DeviceStatusService {
 
     @Resource
-    private IotDeviceMapper deviceMapper;
+    private IbmsDeviceMapper deviceMapper;
+    @Resource
+    private IbmsDeviceRuntimeMapper deviceRuntimeMapper;
 
     @Override
     public DeviceStatusRespVO getDeviceStatus(Long deviceId) {
-        IotDeviceDO device = deviceMapper.selectById(deviceId);
+        IbmsDeviceDO device = deviceMapper.selectById(deviceId);
+        IbmsDeviceRuntimeDO runtime = deviceId != null ? deviceRuntimeMapper.selectById(deviceId) : null;
         
         // Requirements: 5.4 - 查询的设备不存在时返回 INACTIVE 状态
         if (device == null) {
@@ -47,7 +52,7 @@ public class DeviceStatusServiceImpl implements DeviceStatusService {
                     .build();
         }
         
-        return convertToStatusVO(device);
+        return convertToStatusVO(device, runtime);
     }
 
     @Override
@@ -57,15 +62,24 @@ public class DeviceStatusServiceImpl implements DeviceStatusService {
         }
         
         // 批量查询设备
-        List<IotDeviceDO> devices = deviceMapper.selectBatchIds(deviceIds);
-        Map<Long, IotDeviceDO> deviceMap = convertMap(devices, IotDeviceDO::getId);
+        List<IbmsDeviceDO> devices = deviceMapper.selectBatchIds(deviceIds);
+        Map<Long, IbmsDeviceDO> deviceMap = convertMap(devices, IbmsDeviceDO::getId);
+
+        // 批量查询运行态（onlineTime/offlineTime/state）
+        List<IbmsDeviceRuntimeDO> runtimes = deviceRuntimeMapper.selectList(
+                new LambdaQueryWrapperX<IbmsDeviceRuntimeDO>()
+                        .in(IbmsDeviceRuntimeDO::getDeviceId, deviceIds)
+                        .select(IbmsDeviceRuntimeDO::getDeviceId, IbmsDeviceRuntimeDO::getState,
+                                IbmsDeviceRuntimeDO::getOnlineTime, IbmsDeviceRuntimeDO::getOfflineTime));
+        Map<Long, IbmsDeviceRuntimeDO> runtimeMap = convertMap(runtimes, IbmsDeviceRuntimeDO::getDeviceId);
         
         // 构建结果列表，保持请求顺序
         List<DeviceStatusRespVO> result = new ArrayList<>(deviceIds.size());
         for (Long deviceId : deviceIds) {
-            IotDeviceDO device = deviceMap.get(deviceId);
+            IbmsDeviceDO device = deviceMap.get(deviceId);
+            IbmsDeviceRuntimeDO runtime = runtimeMap.get(deviceId);
             if (device != null) {
-                result.add(convertToStatusVO(device));
+                result.add(convertToStatusVO(device, runtime));
             } else {
                 // Requirements: 5.4 - 查询的设备不存在时返回 INACTIVE 状态
                 result.add(DeviceStatusRespVO.builder()
@@ -81,23 +95,52 @@ public class DeviceStatusServiceImpl implements DeviceStatusService {
 
     @Override
     public PageResult<DeviceStatusRespVO> getDeviceStatusPage(DeviceStatusPageReqVO pageReqVO) {
-        // 构建查询条件
-        LambdaQueryWrapperX<IotDeviceDO> wrapper = new LambdaQueryWrapperX<IotDeviceDO>()
-                .likeIfPresent(IotDeviceDO::getDeviceName, pageReqVO.getDeviceName())
-                .eqIfPresent(IotDeviceDO::getDeviceType, pageReqVO.getDeviceType())
-                .eqIfPresent(IotDeviceDO::getState, pageReqVO.getState())
-                .eqIfPresent(IotDeviceDO::getProductId, pageReqVO.getProductId())
-                .orderByDesc(IotDeviceDO::getId);
-        
-        // 执行分页查询
-        PageResult<IotDeviceDO> pageResult = deviceMapper.selectPage(pageReqVO, wrapper);
-        
-        // 转换为 VO
-        List<DeviceStatusRespVO> voList = pageResult.getList().stream()
-                .map(this::convertToStatusVO)
-                .collect(Collectors.toList());
-        
-        return new PageResult<>(voList, pageResult.getTotal());
+        int pageNo = pageReqVO.getPageNo();
+        int pageSize = pageReqVO.getPageSize();
+        if (pageSize <= 0) {
+            pageSize = 10;
+        }
+
+        // 1) 查询设备候选（不做 state 条件过滤，state 来自 ibms_device_runtime）
+        LambdaQueryWrapperX<IbmsDeviceDO> wrapper = new LambdaQueryWrapperX<IbmsDeviceDO>()
+                .likeIfPresent(IbmsDeviceDO::getName, pageReqVO.getDeviceName())
+                .eqIfPresent(IbmsDeviceDO::getDeviceType, pageReqVO.getDeviceType())
+                .eqIfPresent(IbmsDeviceDO::getIbmsProductId, pageReqVO.getProductId())
+                .orderByDesc(IbmsDeviceDO::getId);
+
+        // 为了保证 state 过滤准确，先查足够范围再二次过滤与分页（G4 下数据规模通常可控）
+        List<IbmsDeviceDO> candidates = deviceMapper.selectList(wrapper);
+        if (candidates == null) {
+            candidates = List.of();
+        }
+
+        Map<Long, IbmsDeviceRuntimeDO> runtimeMap = new java.util.HashMap<>();
+        if (candidates.size() > 0) {
+            List<Long> ids = candidates.stream().map(IbmsDeviceDO::getId).toList();
+            List<IbmsDeviceRuntimeDO> runtimes = deviceRuntimeMapper.selectList(
+                    new LambdaQueryWrapperX<IbmsDeviceRuntimeDO>()
+                            .in(IbmsDeviceRuntimeDO::getDeviceId, ids)
+                            .select(IbmsDeviceRuntimeDO::getDeviceId, IbmsDeviceRuntimeDO::getState,
+                                    IbmsDeviceRuntimeDO::getOnlineTime, IbmsDeviceRuntimeDO::getOfflineTime));
+            runtimeMap = convertMap(runtimes, IbmsDeviceRuntimeDO::getDeviceId);
+        }
+
+        List<DeviceStatusRespVO> all = new java.util.ArrayList<>(candidates.size());
+        for (IbmsDeviceDO d : candidates) {
+            IbmsDeviceRuntimeDO rt = runtimeMap.get(d.getId());
+            int state = rt != null && rt.getState() != null ? rt.getState() : IotDeviceStateEnum.INACTIVE.getState();
+            if (pageReqVO.getState() != null && !pageReqVO.getState().equals(state)) {
+                continue;
+            }
+            all.add(convertToStatusVO(d, rt));
+        }
+
+        int total = all.size();
+        int fromIndex = (pageNo - 1) * pageSize;
+        int toIndex = Math.min(fromIndex + pageSize, total);
+
+        List<DeviceStatusRespVO> pageList = (fromIndex >= total) ? List.of() : all.subList(fromIndex, toIndex);
+        return new PageResult<>(pageList, (long) total);
     }
 
     /**
@@ -106,22 +149,24 @@ public class DeviceStatusServiceImpl implements DeviceStatusService {
      * @param device 设备 DO
      * @return 设备状态 VO
      */
-    private DeviceStatusRespVO convertToStatusVO(IotDeviceDO device) {
-        IotDeviceStateEnum stateEnum = IotDeviceStateEnum.fromState(device.getState());
-        
+    private DeviceStatusRespVO convertToStatusVO(IbmsDeviceDO device, IbmsDeviceRuntimeDO runtime) {
+        int state = runtime != null && runtime.getState() != null
+                ? runtime.getState() : IotDeviceStateEnum.INACTIVE.getState();
+        IotDeviceStateEnum stateEnum = IotDeviceStateEnum.fromState(state);
+
         // 计算最后活跃时间戳
-        Long lastSeenTimestamp = calculateLastSeenTimestamp(device);
+        Long lastSeenTimestamp = calculateLastSeenTimestamp(runtime);
         
         return DeviceStatusRespVO.builder()
                 .deviceId(device.getId())
-                .deviceName(device.getDeviceName())
-                .state(device.getState())
+                .deviceName(device.getName())
+                .state(state)
                 .stateName(stateEnum != null ? stateEnum.getName() : "未知")
                 .lastSeenTimestamp(lastSeenTimestamp)
-                .onlineTime(device.getOnlineTime())
-                .offlineTime(device.getOfflineTime())
+                .onlineTime(runtime != null ? runtime.getOnlineTime() : null)
+                .offlineTime(runtime != null ? runtime.getOfflineTime() : null)
                 .deviceType(device.getDeviceType())
-                .productId(device.getProductId())
+                .productId(device.getIbmsProductId())
                 .build();
     }
 
@@ -133,12 +178,15 @@ public class DeviceStatusServiceImpl implements DeviceStatusService {
      * @param device 设备 DO
      * @return 最后活跃时间戳（毫秒），如果都为空则返回 null
      */
-    private Long calculateLastSeenTimestamp(IotDeviceDO device) {
-        if (device.getOnlineTime() != null) {
-            return device.getOnlineTime().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+    private Long calculateLastSeenTimestamp(IbmsDeviceRuntimeDO runtime) {
+        if (runtime == null) {
+            return null;
         }
-        if (device.getOfflineTime() != null) {
-            return device.getOfflineTime().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        if (runtime.getOnlineTime() != null) {
+            return runtime.getOnlineTime().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        }
+        if (runtime.getOfflineTime() != null) {
+            return runtime.getOfflineTime().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
         }
         return null;
     }

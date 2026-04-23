@@ -24,12 +24,37 @@ public interface IotDeviceGisMapper extends BaseMapperX<IotDeviceGisDO> {
      * @param roomId 房间ID
      * @return 设备列表
      */
-    @Select("SELECT id, room_id, floor_id, building_id, name, code, category, device_type, sub_type, " +
-            "brand, model, ip_address, status, health_status, online_time, offline_time, " +
-            "install_location, install_height, install_date, " +
-            "geom, altitude, address, properties, config, remark, " +
-            "create_time, update_time, creator, updater, deleted, tenant_id " +
-            "FROM iot_device WHERE room_id = #{roomId} AND deleted = 0 ORDER BY id")
+    @Select("SELECT " +
+            "r.device_id AS id, " +
+            "r.room_id, " +
+            "r.floor_id, " +
+            "r.building_id, " +
+            "d.name, " +
+            "d.device_code AS code, " +
+            "NULL AS category, " +
+            "d.device_type_code AS device_type, " +
+            "NULL AS sub_type, " +
+            "d.brand, " +
+            "d.product_model AS model, " +
+            "d.ip AS ip_address, " +
+            "CASE WHEN r.state IN (1, 3) THEN 'online' WHEN r.state = 2 THEN 'offline' ELSE 'fault' END AS status, " +
+            "NULL AS health_status, " +
+            "r.online_time, " +
+            "r.offline_time, " +
+            "r.install_location, " +
+            "NULL AS install_height, " +
+            "NULL AS install_date, " +
+            "CONCAT('POINT(', r.longitude, ' ', r.latitude, ')') AS geom, " +
+            "NULL AS altitude, " +
+            "r.address, " +
+            "d.extra AS properties, " +
+            "r.config AS config, " +
+            "d.nickname AS remark, " +
+            "r.create_time, r.update_time, r.creator, r.updater, r.deleted, r.tenant_id " +
+            "FROM ibms_device_runtime r " +
+            "JOIN ibms_device d ON d.id = r.device_id " +
+            "WHERE r.room_id = #{roomId} AND r.deleted = 0 " +
+            "ORDER BY r.device_id")
     List<IotDeviceGisDO> selectListByRoomId(@Param("roomId") Long roomId);
 
     /**
@@ -38,9 +63,37 @@ public interface IotDeviceGisMapper extends BaseMapperX<IotDeviceGisDO> {
      * @param floorId 楼层ID
      * @return 设备列表
      */
-    @Select("SELECT id, room_id, floor_id, building_id, name, code, device_type, status, health_status, " +
-            "geom, remark " +
-            "FROM iot_device WHERE floor_id = #{floorId} AND deleted = 0 ORDER BY room_id, id")
+    @Select("SELECT " +
+            "r.device_id AS id, " +
+            "r.room_id, " +
+            "r.floor_id, " +
+            "r.building_id, " +
+            "d.name, " +
+            "d.device_code AS code, " +
+            "NULL AS category, " +
+            "d.device_type_code AS device_type, " +
+            "NULL AS sub_type, " +
+            "d.brand, " +
+            "d.product_model AS model, " +
+            "d.ip AS ip_address, " +
+            "CASE WHEN r.state IN (1, 3) THEN 'online' WHEN r.state = 2 THEN 'offline' ELSE 'fault' END AS status, " +
+            "NULL AS health_status, " +
+            "r.online_time, " +
+            "r.offline_time, " +
+            "r.install_location, " +
+            "NULL AS install_height, " +
+            "NULL AS install_date, " +
+            "CONCAT('POINT(', r.longitude, ' ', r.latitude, ')') AS geom, " +
+            "NULL AS altitude, " +
+            "r.address, " +
+            "d.extra AS properties, " +
+            "r.config AS config, " +
+            "d.nickname AS remark, " +
+            "r.create_time, r.update_time, r.creator, r.updater, r.deleted, r.tenant_id " +
+            "FROM ibms_device_runtime r " +
+            "JOIN ibms_device d ON d.id = r.device_id " +
+            "WHERE r.floor_id = #{floorId} AND r.deleted = 0 " +
+            "ORDER BY r.room_id, r.device_id")
     List<IotDeviceGisDO> selectListByFloorId(@Param("floorId") Long floorId);
 
     /**
@@ -49,9 +102,37 @@ public interface IotDeviceGisMapper extends BaseMapperX<IotDeviceGisDO> {
      * @param buildingId 建筑ID
      * @return 设备列表
      */
-    @Select("SELECT id, room_id, floor_id, building_id, name, code, device_type, status, health_status, " +
-            "geom " +
-            "FROM iot_device WHERE building_id = #{buildingId} AND deleted = 0 ORDER BY floor_id, room_id, id")
+    @Select("SELECT " +
+            "r.device_id AS id, " +
+            "r.room_id, " +
+            "r.floor_id, " +
+            "r.building_id, " +
+            "d.name, " +
+            "d.device_code AS code, " +
+            "NULL AS category, " +
+            "d.device_type_code AS device_type, " +
+            "NULL AS sub_type, " +
+            "d.brand, " +
+            "d.product_model AS model, " +
+            "d.ip AS ip_address, " +
+            "CASE WHEN r.state IN (1, 3) THEN 'online' WHEN r.state = 2 THEN 'offline' ELSE 'fault' END AS status, " +
+            "NULL AS health_status, " +
+            "r.online_time, " +
+            "r.offline_time, " +
+            "r.install_location, " +
+            "NULL AS install_height, " +
+            "NULL AS install_date, " +
+            "CONCAT('POINT(', r.longitude, ' ', r.latitude, ')') AS geom, " +
+            "NULL AS altitude, " +
+            "r.address, " +
+            "d.extra AS properties, " +
+            "r.config AS config, " +
+            "d.nickname AS remark, " +
+            "r.create_time, r.update_time, r.creator, r.updater, r.deleted, r.tenant_id " +
+            "FROM ibms_device_runtime r " +
+            "JOIN ibms_device d ON d.id = r.device_id " +
+            "WHERE r.building_id = #{buildingId} AND r.deleted = 0 " +
+            "ORDER BY r.floor_id, r.room_id, r.device_id")
     List<IotDeviceGisDO> selectListByBuildingId(@Param("buildingId") Long buildingId);
 
     /**
@@ -60,7 +141,7 @@ public interface IotDeviceGisMapper extends BaseMapperX<IotDeviceGisDO> {
      * @param floorId 楼层ID
      * @return 设备数量
      */
-    @Select("SELECT COUNT(*) FROM iot_device WHERE floor_id = #{floorId} AND deleted = 0")
+    @Select("SELECT COUNT(*) FROM ibms_device_runtime WHERE floor_id = #{floorId} AND deleted = 0")
     Integer countByFloorId(@Param("floorId") Long floorId);
 
     /**
@@ -69,7 +150,7 @@ public interface IotDeviceGisMapper extends BaseMapperX<IotDeviceGisDO> {
      * @param floorId 楼层ID
      * @return 在线设备数量
      */
-    @Select("SELECT COUNT(*) FROM iot_device WHERE floor_id = #{floorId} AND status = '在线' AND deleted = 0")
+    @Select("SELECT COUNT(*) FROM ibms_device_runtime WHERE floor_id = #{floorId} AND state IN (1, 3) AND deleted = 0")
     Integer countOnlineByFloorId(@Param("floorId") Long floorId);
 
     /**
@@ -78,7 +159,7 @@ public interface IotDeviceGisMapper extends BaseMapperX<IotDeviceGisDO> {
      * @param roomId 房间ID
      * @return 设备数量
      */
-    @Select("SELECT COUNT(*) FROM iot_device WHERE room_id = #{roomId} AND deleted = 0")
+    @Select("SELECT COUNT(*) FROM ibms_device_runtime WHERE room_id = #{roomId} AND deleted = 0")
     Integer countByRoomId(@Param("roomId") Long roomId);
 
 }

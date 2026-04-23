@@ -120,7 +120,7 @@
 import { ref, watch, onMounted, nextTick } from 'vue'
 import * as ChanghuiApi from '@/api/iot/changhui'
 import { formatDate } from '@/utils/formatTime'
-import * as echarts from 'echarts'
+import echarts from '@/plugins/echarts'
 import { ElMessage } from 'element-plus'
 
 const props = defineProps<{
