@@ -66,6 +66,24 @@ router.beforeEach(async (to, from, next) => {
     if (to.path === '/login') {
       next({ path: '/' })
     } else {
+      if (to.path === '/security') {
+        next({
+          path: '/security/video-surveillance/visual-board',
+          query: to.query,
+          hash: to.hash,
+          replace: true
+        })
+        return
+      }
+      if (to.path === '/iot/access/visual-dashboard') {
+        next({
+          path: '/smart-access/door/visual-dashboard',
+          query: to.query,
+          hash: to.hash,
+          replace: true
+        })
+        return
+      }
       // 获取所有字典
       const dictStore = useDictStoreWithOut()
       const userStore = useUserStoreWithOut()
@@ -128,13 +146,13 @@ router.afterEach((to) => {
   // 首页全屏模式控制：进入首页时启用，离开首页时关闭
   const appStore = useAppStoreWithOut()
   const isHomePage = to.path === '/' || to.path === '/index'
-  
+
+  // 全屏页面统一在路由后置钩子控制，避免页面 onMounted/onBeforeUnmount 自己切换导致 Layout 反复重建
   if (isHomePage) {
-    // 进入首页，启用全屏模式
     appStore.setHomeFullscreen(true)
     appStore.setFooter(false)
   } else {
-    // 离开首页，关闭全屏模式
     appStore.setHomeFullscreen(false)
+    appStore.setFooter(true)
   }
 })

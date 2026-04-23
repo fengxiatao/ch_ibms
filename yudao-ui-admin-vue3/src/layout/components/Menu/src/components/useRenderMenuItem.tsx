@@ -1,54 +1,109 @@
 import { ElSubMenu, ElMenuItem } from 'element-plus'
+import { nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { hasOneShowingChild } from '../helper'
 import { isUrl } from '@/utils/is'
 import { useRenderMenuTitle } from './useRenderMenuTitle'
 import { pathResolve } from '@/utils/routerHelper'
+import { useI18n } from '@/hooks/web/useI18n'
 
 const { renderMenuTitle } = useRenderMenuTitle()
 
-const clickableDirectoryTitles = new Set(['门禁管理', '智慧建筑', '智慧能源', '环境监测'])
+const clickableDirectoryTitles = new Set([
+  '门禁管理',
+  '智慧通行',
+  '智慧建筑',
+  '智慧楼宇',
+  '建筑设备监控',
+  '智慧能源',
+  '环境监测'
+])
 const directoryTitleNavigateTarget = new Map<string, string>([
-  ['门禁管理', 'visual-dashboard'],
-  ['智慧建筑', '/building/visual-dashboard'],
-  ['智慧能源', '/energy/overview'],
+  ['门禁管理', '/smart-access/door/management'],
+  ['智慧通行', '/smart-access/door/management'],
+  ['智慧建筑', '/iot/building/visual-dashboard'],
+  ['智慧楼宇', '/iot/building/visual-dashboard'],
+  ['建筑设备监控', '/iot/building/visual-dashboard'],
+  ['智慧能源', '/building/newlight/overview'],
   ['环境监测', '/iot/building/env/overview']
 ])
 
-export const useRenderMenuItem = () =>
+export const useRenderMenuItem = (options?: {
+  onDirectoryTitleActivate?: (index: string, event: MouseEvent) => void
+}) =>
   // allRouters: AppRouteRecordRaw[] = [],
   {
     const { push } = useRouter()
+    const { t } = useI18n()
+
+    const resolveMetaTitleText = (meta: AppRouteRecordRaw['meta']) => {
+      return meta?.title != null ? t(String(meta.title)) : ''
+    }
 
     const shouldHideMenuItem = (
       meta: AppRouteRecordRaw['meta'],
       parentMeta: AppRouteRecordRaw['meta']
     ) => {
-      const parentTitle = parentMeta?.title != null ? String(parentMeta.title) : ''
-      const title = meta?.title != null ? String(meta.title) : ''
+      const parentTitle = resolveMetaTitleText(parentMeta)
+      const title = resolveMetaTitleText(meta)
       return parentTitle === '访客管理' && title === '首页'
     }
 
     const shouldNavigateDirectoryTitle = (meta: AppRouteRecordRaw['meta']) => {
       if (!meta) return false
+      const titleText = resolveMetaTitleText(meta)
       return (
         (meta as any).directoryClickable === true ||
-        clickableDirectoryTitles.has(String(meta.title))
+        clickableDirectoryTitles.has(titleText)
       )
     }
 
-    const navigate = (event: MouseEvent, path: string, meta: AppRouteRecordRaw['meta']) => {
+    const keepDirectoryTitleFocus = async (event: MouseEvent) => {
+      await nextTick()
+      ;(event.currentTarget as HTMLElement | null)?.focus?.()
+    }
+
+    const hasRouteInCurrentTree = (
+      targetPath: string,
+      route: AppRouteRecordRaw,
+      parentFullPath: string
+    ) => {
+      const normalizedTargetPath = targetPath.replace(/\/+$/, '') || '/'
+      const walk = (node: AppRouteRecordRaw, nodeParentPath: string): boolean => {
+        const nodeFullPath = isUrl(node.path) ? node.path : pathResolve(nodeParentPath, node.path)
+        const normalizedNodePath = nodeFullPath.replace(/\/+$/, '') || '/'
+        if (normalizedNodePath === normalizedTargetPath) return true
+        const children = node.children ?? []
+        return children.some((child) => walk(child, nodeFullPath))
+      }
+      return walk(route, parentFullPath)
+    }
+
+    const navigate = async (
+      event: MouseEvent,
+      path: string,
+      meta: AppRouteRecordRaw['meta'],
+      route: AppRouteRecordRaw
+    ) => {
       // 不再阻止事件冒泡，保证点击目录标题时，ElSubMenu 仍然可以正常展开子菜单
-      const target = meta?.title ? directoryTitleNavigateTarget.get(String(meta.title)) : undefined
-      const targetPath = target
+      const titleText = resolveMetaTitleText(meta)
+      const target = titleText ? directoryTitleNavigateTarget.get(titleText) : undefined
+      const rawTargetPath = target
         ? target.startsWith('/')
           ? target
           : pathResolve(path, target)
         : path
+
+      // 目录标题映射的目标路由可能不在当前租户权限内，优先校验可访问性，不可访问则回退到首个可访问子菜单
+      const targetPath = hasRouteInCurrentTree(rawTargetPath, route, path)
+        ? rawTargetPath
+        : resolveFirstNavigableIndex(route, path) || rawTargetPath
+
       if (isUrl(targetPath)) {
         window.open(targetPath)
       } else {
-        push(targetPath)
+        await push(targetPath)
+        await keepDirectoryTitleFocus(event)
       }
     }
 
@@ -94,8 +149,9 @@ export const useRenderMenuItem = () =>
       meta: AppRouteRecordRaw['meta'],
       route: AppRouteRecordRaw
     ) => {
+      options?.onDirectoryTitleActivate?.(fullPath, event)
       if (shouldNavigateDirectoryTitle(meta)) {
-        navigate(event, fullPath, meta)
+        void navigate(event, fullPath, meta, route)
         return
       }
       const firstIndex = resolveFirstNavigableIndex(route, fullPath)
@@ -103,7 +159,7 @@ export const useRenderMenuItem = () =>
       if (isUrl(firstIndex)) {
         window.open(firstIndex)
       } else {
-        push(firstIndex)
+        void push(firstIndex).then(() => keepDirectoryTitleFocus(event))
       }
     }
 
@@ -143,6 +199,7 @@ export const useRenderMenuItem = () =>
                   title: () =>
                     v.children && v.children.length ? (
                       <span
+                        tabIndex={0}
                         onClick={(event) =>
                           handleDirectoryTitleClick(event as MouseEvent, fullPath, meta, v)
                         }

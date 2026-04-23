@@ -72,6 +72,30 @@ const remainingRouter: AppRouteRecordRaw[] = [
     ]
   },
   {
+    path: '/security/electronic-patrol/visualization-board',
+    component: Layout,
+    name: 'SecurityElectronicPatrolVisualizationBoardParent',
+    meta: {
+      hidden: true
+    },
+    children: [
+      {
+        path: '',
+        component: () =>
+          import('@/views/security/ElectronicPatrol/PatrolVisualizationBoard/index.vue'),
+        name: 'SecurityElectronicPatrolVisualizationBoard',
+        meta: {
+          title: '离线巡更可视化看板',
+          hidden: true,
+          canTo: true,
+          noTagsView: true,
+          noPadding: true,
+          icon: 'ep:monitor'
+        }
+      }
+    ]
+  },
+  {
     path: '/iot/building/env/overview',
     component: Layout,
     name: 'IotBuildingEnvOverviewParent',
@@ -725,27 +749,46 @@ const remainingRouter: AppRouteRecordRaw[] = [
       hidden: true
     },
     children: [
+      // 设备发现：必须挂在与菜单一致的 /iot 静态父路由下，否则仅依赖动态路由时可能与首条 /iot 记录冲突导致无法匹配、页面长期白屏/加载
+      {
+        path: 'discovery',
+        name: 'IbmsDeviceDiscovery',
+        meta: {
+          title: '设备发现',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          activeMenu: '/iot/discovery'
+        },
+        component: () => import('@/views/ibms/discovery/index.vue')
+      },
       {
         path: 'product/product/detail/:id',
         name: 'IoTProductDetail',
+        redirect: (to) => ({
+          path: '/ibms/ibms-product',
+          query: { id: String(to.params.id) }
+        }),
         meta: {
           title: '产品详情',
           noCache: true,
           hidden: true,
-          activeMenu: '/iot/device/product'
-        },
-        component: () => import('@/views/iot/product/product/detail/index.vue')
+          activeMenu: '/ibms/ibms-product'
+        }
       },
       {
         path: 'device/detail/:id',
         name: 'IoTDeviceDetail',
+        redirect: (to) => ({
+          path: '/ibms/ibms-device',
+          query: { deviceId: String(to.params.id) }
+        }),
         meta: {
           title: '设备详情',
           noCache: true,
           hidden: true,
-          activeMenu: '/iot/device/device'
-        },
-        component: () => import('@/views/iot/device/device/detail/index.vue')
+          activeMenu: '/ibms/ibms-device'
+        }
       },
       {
         path: 'ota/operation/firmware/detail/:id',
@@ -767,7 +810,7 @@ const remainingRouter: AppRouteRecordRaw[] = [
           hidden: true,
           canTo: true,
           icon: 'ep:map-location',
-          activeMenu: '/iot/device/device'
+          activeMenu: '/ibms/ibms-device'
         },
         component: () => import('@/views/iot/gis/index.vue')
       },
@@ -780,7 +823,7 @@ const remainingRouter: AppRouteRecordRaw[] = [
           hidden: false, // 显示在菜单中
           canTo: true,
           icon: 'ep:office-building',
-          activeMenu: '/iot/device/device'
+          activeMenu: '/ibms/ibms-device'
         },
         component: () => import('@/views/iot/spatial/floorplan/index.vue')
       },
@@ -795,6 +838,90 @@ const remainingRouter: AppRouteRecordRaw[] = [
           activeMenu: '/iot/building'
         },
         component: () => import('@/views/iot/building/building-visual-dashboard/index.vue')
+      },
+      {
+        path: 'building/newlight/overview',
+        name: 'IoTBuildingNewLightOverview',
+        meta: {
+          title: '智能照明V2-数据总览',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          activeMenu: '/iot/building'
+        },
+        component: () => import('@/views/iot/building/newlight/overview/index.vue')
+      },
+      {
+        path: 'building/newlight/control',
+        name: 'IoTBuildingNewLightControl',
+        meta: {
+          title: '智能照明V2-照明控制',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          activeMenu: '/iot/building'
+        },
+        component: () => import('@/views/iot/building/newlight/control/index.vue')
+      },
+      {
+        path: 'building/newlight/device',
+        name: 'IoTBuildingNewLightDevice',
+        meta: {
+          title: '智能照明V2-设备管理',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          activeMenu: '/iot/building'
+        },
+        component: () => import('@/views/iot/building/newlight/device/index.vue')
+      },
+      {
+        path: 'building/newlight/task',
+        name: 'IoTBuildingNewLightTask',
+        meta: {
+          title: '智能照明V2-任务管理',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          activeMenu: '/iot/building'
+        },
+        component: () => import('@/views/iot/building/newlight/task/index.vue')
+      },
+      {
+        path: 'building/newlight/log',
+        name: 'IoTBuildingNewLightLog',
+        meta: {
+          title: '智能照明V2-日志管理',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          activeMenu: '/iot/building'
+        },
+        component: () => import('@/views/iot/building/newlight/log/index.vue')
+      },
+      {
+        path: 'building/newlight/alarm',
+        name: 'IoTBuildingNewLightAlarm',
+        meta: {
+          title: '智能照明V2-告警信息',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          activeMenu: '/iot/building'
+        },
+        component: () => import('@/views/iot/building/newlight/alarm/index.vue')
+      },
+      {
+        path: 'building/newlight/circuit',
+        name: 'IoTBuildingNewLightCircuit',
+        meta: {
+          title: '智能照明V2-回路配置',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          activeMenu: '/iot/building'
+        },
+        component: () => import('@/views/iot/building/newlight/circuit/index.vue')
       }
     ]
   },
@@ -816,6 +943,27 @@ const remainingRouter: AppRouteRecordRaw[] = [
           activeMenu: '/security/video-surveillance/real-time-preview'
         },
         component: () => import('@/views/security/VideoSurveillance/RealTimePreview/index.vue')
+      }
+    ]
+  },
+  {
+    path: '/security/perimeter-intrusion/arming-plan',
+    component: Layout,
+    name: 'PerimeterIntrusionArmingPlanAbsParent',
+    meta: { hidden: true },
+    children: [
+      {
+        path: '',
+        name: 'PerimeterIntrusionArmingPlanAbs',
+        meta: {
+          title: '布防计划',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          noPadding: true,
+          activeMenu: '/security/perimeter-intrusion/arming-plan'
+        },
+        component: () => import('@/views/security/PerimeterIntrusion/ArmingPlan/index.vue')
       }
     ]
   },
@@ -842,6 +990,39 @@ const remainingRouter: AppRouteRecordRaw[] = [
     ]
   },
   {
+    path: '/smart-access/door/visual-dashboard',
+    component: Layout,
+    name: 'AccessVisualDashboard',
+    meta: {
+      hidden: true
+    },
+    children: [
+      {
+        path: '',
+        name: 'AccessVisualDashboardRoute',
+        meta: {
+          title: '智慧通行可视化',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          activeMenu: '/iot/access/management'
+        },
+        component: () => import('@/views/iot/access/visual-dashboard/index.vue')
+      }
+    ]
+  },
+  // 兼容旧门禁可视化地址：/iot/access/visual-dashboard -> /smart-access/door/visual-dashboard
+  {
+    path: '/iot/access/visual-dashboard',
+    redirect: '/smart-access/door/visual-dashboard',
+    name: 'AccessVisualDashboardRedirect',
+    meta: {
+      hidden: true,
+      noTagsView: true,
+      breadcrumb: false
+    }
+  },
+  {
     path: '/security',
     component: Layout,
     name: 'Security',
@@ -849,6 +1030,20 @@ const remainingRouter: AppRouteRecordRaw[] = [
       hidden: true
     },
     children: [
+      // 视频监控可视化看板（智慧安防入口）
+      {
+        path: 'video-surveillance/visual-board',
+        name: 'VideoSurveillanceVisualBoard',
+        meta: {
+          title: '智慧安防',
+          noCache: false,
+          hidden: false,
+          canTo: true,
+          icon: 'ep:video-camera',
+          activeMenu: '/security/video-surveillance/visual-board'
+        },
+        component: () => import('@/views/security/VideoSurveillance/VisualBoard/index.vue')
+      },
       // 兼容旧路径：/security/video-surveillance/realtime-preview -> /security/video-surveillance/real-time-preview
       {
         path: 'video-surveillance/realtime-preview',
@@ -870,6 +1065,32 @@ const remainingRouter: AppRouteRecordRaw[] = [
           canTo: true
         },
         component: () => import('@/views/security/VideoSurveillance/RealTimePreview/index.vue')
+      },
+      {
+        path: 'video-surveillance/video-alarm-record',
+        name: 'VideoAlarmRecord',
+        meta: {
+          title: '告警管理',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          noTagsView: true,
+          activeMenu: '/security/video-surveillance/visual-board'
+        },
+        component: () => import('@/views/security/VideoSurveillance/VideoAlarmRecord/index.vue')
+      },
+      {
+        path: 'perimeter-intrusion/intrusionalarm',
+        name: 'PerimeterIntrusionVisualBoard',
+        meta: {
+          title: '入侵报警看板',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          noTagsView: true,
+          activeMenu: '/security/perimeter-intrusion/arming-plan'
+        },
+        component: () => import('@/views/security/PerimeterIntrusion/VisualBoard/index.vue')
       },
       {
         path: 'video-surveillance/patrol-config',
@@ -938,6 +1159,29 @@ const remainingRouter: AppRouteRecordRaw[] = [
           activeMenu: '/security/video-patrol/patrol-task'
         },
         component: () => import('@/views/security/VideoPatrol/PatrolTask/index.vue')
+      }
+    ]
+  },
+  {
+    path: '/factory/digital-twin-studio',
+    component: Layout,
+    name: 'FactoryDigitalTwinStudioParent',
+    meta: {
+      hidden: true
+    },
+    children: [
+      {
+        path: '',
+        name: 'FactoryDigitalTwinStudio',
+        meta: {
+          title: '数字孪生开发工作台',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          noPadding: true,
+          noTagsView: true
+        },
+        component: () => import('@/views/factory/digital-twin-studio/index.vue')
       }
     ]
   },
