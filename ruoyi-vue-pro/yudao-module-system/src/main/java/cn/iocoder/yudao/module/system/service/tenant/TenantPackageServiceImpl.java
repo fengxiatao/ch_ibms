@@ -52,7 +52,7 @@ public class TenantPackageServiceImpl implements TenantPackageService {
         validateTenantPackageNameUnique(null, createReqVO.getName());
         // 插入
         TenantPackageDO tenantPackage = BeanUtils.toBean(createReqVO, TenantPackageDO.class);
-        tenantPackage.setMenuIds(normalizeTenantPackageMenuIds(createReqVO.getMenuIds()));
+        tenantPackage.setMenuIds(normalizeTenantPackageMenuIds(createReqVO.getMenuIds(), createReqVO.getExcludedMenuIds()));
         tenantPackageMapper.insert(tenantPackage);
         // 返回
         return tenantPackage.getId();
@@ -67,7 +67,7 @@ public class TenantPackageServiceImpl implements TenantPackageService {
         validateTenantPackageNameUnique(updateReqVO.getId(), updateReqVO.getName());
         // 将套餐菜单固化为「按钮权限(type=3)且 permission 非空」+「其父级目录链」
         // 目的：权限来源仍以按钮为准，同时保证前端可构建菜单树，避免左侧菜单为空
-        Set<Long> normalizedMenuIds = normalizeTenantPackageMenuIds(updateReqVO.getMenuIds());
+        Set<Long> normalizedMenuIds = normalizeTenantPackageMenuIds(updateReqVO.getMenuIds(), updateReqVO.getExcludedMenuIds());
         // 更新
         TenantPackageDO updateObj = BeanUtils.toBean(updateReqVO, TenantPackageDO.class);
         updateObj.setMenuIds(normalizedMenuIds);
@@ -78,7 +78,7 @@ public class TenantPackageServiceImpl implements TenantPackageService {
         tenants.forEach(tenant -> tenantService.updateTenantRoleMenu(tenant.getId(), normalizedMenuIds));
     }
 
-    private Set<Long> normalizeTenantPackageMenuIds(Set<Long> menuIds) {
+    private Set<Long> normalizeTenantPackageMenuIds(Set<Long> menuIds, Set<Long> excludedMenuIds) {
         if (CollUtil.isEmpty(menuIds)) {
             return Collections.emptySet();
         }
@@ -119,14 +119,26 @@ public class TenantPackageServiceImpl implements TenantPackageService {
                 .map(MenuDO::getId)
                 .collect(Collectors.toSet());
 
-        if (CollUtil.isEmpty(buttonIds)) {
+        // 2.1) 纯展示类菜单页（type=2 且 permission 为空，如部分可视化大屏）被勾选时亦需保留，否则无按钮的卡片页在租户下无法分配
+        Set<Long> menuPageIdsWithoutPerms = expandedIds.stream()
+                .map(menuById::get)
+                .filter(Objects::nonNull)
+                .filter(m -> Objects.equals(m.getType(), MenuTypeEnum.MENU.getType()))
+                .filter(m -> StrUtil.isBlank(m.getPermission()))
+                .map(MenuDO::getId)
+                .collect(Collectors.toSet());
+
+        Set<Long> seedIds = new HashSet<>();
+        seedIds.addAll(buttonIds);
+        seedIds.addAll(menuPageIdsWithoutPerms);
+        if (CollUtil.isEmpty(seedIds)) {
             return Collections.emptySet();
         }
 
-        // 3) 为每个按钮补齐父级目录链（type=1/2），否则前端菜单树无法构建
-        Set<Long> normalizedIds = new HashSet<>(buttonIds);
-        for (Long buttonId : buttonIds) {
-            MenuDO current = menuById.get(buttonId);
+        // 3) 为每个「种子」菜单（按钮 or 无 permission 的页面）补齐父级目录链（type=1/2），否则前端菜单树无法构建
+        Set<Long> normalizedIds = new HashSet<>(seedIds);
+        for (Long seedId : seedIds) {
+            MenuDO current = menuById.get(seedId);
             Set<Long> visited = new HashSet<>();
             while (current != null
                     && current.getParentId() != null
@@ -137,7 +149,47 @@ public class TenantPackageServiceImpl implements TenantPackageService {
                 current = menuById.get(parentId);
             }
         }
+
+        // 4) 排除机制：移除 excludedMenuIds 指定的根菜单及其下的非按钮菜单
+        //    保留按钮(type=3)以确保API权限不丢失，移除目录(type=1)和页面(type=2)以隐藏侧边栏
+        if (CollUtil.isNotEmpty(excludedMenuIds)) {
+            normalizedIds.removeIf(id -> {
+                MenuDO menu = menuById.get(id);
+                if (menu == null) {
+                    return false;
+                }
+                // 按钮权限始终保留，确保API不报403
+                if (Objects.equals(menu.getType(), MenuTypeEnum.BUTTON.getType())) {
+                    return false;
+                }
+                // 检查该菜单的祖先链是否包含被排除的根菜单
+                return isAncestorExcluded(menu, excludedMenuIds, menuById);
+            });
+        }
         return normalizedIds;
+    }
+
+    /**
+     * 判断菜单的祖先链中是否包含被排除的根菜单ID
+     */
+    private boolean isAncestorExcluded(MenuDO menu, Set<Long> excludedMenuIds, Map<Long, MenuDO> menuById) {
+        // 如果菜单本身就是被排除的根菜单
+        if (excludedMenuIds.contains(menu.getId())) {
+            return true;
+        }
+        // 向上遍历祖先链
+        MenuDO current = menu;
+        Set<Long> visited = new HashSet<>();
+        while (current != null
+                && current.getParentId() != null
+                && !Objects.equals(current.getParentId(), MenuDO.ID_ROOT)
+                && visited.add(current.getParentId())) {
+            if (excludedMenuIds.contains(current.getParentId())) {
+                return true;
+            }
+            current = menuById.get(current.getParentId());
+        }
+        return false;
     }
 
     @Override

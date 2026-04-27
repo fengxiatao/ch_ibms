@@ -28,7 +28,7 @@
           type="primary"
           plain
           @click="openForm('create')"
-          v-hasPermi="['iot:patrol-route:create']"
+          v-hasPermi="['iot:epatrol-route:create']"
         >
           <Icon icon="ep:plus" class="mr-5px" /> 新增
         </el-button>
@@ -72,7 +72,7 @@
             link
             type="primary"
             @click="openForm('update', scope.row.id)"
-            v-hasPermi="['iot:patrol-route:update']"
+            v-hasPermi="['iot:epatrol-route:update']"
           >
             编辑
           </el-button>
@@ -80,7 +80,7 @@
             link
             type="success"
             @click="openPointConfig(scope.row.id)"
-            v-hasPermi="['iot:patrol-route:update']"
+            v-hasPermi="['iot:epatrol-route:update']"
           >
             配置点位
           </el-button>
@@ -88,7 +88,7 @@
             link
             type="danger"
             @click="handleDelete(scope.row.id)"
-            v-hasPermi="['iot:patrol-route:delete']"
+            v-hasPermi="['iot:epatrol-route:delete']"
           >
             删除
           </el-button>

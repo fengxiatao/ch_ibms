@@ -1,0 +1,17 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+--------------
+UPDATE system_tenant_package SET menu_ids='[1,2,3]' WHERE id=113
+--------------
+
+Query OK, 0 rows affected
+Rows matched: 1  Changed: 0  Warnings: 0
+
+--------------
+SELECT id, menu_ids FROM system_tenant_package WHERE id=113
+--------------
+
+id	menu_ids
+113	[1,2,3]
+1 row in set
+
+Bye

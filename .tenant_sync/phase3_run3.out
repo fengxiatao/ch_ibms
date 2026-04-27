@@ -1,0 +1,2 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+ERROR 1062 (23000) at line 97: Duplicate entry '6' for key '_tmp_map_eperiod.PRIMARY'

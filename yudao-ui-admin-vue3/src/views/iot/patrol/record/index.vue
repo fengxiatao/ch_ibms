@@ -75,15 +75,6 @@
         <el-button @click="resetQuery">
           <Icon icon="ep:refresh" class="mr-5px" /> 重置
         </el-button>
-        <el-button
-          type="success"
-          plain
-          @click="handleExport"
-          :loading="exportLoading"
-          v-hasPermi="['iot:patrol-record:export']"
-        >
-          <Icon icon="ep:download" class="mr-5px" /> 导出
-        </el-button>
       </el-form-item>
     </el-form>
   </ContentWrap>
@@ -205,7 +196,6 @@ import { ref, onMounted } from 'vue'
 import * as PatrolRecordApi from '@/api/iot/patrol/record'
 import * as PatrolPointApi from '@/api/iot/patrol/point'
 import RecordDetail from './RecordDetail.vue'
-import download from '@/utils/download'
 
 const message = useMessage()
 
@@ -233,9 +223,6 @@ const queryParams = ref({
   isTimeout: undefined,
   createTime: undefined
 })
-
-// 导出加载
-const exportLoading = ref(false)
 
 // 搜索
 const handleQuery = () => {
@@ -294,19 +281,6 @@ const loadPointList = async () => {
 const detailRef = ref()
 const openDetail = (record: any) => {
   detailRef.value.open(record)
-}
-
-// 导出
-const handleExport = async () => {
-  try {
-    await message.exportConfirm()
-    exportLoading.value = true
-    const data = await PatrolRecordApi.exportPatrolRecordExcel(queryParams.value)
-    download.excel(data, '巡更记录.xls')
-  } catch {
-  } finally {
-    exportLoading.value = false
-  }
 }
 
 // 初始化

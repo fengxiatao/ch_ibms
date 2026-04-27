@@ -1,0 +1,10 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+--------------
+SELECT id, name, JSON_LENGTH(menu_ids) AS cnt FROM system_tenant_package WHERE id=113
+--------------
+
+id	name	cnt
+113	智慧安防	604
+1 row in set
+
+Bye

@@ -65,17 +65,19 @@ SET @patrol_plan_id = (SELECT id FROM system_menu WHERE name = '巡更计划' AN
 -- 巡更计划权限
 INSERT INTO system_menu(name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted)
 SELECT * FROM (
-    SELECT '巡更计划查询', 'iot:patrol-plan:query', 3, 1, @patrol_plan_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更计划查询', 'iot:patrol-plan:query',  3, 1, @patrol_plan_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
     SELECT '巡更计划创建', 'iot:patrol-plan:create', 3, 2, @patrol_plan_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
     SELECT '巡更计划更新', 'iot:patrol-plan:update', 3, 3, @patrol_plan_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
     SELECT '巡更计划删除', 'iot:patrol-plan:delete', 3, 4, @patrol_plan_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
-    SELECT '巡更计划导出', 'iot:patrol-plan:export', 3, 5, @patrol_plan_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0'
+    SELECT '巡更计划启动', 'iot:patrol-plan:start',  3, 5, @patrol_plan_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更计划暂停', 'iot:patrol-plan:pause',  3, 6, @patrol_plan_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更计划停止', 'iot:patrol-plan:stop',   3, 7, @patrol_plan_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0'
 ) AS tmp WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE permission LIKE 'iot:patrol-plan:%' AND deleted = b'0');
 
--- 3.2 巡更线路
+-- 3.2 巡更线路（与后端 EpatrolRouteController 对齐：iot:epatrol-route:*）
 INSERT INTO system_menu(name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted)
 SELECT * FROM (
-    SELECT '巡更线路', 'iot:patrol-route:query', 2, 2, @patrol_root_id, 'route', 'ep:connection', 'iot/patrol/route/index', 'PatrolRoute', 0, b'1', b'1', b'0', '1', NOW(), '1', NOW(), b'0'
+    SELECT '巡更线路', 'iot:epatrol-route:query', 2, 2, @patrol_root_id, 'route', 'ep:connection', 'iot/patrol/route/index', 'PatrolRoute', 0, b'1', b'1', b'0', '1', NOW(), '1', NOW(), b'0'
 ) AS tmp WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE name = '巡更线路' AND parent_id = @patrol_root_id AND deleted = b'0') LIMIT 1;
 
 SET @patrol_route_id = (SELECT id FROM system_menu WHERE name = '巡更线路' AND parent_id = @patrol_root_id AND deleted = b'0' LIMIT 1);
@@ -83,17 +85,16 @@ SET @patrol_route_id = (SELECT id FROM system_menu WHERE name = '巡更线路' A
 -- 巡更线路权限
 INSERT INTO system_menu(name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted)
 SELECT * FROM (
-    SELECT '巡更线路查询', 'iot:patrol-route:query', 3, 1, @patrol_route_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
-    SELECT '巡更线路创建', 'iot:patrol-route:create', 3, 2, @patrol_route_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
-    SELECT '巡更线路更新', 'iot:patrol-route:update', 3, 3, @patrol_route_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
-    SELECT '巡更线路删除', 'iot:patrol-route:delete', 3, 4, @patrol_route_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
-    SELECT '巡更线路导出', 'iot:patrol-route:export', 3, 5, @patrol_route_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0'
-) AS tmp WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE permission LIKE 'iot:patrol-route:%' AND deleted = b'0');
+    SELECT '巡更线路查询', 'iot:epatrol-route:query', 3, 1, @patrol_route_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更线路创建', 'iot:epatrol-route:create', 3, 2, @patrol_route_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更线路更新', 'iot:epatrol-route:update', 3, 3, @patrol_route_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更线路删除', 'iot:epatrol-route:delete', 3, 4, @patrol_route_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0'
+) AS tmp WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE permission LIKE 'iot:epatrol-route:%' AND deleted = b'0');
 
--- 3.3 巡更点位
+-- 3.3 巡更点位（与后端 EpatrolPointController 对齐：iot:epatrol-point:*）
 INSERT INTO system_menu(name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted)
 SELECT * FROM (
-    SELECT '巡更点位', 'iot:patrol-point:query', 2, 3, @patrol_root_id, 'point', 'ep:location', 'iot/patrol/point/index', 'PatrolPoint', 0, b'1', b'1', b'0', '1', NOW(), '1', NOW(), b'0'
+    SELECT '巡更点位', 'iot:epatrol-point:query', 2, 3, @patrol_root_id, 'point', 'ep:location', 'iot/patrol/point/index', 'PatrolPoint', 0, b'1', b'1', b'0', '1', NOW(), '1', NOW(), b'0'
 ) AS tmp WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE name = '巡更点位' AND parent_id = @patrol_root_id AND deleted = b'0') LIMIT 1;
 
 SET @patrol_point_id = (SELECT id FROM system_menu WHERE name = '巡更点位' AND parent_id = @patrol_root_id AND deleted = b'0' LIMIT 1);
@@ -101,12 +102,11 @@ SET @patrol_point_id = (SELECT id FROM system_menu WHERE name = '巡更点位' A
 -- 巡更点位权限
 INSERT INTO system_menu(name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted)
 SELECT * FROM (
-    SELECT '巡更点位查询', 'iot:patrol-point:query', 3, 1, @patrol_point_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
-    SELECT '巡更点位创建', 'iot:patrol-point:create', 3, 2, @patrol_point_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
-    SELECT '巡更点位更新', 'iot:patrol-point:update', 3, 3, @patrol_point_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
-    SELECT '巡更点位删除', 'iot:patrol-point:delete', 3, 4, @patrol_point_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
-    SELECT '巡更点位导出', 'iot:patrol-point:export', 3, 5, @patrol_point_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0'
-) AS tmp WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE permission LIKE 'iot:patrol-point:%' AND deleted = b'0');
+    SELECT '巡更点位查询', 'iot:epatrol-point:query', 3, 1, @patrol_point_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更点位创建', 'iot:epatrol-point:create', 3, 2, @patrol_point_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更点位更新', 'iot:epatrol-point:update', 3, 3, @patrol_point_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更点位删除', 'iot:epatrol-point:delete', 3, 4, @patrol_point_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0'
+) AS tmp WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE permission LIKE 'iot:epatrol-point:%' AND deleted = b'0');
 
 -- 3.4 巡更任务
 INSERT INTO system_menu(name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted)
@@ -119,8 +119,13 @@ SET @patrol_task_id = (SELECT id FROM system_menu WHERE name = '巡更任务' AN
 -- 巡更任务权限
 INSERT INTO system_menu(name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted)
 SELECT * FROM (
-    SELECT '巡更任务查询', 'iot:patrol-task:query', 3, 1, @patrol_task_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
-    SELECT '巡更任务导出', 'iot:patrol-task:export', 3, 2, @patrol_task_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0'
+    SELECT '巡更任务查询', 'iot:patrol-task:query',  3, 1, @patrol_task_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更任务创建', 'iot:patrol-task:create', 3, 2, @patrol_task_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更任务更新', 'iot:patrol-task:update', 3, 3, @patrol_task_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更任务删除', 'iot:patrol-task:delete', 3, 4, @patrol_task_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更任务启动', 'iot:patrol-task:start',  3, 5, @patrol_task_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更任务暂停', 'iot:patrol-task:pause',  3, 6, @patrol_task_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更任务停止', 'iot:patrol-task:stop',   3, 7, @patrol_task_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0'
 ) AS tmp WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE permission LIKE 'iot:patrol-task:%' AND deleted = b'0');
 
 -- 3.5 巡更记录
@@ -134,8 +139,8 @@ SET @patrol_record_id = (SELECT id FROM system_menu WHERE name = '巡更记录' 
 -- 巡更记录权限
 INSERT INTO system_menu(name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted)
 SELECT * FROM (
-    SELECT '巡更记录查询', 'iot:patrol-record:query', 3, 1, @patrol_record_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
-    SELECT '巡更记录导出', 'iot:patrol-record:export', 3, 2, @patrol_record_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0'
+    SELECT '巡更记录查询', 'iot:patrol-record:query',  3, 1, @patrol_record_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0' UNION ALL
+    SELECT '巡更记录更新', 'iot:patrol-record:update', 3, 2, @patrol_record_id, NULL, NULL, NULL, NULL, 0, b'0', b'1', b'0', '1', NOW(), '1', NOW(), b'0'
 ) AS tmp WHERE NOT EXISTS (SELECT 1 FROM system_menu WHERE permission LIKE 'iot:patrol-record:%' AND deleted = b'0');
 
 -- ========================================

@@ -10,6 +10,7 @@ import { useUserStoreWithOut } from '@/store/modules/user'
 import { usePermissionStoreWithOut } from '@/store/modules/permission'
 import { useAppStoreWithOut } from '@/store/modules/app'
 import { initIotWebSocket } from '@/utils/iotWebSocket'
+import { checkPermi } from '@/utils/permission'
 
 const { start, done } = useNProgress()
 
@@ -121,6 +122,26 @@ router.beforeEach(async (to, from, next) => {
               : { path: redirect, query }
           next(nextData)
         } else {
+          // permission 预检：若目标路由声明了 meta.permission，但当前用户不具备，直接落到首页并提示，
+          // 避免用户点跨租户硬编码入口后进入 403 空壳页。
+          const toMeta = (to.meta ?? {}) as Record<string, any>
+          const needPerm = toMeta.permission as string | string[] | undefined
+          if (needPerm && String(toMeta.noPermCheck) !== 'true') {
+            const perms = Array.isArray(needPerm) ? needPerm : [needPerm]
+            const allow = perms.some((p) => checkPermi([p]))
+            if (!allow) {
+              if (to.path !== '/') {
+                console.warn(
+                  '[route-guard] 目标路由缺少所需权限:',
+                  to.path,
+                  '需要:',
+                  perms.join('/')
+                )
+                next({ path: '/', replace: true })
+                return
+              }
+            }
+          }
           next()
         }
       } catch (error) {

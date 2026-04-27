@@ -107,7 +107,7 @@ iot:
 
       # ---------- 长辉TCP插件配置 ----------
       changhui:
-        port: 9700
+        port: 9900
         heartbeat-timeout: 60000
         upgrade-timeout: 300000
 

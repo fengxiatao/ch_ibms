@@ -51,4 +51,13 @@ public class TenantPackageDO extends BaseDO {
     @TableField(typeHandler = JacksonTypeHandler.class)
     private Set<Long> menuIds;
 
+    /**
+     * 排除的根菜单编号
+     *
+     * 归一化时，会移除这些根菜单下的非按钮菜单（type != 3），
+     * 从而实现"隐藏某模块侧边栏但保留API权限"的效果。
+     */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private Set<Long> excludedMenuIds;
+
 }

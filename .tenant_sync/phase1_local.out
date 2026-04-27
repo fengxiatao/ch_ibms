@@ -1,0 +1,11 @@
+tbl	t1	t162
+iot_subsystem	8	8
+iot_job_type_definition	20	20
+iot_thing_model	66	66
+iot_data_sink	2	2
+iot_data_rule	1	1
+iot_product_category	8	8
+iot_scheduled_task_config	2	2
+ibms_product	19	19
+ibms_product_property	18	18
+ibms_product_point_type	17	17

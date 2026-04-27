@@ -119,7 +119,7 @@
             link
             type="danger"
             @click="handleDelete(scope.row.id)"
-            v-hasPermi="['iot:ota-firmware:delete']"
+            v-hasPermi="['iot:ota-firmware:update']"
           >
             删除
           </el-button>

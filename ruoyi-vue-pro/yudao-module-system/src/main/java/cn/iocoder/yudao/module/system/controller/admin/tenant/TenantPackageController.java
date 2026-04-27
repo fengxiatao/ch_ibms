@@ -4,12 +4,16 @@ import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
+import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.system.controller.admin.tenant.vo.packages.TenantPackagePageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.tenant.vo.packages.TenantPackageRespVO;
 import cn.iocoder.yudao.module.system.controller.admin.tenant.vo.packages.TenantPackageSaveReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.tenant.vo.packages.TenantPackageSimpleRespVO;
+import cn.iocoder.yudao.module.system.dal.dataobject.tenant.TenantDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.tenant.TenantPackageDO;
 import cn.iocoder.yudao.module.system.service.tenant.TenantPackageService;
+import cn.iocoder.yudao.module.system.service.tenant.TenantService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,6 +24,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
@@ -31,6 +36,9 @@ public class TenantPackageController {
 
     @Resource
     private TenantPackageService tenantPackageService;
+
+    @Resource
+    private TenantService tenantService;
 
     @PostMapping("/create")
     @Operation(summary = "创建租户套餐")
@@ -87,6 +95,51 @@ public class TenantPackageController {
     public CommonResult<List<TenantPackageSimpleRespVO>> getTenantPackageList() {
         List<TenantPackageDO> list = tenantPackageService.getTenantPackageListByStatus(CommonStatusEnum.ENABLE.getStatus());
         return success(BeanUtils.toBean(list, TenantPackageSimpleRespVO.class));
+    }
+
+    @PostMapping("/refresh-all-tenant-role-menu")
+    @Operation(summary = "重新推送所有租户套餐的菜单到租户管理员角色", description = "在批量修正 system_menu 权限后，用此接口按套餐重新落库各租户的 system_role_menu 并清权限缓存。")
+    @PreAuthorize("@ss.hasPermission('system:tenant-package:refresh')")
+    @TenantIgnore
+    public CommonResult<Integer> refreshAllTenantRoleMenu() {
+        List<TenantPackageDO> packages = tenantPackageService.getTenantPackageListByStatus(
+                CommonStatusEnum.ENABLE.getStatus());
+        int count = 0;
+        for (TenantPackageDO pkg : packages) {
+            Set<Long> menuIds = pkg.getMenuIds();
+            if (menuIds == null) {
+                continue;
+            }
+            List<TenantDO> tenants = tenantService.getTenantListByPackageId(pkg.getId());
+            for (TenantDO tenant : tenants) {
+                TenantUtils.execute(
+                        tenant.getId(), () -> tenantService.updateTenantRoleMenu(tenant.getId(), menuIds));
+                count++;
+            }
+        }
+        return success(count);
+    }
+
+    @PostMapping("/resync-role-menu")
+    @Operation(summary = "按指定套餐重新同步该套餐下所有租户的租户管理员菜单",
+            description = "用于修正历史租户 system_role_menu 与套餐当前 menuIds 不一致的数据漂移；复用 system:tenant-package:update 权限，避免新增权限串。")
+    @Parameter(name = "id", description = "租户套餐编号", required = true, example = "1")
+    @PreAuthorize("@ss.hasPermission('system:tenant-package:update')")
+    @TenantIgnore
+    public CommonResult<Integer> resyncTenantRoleMenu(@RequestParam("id") Long id) {
+        TenantPackageDO pkg = tenantPackageService.getTenantPackage(id);
+        if (pkg == null || pkg.getMenuIds() == null) {
+            return success(0);
+        }
+        Set<Long> menuIds = pkg.getMenuIds();
+        List<TenantDO> tenants = tenantService.getTenantListByPackageId(pkg.getId());
+        int count = 0;
+        for (TenantDO tenant : tenants) {
+            TenantUtils.execute(
+                    tenant.getId(), () -> tenantService.updateTenantRoleMenu(tenant.getId(), menuIds));
+            count++;
+        }
+        return success(count);
     }
 
 }

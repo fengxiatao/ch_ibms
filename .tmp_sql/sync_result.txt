@@ -1,0 +1,13 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+menu_id	name	permission	type
+4003	产品查询	iot:product:query	3
+4009	设备查询	iot:device:query	3
+5232	建筑查询	iot:building:query	3
+5237	楼层查询	iot:floor:query	3
+5242	区域查询	iot:area:query	3
+6198	查询通道	iot:channel:query	3
+6203	同步通道	iot:channel:sync	3
+72568	IBMS产品查询	iot:ibms-product:query	3
+72569	IBMS空间查询	iot:ibms-space:query	3
+final_total	final_distinct
+862	862

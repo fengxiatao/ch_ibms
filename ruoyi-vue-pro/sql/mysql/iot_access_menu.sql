@@ -382,16 +382,15 @@ WHERE NOT EXISTS (
     SELECT 1 FROM system_menu WHERE component = 'iot/access/alarm/index' AND deleted = b'0'
 ) LIMIT 1;
 
--- 告警记录按钮权限
+-- 告警记录按钮权限（与后端 AccessAlarmController 对齐：仅 query / update）
+-- 说明：处理 / 批量处理 都走 'iot:access-alarm:update'；后端暂无 export 接口，菜单里不再单独勾出 export 按钮
 INSERT INTO system_menu(name, permission, type, sort, parent_id, status, visible, creator, create_time, updater, update_time, deleted)
 SELECT * FROM (
     SELECT '告警记录查询', 'iot:access-alarm:query', 3, 1, (SELECT id FROM system_menu WHERE component = 'iot/access/alarm/index' AND deleted = b'0' LIMIT 1), 0, b'1', '1', NOW(), '1', NOW(), b'0'
-    UNION ALL SELECT '告警记录处理', 'iot:access-alarm:handle', 3, 2, (SELECT id FROM system_menu WHERE component = 'iot/access/alarm/index' AND deleted = b'0' LIMIT 1), 0, b'1', '1', NOW(), '1', NOW(), b'0'
-    UNION ALL SELECT '告警记录批量处理', 'iot:access-alarm:batch-handle', 3, 3, (SELECT id FROM system_menu WHERE component = 'iot/access/alarm/index' AND deleted = b'0' LIMIT 1), 0, b'1', '1', NOW(), '1', NOW(), b'0'
-    UNION ALL SELECT '告警记录导出', 'iot:access-alarm:export', 3, 4, (SELECT id FROM system_menu WHERE component = 'iot/access/alarm/index' AND deleted = b'0' LIMIT 1), 0, b'1', '1', NOW(), '1', NOW(), b'0'
+    UNION ALL SELECT '告警记录处置', 'iot:access-alarm:update', 3, 2, (SELECT id FROM system_menu WHERE component = 'iot/access/alarm/index' AND deleted = b'0' LIMIT 1), 0, b'1', '1', NOW(), '1', NOW(), b'0'
 ) AS tmp
 WHERE NOT EXISTS (
-    SELECT 1 FROM system_menu WHERE permission IN ('iot:access-alarm:query', 'iot:access-alarm:handle', 'iot:access-alarm:batch-handle', 'iot:access-alarm:export') AND deleted = b'0'
+    SELECT 1 FROM system_menu WHERE permission IN ('iot:access-alarm:query', 'iot:access-alarm:update') AND deleted = b'0'
 );
 
 -- ========================================

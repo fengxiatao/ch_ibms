@@ -50,7 +50,7 @@
         v-if="alarm.handleStatus !== 2"
         type="warning"
         @click="handleOpenHandle"
-        v-hasPermi="['iot:access-alarm:handle']"
+        v-hasPermi="['iot:access-alarm:update']"
       >
         处理告警
       </el-button>

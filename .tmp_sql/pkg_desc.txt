@@ -1,0 +1,13 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Field	Type	Null	Key	Default	Extra
+id	bigint	NO	PRI	NULL	auto_increment
+name	varchar(30)	NO		NULL	
+status	tinyint	NO		0	
+remark	varchar(256)	YES			
+menu_ids	varchar(4096)	NO		NULL	
+excluded_menu_ids	varchar(512)	YES		NULL	
+creator	varchar(64)	NO			
+create_time	datetime	NO		CURRENT_TIMESTAMP	DEFAULT_GENERATED
+updater	varchar(64)	YES			
+update_time	datetime	NO		CURRENT_TIMESTAMP	DEFAULT_GENERATED
+deleted	bit(1)	NO		b'0'	

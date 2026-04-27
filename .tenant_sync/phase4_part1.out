@@ -1,0 +1,24 @@
+tag	device	channel	space	product
+[map_rebuild]	19	39	4	19
+tag	t1	t162	map
+[3] iot_keding_device	12	12	12
+tag	t1	t162
+[4] iot_keding_firmware	5	5
+tag	t1	t162	map
+[5] iot_ota_firmware	2	2	2
+tag	t1	t162	map	orphan_parent
+[6] iot_access_department	28	28	28	0
+tag	t1	t162	map
+[7] iot_access_permission_group	7	7	7
+tag	t1	t162	map
+[8] iot_parking_lot	3	3	3
+tag	t1	t162	map
+[9] iot_parking_charge_rule	3	3	3
+tag	t1	t162	map
+[10] iot_visitor_appointment	43	43	43
+tag	t1	t162
+[11] iot_device_group	2	2
+tag	t1	t162
+[12] iot_device_display_config	8	8
+tag
+=== PART1 DONE ===

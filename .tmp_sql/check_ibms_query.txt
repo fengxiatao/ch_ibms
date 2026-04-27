@@ -1,0 +1,6 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+id	name	permission	type	parent_id
+71383	产品管理	iot:ibms-product:query	2	4000
+71384	空间管理	iot:ibms-space:query	2	4000
+72568	IBMS产品查询	iot:ibms-product:query	3	71383
+72569	IBMS空间查询	iot:ibms-space:query	3	71384

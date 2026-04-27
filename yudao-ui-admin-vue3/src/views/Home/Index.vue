@@ -4,7 +4,14 @@
     <main class="ibms-screen__main">
       <!-- 左侧：智慧安防 -->
       <section class="left-panel">
-        <div class="glass-panel panel-full clickable-module" @click="navigateToModule('security')">
+        <div
+          :class="[
+            'glass-panel',
+            'panel-full',
+            canModuleNav('security') ? 'clickable-module' : 'clickable-module--disabled'
+          ]"
+          @click="onModuleClick('security')"
+        >
           <div class="corner-accent corner-tl"></div>
           <div class="corner-accent corner-tr"></div>
           <div class="corner-accent corner-bl"></div>
@@ -12,7 +19,7 @@
           <div class="module-title">
             <Icon icon="mdi:shield-outline" :size="18" />
             <span>智慧安防</span>
-            <Icon icon="ep:arrow-right" :size="14" class="module-arrow" />
+            <Icon v-if="canModuleNav('security')" icon="ep:arrow-right" :size="14" class="module-arrow" />
           </div>
           <div class="panel-content">
             <div class="data-card security-overview">
@@ -129,12 +136,12 @@
 
             <div class="data-card alarm-type">
               <div
-                class="card-header card-header--link"
-                role="button"
-                tabindex="0"
-                @click.stop="navigateToSubModule('alarmType')"
-                @keydown.enter.stop.prevent="navigateToSubModule('alarmType')"
-                @keydown.space.stop.prevent="navigateToSubModule('alarmType')"
+                :class="['card-header', canSubNav('alarmType') ? 'card-header--link' : '']"
+                :role="canSubNav('alarmType') ? 'button' : undefined"
+                :tabindex="canSubNav('alarmType') ? 0 : undefined"
+                @click.stop="onSubClick('alarmType')"
+                @keydown.enter.stop.prevent="onSubClick('alarmType')"
+                @keydown.space.stop.prevent="onSubClick('alarmType')"
               >
                 <Icon icon="mdi:alarm-light-outline" :size="14" />
                 <span>报警类型分布（今日）</span>
@@ -144,12 +151,12 @@
 
             <div class="data-card access-kpi">
               <div
-                class="card-header card-header--link"
-                role="button"
-                tabindex="0"
-                @click.stop="navigateToSubModule('ePatrol')"
-                @keydown.enter.stop.prevent="navigateToSubModule('ePatrol')"
-                @keydown.space.stop.prevent="navigateToSubModule('ePatrol')"
+                :class="['card-header', canSubNav('ePatrol') ? 'card-header--link' : '']"
+                :role="canSubNav('ePatrol') ? 'button' : undefined"
+                :tabindex="canSubNav('ePatrol') ? 0 : undefined"
+                @click.stop="onSubClick('ePatrol')"
+                @keydown.enter.stop.prevent="onSubClick('ePatrol')"
+                @keydown.space.stop.prevent="onSubClick('ePatrol')"
               >
                 <Icon icon="mdi:walk" :size="14" />
                 <span>电子巡更</span>
@@ -295,13 +302,17 @@
 
         <!-- 智慧楼宇 -->
         <div
-          class="glass-panel building-panel clickable-module"
-          @click="navigateToModule('building')"
+          :class="[
+            'glass-panel',
+            'building-panel',
+            canModuleNav('building') ? 'clickable-module' : 'clickable-module--disabled'
+          ]"
+          @click="onModuleClick('building')"
         >
           <div class="module-title">
             <Icon icon="mdi:office-building" :size="18" />
             <span>智慧楼宇</span>
-            <Icon icon="ep:arrow-right" :size="14" class="module-arrow" />
+            <Icon v-if="canModuleNav('building')" icon="ep:arrow-right" :size="14" class="module-arrow" />
           </div>
           <div class="building-grid">
             <div class="building-card">
@@ -373,7 +384,14 @@
       <!-- 右侧：智慧通行 + 智慧能源 -->
       <section class="right-panel">
         <!-- 智慧通行 -->
-        <div class="glass-panel panel-half clickable-module" @click="navigateToModule('access')">
+        <div
+          :class="[
+            'glass-panel',
+            'panel-half',
+            canModuleNav('access') ? 'clickable-module' : 'clickable-module--disabled'
+          ]"
+          @click="onModuleClick('access')"
+        >
           <div class="corner-accent corner-tl"></div>
           <div class="corner-accent corner-tr"></div>
           <div class="corner-accent corner-bl"></div>
@@ -381,18 +399,18 @@
           <div class="module-title">
             <Icon icon="mdi:card-account-details" :size="18" />
             <span>智慧通行</span>
-            <Icon icon="ep:arrow-right" :size="14" class="module-arrow" />
+            <Icon v-if="canModuleNav('access')" icon="ep:arrow-right" :size="14" class="module-arrow" />
           </div>
           <div class="panel-content">
             <!-- 门禁管理 -->
             <div class="data-card">
               <div
-                class="card-header card-header--link"
-                role="button"
-                tabindex="0"
-                @click.stop="navigateToSubModule('door')"
-                @keydown.enter.stop.prevent="navigateToSubModule('door')"
-                @keydown.space.stop.prevent="navigateToSubModule('door')"
+                :class="['card-header', canSubNav('door') ? 'card-header--link' : '']"
+                :role="canSubNav('door') ? 'button' : undefined"
+                :tabindex="canSubNav('door') ? 0 : undefined"
+                @click.stop="onSubClick('door')"
+                @keydown.enter.stop.prevent="onSubClick('door')"
+                @keydown.space.stop.prevent="onSubClick('door')"
               >
                 <Icon icon="mdi:door-open" :size="14" />
                 <span>门禁管理</span>
@@ -420,12 +438,12 @@
             <!-- 访客预约 -->
             <div class="data-card">
               <div
-                class="card-header card-header--link"
-                role="button"
-                tabindex="0"
-                @click.stop="navigateToSubModule('visitor')"
-                @keydown.enter.stop.prevent="navigateToSubModule('visitor')"
-                @keydown.space.stop.prevent="navigateToSubModule('visitor')"
+                :class="['card-header', canSubNav('visitor') ? 'card-header--link' : '']"
+                :role="canSubNav('visitor') ? 'button' : undefined"
+                :tabindex="canSubNav('visitor') ? 0 : undefined"
+                @click.stop="onSubClick('visitor')"
+                @keydown.enter.stop.prevent="onSubClick('visitor')"
+                @keydown.space.stop.prevent="onSubClick('visitor')"
               >
                 <Icon icon="mdi:account-clock" :size="14" />
                 <span>访客预约</span>
@@ -479,7 +497,14 @@
         </div>
 
         <!-- 智慧能源 -->
-        <div class="glass-panel panel-half clickable-module" @click="navigateToModule('energy')">
+        <div
+          :class="[
+            'glass-panel',
+            'panel-half',
+            canModuleNav('energy') ? 'clickable-module' : 'clickable-module--disabled'
+          ]"
+          @click="onModuleClick('energy')"
+        >
           <div class="corner-accent corner-tl"></div>
           <div class="corner-accent corner-tr"></div>
           <div class="corner-accent corner-bl"></div>
@@ -488,13 +513,18 @@
             class="module-title module-title--link"
             role="button"
             tabindex="0"
-            @click.stop="navigateToSubModule('energy')"
-            @keydown.enter.stop.prevent="navigateToSubModule('energy')"
-            @keydown.space.stop.prevent="navigateToSubModule('energy')"
+            @click.stop="onSubClick('energy')"
+            @keydown.enter.stop.prevent="onSubClick('energy')"
+            @keydown.space.stop.prevent="onSubClick('energy')"
           >
             <Icon icon="mdi:lightning-bolt" :size="18" />
             <span>智慧能源</span>
-            <Icon icon="ep:arrow-right" :size="14" class="module-arrow" />
+            <Icon
+              v-if="canSubNav('energy') || canModuleNav('energy')"
+              icon="ep:arrow-right"
+              :size="14"
+              class="module-arrow"
+            />
           </div>
           <div class="panel-content">
             <!-- 用电量 -->
@@ -590,12 +620,18 @@ import { ElMessage } from 'element-plus'
 import { Icon } from '@/components/Icon'
 import ParkDigitalTwin from '@/components/parkDigitalTwin/ParkDigitalTwin.vue'
 import { getHomeScreenData, type HomeScreenVO } from '@/api/iot/dashboard'
+import { usePermissionStoreWithOut } from '@/store/modules/permission'
+import { findPathByPermission, findPathByMenuName, hasMenuByName } from '@/utils/menuLookup'
+import { isRouteRegistered } from '@/utils/menuResolver'
+import { checkPermi } from '@/utils/permission'
+import { MODULE_ENTRIES, SUB_ENTRIES, type HomeEntry } from './home-entries'
 
 dayjs.locale('zh-cn')
 
 defineOptions({ name: 'Index' })
 
 const router = useRouter()
+const permissionStore = usePermissionStoreWithOut()
 
 // ==================== 数据状态 ====================
 
@@ -835,49 +871,35 @@ const handleFullscreenChange = () => {
   isFullscreen.value = !!document.fullscreenElement
 }
 
-// ==================== 模块点击跳转 ====================
+// ==================== 模块点击跳转（能力驱动：permission / 菜单名 / 兜底路径） ====================
 
-const moduleRoutes: Record<string, { paths: string[]; name?: string; reloadIfNotMatched?: boolean }> =
-  {
-    security: {
-      paths: ['/security/video-surveillance/realtime-preview', '/security/video-surveillance/patrol-config']
-    },
-    access: {
-      paths: ['/smart-access/door/management', '/iot/access/management']
-    },
-    energy: {
-      paths: ['/building/newlight/overview', '/building/newlight/control']
-    },
-    building: {
-      paths: ['/iot/building/visual-dashboard', '/building/bac/monitor']
-    }
-  }
-
+type ModuleKey = 'security' | 'access' | 'energy' | 'building'
 type SubModuleKey = 'alarmType' | 'ePatrol' | 'door' | 'visitor' | 'energy'
 
-const subModuleRoutes: Record<
-  SubModuleKey,
-  { name?: string; paths: string[]; reloadIfNotMatched?: boolean }
-> = {
-  alarmType: {
-    paths: ['/security/perimeter-intrusion/intrusionalarm'],
-    reloadIfNotMatched: true
-  },
-  ePatrol: {
-    paths: ['/security/electronic-patrol/visualization-board']
-  },
-  door: {
-    name: 'AccessManagement',
-    paths: ['/smart-access/door/management', '/iot/access/management']
-  },
-  visitor: {
-    paths: ['/smart-access/visitor-management/home'],
-    reloadIfNotMatched: true
-  },
-  energy: {
-    paths: ['/building/newlight/overview', '/building/newlight/control']
+const canNavigateHomeEntry = (entry: HomeEntry) => {
+  if (entry.permission) {
+    return checkPermi([entry.permission])
   }
+  if (entry.menuName) {
+    return hasMenuByName(entry.menuName, permissionStore.getRouters)
+  }
+  if (entry.routeName) {
+    try {
+      const resolved = router.resolve({ name: entry.routeName as any })
+      if (resolved.matched.length) return true
+    } catch {
+      /* ignore */
+    }
+  }
+  if (entry.fallbackPaths?.length) {
+    // 兜底路径必须真实存在于当前用户路由树内，才允许点击
+    return entry.fallbackPaths.some((p) => isRouteRegistered(p))
+  }
+  return false
 }
+
+const canModuleNav = (k: ModuleKey) => canNavigateHomeEntry(MODULE_ENTRIES[k])
+const canSubNav = (k: SubModuleKey) => canNavigateHomeEntry(SUB_ENTRIES[k])
 
 const resolveAndPush = async (candidates: {
   name?: string
@@ -904,7 +926,15 @@ const resolveAndPush = async (candidates: {
     const resolved = router.resolve(path)
     if (!resolved.matched.length) return false
     const lastMatched = resolved.matched[resolved.matched.length - 1]
-    return !isFallback404Record(lastMatched)
+    if (isFallback404Record(lastMatched)) return false
+    // 同时校验 meta.permission：即使路由已注册，若当前用户不具备权限也视为不可达
+    const meta = (resolved.meta ?? {}) as Record<string, any>
+    const needPerm = meta.permission as string | string[] | undefined
+    if (needPerm && String(meta.noPermCheck) !== 'true') {
+      const perms = Array.isArray(needPerm) ? needPerm : [needPerm]
+      if (!perms.some((p) => checkPermi([p]))) return false
+    }
+    return true
   }
 
   if (candidates.name) {
@@ -937,20 +967,70 @@ const resolveAndPush = async (candidates: {
     }
   }
 
-  ElMessage.info('该模块正在开发中，敬请期待！')
+  ElMessage.warning('暂未授权或路由未开放，请联系管理员')
+}
+
+const navigateByHomeEntry = async (entry: HomeEntry) => {
+  if (!entry) {
+    return
+  }
+  const routes = permissionStore.getRouters
+  if (entry.permission) {
+    if (!checkPermi([entry.permission])) {
+      ElMessage.warning('暂无访问权限，请联系管理员')
+      return
+    }
+    const p = findPathByPermission(entry.permission, routes)
+    if (p) {
+      await resolveAndPush({ paths: [p] })
+      return
+    }
+  }
+  if (entry.menuName) {
+    const p = findPathByMenuName(entry.menuName, routes)
+    if (p) {
+      await resolveAndPush({ paths: [p] })
+      return
+    }
+  }
+  if (entry.routeName) {
+    try {
+      await router.push({ name: entry.routeName as any })
+      return
+    } catch {
+      // 继续走静态兜底路径
+    }
+  }
+  if (entry.fallbackPaths?.length) {
+    await resolveAndPush({
+      paths: entry.fallbackPaths,
+      reloadIfNotMatched: entry.reloadIfNotMatched
+    })
+    return
+  }
+  ElMessage.warning('暂未授权，请联系管理员')
 }
 
 const navigateToSubModule = async (key: SubModuleKey) => {
-  await resolveAndPush(subModuleRoutes[key])
+  await navigateByHomeEntry(SUB_ENTRIES[key])
 }
 
-const navigateToModule = async (module: keyof typeof moduleRoutes) => {
-  const candidates = moduleRoutes[module]
-  if (!candidates) {
-    ElMessage.info('该模块正在开发中，敬请期待！')
+const navigateToModule = async (module: ModuleKey) => {
+  await navigateByHomeEntry(MODULE_ENTRIES[module])
+}
+
+const onModuleClick = (k: ModuleKey) => {
+  if (!canModuleNav(k)) {
     return
   }
-  await resolveAndPush(candidates)
+  void navigateToModule(k)
+}
+
+const onSubClick = (k: SubModuleKey) => {
+  if (!canSubNav(k)) {
+    return
+  }
+  void navigateToSubModule(k)
 }
 
 // ==================== 图表初始化 ====================
@@ -1198,6 +1278,19 @@ $warning-gold: #faad14;
 }
 
 // 可点击模块样式
+.clickable-module--disabled {
+  cursor: default;
+  user-select: none;
+  .module-arrow {
+    display: none;
+  }
+  &:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: rgba(0, 212, 255, 0.12);
+  }
+}
+
 .clickable-module {
   cursor: pointer;
   transition: all 0.3s ease;

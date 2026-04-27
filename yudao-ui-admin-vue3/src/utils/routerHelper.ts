@@ -108,6 +108,26 @@ export const generateRoute = (routes: AppCustomRouteRecordRaw[]): AppRouteRecord
   const res: AppRouteRecordRaw[] = []
   const modulesRoutesKeys = Object.keys(modules)
   for (const route of routes) {
+    const routeMeta = (route.meta ?? {}) as Record<string, any>
+    const resolveDirectoryMeta = () => {
+      const directoryClickable =
+        routeMeta.directoryClickable ?? (route as any).directoryClickable ?? undefined
+      const directoryLanding =
+        routeMeta.directoryLanding ??
+        routeMeta.landingName ??
+        (route as any).directoryLanding ??
+        (route as any).landingName ??
+        undefined
+      const directoryPermission =
+        routeMeta.directoryPermission ?? (route as any).directoryPermission ?? undefined
+      return {
+        directoryClickable,
+        directoryLanding,
+        landingName: directoryLanding,
+        directoryPermission
+      }
+    }
+
     // 1. 生成 meta 菜单元数据
     const meta = {
       title: route.name,
@@ -118,7 +138,9 @@ export const generateRoute = (routes: AppCustomRouteRecordRaw[]): AppRouteRecord
       alwaysShow:
         route.children &&
         route.children.length > 0 &&
-        (route.alwaysShow !== undefined ? route.alwaysShow : true)
+        (route.alwaysShow !== undefined ? route.alwaysShow : true),
+      permission: (route as AppCustomRouteRecordRaw).permission,
+      ...resolveDirectoryMeta()
     } as any
     // 特殊逻辑：如果后端配置的 MenuDO.component 包含 ?，则表示需要传递参数
     // 此时，我们需要解析参数，并且将参数放到 meta.query 中

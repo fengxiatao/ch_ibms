@@ -1,0 +1,5 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+before_total	before_distinct
+1647	860
+after_total	after_distinct
+860	860

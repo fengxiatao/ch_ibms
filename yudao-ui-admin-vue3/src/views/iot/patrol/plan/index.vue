@@ -111,7 +111,7 @@
             link
             type="success"
             @click="handleTrigger(scope.row.id)"
-            v-hasPermi="['iot:patrol-plan:trigger']"
+            v-hasPermi="['iot:patrol-plan:start']"
           >
             触发
           </el-button>

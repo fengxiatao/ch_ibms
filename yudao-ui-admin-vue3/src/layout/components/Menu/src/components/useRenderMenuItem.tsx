@@ -6,10 +6,20 @@ import { isUrl } from '@/utils/is'
 import { useRenderMenuTitle } from './useRenderMenuTitle'
 import { pathResolve } from '@/utils/routerHelper'
 import { useI18n } from '@/hooks/web/useI18n'
+import { findPathByMenuName } from '@/utils/menuLookup'
+import { resolvePathByMenuPermission } from '@/utils/menuResolver'
 
 const { renderMenuTitle } = useRenderMenuTitle()
 
-const clickableDirectoryTitles = new Set([
+/**
+ * 过渡期：部分老菜单尚未回填 meta.directoryClickable / meta.directoryLanding，
+ * 先按中文菜单名做兼容，后续逐步迁移到后端 meta 配置后即可清空。
+ * 新增业务目录点击行为请走后端 system_menu：
+ *   - meta.directoryClickable = true          -> 点击目录标题时跳转
+ *   - meta.directoryLanding   = '子菜单名'    -> 跳到指定子菜单
+ *   - meta.directoryPermission = 'xxx:yyy'     -> 按权限反查菜单树得到落地页
+ */
+const legacyClickableDirectoryTitles = new Set<string>([
   '门禁管理',
   '智慧通行',
   '智慧建筑',
@@ -18,14 +28,18 @@ const clickableDirectoryTitles = new Set([
   '智慧能源',
   '环境监测'
 ])
-const directoryTitleNavigateTarget = new Map<string, string>([
-  ['门禁管理', '/smart-access/door/management'],
-  ['智慧通行', '/smart-access/door/management'],
-  ['智慧建筑', '/iot/building/visual-dashboard'],
-  ['智慧楼宇', '/iot/building/visual-dashboard'],
-  ['建筑设备监控', '/iot/building/visual-dashboard'],
-  ['智慧能源', '/building/newlight/overview'],
-  ['环境监测', '/iot/building/env/overview']
+
+/**
+ * 过渡期目录标题落地页映射：
+ * 后端尚未统一配置 meta.directoryLanding 时，按目录标题指定稳定落地路由。
+ */
+const legacyDirectoryLandingByTitle = new Map<string, string>([
+  ['门禁管理', '/smart-access/door/visual-dashboard'],
+  ['智慧通行', '/smart-access/door/visual-dashboard'],
+  ['智慧建筑', '/building/visual-dashboard'],
+  ['智慧楼宇', '/building/visual-dashboard'],
+  ['智慧能源', '/energy/overview'],
+  ['智慧安防', '/security/video-surveillance/visual-board']
 ])
 
 export const useRenderMenuItem = (options?: {
@@ -33,7 +47,7 @@ export const useRenderMenuItem = (options?: {
 }) =>
   // allRouters: AppRouteRecordRaw[] = [],
   {
-    const { push } = useRouter()
+    const { push, resolve } = useRouter()
     const { t } = useI18n()
 
     const resolveMetaTitleText = (meta: AppRouteRecordRaw['meta']) => {
@@ -51,11 +65,11 @@ export const useRenderMenuItem = (options?: {
 
     const shouldNavigateDirectoryTitle = (meta: AppRouteRecordRaw['meta']) => {
       if (!meta) return false
+      const metaAny = meta as any
+      if (metaAny.directoryClickable === true) return true
+      if (metaAny.directoryLanding || metaAny.directoryPermission) return true
       const titleText = resolveMetaTitleText(meta)
-      return (
-        (meta as any).directoryClickable === true ||
-        clickableDirectoryTitles.has(titleText)
-      )
+      return legacyClickableDirectoryTitles.has(titleText)
     }
 
     const keepDirectoryTitleFocus = async (event: MouseEvent) => {
@@ -63,20 +77,24 @@ export const useRenderMenuItem = (options?: {
       ;(event.currentTarget as HTMLElement | null)?.focus?.()
     }
 
-    const hasRouteInCurrentTree = (
-      targetPath: string,
-      route: AppRouteRecordRaw,
-      parentFullPath: string
-    ) => {
-      const normalizedTargetPath = targetPath.replace(/\/+$/, '') || '/'
-      const walk = (node: AppRouteRecordRaw, nodeParentPath: string): boolean => {
-        const nodeFullPath = isUrl(node.path) ? node.path : pathResolve(nodeParentPath, node.path)
-        const normalizedNodePath = nodeFullPath.replace(/\/+$/, '') || '/'
-        if (normalizedNodePath === normalizedTargetPath) return true
-        const children = node.children ?? []
-        return children.some((child) => walk(child, nodeFullPath))
+    const canResolveAsRealRoute = (targetPath: string) => {
+      if (!targetPath || isUrl(targetPath)) return true
+      const resolved = resolve(targetPath)
+      if (!resolved.matched.length) return false
+      const last = resolved.matched[resolved.matched.length - 1]
+      if (!last) return false
+      const recordName = String(last.name || '')
+      if (
+        last.path === '/:pathMatch(.*)*' ||
+        last.path === '/:path(.*)*' ||
+        recordName === '404Page' ||
+        recordName === 'NoFound'
+      ) {
+        return false
       }
-      return walk(route, parentFullPath)
+      const routeComponent = (last.components as any)?.default || (last as any).component
+      const componentText = typeof routeComponent === 'function' ? routeComponent.toString() : ''
+      return !componentText.includes('Error/404.vue')
     }
 
     const navigate = async (
@@ -86,16 +104,36 @@ export const useRenderMenuItem = (options?: {
       route: AppRouteRecordRaw
     ) => {
       // 不再阻止事件冒泡，保证点击目录标题时，ElSubMenu 仍然可以正常展开子菜单
-      const titleText = resolveMetaTitleText(meta)
-      const target = titleText ? directoryTitleNavigateTarget.get(titleText) : undefined
-      const rawTargetPath = target
-        ? target.startsWith('/')
-          ? target
-          : pathResolve(path, target)
-        : path
+      const metaAny = meta as any
+      // 优先级：meta.directoryPermission -> meta.directoryLanding / landingName（兼容老字段）
+      //        -> resolveFirstNavigableIndex（首个可见叶子兜底）
+      const permissionKey = metaAny.directoryPermission as string | undefined
+      const fromPermission = permissionKey ? resolvePathByMenuPermission(permissionKey) : undefined
 
-      // 目录标题映射的目标路由可能不在当前租户权限内，优先校验可访问性，不可访问则回退到首个可访问子菜单
-      const targetPath = hasRouteInCurrentTree(rawTargetPath, route, path)
+      const landingName =
+        (metaAny.directoryLanding as string | undefined) ||
+        (metaAny.landingName as string | undefined)
+      const fromLandingPath =
+        !fromPermission && landingName?.startsWith('/') ? landingName : undefined
+      const fromLanding =
+        !fromPermission && !fromLandingPath && landingName ? findPathByMenuName(landingName) : undefined
+      const fromLegacyLanding = legacyDirectoryLandingByTitle.get(resolveMetaTitleText(meta))
+
+      const rawTargetPath = fromPermission
+        ? fromPermission
+        : fromLandingPath
+          ? fromLandingPath
+        : fromLanding
+          ? fromLanding.startsWith('/')
+            ? fromLanding
+            : pathResolve(path, fromLanding)
+          : fromLegacyLanding
+            ? fromLegacyLanding
+          : resolveFirstNavigableIndex(route, path) || path
+
+      // 目录标题映射的目标路由可能不在当前目录子树内（例如统一可视化页放在静态路由），
+      // 因此按“全局可解析真实路由”校验，不可达再回退首个可见叶子。
+      const targetPath = canResolveAsRealRoute(rawTargetPath)
         ? rawTargetPath
         : resolveFirstNavigableIndex(route, path) || rawTargetPath
 

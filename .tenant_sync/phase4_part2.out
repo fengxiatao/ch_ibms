@@ -1,0 +1,36 @@
+tag	t1	t162	map
+[14] iot_access_person	15	15	15
+tag	t1	t162	map
+[15] iot_parking_lane	5	5	5
+tag	t1	t162	map
+[16] iot_parking_gate	4	4	4
+tag	t1	t162	map
+[17] iot_parking_monthly_vehicle	8	8	8
+tag	t1	t162
+[18] iot_parking_monthly_recharge	2	2
+tag	t1	t162
+[19] iot_parking_blacklist	4	4
+tag	t1	t162
+[20] iot_parking_free_vehicle	5	5
+tag	t1	t162	map
+[21] iot_parking_pass_rule	3	3	3
+tag	t1	t162
+[22] iot_parking_charge_rule_apply	2	2
+tag	t1	t162
+[23] iot_parking_system_config	2	2
+tag	t1	t162
+[24] iot_parking_wechat_user	2	2
+tag	t1	t162
+[25] iot_parking_present_vehicle	20	20
+tag	t1	t162	map
+[26] iot_parking_record	24	24	24
+tag	t1	t162
+[27] iot_parking_refund_record	3	3
+tag	t1	t162
+[28] iot_visitor_abnormal_event	11	11
+tag	t1	t162
+[29] iot_device_channel	2	2
+tag	t1	t162
+[30] iot_device_event_log	979	979
+tag
+=== PART2 DONE ===

@@ -123,7 +123,7 @@
             type="warning"
             @click="handleComplete(scope.row.id)"
             v-if="scope.row.status === 2"
-            v-hasPermi="['iot:patrol-task:complete']"
+            v-hasPermi="['iot:patrol-task:update']"
           >
             完成
           </el-button>

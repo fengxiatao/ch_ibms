@@ -1,0 +1,3 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+id	name	excluded_menu_ids	len	has_4003	has_4009	has_72568	has_72569
+113	智慧安防	[4000]	3156	496	497	503	504

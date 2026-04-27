@@ -1,0 +1,6 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
++---------+----------+
+| pkg_cnt | role_cnt |
++---------+----------+
+|     416 |      511 |
++---------+----------+

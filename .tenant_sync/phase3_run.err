@@ -1,0 +1,2 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+ERROR 1048 (23000) at line 157: Column 'device_id' cannot be null

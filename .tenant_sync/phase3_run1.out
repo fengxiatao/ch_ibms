@@ -1,0 +1,7 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+tag	host	part	zone	event	op_log
+[A]	2	1	8	2468	103
+tag	preset	cruise	cp	rec	snap
+[B]	4	13	66	3	14
+tag	mode_	area	rel	point_	sc
+[C]	6	5	6	6	1

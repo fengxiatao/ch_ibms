@@ -635,9 +635,13 @@ public class NvrSdkWrapper {
 
             int sdkRecordType = recordType != null ? recordType : 0; // 0-所有录像
 
+            // 大华 SDK 通道号从 0 开始，业务层通道号从 1 开始，需要减 1
+            // （与 PTZ / 预设点 / 巡航 等其它接口的换算保持一致）
+            int sdkChannelNo = channelNo > 0 ? channelNo - 1 : 0;
+
             boolean ok = getNetSdk().CLIENT_QueryRecordFile(
                     new LLong(loginHandle),
-                    channelNo,
+                    sdkChannelNo,
                     sdkRecordType,
                     stTimeStart,
                     stTimeEnd,

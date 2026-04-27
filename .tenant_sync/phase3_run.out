@@ -1,0 +1,2 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+ERROR 1062 (23000) at line 45: Duplicate entry '1' for key '_tmp_map_alarm_host.PRIMARY'

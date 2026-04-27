@@ -1,0 +1,24 @@
+tag	t1	t162
+[31] iot_access_person_credential	18	18
+tag	t1	t162
+[32] iot_access_person_device_auth	25	25
+tag	t1	t162
+[33] iot_access_device_capability	2	2
+tag	t1	t162
+[34] iot_access_permission_group_device	27	27
+tag	t1	t162
+[35] iot_access_permission_group_person	23	23
+tag	t1	t162	map
+[36] iot_access_auth_task	208	208	208
+tag	t1	t162
+[37] iot_access_auth_task_detail	305	305
+tag	t1	t162
+[38] iot_access_event_log	12566	12566
+tag	t1	t162
+[39] iot_access_operation_log	254	254
+tag	t1	t162	map
+[40] iot_ota_task	7	7	7
+tag	t1	t162
+[41] iot_ota_task_record	20	20
+tag
+=== PART3 DONE ===

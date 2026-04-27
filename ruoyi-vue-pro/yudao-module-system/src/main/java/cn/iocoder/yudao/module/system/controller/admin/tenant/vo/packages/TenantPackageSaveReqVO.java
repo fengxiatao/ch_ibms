@@ -32,4 +32,7 @@ public class TenantPackageSaveReqVO {
     @NotNull(message = "关联的菜单编号不能为空")
     private Set<Long> menuIds;
 
+    @Schema(description = "排除的根菜单编号（归一化后移除这些根菜单下的非按钮菜单，用于隐藏模块侧边栏但保留API权限）")
+    private Set<Long> excludedMenuIds;
+
 }

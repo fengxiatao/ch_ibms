@@ -25,6 +25,9 @@ public class TenantPackageRespVO {
     @Schema(description = "关联的菜单编号", requiredMode = Schema.RequiredMode.REQUIRED)
     private Set<Long> menuIds;
 
+    @Schema(description = "排除的根菜单编号")
+    private Set<Long> excludedMenuIds;
+
     @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED)
     private LocalDateTime createTime;
 

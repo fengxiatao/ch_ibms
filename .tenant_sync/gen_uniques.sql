@@ -1,0 +1,10 @@
+-- 唯一索引（除 PRIMARY 之外）
+SELECT s.TABLE_NAME, s.INDEX_NAME, s.COLUMN_NAME, s.SEQ_IN_INDEX
+FROM INFORMATION_SCHEMA.STATISTICS s
+WHERE s.TABLE_SCHEMA='ch_ibms'
+  AND s.NON_UNIQUE=0 AND s.INDEX_NAME != 'PRIMARY'
+  AND (s.TABLE_NAME LIKE 'ibms_%' OR s.TABLE_NAME LIKE 'iot_%' OR s.TABLE_NAME LIKE 'security_%'
+       OR s.TABLE_NAME LIKE 'access_parking_%'
+       OR s.TABLE_NAME IN ('building','area','campus','floor'))
+  AND s.TABLE_NAME NOT LIKE 'bak_%'
+ORDER BY s.TABLE_NAME, s.INDEX_NAME, s.SEQ_IN_INDEX;
