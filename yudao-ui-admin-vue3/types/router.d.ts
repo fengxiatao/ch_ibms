@@ -49,6 +49,16 @@ declare module 'vue-router' {
     noTagsView?: boolean
     followAuth?: string
     canTo?: boolean
+    /** 与后端 system_menu.permission 一致，供首页/目录反查可访问路径 */
+    permission?: string
+    /** 为 true 时侧栏目录标题可点击，配合首个可达叶子或 landingName */
+    directoryClickable?: boolean
+    /** 显式跳转到与标题匹配的子菜单名（兼容旧字段） */
+    landingName?: string
+    /** 目录标题点击后的落地目标，可为菜单标题或绝对路由 */
+    directoryLanding?: string
+    /** 目录标题点击按权限反查落地页 */
+    directoryPermission?: string
   }
 }
 
@@ -81,5 +91,13 @@ declare global {
     visible?: boolean
     parentId?: number
     alwaysShow?: boolean
+    /** 后端 system_menu.permission，会写入 route.meta.permission */
+    permission?: string
+    /** 目录标题是否可点击 */
+    directoryClickable?: boolean
+    /** 目录标题落地目标（菜单名或绝对路由） */
+    directoryLanding?: string
+    /** 目录标题按权限反查落地页 */
+    directoryPermission?: string
   }
 }

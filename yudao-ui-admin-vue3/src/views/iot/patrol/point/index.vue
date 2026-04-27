@@ -36,7 +36,7 @@
             link
             type="primary"
             @click="openForm('update', scope.row.id)"
-            v-hasPermi="['iot:patrol-point:update']"
+            v-hasPermi="['iot:epatrol-point:update']"
           >
             编辑
           </el-button>
@@ -44,7 +44,7 @@
             link
             type="danger"
             @click="handleDelete(scope.row.id)"
-            v-hasPermi="['iot:patrol-point:delete']"
+            v-hasPermi="['iot:epatrol-point:delete']"
           >
             删除
           </el-button>
@@ -53,7 +53,7 @@
             type="success"
             @click="handleGenerateQrCode(scope.row.id)"
             v-if="scope.row.type === 3"
-            v-hasPermi="['iot:patrol-point:generate-qrcode']"
+            v-hasPermi="['iot:epatrol-point:update']"
           >
             生成二维码
           </el-button>

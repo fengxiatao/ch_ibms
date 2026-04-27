@@ -52,6 +52,7 @@ public class AuthConvertImpl implements AuthConvert {
         vo.setVisible(menu.getVisible());
         vo.setKeepAlive(menu.getKeepAlive());
         vo.setAlwaysShow(menu.getAlwaysShow());
+        vo.setPermission(menu.getPermission());
         return vo;
     }
 

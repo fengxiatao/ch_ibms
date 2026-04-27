@@ -92,6 +92,9 @@ public class AuthPermissionInfoRespVO {
         @Schema(description = "是否总是显示", example = "false")
         private Boolean alwaysShow;
 
+        @Schema(description = "权限标识，用于前端反查可访问路径（目录/菜单可能为空）", example = "system:user:query")
+        private String permission;
+
         /**
          * 子路由
          */

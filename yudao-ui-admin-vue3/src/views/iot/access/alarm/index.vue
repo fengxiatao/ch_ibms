@@ -95,7 +95,7 @@
           plain
           @click="handleBatchHandle"
           :disabled="selectedIds.length === 0"
-          v-hasPermi="['iot:access-alarm:batch-handle']"
+          v-hasPermi="['iot:access-alarm:update']"
         >
           <Icon icon="ep:operation" class="mr-5px" /> 批量处理
         </el-button>
@@ -104,7 +104,7 @@
           plain
           @click="handleExport"
           :loading="exportLoading"
-          v-hasPermi="['iot:access-alarm:export']"
+          v-hasPermi="['iot:access-alarm:query']"
         >
           <Icon icon="ep:download" class="mr-5px" /> 导出
         </el-button>
@@ -176,7 +176,7 @@
             link
             type="warning"
             @click="openHandle(scope.row)"
-            v-hasPermi="['iot:access-alarm:handle']"
+            v-hasPermi="['iot:access-alarm:update']"
           >
             处理
           </el-button>

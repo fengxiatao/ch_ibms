@@ -1073,7 +1073,7 @@ public class NvrPlugin implements ActiveDeviceHandler, GatewayCapabilityProvider
                 LOG_PREFIX, deviceId, channelNo, startTime, endTime);
 
         try {
-            Long loginHandle = connectionManager.getLoginHandle(deviceId);
+            Long loginHandle = ensureLoggedIn(deviceId, command);
             if (loginHandle == null || loginHandle <= 0) {
                 return CommandResult.failure("设备未连接");
             }
@@ -1132,7 +1132,7 @@ public class NvrPlugin implements ActiveDeviceHandler, GatewayCapabilityProvider
                 LOG_PREFIX, deviceId, channelNos.size(), startTime, endTime);
 
         try {
-            Long loginHandle = connectionManager.getLoginHandle(deviceId);
+            Long loginHandle = ensureLoggedIn(deviceId, command);
             if (loginHandle == null || loginHandle <= 0) {
                 return CommandResult.failure("设备未连接");
             }
@@ -1433,6 +1433,54 @@ public class NvrPlugin implements ActiveDeviceHandler, GatewayCapabilityProvider
     @Override
     public String supportedDeviceType() {
         return PluginConstants.DEVICE_TYPE_NVR;
+    }
+
+    /**
+     * 确保 NVR 已登录：若 connectionManager 中无 loginHandle，则使用 command 中的
+     * ip/port/username/password 自动 CONNECT 一次（与正常 CONNECT 命令同源），返回登录句柄。
+     *
+     * <p>用于"录像查询/批量录像查询"等场景：用户可能直接发起搜索而未先发 CONNECT，
+     * 通过此兜底避免出现"设备未连接"。</p>
+     */
+    private Long ensureLoggedIn(Long deviceId, DeviceCommand command) {
+        Long loginHandle = connectionManager.getLoginHandle(deviceId);
+        if (loginHandle != null && loginHandle > 0) {
+            return loginHandle;
+        }
+        // 从命令参数中读取连接信息（biz 已统一在 params 中下发）
+        String ip = command != null ? command.getStringParam("ip") : null;
+        Integer port = command != null ? command.getIntParam("port") : null;
+        String username = command != null ? command.getStringParam("username") : null;
+        String password = command != null ? command.getStringParam("password") : null;
+        if (ip == null || ip.isEmpty() || username == null || username.isEmpty() || password == null || password.isEmpty()) {
+            log.warn("{} 自动登录缺失参数: deviceId={}, ip={}, port={}, hasUser={}, hasPwd={}",
+                    LOG_PREFIX, deviceId, ip, port, username != null && !username.isEmpty(),
+                    password != null && !password.isEmpty());
+            return null;
+        }
+        log.info("{} 设备未连接，按命令参数自动登录: deviceId={}, ip={}, port={}", LOG_PREFIX, deviceId, ip, port);
+        DeviceConnectionInfo connectionInfo = DeviceConnectionInfo.builder()
+                .deviceId(deviceId)
+                .ipAddress(ip)
+                .port(port)
+                .username(username)
+                .password(password)
+                .deviceType(PluginConstants.DEVICE_TYPE_NVR)
+                .vendor(getVendor())
+                .connectionMode(ConnectionMode.ACTIVE)
+                .build();
+        LoginResult loginResult = login(connectionInfo);
+        if (loginResult == null || !loginResult.isSuccess()) {
+            log.warn("{} 自动登录失败: deviceId={}, error={}", LOG_PREFIX, deviceId,
+                    loginResult != null ? loginResult.getErrorMessage() : "loginResult=null");
+            return null;
+        }
+        Object handleObj = loginResult.getLoginHandle();
+        if (handleObj instanceof Number) {
+            return ((Number) handleObj).longValue();
+        }
+        // 兜底再从 connectionManager 取一次（login 内部已 register）
+        return connectionManager.getLoginHandle(deviceId);
     }
 
     @Override

@@ -1,0 +1,8 @@
+# 项目规则 - 长辉IBMS
+
+## 数据库操作
+- 查询数据库时，必须使用 `mysql-ibms` MCP Server（工具名 `mcp4_mysql_query`），禁止通过 `run_command` 执行 mysql 命令行进行查询。
+- `mysql-ibms` MCP Server 是只读的。需要写操作（INSERT/UPDATE/DELETE/ALTER）时，通过 `run_command` 执行 mysql 命令。
+
+## 回复语言
+- 使用简体中文回复。
