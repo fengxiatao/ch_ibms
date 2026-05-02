@@ -20,7 +20,39 @@ platform:
   os: linux
   arch: amd64
 
+# 禁用默认 clone，改用自定义 fast-clone step 从宿主 mirror 拉取
+# 背景：chvm1→GitHub 下行网速 ~20KiB/s，默认 clone 要 >30min
+# mirror 目录 /opt/ci/cache/git/ch_ibms.git 由开发者本地 push 同步
+clone:
+  disable: true
+
+volumes:
+  - name: git-mirror
+    host:
+      path: /opt/ci/cache/git/ch_ibms.git
+
 steps:
+  # ---------------------------------------------------------------------
+  # Step 0: fast-clone — 从宿主 mirror 本地 clone，秒级完成
+  # ---------------------------------------------------------------------
+  - name: fast-clone
+    image: alpine/git:latest
+    volumes:
+      - name: git-mirror
+        path: /mirror
+    commands:
+      - apk add --no-cache coreutils > /dev/null 2>&1 || true
+      - git config --global --add safe.directory /mirror
+      - git config --global --add safe.directory /drone/src
+      - START=$(date +%s)
+      - git init -q .
+      - git remote add origin /mirror
+      - git fetch --depth 1 -q origin "$DRONE_COMMIT"
+      - git checkout -q FETCH_HEAD
+      - END=$(date +%s)
+      - echo "[fast-clone] 耗时 $((END-START))s, HEAD=$(git rev-parse --short HEAD)"
+      - echo "[fast-clone] 文件数 $(git ls-files | wc -l), 工作树大小 $(du -sh --exclude=.git . | cut -f1)"
+
   # ---------------------------------------------------------------------
   # Step 1: hello — 打印环境信息，验证 runner 可用
   # ---------------------------------------------------------------------
