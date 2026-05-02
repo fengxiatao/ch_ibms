@@ -98,16 +98,6 @@
 
     <!-- 右侧：布局、全屏 -->
     <div class="controls-right">
-      <el-radio-group
-        v-if="playbackMode"
-        v-model="localPlaybackMode"
-        size="small"
-        class="playback-mode-switch"
-        @change="handlePlaybackModeChange"
-      >
-        <el-radio-button label="sdk">内网</el-radio-button>
-        <el-radio-button label="stream">外网</el-radio-button>
-      </el-radio-group>
       <el-select
         v-model="localLayout"
         size="small"

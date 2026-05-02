@@ -83,6 +83,13 @@ const normalizeDateTime = (value?: string | number) => {
   return dayjs(raw).isValid() ? dayjs(raw).format('YYYY-MM-DD HH:mm:ss') : raw
 }
 
+// 过滤占位/示例域名的图片 URL，避免浏览器去请求不存在的资源（来自种子数据）
+const sanitizePhotoUrl = (url?: string): string | undefined => {
+  if (!url) return undefined
+  if (/^https?:\/\/(example\.invalid|example\.com)\b/i.test(url)) return undefined
+  return url
+}
+
 const mapPresentRow = (row: BackendParkingPresentResp): ParkingPresentRespVO => {
   const plateNo = row.plateNumber || ''
   const warningType = !plateNo ? 3 : row.longTermFlag === 1 ? 2 : undefined
@@ -95,7 +102,7 @@ const mapPresentRow = (row: BackendParkingPresentResp): ParkingPresentRespVO => 
     inTime: normalizeDateTime(row.entryTime),
     durationMinutes: row.parkingDuration,
     warningType,
-    snapshotUrl: row.entryPhotoUrl || undefined,
+    snapshotUrl: sanitizePhotoUrl(row.entryPhotoUrl),
     remark: row.remark
   }
 }

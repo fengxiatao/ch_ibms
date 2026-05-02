@@ -84,6 +84,13 @@ const normalizeDateTime = (value?: string | number) => {
   return dayjs(raw).isValid() ? dayjs(raw).format('YYYY-MM-DD HH:mm:ss') : raw
 }
 
+// 过滤占位/示例域名的图片 URL，避免浏览器去请求不存在的资源（来自种子数据）
+const sanitizePhotoUrl = (url?: string): string | undefined => {
+  if (!url) return undefined
+  if (/^https?:\/\/(example\.invalid|example\.com)\b/i.test(url)) return undefined
+  return url
+}
+
 const mapRecordRow = (row: BackendParkingRecordResp): ParkingRecordRespVO => {
   const ioType: 'in' | 'out' = row.exitTime ? 'out' : 'in'
   const operator = row.exitTime ? row.exitOperator : row.entryOperator
@@ -110,8 +117,8 @@ const mapRecordRow = (row: BackendParkingRecordResp): ParkingRecordRespVO => {
     payChannel: row.paymentMethod || undefined,
     payTime: row.paymentTime ? normalizeDateTime(row.paymentTime) : undefined,
     operator: operator || undefined,
-    inPhotoUrl: row.entryPhotoUrl || undefined,
-    outPhotoUrl: row.exitPhotoUrl || undefined,
+    inPhotoUrl: sanitizePhotoUrl(row.entryPhotoUrl),
+    outPhotoUrl: sanitizePhotoUrl(row.exitPhotoUrl),
     abnormal: false,
     remark: row.remark || undefined
   }

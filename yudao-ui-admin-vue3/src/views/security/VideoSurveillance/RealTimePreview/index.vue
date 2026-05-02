@@ -51,13 +51,6 @@
 
         <!-- 中间面板：播放器网格 -->
         <div class="center-panel">
-          <!-- WebRTC 测试开关（不改默认逻辑；点击会改 URL 并刷新） -->
-          <div class="mode-indicator">
-            <span class="mode-text">当前模式：{{ isIntranet ? '大华直连(RPC2)' : 'ZLM(WebRTC优先)' }}</span>
-            <el-button size="small" type="primary" plain @click="toggleForceWebrtc">
-              {{ forceWebrtc ? '关闭强制WebRTC' : '强制WebRTC测试' }}
-            </el-button>
-          </div>
           <VideoPlayerGrid
             ref="playerGridRef"
             :panes="panes"
@@ -195,24 +188,9 @@ const {
   stopPatrol
 } = useRealtimePaneOrchestrator()
 
-const forceWebrtc = isForceWebrtcEnabled()
-
-const isIntranet = isIntranetAccess() && !forceWebrtc
-
-const toggleForceWebrtc = () => {
-  try {
-    // 仅修改 query，严格保留当前 path/hash（避免切换后跳到根路由导致 404）
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('forceWebrtc') === '1') params.delete('forceWebrtc')
-    else params.set('forceWebrtc', '1')
-    const nextSearch = params.toString()
-    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`
-    window.history.replaceState(null, '', nextUrl)
-    window.location.reload()
-  } catch {
-    // ignore
-  }
-}
+// 是否走「大华直连（内网 RPC2）」：仅当页面 host 是私网网段且未强制 WebRTC 时启用。
+// 线上公网域名一律走 ZLM 流媒体（外网模式），不再展示内网/外网切换。
+const isIntranet = isIntranetAccess() && !isForceWebrtcEnabled()
 
 // 播放器扩展状态（在 Dahua 窗格上附加 ZLM 播放信息）
 type ExtendedPane = DahuaPlayerPane & {
@@ -1239,24 +1217,4 @@ onUnmounted(async () => {
   }
 }
 
-.mode-indicator {
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  z-index: 20;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  border: 1px solid #2f2f2f;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
-
-  .mode-text {
-    font-size: 12px;
-    color: #d2d2d2;
-    white-space: nowrap;
-  }
-}
 </style>

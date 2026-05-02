@@ -827,7 +827,7 @@ const applyViewToVideoWall = (view: VideoViewDetail) => {
   const paneBySlot = new Map<number, ViewPaneItem>()
   panes.forEach((pane, idx) => {
     const rawPaneIndex = Number(pane.paneIndex)
-    const slot = Number.isFinite(rawPaneIndex) && rawPaneIndex > 0 ? Math.floor(rawPaneIndex) - 1 : idx
+    const slot = Number.isFinite(rawPaneIndex) && rawPaneIndex >= 0 ? Math.floor(rawPaneIndex) : idx
     if (slot >= 0 && slot < targetPaneCount && !paneBySlot.has(slot)) {
       paneBySlot.set(slot, pane)
     }
