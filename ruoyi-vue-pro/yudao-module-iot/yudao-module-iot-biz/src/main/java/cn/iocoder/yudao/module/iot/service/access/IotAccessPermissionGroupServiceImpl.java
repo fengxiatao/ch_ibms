@@ -50,7 +50,7 @@ public class IotAccessPermissionGroupServiceImpl implements IotAccessPermissionG
     private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
 
     @Resource
-    private cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService iotDeviceChannelService;
+    private cn.iocoder.yudao.module.iot.service.ibms.channel.IbmsChannelService ibmsChannelService;
 
     @Resource
     private cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPersonMapper personMapper;
@@ -302,12 +302,13 @@ public class IotAccessPermissionGroupServiceImpl implements IotAccessPermissionG
                     }
                 }
             }
-            // 查询通道信息
+            // 查询通道信息（IBMS 单台账）
             if (device.getChannelId() != null) {
-                cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO channelDO = iotDeviceChannelService.getChannel(device.getChannelId());
-                if (channelDO != null) {
-                    vo.setChannelNo(channelDO.getChannelNo());
-                    vo.setChannelName(channelDO.getChannelName());
+                cn.iocoder.yudao.module.iot.controller.admin.ibms.channel.vo.IbmsChannelRespVO channelVO =
+                        ibmsChannelService.getChannel(device.getChannelId());
+                if (channelVO != null) {
+                    vo.setChannelNo(channelVO.getChannelNo());
+                    vo.setChannelName(channelVO.getName());
                 }
             }
             result.add(vo);

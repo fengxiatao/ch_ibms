@@ -19,7 +19,7 @@
             :key="(win.state.stream || '') + '_' + (win.state.streamStartTime || 0)"
             :flv-url="win.state.flvUrl"
             :webrtc-url="win.state.webrtcUrl"
-            :prefer-webrtc="true"
+            :prefer-webrtc="false"
           />
           <div v-else class="video-placeholder">
             <Icon icon="ep:video-pause" class="placeholder-icon" />

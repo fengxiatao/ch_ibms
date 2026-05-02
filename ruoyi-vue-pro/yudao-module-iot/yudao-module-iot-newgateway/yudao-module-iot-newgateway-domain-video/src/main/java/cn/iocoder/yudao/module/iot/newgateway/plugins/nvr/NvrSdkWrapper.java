@@ -903,7 +903,7 @@ public class NvrSdkWrapper {
                     );
                     
                     if (ok) {
-                        // 大华 SDK 返回的通道名称是 GBK 编码
+                        // 大华 SDK 返回的通道名称编码（GBK / UTF-8）取决于固件版本，由 decodeGbkString 自动探测
                         String channelName = decodeGbkString(cfg.szName);
                         
                         if (StringUtils.hasText(channelName)) {
@@ -937,7 +937,7 @@ public class NvrSdkWrapper {
                         );
                         
                         if (ok && cfg.szChnName != null) {
-                            // 大华 SDK 返回的通道名称是 GBK 编码
+                            // 大华 SDK 返回的通道名称编码（GBK / UTF-8）取决于固件版本，由 decodeGbkString 自动探测
                             String channelName = decodeGbkString(cfg.szChnName);
                             
                             if (StringUtils.hasText(channelName)) {
@@ -968,37 +968,59 @@ public class NvrSdkWrapper {
     }
     
     /**
-     * 将大华 SDK 返回的 GBK 编码字节数组解码为字符串
-     * 
-     * @param bytes 字节数组（GBK 编码）
+     * 将大华 SDK 返回的字节数组解码为字符串。
+     *
+     * <p>大华 NetSDK 不同固件/不同 SDK 版本下，通道名称等字段可能返回 GBK，也可能返回 UTF-8。
+     * 这里采用"严格 UTF-8 优先，失败回退 GBK"的策略：</p>
+     * <ul>
+     *     <li>对纯 ASCII：UTF-8 与 GBK 结果一致，无差异；</li>
+     *     <li>对真正的 UTF-8 中文字节：严格 UTF-8 解码成功，正确还原；</li>
+     *     <li>对 GBK 中文字节：严格 UTF-8 解码会抛 {@link java.nio.charset.MalformedInputException}，
+     *         回退到 GBK 后能正确还原。</li>
+     * </ul>
+     *
+     * <p>历史上本方法只按 GBK 解码，遇到 SDK 返回 UTF-8 的设备会出现"UTF-8 字节被当 GBK 解码"
+     * 的双重编码乱码（如 "球机细节相机" → "鐞冩満缁嗚妭鐩告満"），故改为自动探测。</p>
+     *
+     * @param bytes 字节数组（GBK 或 UTF-8 编码，由 SDK 决定）
      * @return 解码后的字符串
      */
     private String decodeGbkString(byte[] bytes) {
         if (bytes == null || bytes.length == 0) {
             return null;
         }
-        
+
+        // 查找字符串的实际长度（到第一个 null 字符为止）
+        int len = 0;
+        for (int i = 0; i < bytes.length; i++) {
+            if (bytes[i] == 0) {
+                len = i;
+                break;
+            }
+        }
+        if (len == 0) {
+            // 没有找到 null 字符，使用整个数组
+            len = bytes.length;
+        }
+
+        // 1) 严格 UTF-8 优先：可识别真正的 UTF-8 字节（包含 ASCII），失败抛异常进入回退
         try {
-            // 查找字符串的实际长度（到第一个 null 字符为止）
-            int len = 0;
-            for (int i = 0; i < bytes.length; i++) {
-                if (bytes[i] == 0) {
-                    len = i;
-                    break;
-                }
-            }
-            if (len == 0) {
-                // 没有找到 null 字符，使用整个数组
-                len = bytes.length;
-            }
-            
-            // 使用 GBK 编码解码（大华设备通常使用 GBK 编码）
+            java.nio.charset.CharsetDecoder utf8Decoder = java.nio.charset.StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT);
+            String utf8Result = utf8Decoder.decode(java.nio.ByteBuffer.wrap(bytes, 0, len)).toString().trim();
+            return StringUtils.hasText(utf8Result) ? utf8Result : null;
+        } catch (java.nio.charset.CharacterCodingException ignore) {
+            // 2) UTF-8 严格解码失败 → 视为 GBK
+        }
+
+        try {
             String result = new String(bytes, 0, len, "GBK").trim();
             return StringUtils.hasText(result) ? result : null;
         } catch (Exception e) {
-            // 如果 GBK 解码失败，尝试使用默认编码
+            // 3) 兜底：使用默认编码
             log.debug("{} GBK 解码失败，使用默认编码: {}", LOG_PREFIX, e.getMessage());
-            String result = new String(bytes).trim();
+            String result = new String(bytes, 0, len).trim();
             int nullIndex = result.indexOf('\0');
             if (nullIndex > 0) {
                 result = result.substring(0, nullIndex);

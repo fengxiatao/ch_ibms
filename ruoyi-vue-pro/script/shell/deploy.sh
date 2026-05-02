@@ -16,7 +16,10 @@ HEALTH_CHECK_URL=http://127.0.0.1:48080/actuator/health/
 # heapError 存放路径
 HEAP_ERROR_PATH=$BASE_PATH/heapError
 # JVM 参数
-JAVA_OPS="-Xms512m -Xmx512m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$HEAP_ERROR_PATH"
+# 注意：必须显式设置 file.encoding 和 user.timezone，否则在 Linux 服务器上：
+#   - 系统 LANG 非 UTF-8 时，中文（如通道名称）会乱码
+#   - 系统 TZ 非 Asia/Shanghai 时，操作时间会偏离东 8 区
+JAVA_OPS="-Xms512m -Xmx512m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$HEAP_ERROR_PATH -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
 
 # SkyWalking Agent 配置
 #export SW_AGENT_NAME=$SERVER_NAME

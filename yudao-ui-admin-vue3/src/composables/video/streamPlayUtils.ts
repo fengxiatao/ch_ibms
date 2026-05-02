@@ -37,7 +37,9 @@ export const isForceWebrtcEnabled = () => {
 }
 
 export const getDefaultPreferWebrtc = () => {
-  return isForceWebrtcEnabled() || !isIntranetAccess()
+  // 外网环境下 WebRTC 信令/UDP 经常无法穿透，统一关闭 WebRTC 优先，走 ws-flv。
+  // 仅当 URL 显式带 forceWebrtc=1 时才尝试 WebRTC（用于内部测试）。
+  return isForceWebrtcEnabled()
 }
 
 /** 计算拉流地址中的「公网 host[:port]」替换目标（私网 IP 段会被替换为此值） */

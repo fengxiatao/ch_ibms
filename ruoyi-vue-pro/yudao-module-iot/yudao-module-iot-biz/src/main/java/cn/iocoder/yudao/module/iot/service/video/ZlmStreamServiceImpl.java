@@ -257,9 +257,12 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
         // 📍 确定目标 IP
         // 关键逻辑：NVR 通道需要使用 NVR 的 IP（设备 IP），而不是 IPC 的 IP（targetIp）
         // 因为 RTSP 流是从 NVR 获取的，不是直连 IPC
+        // ⚠️ 注意：通道发现来源（如 ONVIF 直挂）可能让 channel.deviceType 不为 NVR，
+        //   但只要父设备是 NVR，就必须走 NVR 分支，避免误直连 IPC。
+        boolean isNvr = isNvrAttached(device, channel);
+        String deviceType = isNvr ? "NVR" : channel.getDeviceType();
         String ip;
-        String deviceType = channel.getDeviceType();
-        if ("NVR".equalsIgnoreCase(deviceType)) {
+        if (isNvr) {
             // NVR 通道：使用设备 IP（NVR 的 IP）
             ip = net.ip;
             log.debug("[ZLM] NVR 通道，使用 NVR IP: {}", ip);
@@ -276,15 +279,22 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
         }
 
         // 🔐 获取认证信息
-        String username = channel.getUsername();
-        String password = channel.getPassword();
-        
-        // 如果通道没有配置，尝试从台账/运行态解析（与 DhVideoController 一致）
-        if (StrUtil.isBlank(username)) {
-            username = net.username;
-        }
-        if (StrUtil.isBlank(password)) {
-            password = net.password;
+        // ⚠️ NVR 模式下优先用设备级（NVR）账号；IPC 直连模式下才优先用通道级账号。
+        //   这样即使通道 extra 里残留了 IPC 自身的密码，也不会污染对 NVR 的认证。
+        String username;
+        String password;
+        if (isNvr) {
+            username = StrUtil.isNotBlank(net.username) ? net.username : channel.getUsername();
+            password = StrUtil.isNotBlank(net.password) ? net.password : channel.getPassword();
+        } else {
+            username = channel.getUsername();
+            password = channel.getPassword();
+            if (StrUtil.isBlank(username)) {
+                username = net.username;
+            }
+            if (StrUtil.isBlank(password)) {
+                password = net.password;
+            }
         }
         if (StrUtil.isBlank(username) || StrUtil.isBlank(password)) {
             if (runtime != null && runtime.getConfig() != null) {
@@ -311,7 +321,7 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
         // - channel_no：NVR 设备上的通道编号（1-16），用于 RTSP 流地址中的 channel 参数
         // - target_channel_no：实际 IPC 设备的通道号（通常为1），仅用于 PTZ 直连控制
         int channelNo = 1;
-        if ("NVR".equalsIgnoreCase(deviceType)) {
+        if (isNvr) {
             // NVR 场景：使用 NVR 的 channel_no
             if (channel.getChannelNo() != null && channel.getChannelNo() > 0) {
                 channelNo = channel.getChannelNo();
@@ -446,6 +456,21 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
         return null;
     }
 
+    /**
+     * 判断通道是否挂载在 NVR 下。
+     * <p>只要满足任一条件即视为 NVR 通道：</p>
+     * <ul>
+     *     <li>通道自身解析出的 deviceType 为 NVR（来自 channel.dataSource / category 或 extra.deviceType）</li>
+     *     <li>父设备的 deviceTypeCode 为 NVR（防止 ONVIF 直挂等来源让通道 deviceType 不为 NVR 时被误判为 IPC 直连）</li>
+     * </ul>
+     */
+    private boolean isNvrAttached(IbmsDeviceDO device, IotDeviceChannelDO channel) {
+        if (channel != null && "NVR".equalsIgnoreCase(channel.getDeviceType())) {
+            return true;
+        }
+        return device != null && "NVR".equalsIgnoreCase(device.getDeviceTypeCode());
+    }
+
     private boolean isDahuaDevice(String deviceType, String productKey) {
         if (deviceType != null) {
             String lower = deviceType.toLowerCase();
@@ -577,9 +602,9 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
     private String buildPlaybackRtspUrl(IbmsDeviceDO device, IbmsDeviceRuntimeDO runtime, IotDeviceChannelDO channel, String startTime, String endTime) {
         IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(device, runtime);
         // 📍 确定目标 IP（与实时流逻辑保持一致）
+        boolean isNvr = isNvrAttached(device, channel);
         String ip;
-        String deviceType = channel.getDeviceType();
-        if ("NVR".equalsIgnoreCase(deviceType)) {
+        if (isNvr) {
             ip = net.ip;
             log.debug("[ZLM] NVR 通道回放，使用 NVR IP: {}", ip);
         } else {
@@ -593,13 +618,21 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
             return null;
         }
 
-        String username = channel.getUsername();
-        String password = channel.getPassword();
-        if (StrUtil.isBlank(username)) {
-            username = net.username;
-        }
-        if (StrUtil.isBlank(password)) {
-            password = net.password;
+        // 🔐 NVR 模式下优先用设备级账号，避免被通道级 IPC 凭据污染
+        String username;
+        String password;
+        if (isNvr) {
+            username = StrUtil.isNotBlank(net.username) ? net.username : channel.getUsername();
+            password = StrUtil.isNotBlank(net.password) ? net.password : channel.getPassword();
+        } else {
+            username = channel.getUsername();
+            password = channel.getPassword();
+            if (StrUtil.isBlank(username)) {
+                username = net.username;
+            }
+            if (StrUtil.isBlank(password)) {
+                password = net.password;
+            }
         }
         if (StrUtil.isBlank(username) || StrUtil.isBlank(password)) {
             if (runtime != null && runtime.getConfig() != null) {
@@ -622,7 +655,7 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
         // 📺 确定通道号（与实时流逻辑保持一致）
         // NVR 通道需要使用 channel_no（NVR通道号），而不是 target_channel_no（IPC通道号）
         int channelNo = 1;
-        if ("NVR".equalsIgnoreCase(deviceType)) {
+        if (isNvr) {
             // NVR 场景：使用 NVR 的 channel_no
             if (channel.getChannelNo() != null && channel.getChannelNo() > 0) {
                 channelNo = channel.getChannelNo();
@@ -752,5 +785,39 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
         log.info("[ZLM流服务] ✅ 清除完成: 本地缓存={}, ZLM关闭={}", cacheSize, totalClosed);
         
         return totalClosed;
+    }
+
+    // ==================== 通道封面快照 ====================
+
+    @Override
+    public byte[] getChannelSnapshot(Long channelId, Integer subtype) {
+        if (subtype == null) {
+            subtype = 1; // 封面默认走子码流，体积更小、抓帧更快
+        }
+
+        // 1. 查询通道、设备、运行态（与 getLivePlayUrl 完全一致）
+        IotDeviceChannelDO channel = loadChannel(channelId);
+        if (channel == null) {
+            log.warn("[ZLM快照] 通道不存在: channelId={}", channelId);
+            return null;
+        }
+        IbmsDeviceDO device = ibmsDeviceMapper.selectById(channel.getDeviceId());
+        if (device == null) {
+            log.warn("[ZLM快照] 设备不存在: deviceId={}", channel.getDeviceId());
+            return null;
+        }
+        IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(channel.getDeviceId());
+
+        // 2. 构建 RTSP 源 URL
+        String rtspUrl = buildRtspUrl(device, runtime, channel, subtype);
+        if (StrUtil.isBlank(rtspUrl)) {
+            log.warn("[ZLM快照] 无法构建 RTSP: channelId={}", channelId);
+            return null;
+        }
+
+        // 3. 调用 ZLM 抓帧
+        //    - timeout_sec=5：首次抓帧最多等 5 秒
+        //    - expire_sec=60：jpeg 在 ZLM 磁盘缓存 60 秒，期间重复请求秒级命中
+        return zlmApiClient.getSnap(rtspUrl, 5, 60);
     }
 }

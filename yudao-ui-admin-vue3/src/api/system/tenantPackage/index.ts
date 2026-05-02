@@ -9,6 +9,8 @@ export interface TenantPackageVO {
   updater: string
   updateTime: string
   menuIds: number[]
+  /** 排除的根菜单编号：仅放行 API 权限、隐藏前端侧边栏（按目录粒度切换） */
+  excludedMenuIds?: number[]
   createTime: Date
 }
 

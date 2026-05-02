@@ -204,6 +204,56 @@ public class ZlmApiClient {
         }
     }
 
+    // ==================== 快照 ====================
+
+    /**
+     * 获取流快照（JPEG）。
+     *
+     * <p>调用 ZLM 的 /index/api/getSnap 接口。ZLM 行为：</p>
+     * <ul>
+     *   <li>若 sourceUrl 对应的流已经在 ZLM 中存活（例如 addStreamProxy 已生效），从内存帧抓取，毫秒级返回</li>
+     *   <li>若流不存在，ZLM 会临时拉一次源（可能 1-3 秒）抓帧，并按 expireSec 缓存 jpeg 在磁盘</li>
+     *   <li>expireSec 内重复调用直接读磁盘缓存，极快</li>
+     * </ul>
+     *
+     * @param sourceUrl   源 URL（可填 RTSP，或填 ZLM 自身的 RTMP/FLV 地址，例如 rtmp://127.0.0.1/live/streamKey）
+     * @param timeoutSec  最大抓帧等待秒数（建议 5）
+     * @param expireSec   生成的 jpeg 在 ZLM 磁盘上的过期时间（建议 300）
+     * @return JPEG 字节数组；失败返回 null
+     */
+    public byte[] getSnap(String sourceUrl, int timeoutSec, int expireSec) {
+        try {
+            // ZLM 的 url 参数同样可能包含 & ，需要安全编码（参考 addStreamProxy 的做法）
+            String safeUrl = sourceUrl.replace("&", "%26");
+            String url = String.format(
+                    "%s/index/api/getSnap?%surl=%s&timeout_sec=%d&expire_sec=%d",
+                    config.getApiUrl(), secretQueryPrefix(), safeUrl, timeoutSec, expireSec
+            );
+            log.debug("[ZLM] 抓取快照: source={}", sourceUrl);
+
+            ResponseEntity<byte[]> response = restTemplate.getForEntity(url, byte[].class);
+            byte[] body = response.getBody();
+            if (body == null || body.length == 0) {
+                log.warn("[ZLM] 快照返回空: source={}", sourceUrl);
+                return null;
+            }
+            // 当 ZLM 返回 JSON 错误（例如 secret 校验失败），body 会是 JSON 文本而不是 JPEG
+            // JPEG 文件以 0xFFD8 开头
+            if (!(body.length >= 2 && (body[0] & 0xFF) == 0xFF && (body[1] & 0xFF) == 0xD8)) {
+                String text = new String(body, java.nio.charset.StandardCharsets.UTF_8);
+                if (text.length() > 200) {
+                    text = text.substring(0, 200);
+                }
+                log.warn("[ZLM] 快照返回非 JPEG，可能是错误响应: source={}, body={}", sourceUrl, text);
+                return null;
+            }
+            return body;
+        } catch (Exception e) {
+            log.warn("[ZLM] 抓取快照异常: source={}, err={}", sourceUrl, e.getMessage());
+            return null;
+        }
+    }
+
     // ==================== 录像管理 ====================
 
     /**

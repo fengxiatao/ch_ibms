@@ -7,6 +7,7 @@ import { ElMessage } from 'element-plus'
 import { PlaybackApi } from '@/api/security/playback'
 import type { PlaybackPane } from '../types'
 import { formatDateTime, parseTimeString } from '../types'
+import { adaptStreamPlayUrls } from '@/composables/video/streamPlayUtils'
 
 export interface StreamPaneState {
   cameraId?: number
@@ -82,11 +83,17 @@ export function useStreamPlayback() {
       // 兼容 CommonResult 包装：{ code, data, msg }
       const vo = resp?.data ?? resp
 
+      // 将后端返回的内网 IP 重写为页面公网域名，外网才能访问 ZLM
+      const adapted = adaptStreamPlayUrls<{ flvUrl?: string; webrtcUrl?: string }>({
+        flvUrl: vo?.flvUrl,
+        webrtcUrl: vo?.webrtcUrl
+      }) || ({} as { flvUrl?: string; webrtcUrl?: string })
+
       const st = getState(paneIndex)
       st.cameraId = cameraId
       st.cameraName = cameraName
-      st.flvUrl = fixUrl(vo?.flvUrl)
-      st.webrtcUrl = fixUrl(vo?.webrtcUrl)
+      st.flvUrl = fixUrl(adapted.flvUrl)
+      st.webrtcUrl = fixUrl(adapted.webrtcUrl)
       st.streamId = vo?.streamId ?? vo?.stream
       st.app = vo?.app
       st.stream = vo?.stream ?? vo?.streamId

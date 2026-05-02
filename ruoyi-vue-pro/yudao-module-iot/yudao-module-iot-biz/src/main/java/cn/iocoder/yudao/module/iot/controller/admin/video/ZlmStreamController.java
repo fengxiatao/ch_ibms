@@ -7,7 +7,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -88,5 +92,27 @@ public class ZlmStreamController {
         log.info("[ZLM] 请求清除所有流代理");
         int count = zlmStreamService.clearAllStreams();
         return success(count);
+    }
+
+    @GetMapping(value = "/snap/{channelId}", produces = MediaType.IMAGE_JPEG_VALUE)
+    @Operation(summary = "获取通道封面快照（JPEG）",
+            description = "用于列表页 / 播放器 idle/loading 状态的占位封面，降低首屏体感延迟。" +
+                    "ZLM 内部按 60s 缓存 jpeg，前端可放心配 CDN/浏览器缓存。")
+    @Parameter(name = "channelId", description = "通道ID", required = true)
+    @Parameter(name = "subtype", description = "码流类型: 0=主码流, 1=子码流（默认，封面用子码流体积小）", required = false)
+    @PreAuthorize("@ss.hasPermission('iot:camera:query')")
+    public ResponseEntity<byte[]> getChannelSnapshot(
+            @PathVariable("channelId") Long channelId,
+            @RequestParam(value = "subtype", defaultValue = "1") Integer subtype) {
+        byte[] body = zlmStreamService.getChannelSnapshot(channelId, subtype);
+        if (body == null || body.length == 0) {
+            // 抓帧失败时，返回 503 让前端可降级到默认占位图
+            return ResponseEntity.status(503).build();
+        }
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_JPEG)
+                // 浏览器侧缓存 60 秒，与 ZLM 端 expire_sec 对齐
+                .header(HttpHeaders.CACHE_CONTROL, "private, max-age=60")
+                .body(body);
     }
 }

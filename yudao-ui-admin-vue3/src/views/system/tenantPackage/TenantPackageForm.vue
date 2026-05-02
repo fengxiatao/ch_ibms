@@ -31,25 +31,15 @@
             />
             <span class="ml-12px">显示类型:</span>
             <el-switch v-model="showMenuTypeTag" active-text="显示" inactive-text="隐藏" inline-prompt />
-            <span class="ml-12px">提交时剔除目录/菜单:</span>
-            <el-switch v-model="stripDirAndMenuOnSubmit" active-text="仅保留按钮" inactive-text="原样保存" inline-prompt />
-            <el-select
-              v-if="stripDirAndMenuOnSubmit"
-              v-model="stripRootMenuIds"
-              class="ml-8px w-260px"
-              multiple
-              collapse-tags
-              collapse-tags-tooltip
-              clearable
-              placeholder="选择要隐藏的目录（可多选）"
+            <el-tooltip
+              effect="dark"
+              placement="top"
+              content="鼠标悬停目录后，点击右侧 眼睛 图标可把该目录设为「仅后台」：放行 API 权限但不在租户侧边栏显示。"
             >
-              <el-option
-                v-for="opt in rootDirOptions"
-                :key="opt.id"
-                :label="opt.name"
-                :value="opt.id"
-              />
-            </el-select>
+              <el-tag class="ml-12px" type="info" size="small" effect="plain">
+                目录可点 隐藏 切换「仅后台」
+              </el-tag>
+            </el-tooltip>
           </template>
           <el-tree
             ref="treeRef"
@@ -61,7 +51,7 @@
           >
             <template #default="{ data }">
               <span class="flex items-center gap-8px">
-                <span>{{ data.name }}</span>
+                <span :class="{ 'text-gray-400': isDirectoryHidden(data) }">{{ data.name }}</span>
                 <el-tag
                   v-if="showMenuTypeTag"
                   size="small"
@@ -70,6 +60,28 @@
                 >
                   {{ getMenuTypeLabel(data.type) }}
                 </el-tag>
+                <el-tag
+                  v-if="isDirectoryHidden(data)"
+                  size="small"
+                  type="warning"
+                  effect="plain"
+                >
+                  仅后台
+                </el-tag>
+                <el-tooltip
+                  v-if="data.type === 1"
+                  :content="isDirectoryHidden(data) ? '取消「仅后台」：恢复在侧边栏显示' : '切换为「仅后台」：放行 API 但不在侧边栏显示'"
+                  placement="top"
+                >
+                  <el-icon
+                    class="cursor-pointer"
+                    :class="isDirectoryHidden(data) ? 'text-orange-500' : 'text-gray-400 hover:text-blue-500'"
+                    @click.stop="toggleDirectoryHidden(data)"
+                  >
+                    <Hide v-if="isDirectoryHidden(data)" />
+                    <View v-else />
+                  </el-icon>
+                </el-tooltip>
               </span>
             </template>
           </el-tree>
@@ -103,6 +115,7 @@ import { defaultProps, handleTree } from '@/utils/tree'
 import * as TenantPackageApi from '@/api/system/tenantPackage'
 import * as MenuApi from '@/api/system/menu'
 import { ElTree } from 'element-plus'
+import { Hide, View } from '@element-plus/icons-vue'
 
 defineOptions({ name: 'SystemTenantPackageForm' })
 
@@ -131,12 +144,12 @@ const menuExpand = ref(false) // 展开/折叠
 const treeRef = ref<InstanceType<typeof ElTree>>() // 树组件 Ref
 const treeNodeAll = ref(false) // 全选/全不选
 const showMenuTypeTag = ref(true) // 是否显示菜单类型标签
-const stripDirAndMenuOnSubmit = ref(false) // 提交时剔除目录/菜单(type=1/2)，仅保留按钮权限（type=3）
-const stripRootMenuIds = ref<number[]>([]) // 要剔除的目录根节点（可多选）
 
-// menuId -> menu meta（用于提交时过滤）
+// 「仅后台」目录集合：勾选后会把目录加入 excludedMenuIds，后端会保留按钮但隐藏前端侧边栏入口
+const hiddenDirIds = ref(new Set<number>())
+
+// menuId -> menu meta（用于编辑加载时还原）
 const menuMetaById = ref(new Map<number, { id: number; parentId: number; name: string; type: number }>())
-const rootDirOptions = ref<Array<{ id: number; name: string }>>([]) // 可选择的目录根节点列表
 
 const getMenuTypeLabel = (type: number) => {
   // 1 目录、2 菜单、3 按钮
@@ -158,74 +171,24 @@ const buildMenuMetaIndex = (menus: MenuApi.MenuVO[]) => {
     m.set(it.id, { id: it.id, parentId: it.parentId, name: it.name, type: it.type })
   })
   menuMetaById.value = m
-  // 目录根节点：type=1 且 parentId=0（多数项目约定）
-  rootDirOptions.value = menus
-    .filter((it) => it.type === 1 && (it.parentId === 0 || it.parentId === null))
-    .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
-    .map((it) => ({ id: it.id, name: it.name }))
 }
 
-const collectSubTreeIds = (rootId: number) => {
-  const childrenMap = new Map<number, number[]>()
-  menuMetaById.value.forEach((meta) => {
-    if (!childrenMap.has(meta.parentId)) {
-      childrenMap.set(meta.parentId, [])
-    }
-    childrenMap.get(meta.parentId)!.push(meta.id)
-  })
-  const result: number[] = []
-  const stack: number[] = [rootId]
-  while (stack.length) {
-    const id = stack.pop()!
-    result.push(id)
-    const children = childrenMap.get(id)
-    if (children?.length) {
-      stack.push(...children)
-    }
+/** 切换某目录是否「仅后台」 */
+const toggleDirectoryHidden = (data: any) => {
+  if (!data || data.type !== 1) return
+  const next = new Set(hiddenDirIds.value)
+  if (next.has(data.id)) {
+    next.delete(data.id)
+  } else {
+    next.add(data.id)
   }
-  return result
+  hiddenDirIds.value = next
 }
 
-const buildStripPreview = (selectedMenuIds: number[], rootIds: number[]) => {
-  const selected = Array.from(new Set(selectedMenuIds))
-  const subTreeIdSet = new Set<number>()
-  rootIds.forEach((rootId) => {
-    collectSubTreeIds(rootId).forEach((id) => subTreeIdSet.add(id))
-  })
-
-  const inSubTreeSelected = selected.filter((id) => subTreeIdSet.has(id))
-  const willRemove = inSubTreeSelected.filter((id) => {
-    const meta = menuMetaById.value.get(id)
-    return meta && meta.type !== 3
-  })
-  const willKeepInSubTree = inSubTreeSelected.filter((id) => {
-    const meta = menuMetaById.value.get(id)
-    return meta && meta.type === 3
-  })
-  const willKeepTotal = selected.filter((id) => {
-    const meta = menuMetaById.value.get(id)
-    if (!meta) return false
-    if (!subTreeIdSet.has(id)) return true
-    return meta.type === 3
-  })
-
-  // 高风险：被剔除的节点里，存在 permission 的页面菜单(type=2)
-  const riskyRemovedMenus: Array<{ id: number; name: string; permission?: string }> = []
-  willRemove.forEach((id) => {
-    const meta = menuMetaById.value.get(id)
-    if (!meta || meta.type !== 2) return
-    // permission 不在 meta 里，临时从树节点数据上拿不到；这里用“提示可能丢权限”的形式即可
-    riskyRemovedMenus.push({ id, name: meta.name })
-  })
-
-  return {
-    selectedCount: selected.length,
-    inSubTreeSelectedCount: inSubTreeSelected.length,
-    willRemoveCount: willRemove.length,
-    willKeepInSubTreeCount: willKeepInSubTree.length,
-    willKeepTotalCount: willKeepTotal.length,
-    riskyRemovedMenus
-  }
+/** 当前节点（或其某个祖先目录）是否被标记为「仅后台」 */
+const isDirectoryHidden = (data: any) => {
+  if (!data) return false
+  return hiddenDirIds.value.has(data.id)
 }
 
 /** 打开弹窗 */
@@ -249,6 +212,8 @@ const open = async (type: string, id?: number) => {
       res.menuIds.forEach((menuId: number) => {
         treeRef.value!.setChecked(menuId, true, false)
       })
+      // 还原「仅后台」目录集合
+      hiddenDirIds.value = new Set<number>(res.excludedMenuIds ?? [])
     } finally {
       formLoading.value = false
     }
@@ -271,48 +236,25 @@ const submitForm = async () => {
       ...(treeRef.value!.getCheckedKeys(false) as unknown as Array<number>), // 获得当前选中节点
       ...(treeRef.value!.getHalfCheckedKeys() as unknown as Array<number>) // 获得半选中的父节点
     ]
+    // 「仅后台」目录：通过 excludedMenuIds 字段告诉后端
+    // 后端 normalize 会保留这些目录子树下的按钮（API 权限）但移除目录/菜单（隐藏侧边栏）
+    data.excludedMenuIds = Array.from(hiddenDirIds.value)
 
-    // 保存前检测：开启“仅保留按钮”时，先预览将被剔除的目录/菜单数量，避免误操作
-    if (stripDirAndMenuOnSubmit.value) {
-      if (stripRootMenuIds.value.length === 0) {
-        message.warning('已开启“仅保留按钮”，但未选择要隐藏的目录，请先选择目录后再保存')
-        return
-      }
-      const preview = buildStripPreview(data.menuIds, stripRootMenuIds.value)
-      const rootNames = stripRootMenuIds.value
-        .map((id) => rootDirOptions.value.find((x) => x.id === id)?.name || String(id))
+    // 保存前确认：若有「仅后台」目录，提示用户这些目录将不在租户侧边栏显示
+    if (data.excludedMenuIds.length > 0) {
+      const hiddenNames = data.excludedMenuIds
+        .map((id) => menuMetaById.value.get(id)?.name || String(id))
         .join('、')
-      const riskyNames = preview.riskyRemovedMenus.slice(0, 10).map((x) => x.name).join('、')
-      const riskyMore = preview.riskyRemovedMenus.length > 10 ? ` 等${preview.riskyRemovedMenus.length}项` : ''
-      const content =
-        `你已选择隐藏目录：${rootNames}\n` +
-        `本次保存会在这些目录子树中：剔除目录/菜单 ${preview.willRemoveCount} 项，仅保留按钮 ${preview.willKeepInSubTreeCount} 项。\n` +
-        `最终保存权限条目数：${preview.willKeepTotalCount}（原选择 ${preview.selectedCount}）。\n` +
-        (preview.riskyRemovedMenus.length
-          ? `注意：有 ${preview.riskyRemovedMenus.length} 个“页面菜单(type=2)”会被剔除（若这些节点承载了接口 permission，可能导致权限缺失）：${riskyNames}${riskyMore}\n`
-          : '') +
-        `确认继续保存吗？`
       try {
-        await message.confirm(content, '保存前确认')
+        await message.confirm(
+          `已设置「仅后台」目录：${hiddenNames}\n` +
+            `保存后租户用户将看不到这些目录的菜单入口，但 API 权限仍然生效。\n` +
+            `确认继续保存吗？`,
+          '保存前确认'
+        )
       } catch {
         return
       }
-    }
-
-    // 通用：对选定的“目录根节点”子树，提交时剔除目录/菜单(type=1/2)，只保留按钮(type=3)，从而实现“有权限但不展示菜单入口”
-    if (stripDirAndMenuOnSubmit.value && stripRootMenuIds.value.length > 0) {
-      const subTreeIdSet = new Set<number>()
-      stripRootMenuIds.value.forEach((rootId) => {
-        collectSubTreeIds(rootId).forEach((id) => subTreeIdSet.add(id))
-      })
-      const filtered = data.menuIds.filter((id) => {
-        const meta = menuMetaById.value.get(id)
-        if (!meta) return false
-        if (!subTreeIdSet.has(id)) return true
-        return meta.type === 3
-      })
-      // 去重
-      data.menuIds = Array.from(new Set(filtered))
     }
     if (formType.value === 'create') {
       await TenantPackageApi.createTenantPackage(data)
@@ -335,8 +277,7 @@ const resetForm = () => {
   treeNodeAll.value = false
   menuExpand.value = false
   showMenuTypeTag.value = true
-  stripDirAndMenuOnSubmit.value = false
-  stripRootMenuIds.value = []
+  hiddenDirIds.value = new Set<number>()
   // 重置表单
   formData.value = {
     id: null,
