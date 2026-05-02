@@ -1,0 +1,76 @@
+# =====================================================================
+# Drone CI Pipeline — CH (长辉 IBMS)
+# v1: 仅验证 CI 连通性（hello + 关键文件存在性检查），不执行真实构建
+# 后续 v2 再加：backend-build (mvn) / frontend-build (pnpm) / test / package
+# 文档参考：docs/session-handoff-20260502-v1.md §3.3
+# =====================================================================
+
+kind: pipeline
+type: docker
+name: ci-smoke
+
+# 触发条件：所有分支的 push、所有 PR
+trigger:
+  event:
+    - push
+    - pull_request
+
+# 平台：linux + amd64（drone runner 默认）
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+  # ---------------------------------------------------------------------
+  # Step 1: hello — 打印环境信息，验证 runner 可用
+  # ---------------------------------------------------------------------
+  - name: hello
+    image: alpine:3.19
+    commands:
+      - echo "===== Drone CI Smoke Test for CH (长辉 IBMS) ====="
+      - echo "DRONE_REPO=$DRONE_REPO"
+      - echo "DRONE_BRANCH=$DRONE_BRANCH"
+      - echo "DRONE_COMMIT=$DRONE_COMMIT"
+      - echo "DRONE_COMMIT_AUTHOR=$DRONE_COMMIT_AUTHOR"
+      - echo "DRONE_COMMIT_MESSAGE=$DRONE_COMMIT_MESSAGE"
+      - echo "DRONE_BUILD_NUMBER=$DRONE_BUILD_NUMBER"
+      - echo "DRONE_BUILD_EVENT=$DRONE_BUILD_EVENT"
+      - echo "PWD=$(pwd)"
+      - uname -a
+      - date
+
+  # ---------------------------------------------------------------------
+  # Step 2: sanity-check — 验证关键文件/目录存在
+  # ---------------------------------------------------------------------
+  - name: sanity-check
+    image: alpine:3.19
+    commands:
+      - echo "===== 检查关键路径 ====="
+      - test -f AGENTS.md && echo "[OK] AGENTS.md"
+      - test -f .drone.yml && echo "[OK] .drone.yml"
+      - test -f ruoyi-vue-pro/pom.xml && echo "[OK] backend pom.xml"
+      - test -f yudao-ui-admin-vue3/package.json && echo "[OK] frontend package.json"
+      - test -d docs && echo "[OK] docs/"
+      - echo "===== 后端模块清单 ====="
+      - ls -la ruoyi-vue-pro/yudao-* 2>/dev/null | head -20 || true
+      - echo "===== 前端依赖标识 ====="
+      - grep -E '"(name|version)":' yudao-ui-admin-vue3/package.json | head -3
+
+  # ---------------------------------------------------------------------
+  # TODO v2: 真实构建步骤（取消注释并按需调整后启用）
+  # ---------------------------------------------------------------------
+  # - name: backend-build
+  #   image: maven:3.9-eclipse-temurin-17
+  #   environment:
+  #     MAVEN_OPTS: "-Xmx2g -Dmaven.repo.local=/drone/src/.m2"
+  #   commands:
+  #     - cd ruoyi-vue-pro
+  #     - mvn -q -T 1C clean package -DskipTests
+  #
+  # - name: frontend-build
+  #   image: node:20-alpine
+  #   commands:
+  #     - cd yudao-ui-admin-vue3
+  #     - npm install -g pnpm@9
+  #     - pnpm i --frozen-lockfile
+  #     - pnpm build:prod
