@@ -36,11 +36,50 @@
 
 ## 2. 本次会话变更
 
-**本次为 v1 首次建立 handoff，未进行代码修改**。产出物：
+**本次为 v1 首次建立 handoff + CI 接入 + 冒烟测试**。产出物：
 
-- 新增 `AGENTS.md`（项目根，AI Agent 承接入口）
-- 新增 `docs/session-handoff-20260502-v1.md`（本文件）
-- 新增 `.cursor/rules/14-local-build.mdc`（本机构建硬规则）
+### 2.1 新增文件
+- `AGENTS.md`（项目根，AI Agent 承接入口）
+- `docs/session-handoff-20260502-v1.md`（本文件）
+- `.cursor/rules/14-local-build.mdc`（本机构建硬规则，gitignored）
+- `.drone.yml`（Drone CI 冒烟测试版：clone + hello + sanity-check）
+- `.drone-token.local`（token 本地存放，gitignored）
+
+### 2.2 提交记录（分支 `snapshot/20260423-full`）
+- `a36b9ad6` — docs: 新增 AGENTS.md 与首版 session-handoff，接入 Drone CI
+- `62290905` — ci: 新增 .drone.yml 初版（smoke test：hello + sanity-check）
+- 均已 push 到 `origin/snapshot/20260423-full`（GitHub `fengxiatao/ch_ibms`）
+
+### 2.3 备份 Tag
+- `backup/pre-cleanup-20260502` → `62290905`（**尚未 push 到远端**，下次可 `git push origin backup/pre-cleanup-20260502`）
+- 用途：清理仓库前的回滚锚点
+
+### 2.4 CI 首次构建结果（关键发现）
+- Build #1 自动触发（GitHub webhook → Drone 链路正常 ✅）
+- **clone 步骤卡 24 分钟未完成，被 SIGKILL**（exit_code 137）
+- 根本原因：仓库体积 **716 MB / 13216 个被跟踪文件**，其中大量是参考项目与历史 SQL 备份
+- 取消 API：`DELETE /api/repos/fengxiatao/ch_ibms/builds/1` 可用，但第一次调用时连接被重置，第二次成功
+- Drone runner 名：`drone-runner-253`（linux/amd64）
+
+### 2.5 仓库肥胖根因（待下次会话处理）
+已被 git 跟踪的"非主项目"顶层目录按文件数排序：
+
+| 目录 | 文件数 |
+|---|---|
+| `dh/` | 3728 |
+| `CH-NetSDK(Windows64)V5.5.0.0_build20250325/` | 1359 |
+| `大华海康代码/` | 1193 |
+| `parking-miniapp/` | 496 |
+| `threejs-park-master/` | 149 |
+| `WEB/` | 128 |
+| `智慧工厂看板UI/` | 89 |
+| `.tenant_sync/` | 74 |
+| `.tmp_sql/` | 58 |
+| `smart-factory/` | 28 |
+| 其他（`anfang/`、`wvp-GB28181-pro/`、`xungen/`、`tongxing/`、`fangke/`、`0415原型/`、`Kimi_Agent_*/`、`智慧工厂-AI*/`、`tmp-check/`、`wvp-deploy/`、`.tmp_tools/` 等） | ~100 |
+| 根目录散文件（`*.HTML`、`*.txt`、`*.md`、`.webm`、`.tif`、`.ps1` 等） | ~30 |
+
+**决策（用户确认）**：仓库只保留 `ruoyi-vue-pro/` + `yudao-ui-admin-vue3/` + 必要的配置/文档，其余参考资料全部移除。
 
 **关键技术发现 / 现状摘要**：
 
@@ -139,18 +178,49 @@ CI steps 映射（builds/{n}/logs/{stage}/{step}）：
 
 ---
 
-## 6. 下一步候选（3~5 条带 DoD）
+## 6. 下一步候选（按优先级）
 
-1. **起草 `.drone.yml` 初版**
-   - DoD：文件合入 `main`，Drone 上成功触发首次 build（即使只有 clone + hello step），并把 steps 映射回填到本文件 §3.3
-2. **确认 Drone 仓库是否已激活**
-   - DoD：在 `http://test.sanligz.com.cn/fengxiatao/ch_ibms/settings` 看到 `Active = true`，webhook 已注册；未激活则协调管理员启用
-3. **`.drone.yml` 增加 backend-build + frontend-build 双 step**
-   - DoD：一次 push 能同时跑完后端 `mvn package -DskipTests` 与前端 `pnpm build:prod`，两 step 绿灯，产物 artifact（可选）
-4. **给下次会话的建议：补充 pipeline steps 映射**
-   - DoD：首次 CI 跑通后，用 `curl $API/builds/1` 拉取实际 step 列表，替换 §3.3 的占位表格，发 v2 handoff
-5. **（可选）根目录整理**
-   - DoD：创建 `_reference/` 与 `_archive/`，把 `dh/`、`anfang/`、`smart-factory/`、`wvp-GB28181-pro/`、`threejs-park-master/`、`parking-miniapp/`、根目录 `*.sql`/`*.zip`/`*.rar` 分类迁入；先 grep 所有引用（脚本、IDE 配置）再移动，更新 `.gitignore`
+> 已完成：Drone 激活确认 ✅ / `.drone.yml` 初版已合入 ✅ / Build #1 已触发但因仓库过肥失败 ❌
+
+### P0：精简仓库（**必须先做，否则 CI 永远跑不起来**）
+
+**目标**：仓库只保留 `ruoyi-vue-pro/` + `yudao-ui-admin-vue3/` + 必要配置（`docs/`、`AGENTS.md`、`.drone.yml`、`.gitignore` 等），其余全部移除。
+
+**三种实施方案**（下次会话需要与用户确认）：
+
+1. **方案 A（保守）**：`git rm -r --cached <参考目录>` + 扩充 `.gitignore`
+   - ✅ 本地文件保留、无需协作者重置
+   - ❌ **历史体积不变（仍 716 MB），clone 仍慢** — 对 CI 问题无帮助
+   - 适用：仅想停止跟踪，不在意 clone 速度
+
+2. **方案 B（推荐）**：`git filter-repo` 重写历史，彻底瘦身
+   - ✅ 仓库体积可缩至 ~50-100 MB，CI clone 几秒完成
+   - ❌ **rewrite history**：所有协作者必须 `git fetch + reset --hard`；需要 `git push --force`
+   - 前置：所有人的未提交改动先 stash 或提交；打好备份 tag（✅ 已打 `backup/pre-cleanup-20260502`）
+
+3. **方案 C（最稳但有迁移成本）**：新建干净仓库 `ch_ibms_clean`
+   - ✅ 旧仓库完全保留作归档，新仓库从 0 开始干净
+   - ❌ PR 历史、issue、stars、webhook 全部丢失或重建
+   - 适用：旧仓库问题积重难返、且无历史价值
+
+**DoD（任一方案达成）**：
+
+- 重新 push 后触发 Build #N，clone 在 **60 秒内完成**
+- Step `sanity-check` 通过（能找到 `ruoyi-vue-pro/pom.xml` 和 `yudao-ui-admin-vue3/package.json`）
+
+### P1：`.drone.yml` 增加真实构建 step（仓库瘦身后再做）
+
+- DoD：单次 push 能跑完 `backend-build`（`mvn -q -T 1C clean package -DskipTests`）和 `frontend-build`（`pnpm i --frozen-lockfile && pnpm build:prod`），两 step 绿灯
+- 注意：后端可能依赖 MySQL/Redis，`-DskipTests` 可绕过单测；若要跑测试，需在 `.drone.yml` 里启 service container
+
+### P2：回填 pipeline steps 映射到本文件 §3.3
+
+- DoD：`curl $API/builds/<成功的 build>/` 拉取实际 step 列表，替换 §3.3 占位表格，发 v2 handoff
+
+### P3：Push 备份 tag 到远端
+
+- `git push origin backup/pre-cleanup-20260502`
+- DoD：GitHub 上能看到该 tag，万一瘦身出问题可回滚
 
 ---
 
