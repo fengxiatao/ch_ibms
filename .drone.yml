@@ -57,7 +57,7 @@ steps:
   # Step 1: hello — 打印环境信息，验证 runner 可用
   # ---------------------------------------------------------------------
   - name: hello
-    image: alpine:3.19
+    image: alpine:3.20
     commands:
       - echo "===== Drone CI Smoke Test for CH (长辉 IBMS) ====="
       - echo "DRONE_REPO=$DRONE_REPO"
@@ -75,7 +75,7 @@ steps:
   # Step 2: sanity-check — 验证关键文件/目录存在
   # ---------------------------------------------------------------------
   - name: sanity-check
-    image: alpine:3.19
+    image: alpine:3.20
     commands:
       - echo "===== 检查关键路径 ====="
       - test -f AGENTS.md && echo "[OK] AGENTS.md"
