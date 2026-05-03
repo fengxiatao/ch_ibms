@@ -40,6 +40,7 @@ steps:
     volumes:
       - name: git-mirror
         path: /mirror
+        read_only: true
     commands:
       - apk add --no-cache coreutils > /dev/null 2>&1 || true
       - git config --global --add safe.directory /mirror
