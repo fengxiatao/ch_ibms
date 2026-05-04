@@ -22,6 +22,7 @@ import cn.iocoder.yudao.module.iot.mq.producer.DeviceProfileChangedPublisher;
 import cn.iocoder.yudao.module.iot.mq.support.DeviceProfileMessageBuilder;
 import cn.iocoder.yudao.module.iot.service.device.IotDeviceGroupService;
 import cn.iocoder.yudao.module.iot.service.ibms.channel.IbmsChannelService;
+import cn.iocoder.yudao.module.iot.service.ibms.facade.IbmsBusinessMappingHelper;
 import cn.iocoder.yudao.module.iot.service.ibms.product.IbmsProductService;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
@@ -59,6 +60,7 @@ public class IbmsDeviceServiceImpl implements IbmsDeviceService {
     private final DeviceProfileChangedPublisher deviceProfileChangedPublisher;
     private final IbmsDeviceRuntimeService deviceRuntimeService;
     private final IbmsDeviceRuntimeMapper deviceRuntimeMapper;
+    private final IbmsBusinessMappingHelper businessMappingHelper;
 
     @Resource
     @Lazy
@@ -175,18 +177,10 @@ public class IbmsDeviceServiceImpl implements IbmsDeviceService {
     }
 
     private String resolveBusinessBySystemType(String systemType) {
-        // 先按系统类型映射到 ibms_channel.business 的枚举集合
-        return switch (systemType) {
-            case "VI", "GR" -> "security";
-            case "AC", "IC" -> "access";
-            case "AL", "FD", "PA" -> "alarm";
-            case "CA" -> "parking";
-            case "BA" -> "building";
-            case "EL" -> "environment";
-            case "LI" -> "lighting";
-            case "EP", "EN" -> "energy";
-            default -> "security";
-        };
+        // 单一事实源：复用 IbmsBusinessMappingHelper，返回小写大类码（sa/st/sb/se/sf）
+        // 与 IbmsChannelServiceImpl.deriveBusinessFromSystemType 行为对齐
+        String group = businessMappingHelper.resolveGroupBySystem(systemType);
+        return StrUtil.isNotBlank(group) ? group.toLowerCase() : "sa";
     }
 
     private String resolveStatusBySystemType(String systemType) {

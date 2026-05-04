@@ -131,7 +131,7 @@ const fetchChannelPage = async () => {
     const pageResult = await getChannelPage({
       pageNo,
       pageSize: MAX_PAGE_SIZE,
-      business: 'security',
+      business: 'sa',
       typeCode: 'VT'
     })
     const pageData = (pageResult as any)?.list ? pageResult : (pageResult as any)?.data

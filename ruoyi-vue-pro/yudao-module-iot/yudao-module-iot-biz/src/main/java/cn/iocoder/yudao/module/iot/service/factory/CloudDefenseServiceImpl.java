@@ -413,10 +413,11 @@ public class CloudDefenseServiceImpl implements CloudDefenseService {
         if ("VI".equalsIgnoreCase(device.getSystemCode()) || channels.stream().anyMatch(channel -> "VI".equalsIgnoreCase(channel.getSystemType()))) {
             tags.add("视频");
         }
-        if ("AC".equalsIgnoreCase(device.getSystemCode()) || channels.stream().anyMatch(channel -> "access".equalsIgnoreCase(channel.getBusiness()))) {
+        // business 取小写大类码：ST 智慧通行（含 AC 门禁）、SA 智慧安防（含 AL 入侵报警）
+        if ("AC".equalsIgnoreCase(device.getSystemCode()) || channels.stream().anyMatch(channel -> "st".equalsIgnoreCase(channel.getBusiness()))) {
             tags.add("门禁");
         }
-        if ("AL".equalsIgnoreCase(device.getSystemCode()) || channels.stream().anyMatch(channel -> "alarm".equalsIgnoreCase(channel.getBusiness()))) {
+        if ("AL".equalsIgnoreCase(device.getSystemCode()) || channels.stream().anyMatch(channel -> "sa".equalsIgnoreCase(channel.getBusiness()))) {
             tags.add("云防");
         }
         if (channels.stream().anyMatch(channel -> StrUtil.containsIgnoreCase(channel.getName(), "云台") || StrUtil.containsIgnoreCase(channel.getName(), "球机"))) {

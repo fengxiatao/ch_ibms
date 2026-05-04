@@ -608,7 +608,7 @@ const findIbmsChannelIdByNvrNoPaged = async (
     const res = await getIbmsChannelPage({
       pageNo,
       pageSize: IBMS_CHANNEL_PAGE_MAX,
-      business: 'security',
+      business: 'sa',
       typeCode: 'VT',
       keyword: String(nvrNo),
       ...(deviceId ? { deviceId } : {})

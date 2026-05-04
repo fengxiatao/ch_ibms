@@ -144,7 +144,7 @@ function channelVoToIbmsSavePayload(data: ChannelVO): Record<string, any> {
     code,
     channelNo,
     name: data.channelName || code,
-    business: 'security',
+    business: 'sa',
     typeCode: data.channelType || 'VT',
     category: data.channelSubType,
     systemType: data.deviceType || 'VI',

@@ -18,6 +18,7 @@ import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.service.device.discovery.DiscoveredDeviceService;
 import cn.iocoder.yudao.module.iot.service.device.discovery.dto.DiscoveredDeviceDTO;
 import cn.iocoder.yudao.module.iot.service.ibms.channel.IbmsChannelService;
+import cn.iocoder.yudao.module.iot.service.ibms.facade.IbmsBusinessMappingHelper;
 import cn.iocoder.yudao.module.iot.service.ibms.product.IbmsProductService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +61,9 @@ public class IotDeviceActivationServiceImpl implements IotDeviceActivationServic
 
     @Resource
     private IbmsChannelService ibmsChannelService;
+
+    @Resource
+    private IbmsBusinessMappingHelper businessMappingHelper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -486,20 +490,9 @@ public class IotDeviceActivationServiceImpl implements IotDeviceActivationServic
     }
 
     private String resolveBusinessBySystemType(String systemType) {
-        if (systemType == null) {
-            return "security";
-        }
-        return switch (systemType) {
-            case "VI", "GR" -> "security";
-            case "AC", "IC" -> "access";
-            case "AL", "FD", "PA" -> "alarm";
-            case "CA" -> "parking";
-            case "BA" -> "building";
-            case "EL" -> "environment";
-            case "LI" -> "lighting";
-            case "EP", "EN" -> "energy";
-            default -> "security";
-        };
+        // 单一事实源：复用 IbmsBusinessMappingHelper，返回小写大类码（sa/st/sb/se/sf）
+        String group = businessMappingHelper.resolveGroupBySystem(systemType);
+        return StrUtil.isNotBlank(group) ? group.toLowerCase() : "sa";
     }
 
     private boolean isIbmsDeviceOnlineInExtra(IbmsDeviceDO device) {

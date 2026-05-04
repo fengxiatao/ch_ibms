@@ -411,7 +411,8 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
 
         // 4) 写入 ibms_channel（typeCode=VT）
         String dc = StrUtil.blankToDefault(ibmsDevice.getDeviceCode(), "D" + deviceId);
-        String business = StrUtil.isNotBlank(ibmsDevice.getGroupCode()) ? ibmsDevice.getGroupCode().toLowerCase() : "security";
+        // business 取小写大类码（sa/st/sb/se/sf），兜底 sa
+        String business = StrUtil.isNotBlank(ibmsDevice.getGroupCode()) ? ibmsDevice.getGroupCode().toLowerCase() : "sa";
         String systemType = StrUtil.isNotBlank(ibmsDevice.getSystemCode()) ? ibmsDevice.getSystemCode() : "VI";
 
         // device.getState() 沿用旧逻辑：1=在线，2=离线
@@ -1190,7 +1191,7 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
             channel.setCode(dc + "-VT" + String.format("%02d", channelNo));
             channel.setTypeCode("VT");
             channel.setSystemType(StrUtil.isNotBlank(ibmsNvr.getSystemCode()) ? ibmsNvr.getSystemCode() : "VI");
-            channel.setBusiness(StrUtil.isNotBlank(ibmsNvr.getGroupCode()) ? ibmsNvr.getGroupCode().toLowerCase() : "security");
+            channel.setBusiness(StrUtil.isNotBlank(ibmsNvr.getGroupCode()) ? ibmsNvr.getGroupCode().toLowerCase() : "sa");
             channel.setCategory("视频通道");
             channel.setDataSource("NVR");
             channel.setCurrentValue("--");
@@ -1854,7 +1855,8 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
                 "门" + channelInfo.getChannelNo());
         channel.setName(channelName);
 
-        channel.setBusiness("access");
+        // business: ST 智慧通行（小写大类码）；AC 子系统码归属 ST
+        channel.setBusiness("st");
         channel.setTypeCode("DR");
         channel.setCategory("门禁通行");
         channel.setSystemType(StrUtil.blankToDefault(ibmsAccess.getSystemCode(), "AC"));

@@ -85,7 +85,7 @@ public class FactoryOverviewServiceImpl implements FactoryOverviewService {
         Map<Long, IbmsEnvDataRecordDO> latestEnvRecordMap = getLatestEnvRecordMap(sensors);
         List<IbmsChannelDO> channels = ibmsChannelMapper.selectList(
                 new LambdaQueryWrapperX<IbmsChannelDO>()
-                        .and(wrapper -> wrapper.eq(IbmsChannelDO::getBusiness, "security")
+                        .and(wrapper -> wrapper.eq(IbmsChannelDO::getBusiness, "sa")
                                 .or()
                                 .eq(IbmsChannelDO::getSystemType, "VI"))
                         .orderByDesc(IbmsChannelDO::getId));
@@ -444,7 +444,8 @@ public class FactoryOverviewServiceImpl implements FactoryOverviewService {
     }
 
     private boolean isVideoChannel(String business, String systemType) {
-        return "security".equalsIgnoreCase(StrUtil.blankToDefault(business, ""))
+        // business 取 sa（智慧安防大类码），子系统 VI 兜底
+        return "sa".equalsIgnoreCase(StrUtil.blankToDefault(business, ""))
                 || "VI".equalsIgnoreCase(StrUtil.blankToDefault(systemType, ""));
     }
 

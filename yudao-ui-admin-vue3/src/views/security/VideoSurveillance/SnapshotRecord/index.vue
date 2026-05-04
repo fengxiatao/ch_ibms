@@ -386,7 +386,7 @@ const loadChannelsBySpace = async (spaceId: number): Promise<DeviceTreeNode[]> =
     const res = await getIbmsChannelPage({
       pageNo,
       pageSize: MAX_PAGE_SIZE,
-      business: 'security',
+      business: 'sa',
       typeCode: 'VT',
       spaceId
     })
@@ -434,7 +434,7 @@ const handleChannelSearch = async () => {
 
     const res = await getIbmsChannelPage({
       keyword,
-      business: 'security',
+      business: 'sa',
       typeCode: 'VT',
       pageNo: 1,
       pageSize: MAX_PAGE_SIZE
