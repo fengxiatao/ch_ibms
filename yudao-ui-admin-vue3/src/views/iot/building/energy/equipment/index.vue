@@ -72,6 +72,20 @@
         <el-table-column label="型号" prop="model" width="120" />
         <el-table-column label="所属区域" prop="areaName" width="120" />
         <el-table-column label="安装位置" prop="installLocation" width="160" show-overflow-tooltip />
+        <el-table-column label="关联设备" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">
+            <template v-if="row.ibmsDeviceId">
+              <div class="bind-device-cell">
+                <div class="bind-device-name">{{ row.ibmsDeviceName || '—' }}</div>
+                <div class="bind-device-meta">
+                  <span v-if="row.ibmsDeviceCode">{{ row.ibmsDeviceCode }}</span>
+                  <span v-if="row.ibmsDeviceIp" class="ml-6px">{{ row.ibmsDeviceIp }}</span>
+                </div>
+              </div>
+            </template>
+            <span v-else class="text-gray-400">未绑定</span>
+          </template>
+        </el-table-column>
         <el-table-column label="倍率" prop="ratio" width="80" align="center">
           <template #default="{ row }">{{ row.ratio || 1 }}</template>
         </el-table-column>
@@ -83,10 +97,26 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" align="center" fixed="right">
+        <el-table-column label="操作" width="240" align="center" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openForm('update', row)">
               <Icon icon="ep:edit" /> 编辑
+            </el-button>
+            <el-button
+              v-if="!row.ibmsDeviceId"
+              link
+              type="success"
+              @click="openBindDialog(row)"
+            >
+              <Icon icon="ep:link" /> 绑定
+            </el-button>
+            <el-button
+              v-else
+              link
+              type="warning"
+              @click="handleUnbind(row)"
+            >
+              <Icon icon="ep:close" /> 解绑
             </el-button>
             <el-button link type="danger" @click="handleDelete(row)">
               <Icon icon="ep:delete" /> 删除
@@ -185,10 +215,80 @@
         <el-form-item label="安装位置" prop="installLocation">
           <el-input v-model="formData.installLocation" placeholder="请输入安装位置" />
         </el-form-item>
+        <el-form-item label="关联设备" prop="ibmsDeviceId">
+          <el-select
+            v-model="formData.ibmsDeviceId"
+            filterable
+            remote
+            clearable
+            remote-show-suffix
+            :remote-method="searchIbmsDevices"
+            :loading="ibmsDeviceLoading"
+            placeholder="输入设备名称/编码搜索（可选）"
+            class="w-full"
+          >
+            <el-option
+              v-for="item in ibmsDeviceOptions"
+              :key="item.id"
+              :label="`${item.name}（${item.deviceCode}）`"
+              :value="item.id"
+            />
+          </el-select>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="submitForm" :loading="submitLoading">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 绑定 IBMS 设备弹窗 -->
+    <el-dialog
+      v-model="bindDialogVisible"
+      title="绑定 IBMS 设备"
+      width="480px"
+      class="dark-dialog"
+      destroy-on-close
+    >
+      <div v-if="bindMeterRow" class="bind-dialog-body">
+        <div class="bind-meter-info">
+          <span class="bind-meter-label">仪表：</span>
+          <span class="bind-meter-name">{{ bindMeterRow.meterName }}</span>
+          <span class="bind-meter-code">（{{ bindMeterRow.meterCode }}）</span>
+        </div>
+        <el-form label-width="90px" class="dark-form">
+          <el-form-item label="IBMS 设备">
+            <el-select
+              v-model="bindSelectedDeviceId"
+              filterable
+              remote
+              clearable
+              remote-show-suffix
+              :remote-method="searchIbmsDevices"
+              :loading="ibmsDeviceLoading"
+              placeholder="输入设备名称/编码搜索"
+              class="w-full"
+            >
+              <el-option
+                v-for="item in ibmsDeviceOptions"
+                :key="item.id"
+                :label="`${item.name}（${item.deviceCode}）`"
+                :value="item.id"
+              />
+            </el-select>
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <el-button @click="bindDialogVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="bindSubmitLoading"
+          :disabled="!bindSelectedDeviceId"
+          @click="submitBind"
+        >
+          确定绑定
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -198,6 +298,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import * as EnergyApi from '@/api/iot/building/energy'
 import type { IbmsEnergyMeterVO, IbmsEnergyMeterSaveReqVO } from '@/api/iot/building/energy'
+import { getDevicePage as getIbmsDevicePage } from '@/api/iot/ibms/device'
+import type { IbmsDeviceRespVO } from '@/api/iot/ibms/device'
 import { useMessage } from '@/hooks/web/useMessage'
 
 defineOptions({ name: 'BuildingEnergyEquipment' })
@@ -233,8 +335,52 @@ const formData = reactive<IbmsEnergyMeterSaveReqVO>({
   areaName: '',
   installLocation: '',
   ratio: 1,
-  status: 1
+  status: 1,
+  ibmsDeviceId: undefined
 })
+
+// IBMS 设备选择器（远程搜索，与表单/绑定弹窗共用 options）
+const ibmsDeviceOptions = ref<IbmsDeviceRespVO[]>([])
+const ibmsDeviceLoading = ref(false)
+
+// 行操作 - 绑定弹窗
+const bindDialogVisible = ref(false)
+const bindMeterRow = ref<IbmsEnergyMeterVO | null>(null)
+const bindSelectedDeviceId = ref<number | null>(null)
+const bindSubmitLoading = ref(false)
+
+// 远程搜索 IBMS 设备
+const searchIbmsDevices = async (keyword: string) => {
+  ibmsDeviceLoading.value = true
+  try {
+    const res: any = await getIbmsDevicePage({
+      pageNo: 1,
+      pageSize: 50,
+      keyword: keyword?.trim() || undefined
+    } as any)
+    ibmsDeviceOptions.value = (res?.list || []) as IbmsDeviceRespVO[]
+  } catch (e) {
+    console.error('搜索 IBMS 设备失败', e)
+    ibmsDeviceOptions.value = []
+  } finally {
+    ibmsDeviceLoading.value = false
+  }
+}
+
+// 把仪表行已绑定的 IBMS 设备塞进 options，避免回显仅显示 id
+const seedBoundDeviceOption = (row: IbmsEnergyMeterVO | null | undefined) => {
+  if (!row?.ibmsDeviceId) return
+  const existed = ibmsDeviceOptions.value.find((d) => d.id === row.ibmsDeviceId)
+  if (existed) return
+  ibmsDeviceOptions.value = [
+    {
+      id: row.ibmsDeviceId,
+      deviceCode: row.ibmsDeviceCode || '',
+      name: row.ibmsDeviceName || `设备#${row.ibmsDeviceId}`
+    } as IbmsDeviceRespVO,
+    ...ibmsDeviceOptions.value
+  ]
+}
 
 const formRules = {
   meterCode: [{ required: true, message: '请输入设备编号', trigger: 'blur' }],
@@ -301,6 +447,7 @@ const openForm = (type: string, row?: IbmsEnergyMeterVO) => {
   
   if (row) {
     Object.assign(formData, row)
+    seedBoundDeviceOption(row)
   } else {
     Object.assign(formData, {
       id: undefined,
@@ -312,11 +459,53 @@ const openForm = (type: string, row?: IbmsEnergyMeterVO) => {
       areaName: '',
       installLocation: '',
       ratio: 1,
-      status: 1
+      status: 1,
+      ibmsDeviceId: undefined
     })
   }
   
   dialogVisible.value = true
+}
+
+// 行操作 - 打开绑定弹窗
+const openBindDialog = (row: IbmsEnergyMeterVO) => {
+  bindMeterRow.value = row
+  bindSelectedDeviceId.value = row.ibmsDeviceId ?? null
+  seedBoundDeviceOption(row)
+  bindDialogVisible.value = true
+}
+
+// 行操作 - 提交绑定
+const submitBind = async () => {
+  if (!bindMeterRow.value?.id || !bindSelectedDeviceId.value) return
+  bindSubmitLoading.value = true
+  try {
+    await EnergyApi.bindMeterDevice(bindMeterRow.value.id, bindSelectedDeviceId.value)
+    message.success('绑定成功')
+    bindDialogVisible.value = false
+    getList()
+  } catch (e) {
+    console.error('绑定失败', e)
+    message.error('绑定失败，请重试')
+  } finally {
+    bindSubmitLoading.value = false
+  }
+}
+
+// 行操作 - 解绑
+const handleUnbind = async (row: IbmsEnergyMeterVO) => {
+  if (!row.id) return
+  try {
+    await message.confirm(`确认解除仪表【${row.meterName}】与 IBMS 设备【${row.ibmsDeviceName || row.ibmsDeviceId}】的关联吗？`)
+    await EnergyApi.bindMeterDevice(row.id, null)
+    message.success('解绑成功')
+    getList()
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error('解绑失败', e)
+      message.error('解绑失败，请重试')
+    }
+  }
 }
 
 // 提交表单
@@ -551,5 +740,51 @@ onMounted(() => {
 
 .w-full {
   width: 100%;
+}
+
+.bind-device-cell {
+  line-height: 1.4;
+  
+  .bind-device-name {
+    color: #ffffff;
+    font-size: 13px;
+  }
+  
+  .bind-device-meta {
+    color: #6b7280;
+    font-size: 11px;
+    margin-top: 2px;
+    
+    .ml-6px {
+      margin-left: 6px;
+    }
+  }
+}
+
+.bind-dialog-body {
+  padding: 8px 0;
+  
+  .bind-meter-info {
+    margin-bottom: 16px;
+    padding: 10px 12px;
+    background: #1a1a2e;
+    border: 1px solid #3a3a4a;
+    border-radius: 6px;
+    font-size: 13px;
+    
+    .bind-meter-label {
+      color: #a0a0b0;
+    }
+    
+    .bind-meter-name {
+      color: #ffffff;
+      font-weight: 600;
+    }
+    
+    .bind-meter-code {
+      color: #6b7280;
+      font-size: 12px;
+    }
+  }
 }
 </style>
