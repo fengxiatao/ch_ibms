@@ -51,6 +51,15 @@ public interface IbmsEnergyService {
      */
     void deleteMeter(Long id);
 
+    /**
+     * 将能耗仪表绑定到 IBMS 设备台账（幂等）。
+     * <p>{@code ibmsDeviceId} 为 null 表示解绑。</p>
+     *
+     * @param meterId       仪表 ID
+     * @param ibmsDeviceId  IBMS 设备台账 ID；传 null 表示解绑
+     */
+    void bindDevice(Long meterId, Long ibmsDeviceId);
+
     // ======================= 采集记录 =======================
 
     /**

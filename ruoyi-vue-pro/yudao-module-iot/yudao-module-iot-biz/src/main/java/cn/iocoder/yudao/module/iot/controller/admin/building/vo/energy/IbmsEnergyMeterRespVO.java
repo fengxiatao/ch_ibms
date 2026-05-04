@@ -13,6 +13,21 @@ public class IbmsEnergyMeterRespVO {
     @Schema(description = "主键ID")
     private Long id;
 
+    @Schema(description = "关联的 IBMS 设备台账 ID（ibms_device.id）")
+    private Long ibmsDeviceId;
+
+    @Schema(description = "关联的 IBMS 设备名称（联表 ibms_device.name，仅展示）")
+    private String ibmsDeviceName;
+
+    @Schema(description = "关联的 IBMS 设备编码（联表 ibms_device.device_code，仅展示）")
+    private String ibmsDeviceCode;
+
+    @Schema(description = "关联的 IBMS 设备 IP（联表 ibms_device.ip，仅展示）")
+    private String ibmsDeviceIp;
+
+    @Schema(description = "关联的 IBMS 设备空间（联表 ibms_device.space，仅展示）")
+    private String ibmsDeviceSpace;
+
     @Schema(description = "仪表编码")
     private String meterCode;
 

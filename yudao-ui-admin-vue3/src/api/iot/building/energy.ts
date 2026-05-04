@@ -4,6 +4,16 @@ import request from '@/config/axios'
 
 export interface IbmsEnergyMeterVO {
   id?: number
+  /** 关联的 IBMS 设备台账 ID（ibms_device.id） */
+  ibmsDeviceId?: number
+  /** 关联的 IBMS 设备名称（仅展示，后端联表填充） */
+  ibmsDeviceName?: string
+  /** 关联的 IBMS 设备编码（仅展示） */
+  ibmsDeviceCode?: string
+  /** 关联的 IBMS 设备 IP（仅展示） */
+  ibmsDeviceIp?: string
+  /** 关联的 IBMS 设备空间（仅展示） */
+  ibmsDeviceSpace?: string
   meterCode?: string
   meterName?: string
   meterType?: number
@@ -77,6 +87,15 @@ export const updateMeter = (data: IbmsEnergyMeterSaveReqVO) => {
 // 删除能耗仪表
 export const deleteMeter = (id: number) => {
   return request.delete({ url: '/iot/building/energy/meter/delete?id=' + id })
+}
+
+// 绑定/解绑能耗仪表到 IBMS 设备台账（ibmsDeviceId 传 null 表示解绑；幂等）
+export const bindMeterDevice = (meterId: number, ibmsDeviceId: number | null) => {
+  const params: Record<string, number | undefined> = { meterId }
+  if (ibmsDeviceId != null) {
+    params.ibmsDeviceId = ibmsDeviceId
+  }
+  return request.post({ url: '/iot/building/energy/meter/bind-device', params })
 }
 
 // ======================= 采集记录相关接口 =======================

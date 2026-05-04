@@ -28,6 +28,12 @@ public class IbmsEnergyMeterDO extends BaseDO {
     private Long id;
 
     /**
+     * IBMS 设备台账外键（ibms_device.id）
+     * <p>M0 阶段允许为空：存量数据可通过 bind-device 接口补齐；新增仪表应先在智慧物联创建设备再选择绑定。</p>
+     */
+    private Long ibmsDeviceId;
+
+    /**
      * 表具编号
      */
     private String meterCode;

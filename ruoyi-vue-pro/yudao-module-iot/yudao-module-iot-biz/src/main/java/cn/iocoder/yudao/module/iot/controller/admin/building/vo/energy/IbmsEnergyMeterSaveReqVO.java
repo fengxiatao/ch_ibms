@@ -15,6 +15,9 @@ public class IbmsEnergyMeterSaveReqVO {
     @Schema(description = "主键（新增时不传）")
     private Long id;
 
+    @Schema(description = "关联的 IBMS 设备台账 ID（ibms_device.id），推荐从智慧物联设备选择器中选择")
+    private Long ibmsDeviceId;
+
     @Schema(description = "表具编号", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "表具编号不能为空")
     private String meterCode;

@@ -4,8 +4,11 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.iot.controller.admin.building.vo.energy.*;
 import cn.iocoder.yudao.module.iot.dal.dataobject.building.*;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.building.*;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -25,10 +28,14 @@ import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.*;
  */
 @Service
 @Validated
+@Slf4j
 public class IbmsEnergyServiceImpl implements IbmsEnergyService {
 
     @Resource
     private IbmsEnergyMeterMapper meterMapper;
+
+    @Resource
+    private IbmsDeviceMapper ibmsDeviceMapper;
 
     @Resource
     private IbmsEnergyRecordMapper recordMapper;
@@ -89,6 +96,31 @@ public class IbmsEnergyServiceImpl implements IbmsEnergyService {
         validateMeterExists(id);
         // 删除
         meterMapper.deleteById(id);
+    }
+
+    @Override
+    public void bindDevice(Long meterId, Long ibmsDeviceId) {
+        // 校验仪表存在
+        IbmsEnergyMeterDO meter = meterMapper.selectById(meterId);
+        if (meter == null) {
+            throw exception(ENERGY_METER_NOT_EXISTS);
+        }
+        // 校验设备存在且大类为 SE（仅 WARN，不阻断）
+        if (ibmsDeviceId != null) {
+            IbmsDeviceDO device = ibmsDeviceMapper.selectById(ibmsDeviceId);
+            if (device == null) {
+                throw exception(ENERGY_METER_NOT_EXISTS); // 复用同一错误码，提示前端设备不存在
+            }
+            if (device.getGroupCode() != null && !"SE".equalsIgnoreCase(device.getGroupCode())) {
+                log.warn("[IbmsEnergy] 绑定的 IBMS 设备 group_code 非 SE: meterId={}, deviceId={}, groupCode={}",
+                        meterId, ibmsDeviceId, device.getGroupCode());
+            }
+        }
+        // 幂等更新
+        IbmsEnergyMeterDO update = new IbmsEnergyMeterDO();
+        update.setId(meterId);
+        update.setIbmsDeviceId(ibmsDeviceId);
+        meterMapper.updateById(update);
     }
 
     private void validateMeterExists(Long id) {

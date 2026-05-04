@@ -5,7 +5,10 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.iot.controller.admin.building.vo.energy.*;
 import cn.iocoder.yudao.module.iot.dal.dataobject.building.*;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.service.building.IbmsEnergyService;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,7 +20,11 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
@@ -36,6 +43,9 @@ public class IbmsEnergyController {
     @Resource
     private IbmsEnergyService energyService;
 
+    @Resource
+    private IbmsDeviceMapper ibmsDeviceMapper;
+
     // ======================= 仪表管理 =======================
 
     @GetMapping("/meter/page")
@@ -43,7 +53,8 @@ public class IbmsEnergyController {
     @PreAuthorize("@ss.hasPermission('iot:building-energy:query')")
     public CommonResult<PageResult<IbmsEnergyMeterRespVO>> getMeterPage(@Valid IbmsEnergyMeterPageReqVO pageReqVO) {
         PageResult<IbmsEnergyMeterDO> pageResult = energyService.getMeterPage(pageReqVO);
-        return success(BeanUtils.toBean(pageResult, IbmsEnergyMeterRespVO.class));
+        List<IbmsEnergyMeterRespVO> list = enrichMeterList(pageResult.getList());
+        return success(new PageResult<>(list, pageResult.getTotal()));
     }
 
     @GetMapping("/meter/get")
@@ -52,7 +63,11 @@ public class IbmsEnergyController {
     @PreAuthorize("@ss.hasPermission('iot:building-energy:query')")
     public CommonResult<IbmsEnergyMeterRespVO> getMeter(@RequestParam("id") Long id) {
         IbmsEnergyMeterDO meter = energyService.getMeter(id);
-        return success(BeanUtils.toBean(meter, IbmsEnergyMeterRespVO.class));
+        if (meter == null) {
+            return success(null);
+        }
+        List<IbmsEnergyMeterRespVO> list = enrichMeterList(Collections.singletonList(meter));
+        return success(list.isEmpty() ? null : list.get(0));
     }
 
     @GetMapping("/meter/list-by-type")
@@ -61,7 +76,7 @@ public class IbmsEnergyController {
     @PreAuthorize("@ss.hasPermission('iot:building-energy:query')")
     public CommonResult<List<IbmsEnergyMeterRespVO>> getMeterListByType(@RequestParam("meterType") Integer meterType) {
         List<IbmsEnergyMeterDO> list = energyService.getMeterListByType(meterType);
-        return success(BeanUtils.toBean(list, IbmsEnergyMeterRespVO.class));
+        return success(enrichMeterList(list));
     }
 
     @GetMapping("/meter/list")
@@ -69,7 +84,41 @@ public class IbmsEnergyController {
     @PreAuthorize("@ss.hasPermission('iot:building-energy:query')")
     public CommonResult<List<IbmsEnergyMeterRespVO>> getMeterList() {
         List<IbmsEnergyMeterDO> list = energyService.getMeterList();
-        return success(BeanUtils.toBean(list, IbmsEnergyMeterRespVO.class));
+        return success(enrichMeterList(list));
+    }
+
+    /**
+     * 批量为仪表填充 IBMS 设备台账展示字段（name/deviceCode/ip/space）。
+     */
+    private List<IbmsEnergyMeterRespVO> enrichMeterList(List<IbmsEnergyMeterDO> meters) {
+        if (meters == null || meters.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<IbmsEnergyMeterRespVO> vos = BeanUtils.toBean(meters, IbmsEnergyMeterRespVO.class);
+        List<Long> deviceIds = meters.stream()
+                .map(IbmsEnergyMeterDO::getIbmsDeviceId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (deviceIds.isEmpty()) {
+            return vos;
+        }
+        List<IbmsDeviceDO> devices = ibmsDeviceMapper.selectList(
+                Wrappers.<IbmsDeviceDO>lambdaQuery().in(IbmsDeviceDO::getId, deviceIds));
+        Map<Long, IbmsDeviceDO> deviceMap = new HashMap<>(devices.size());
+        for (IbmsDeviceDO d : devices) {
+            deviceMap.put(d.getId(), d);
+        }
+        for (IbmsEnergyMeterRespVO vo : vos) {
+            IbmsDeviceDO d = vo.getIbmsDeviceId() != null ? deviceMap.get(vo.getIbmsDeviceId()) : null;
+            if (d != null) {
+                vo.setIbmsDeviceName(d.getName());
+                vo.setIbmsDeviceCode(d.getDeviceCode());
+                vo.setIbmsDeviceIp(d.getIp());
+                vo.setIbmsDeviceSpace(d.getSpace());
+            }
+        }
+        return vos;
     }
 
     @PostMapping("/meter/create")
@@ -93,6 +142,17 @@ public class IbmsEnergyController {
     @PreAuthorize("@ss.hasPermission('iot:building-energy:delete')")
     public CommonResult<Boolean> deleteMeter(@RequestParam("id") Long id) {
         energyService.deleteMeter(id);
+        return success(true);
+    }
+
+    @PostMapping("/meter/bind-device")
+    @Operation(summary = "绑定/解绑能耗仪表到 IBMS 设备台账",
+            description = "ibmsDeviceId 传 null 表示解绑；幂等。推荐新仪表先在智慧物联创建设备再走此接口。")
+    @PreAuthorize("@ss.hasPermission('iot:building-energy:update')")
+    public CommonResult<Boolean> bindMeterDevice(
+            @RequestParam("meterId") Long meterId,
+            @RequestParam(value = "ibmsDeviceId", required = false) Long ibmsDeviceId) {
+        energyService.bindDevice(meterId, ibmsDeviceId);
         return success(true);
     }
 
