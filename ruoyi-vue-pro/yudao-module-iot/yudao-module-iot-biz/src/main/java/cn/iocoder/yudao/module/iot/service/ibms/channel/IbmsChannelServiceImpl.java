@@ -28,6 +28,7 @@ import cn.iocoder.yudao.module.iot.service.channel.SyncResult;
 import cn.iocoder.yudao.module.iot.service.channel.support.IotGisSpatialLocationBuilder;
 import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
 import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
+import cn.iocoder.yudao.module.iot.service.ibms.facade.IbmsBusinessMappingHelper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,12 +65,14 @@ public class IbmsChannelServiceImpl implements IbmsChannelService {
     private final IotDeviceChannelService iotDeviceChannelService;
     private final IotGisSpatialLocationBuilder spatialLocationBuilder;
     private final IbmsSpaceMapper ibmsSpaceMapper;
+    private final IbmsBusinessMappingHelper businessMappingHelper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createChannel(IbmsChannelSaveReqVO reqVO) {
         IbmsChannelDO channel = BeanUtils.toBean(reqVO, IbmsChannelDO.class);
         channel.setId(null);
+        deriveBusinessFromSystemType(channel);
         channelMapper.insert(channel);
         return channel.getId();
     }
@@ -85,7 +88,30 @@ public class IbmsChannelServiceImpl implements IbmsChannelService {
             throw ServiceExceptionUtil.exception0(404, "通道不存在");
         }
         IbmsChannelDO update = BeanUtils.toBean(reqVO, IbmsChannelDO.class);
+        deriveBusinessFromSystemType(update);
         channelMapper.updateById(update);
+    }
+
+    /**
+     * 根据 system_type 自动回填 business（业务大类码，小写；与 ibms_group.value 一致但存储为小写）。
+     * 前端若手填了 business 且与推导结果不一致，则以推导值覆盖并 WARN。
+     */
+    private void deriveBusinessFromSystemType(IbmsChannelDO channel) {
+        String systemType = channel.getSystemType();
+        if (StrUtil.isBlank(systemType)) {
+            return;
+        }
+        String resolvedGroup = businessMappingHelper.resolveGroupBySystem(systemType);
+        if (StrUtil.isBlank(resolvedGroup)) {
+            return;
+        }
+        String expected = resolvedGroup.toLowerCase();
+        String current = channel.getBusiness();
+        if (StrUtil.isNotBlank(current) && !expected.equalsIgnoreCase(current.trim())) {
+            log.warn("[IbmsChannel] business 与 system_type 不自洽，以字典推导值覆盖: systemType={}, inputBusiness={}, resolved={}",
+                    systemType, current, expected);
+        }
+        channel.setBusiness(expected);
     }
 
     @Override
@@ -224,6 +250,7 @@ public class IbmsChannelServiceImpl implements IbmsChannelService {
             if (exist == null) {
                 IbmsChannelDO channel = buildNewChannel(ibmsDeviceId, ibmsDevice, channelNo, channelName,
                         ibmsDevice.getIp(), online ? "online" : "offline");
+                deriveBusinessFromSystemType(channel);
                 channelMapper.insert(channel);
             } else {
                 channelMapper.update(null, new LambdaUpdateWrapper<IbmsChannelDO>()
