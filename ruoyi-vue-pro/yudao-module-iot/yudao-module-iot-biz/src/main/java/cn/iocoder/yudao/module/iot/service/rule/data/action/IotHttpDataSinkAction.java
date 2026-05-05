@@ -50,7 +50,7 @@ public class IotHttpDataSinkAction implements IotDataRuleAction {
             // 1.1 构建 Header
             HttpHeaders headers = new HttpHeaders();
             if (CollUtil.isNotEmpty(config.getHeaders())) {
-                config.getHeaders().putAll(config.getHeaders());
+                config.getHeaders().forEach(headers::add);
             }
             headers.add(HEADER_TENANT_ID, message.getTenantId().toString());
             // 1.2 构建 URL
@@ -82,10 +82,12 @@ public class IotHttpDataSinkAction implements IotDataRuleAction {
             } else {
                 log.error("[execute][message({}) config({}) url({}) method({}) requestEntity({}) 请求失败({})]",
                         message, config, url, method, requestEntity, responseEntity);
+                throw new RuntimeException("HTTP DataSink 非 2xx 响应: " + responseEntity.getStatusCode());
             }
         } catch (Exception e) {
             log.error("[execute][message({}) config({}) url({}) method({}) requestEntity({}) 请求异常({})]",
                     message, config, url, method, requestEntity, responseEntity, e);
+            throw e instanceof RuntimeException re ? re : new RuntimeException(e);
         }
     }
 

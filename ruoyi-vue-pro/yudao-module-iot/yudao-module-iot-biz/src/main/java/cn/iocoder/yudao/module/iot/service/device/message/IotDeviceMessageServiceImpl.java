@@ -69,6 +69,9 @@ public class IotDeviceMessageServiceImpl implements IotDeviceMessageService {
     @Resource
     @Lazy // 延迟加载，避免循环依赖
     private IotOtaTaskRecordService otaTaskRecordService;
+    @Resource
+    @Lazy
+    private cn.iocoder.yudao.module.iot.service.rule.data.IotDataRuleService dataRuleService;
 
     @Resource
     private IotDeviceMessageMapper deviceMessageMapper;
@@ -189,6 +192,12 @@ public class IotDeviceMessageServiceImpl implements IotDeviceMessageService {
 
         // 2. 记录消息
         getSelf().createDeviceLogAsync(message);
+        // 2.5 触发数据流转规则（webhook/HTTP DataSink 等）
+        try {
+            dataRuleService.executeDataRule(message);
+        } catch (Exception ex) {
+            log.error("[handleUpstreamDeviceMessage][message({}) 数据流转规则执行异常]", message, ex);
+        }
 
         // 3. 回复消息。前提：非 _reply 消息，并且非禁用回复的消息
         if (IotDeviceMessageUtils.isReplyMessage(message)
