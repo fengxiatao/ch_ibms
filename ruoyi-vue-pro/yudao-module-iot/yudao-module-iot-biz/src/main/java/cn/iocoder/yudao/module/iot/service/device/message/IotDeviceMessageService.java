@@ -46,18 +46,6 @@ public interface IotDeviceMessageService {
     IotDeviceMessage sendDeviceMessage(IotDeviceMessage message);
 
     /**
-     * 处理设备上行的消息，包括如下步骤：
-     *
-     * 1. 处理消息
-     * 2. 记录消息
-     * 3. 回复消息
-     *
-     * @param message 消息
-     * @param device 设备
-     */
-    void handleUpstreamDeviceMessage(IotDeviceMessage message, IotDeviceDO device);
-
-    /**
      * 获得设备消息分页
      *
      * @param pageReqVO 分页查询

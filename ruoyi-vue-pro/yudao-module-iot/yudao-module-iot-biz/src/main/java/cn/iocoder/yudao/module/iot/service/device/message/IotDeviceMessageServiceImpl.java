@@ -1,11 +1,9 @@
 package cn.iocoder.yudao.module.iot.service.device.message;
 
 import cn.hutool.core.date.LocalDateTimeUtil;
-import cn.hutool.core.lang.Assert;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.spring.SpringUtil;
-import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.date.LocalDateTimeUtils;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
@@ -13,24 +11,18 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.message.IotDeviceMessagePageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.statistics.vo.IotStatisticsDeviceMessageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.statistics.vo.IotStatisticsDeviceMessageSummaryByDateRespVO;
-import cn.iocoder.yudao.module.iot.core.enums.IotDeviceMessageMethodEnum;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.core.mq.producer.IotDeviceMessageProducer;
 import cn.iocoder.yudao.module.iot.core.util.IotDeviceMessageUtils;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceMessageDO;
 import cn.iocoder.yudao.module.iot.dal.tdengine.IotDeviceMessageMapper;
-import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
-import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceGatewaySupportService;
 import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsIotDualTrackDeviceResolver;
 import cn.iocoder.yudao.module.iot.service.device.property.IotDevicePropertyService;
-import cn.iocoder.yudao.module.iot.service.ota.IotOtaTaskRecordService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.google.common.base.Objects;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -61,32 +53,13 @@ public class IotDeviceMessageServiceImpl implements IotDeviceMessageService {
     @Resource
     private IbmsIotDualTrackDeviceResolver dualTrackDeviceResolver;
     @Resource
-    private IbmsDeviceMapper ibmsDeviceMapper;
-    @Resource
-    private IbmsDeviceGatewaySupportService ibmsDeviceGatewaySupportService;
-    @Resource
     private IotDevicePropertyService devicePropertyService;
-    @Resource
-    @Lazy // 延迟加载，避免循环依赖
-    private IotOtaTaskRecordService otaTaskRecordService;
-    @Resource
-    @Lazy
-    private cn.iocoder.yudao.module.iot.service.rule.data.IotDataRuleService dataRuleService;
 
     @Resource
     private IotDeviceMessageMapper deviceMessageMapper;
 
     @Resource
     private IotDeviceMessageProducer deviceMessageProducer;
-    
-    @Resource
-    private cn.iocoder.yudao.module.iot.service.device.handler.DynamicDeviceServiceInvoker deviceServiceInvoker;
-    
-    @Resource
-    private cn.iocoder.yudao.module.iot.service.device.handler.property.DevicePropertyProcessor devicePropertyProcessor;
-    
-    @Resource
-    private cn.iocoder.yudao.module.iot.service.device.handler.event.DeviceEventProcessor deviceEventProcessor;
 
     @Override
     public void defineDeviceMessageStable() {
@@ -175,95 +148,6 @@ public class IotDeviceMessageServiceImpl implements IotDeviceMessageService {
         }
     }
 
-    @Override
-    public void handleUpstreamDeviceMessage(IotDeviceMessage message, IotDeviceDO device) {
-        // 1. 处理消息
-        Object replyData = null;
-        ServiceException serviceException = null;
-        try {
-            replyData = handleUpstreamDeviceMessage0(message, device);
-        } catch (ServiceException ex) {
-            serviceException = ex;
-            log.warn("[handleUpstreamDeviceMessage][message({}) 业务异常]", message, serviceException);
-        } catch (Exception ex) {
-            log.error("[handleUpstreamDeviceMessage][message({}) 发生异常]", message, ex);
-            throw ex;
-        }
-
-        // 2. 记录消息
-        getSelf().createDeviceLogAsync(message);
-        // 2.5 触发数据流转规则（webhook/HTTP DataSink 等）
-        try {
-            dataRuleService.executeDataRule(message);
-        } catch (Exception ex) {
-            log.error("[handleUpstreamDeviceMessage][message({}) 数据流转规则执行异常]", message, ex);
-        }
-
-        // 3. 回复消息。前提：非 _reply 消息，并且非禁用回复的消息
-        if (IotDeviceMessageUtils.isReplyMessage(message)
-                || IotDeviceMessageMethodEnum.isReplyDisabled(message.getMethod())
-                || StrUtil.isEmpty(message.getServerId())) {
-            return;
-        }
-        try {
-            IotDeviceMessage replyMessage = IotDeviceMessage.replyOf(message.getRequestId(), message.getMethod(), replyData,
-                    serviceException != null ? serviceException.getCode() : null,
-                    serviceException != null ? serviceException.getMessage() : null);
-            sendDeviceMessage(replyMessage, device, message.getServerId());
-        } catch (Exception ex) {
-            log.error("[handleUpstreamDeviceMessage][message({}) 回复消息失败]", message, ex);
-        }
-    }
-
-    // TODO @长辉开发团队：可优化：未来逻辑复杂后，可以独立拆除 Processor 处理器
-    @SuppressWarnings("SameReturnValue")
-    private Object handleUpstreamDeviceMessage0(IotDeviceMessage message, IotDeviceDO device) {
-        // 设备上下线
-        if (Objects.equal(message.getMethod(), IotDeviceMessageMethodEnum.STATE_UPDATE.getMethod())) {
-            String stateStr = IotDeviceMessageUtils.getIdentifier(message);
-            assert stateStr != null;
-            Assert.notEmpty(stateStr, "设备状态不能为空");
-            int state = Integer.parseInt(stateStr);
-            // 单台账：状态更新仅写入 IBMS（网关缓存 / 在线态）。
-            // 由于 dual resolver 已禁止回退 iot_device，这里直接要求 IBMS 必须存在。
-            if (ibmsDeviceMapper.selectById(device.getId()) == null) {
-                throw exception(DEVICE_NOT_EXISTS);
-            }
-            ibmsDeviceGatewaySupportService.updateGatewayDeviceStateWithTimestamp(
-                    device.getId(), state, System.currentTimeMillis());
-            // TODO 长辉开发团队：子设备的关联
-            return null;
-        }
-
-        // ========== 属性上报（使用可扩展处理器） ==========
-        if (Objects.equal(message.getMethod(), IotDeviceMessageMethodEnum.PROPERTY_POST.getMethod())) {
-            // 使用原有的saveDeviceProperty方法（包含物模型验证）
-            devicePropertyService.saveDeviceProperty(device, message);
-            return null;
-        }
-
-        // ========== 事件上报（使用可扩展处理器） ==========
-        if (Objects.equal(message.getMethod(), IotDeviceMessageMethodEnum.EVENT_POST.getMethod())) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> params = (Map<String, Object>) message.getParams();
-            String eventIdentifier = (String) params.get("identifier");
-            return deviceEventProcessor.processEvent(device, eventIdentifier, params, message.getReportTime());
-        }
-
-        // ========== 服务调用（使用可扩展处理器） ==========
-        if (Objects.equal(message.getMethod(), IotDeviceMessageMethodEnum.SERVICE_INVOKE.getMethod())) {
-            return deviceServiceInvoker.handleDeviceService(message, device);
-        }
-
-        // OTA 上报升级进度
-        if (Objects.equal(message.getMethod(), IotDeviceMessageMethodEnum.OTA_PROGRESS.getMethod())) {
-            otaTaskRecordService.updateOtaRecordProgress(device, message);
-            return null;
-        }
-
-        // TODO @长辉开发团队：这里可以按需，添加别的逻辑；
-        return null;
-    }
 
     @Override
     public PageResult<IotDeviceMessageDO> getDeviceMessagePage(IotDeviceMessagePageReqVO pageReqVO) {
