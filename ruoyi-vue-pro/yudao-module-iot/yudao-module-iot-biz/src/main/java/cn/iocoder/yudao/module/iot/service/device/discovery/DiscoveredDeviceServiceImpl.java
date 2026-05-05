@@ -154,17 +154,20 @@ public class DiscoveredDeviceServiceImpl implements DiscoveredDeviceService {
                 log.warn("[unignoreDevice][设备不存在: {}]", id);
                 return;
             }
-            
-            device.setStatus(DiscoveredDeviceStatusEnum.DISCOVERED.getStatus());
-            device.setIgnoredBy(null);
-            device.setIgnoredTime(null);
-            device.setIgnoreReason(null);
-            device.setIgnoreUntil(null);
-            
-            discoveredDeviceMapper.updateById(device);
-            
+
+            // 用 LambdaUpdateWrapper 显式 set，避免 MyBatis-Plus 默认 FieldStrategy.NOT_NULL
+            // 导致 4 个忽略相关字段 null 被忽略，残留旧的忽略人/时间/原因/到期，"取消忽略"语义失效
+            discoveredDeviceMapper.update(null,
+                    com.baomidou.mybatisplus.core.toolkit.Wrappers.<IbmsDiscoveredDeviceDO>lambdaUpdate()
+                            .set(IbmsDiscoveredDeviceDO::getStatus, DiscoveredDeviceStatusEnum.DISCOVERED.getStatus())
+                            .set(IbmsDiscoveredDeviceDO::getIgnoredBy, null)
+                            .set(IbmsDiscoveredDeviceDO::getIgnoredTime, null)
+                            .set(IbmsDiscoveredDeviceDO::getIgnoreReason, null)
+                            .set(IbmsDiscoveredDeviceDO::getIgnoreUntil, null)
+                            .eq(IbmsDiscoveredDeviceDO::getId, id));
+
             log.info("[unignoreDevice][已取消忽略设备: {}]", device.getIpAddress());
-            
+
         } catch (Exception e) {
             log.error("[unignoreDevice][取消忽略失败: {}]", id, e);
         }

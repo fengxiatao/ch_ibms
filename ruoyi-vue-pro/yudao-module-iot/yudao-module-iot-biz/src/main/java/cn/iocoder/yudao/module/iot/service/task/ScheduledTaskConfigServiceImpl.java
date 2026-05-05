@@ -149,19 +149,16 @@ public class ScheduledTaskConfigServiceImpl implements ScheduledTaskConfigServic
         // 校验存在
         ScheduledTaskConfigDO task = validateTaskExists2(id);
 
-        // 更新状态
-        ScheduledTaskConfigDO updateObj = new ScheduledTaskConfigDO();
-        updateObj.setId(id);
-        updateObj.setEnabled(enabled);
+        // 计算下次执行时间：启用→重新计算；禁用→显式置 null
+        LocalDateTime nextExecutionTime = enabled ? calculateNextExecutionTime(task) : null;
 
-        // 如果启用，计算下次执行时间
-        if (enabled) {
-            updateObj.setNextExecutionTime(calculateNextExecutionTime(task));
-        } else {
-            updateObj.setNextExecutionTime(null);
-        }
-
-        taskConfigMapper.updateById(updateObj);
+        // 用 LambdaUpdateWrapper 显式 set，避免 MyBatis-Plus 默认 FieldStrategy.NOT_NULL
+        // 导致禁用时 nextExecutionTime=null 被忽略，残留旧执行时间
+        taskConfigMapper.update(null,
+                com.baomidou.mybatisplus.core.toolkit.Wrappers.<ScheduledTaskConfigDO>lambdaUpdate()
+                        .set(ScheduledTaskConfigDO::getEnabled, enabled)
+                        .set(ScheduledTaskConfigDO::getNextExecutionTime, nextExecutionTime)
+                        .eq(ScheduledTaskConfigDO::getId, id));
     }
 
     @Override

@@ -132,13 +132,15 @@ public class FloorDxfServiceImpl implements FloorDxfService {
         deletePhysicalFile(floor.getDxfFilePath());
 
         // 3. 更新数据库（清空DXF字段）
-        FloorDO updateFloor = new FloorDO();
-        updateFloor.setId(floorId);
-        updateFloor.setDxfFilePath(null);
-        updateFloor.setDxfFileName(null);
-        updateFloor.setDxfFileSize(null);
-        updateFloor.setDxfUploadTime(null);
-        floorMapper.updateById(updateFloor);
+        // 用 LambdaUpdateWrapper 显式 set，避免 MyBatis-Plus 默认 FieldStrategy.NOT_NULL
+        // 导致 4 个 dxf* 字段 null 被忽略，前端会继续显示已删除文件信息
+        floorMapper.update(null,
+                com.baomidou.mybatisplus.core.toolkit.Wrappers.<FloorDO>lambdaUpdate()
+                        .set(FloorDO::getDxfFilePath, null)
+                        .set(FloorDO::getDxfFileName, null)
+                        .set(FloorDO::getDxfFileSize, null)
+                        .set(FloorDO::getDxfUploadTime, null)
+                        .eq(FloorDO::getId, floorId));
 
         log.info("【楼层DXF服务】删除成功，楼层ID: {}", floorId);
     }
