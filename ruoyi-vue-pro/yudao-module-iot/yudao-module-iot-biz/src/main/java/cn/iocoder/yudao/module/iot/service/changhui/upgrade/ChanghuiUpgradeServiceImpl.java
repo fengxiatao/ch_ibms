@@ -857,13 +857,17 @@ public class ChanghuiUpgradeServiceImpl implements ChanghuiUpgradeService {
         }
 
         // 重置状态为待执行，重试计数清零（手动重试）
-        task.setStatus(ChanghuiUpgradeStatusEnum.PENDING.getCode());
-        task.setProgress(0);
-        task.setStartTime(null);
-        task.setEndTime(null);
-        task.setErrorMessage(null);
-        task.setRetryCount(0); // 手动重试时重置计数
-        upgradeTaskMapper.updateById(task);
+        // 用 LambdaUpdateWrapper 显式 set，避免 MyBatis-Plus 默认 FieldStrategy.NOT_NULL
+        // 导致 startTime/endTime/errorMessage=null 被忽略，重试任务残留上一轮的时间和错误信息
+        upgradeTaskMapper.update(null,
+                com.baomidou.mybatisplus.core.toolkit.Wrappers.<ChanghuiUpgradeTaskDO>lambdaUpdate()
+                        .set(ChanghuiUpgradeTaskDO::getStatus, ChanghuiUpgradeStatusEnum.PENDING.getCode())
+                        .set(ChanghuiUpgradeTaskDO::getProgress, 0)
+                        .set(ChanghuiUpgradeTaskDO::getStartTime, null)
+                        .set(ChanghuiUpgradeTaskDO::getEndTime, null)
+                        .set(ChanghuiUpgradeTaskDO::getErrorMessage, null)
+                        .set(ChanghuiUpgradeTaskDO::getRetryCount, 0)
+                        .eq(ChanghuiUpgradeTaskDO::getId, taskId));
 
         // 获取设备信息检查是否在线（使用统一的状态判断方法）
         ChanghuiDeviceDO device = deviceService.getDeviceDOByStationCode(task.getStationCode());

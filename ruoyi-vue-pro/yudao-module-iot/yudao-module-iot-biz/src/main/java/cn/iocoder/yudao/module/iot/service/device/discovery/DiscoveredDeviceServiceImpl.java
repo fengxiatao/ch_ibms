@@ -124,23 +124,26 @@ public class DiscoveredDeviceServiceImpl implements DiscoveredDeviceService {
                 log.warn("[ignoreDevice][设备不存在: {}]", id);
                 return;
             }
-            
-            device.setStatus(DiscoveredDeviceStatusEnum.IGNORED.getStatus());
-            device.setIgnoredBy(SecurityFrameworkUtils.getLoginUserId());
-            device.setIgnoredTime(LocalDateTime.now());
-            device.setIgnoreReason(reason);
-            
-            if (ignoreDays != null && ignoreDays > 0) {
-                device.setIgnoreUntil(LocalDateTime.now().plusDays(ignoreDays));
-            } else {
-                device.setIgnoreUntil(null);
-            }
-            
-            discoveredDeviceMapper.updateById(device);
-            
-            log.info("[ignoreDevice][已忽略设备: {}, 操作人: {}, 天数: {}]", 
-                device.getIpAddress(), device.getIgnoredBy(), ignoreDays);
-            
+
+            Long operatorId = SecurityFrameworkUtils.getLoginUserId();
+            LocalDateTime ignoreUntil = (ignoreDays != null && ignoreDays > 0)
+                    ? LocalDateTime.now().plusDays(ignoreDays)
+                    : null;
+
+            // 用 LambdaUpdateWrapper 显式 set，避免 MyBatis-Plus 默认 FieldStrategy.NOT_NULL
+            // 导致 ignoreUntil=null（永久忽略语义）被忽略，残留旧的到期时间
+            discoveredDeviceMapper.update(null,
+                    com.baomidou.mybatisplus.core.toolkit.Wrappers.<IbmsDiscoveredDeviceDO>lambdaUpdate()
+                            .set(IbmsDiscoveredDeviceDO::getStatus, DiscoveredDeviceStatusEnum.IGNORED.getStatus())
+                            .set(IbmsDiscoveredDeviceDO::getIgnoredBy, operatorId)
+                            .set(IbmsDiscoveredDeviceDO::getIgnoredTime, LocalDateTime.now())
+                            .set(IbmsDiscoveredDeviceDO::getIgnoreReason, reason)
+                            .set(IbmsDiscoveredDeviceDO::getIgnoreUntil, ignoreUntil)
+                            .eq(IbmsDiscoveredDeviceDO::getId, id));
+
+            log.info("[ignoreDevice][已忽略设备: {}, 操作人: {}, 天数: {}]",
+                device.getIpAddress(), operatorId, ignoreDays);
+
         } catch (Exception e) {
             log.error("[ignoreDevice][忽略设备失败: {}]", id, e);
         }
