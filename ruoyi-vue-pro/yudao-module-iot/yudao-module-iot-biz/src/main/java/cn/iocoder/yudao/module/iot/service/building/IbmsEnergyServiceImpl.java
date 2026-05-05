@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.building.*;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.building.*;
 import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -116,11 +117,12 @@ public class IbmsEnergyServiceImpl implements IbmsEnergyService {
                         meterId, ibmsDeviceId, device.getGroupCode());
             }
         }
-        // 幂等更新
-        IbmsEnergyMeterDO update = new IbmsEnergyMeterDO();
-        update.setId(meterId);
-        update.setIbmsDeviceId(ibmsDeviceId);
-        meterMapper.updateById(update);
+        // 幂等更新：用 LambdaUpdateWrapper 显式 set，避免 MyBatis-Plus 默认 FieldStrategy.NOT_NULL
+        // 导致 ibmsDeviceId=null（解绑语义）被忽略
+        meterMapper.update(null,
+                Wrappers.<IbmsEnergyMeterDO>lambdaUpdate()
+                        .set(IbmsEnergyMeterDO::getIbmsDeviceId, ibmsDeviceId)
+                        .eq(IbmsEnergyMeterDO::getId, meterId));
     }
 
     private void validateMeterExists(Long id) {
