@@ -9,6 +9,9 @@ import cn.iocoder.yudao.module.iot.mq.consumer.device.handler.DeviceResultHandle
 import cn.iocoder.yudao.module.iot.mq.manager.DeviceCommandResponseManager;
 import cn.iocoder.yudao.module.iot.service.channel.ChannelSyncRetryTemplate;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
+import cn.iocoder.yudao.module.iot.service.rule.data.IotDataRuleService;
+import jakarta.annotation.Resource;
+import org.springframework.context.annotation.Lazy;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService.AccessChannelSyncInfo;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService.AccessChannelSyncResult;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService.NvrChannelSyncInfo;
@@ -80,6 +83,13 @@ public class DeviceServiceResultConsumer implements IotMessageSubscriber<IotDevi
      * 激活状态机：用于兜底（CONNECT 已在线 alreadyOnline=true 时，newgateway 可能不再触发 DEVICE_STATE_CHANGED）。
      */
     private final DeviceActivationStateManager activationStateManager;
+
+    /**
+     * 数据流转规则服务（v19 修复：service.invoke reply 路径也挂上数据流转）
+     */
+    @Resource
+    @Lazy
+    private IotDataRuleService dataRuleService;
 
     /**
      * 构造函数
@@ -192,6 +202,16 @@ public class DeviceServiceResultConsumer implements IotMessageSubscriber<IotDevi
 
             // 2. 路由到对应的处理器
             routeToHandler(deviceType, message);
+
+            // 2.5 触发数据流转规则（v19 顺手挂：service.invoke reply 也走 DataSink）
+            try {
+                if (dataRuleService != null) {
+                    dataRuleService.executeDataRule(message);
+                }
+            } catch (Exception ex) {
+                log.error("[DeviceServiceResultConsumer] 触发数据流转规则失败: deviceId={}, requestId={}",
+                        deviceId, requestId, ex);
+            }
 
             // 3. 推送到前端
             pushToFrontend(deviceId, deviceType, requestId, success, message);

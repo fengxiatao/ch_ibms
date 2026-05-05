@@ -7,11 +7,14 @@ import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageSubscriber;
 import cn.iocoder.yudao.module.iot.core.messagebus.topics.IotMessageTopics;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.mq.consumer.device.handler.DeviceEventHandler;
+import cn.iocoder.yudao.module.iot.service.rule.data.IotDataRuleService;
 import cn.iocoder.yudao.module.iot.websocket.DeviceMessagePushService;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -46,6 +49,14 @@ public class DeviceEventConsumer implements IotMessageSubscriber<IotMessageEnvel
     private final IotMessageBus messageBus;
     private final DeviceMessagePushService pushService;
     private final Map<String, DeviceEventHandler> handlers;
+
+    /**
+     * 数据流转规则服务（v19 修复：将 v18 修复 4 从死代码 handleUpstreamDeviceMessage 迁移到此真实消费入口）
+     * 用 @Lazy 避免与 IotDataRuleService -> ... 形成的潜在循环依赖
+     */
+    @Resource
+    @Lazy
+    private IotDataRuleService dataRuleService;
 
     /**
      * 构造函数
@@ -124,6 +135,19 @@ public class DeviceEventConsumer implements IotMessageSubscriber<IotMessageEnvel
         try {
             // 1. 路由到对应的处理器存储事件
             routeToHandler(deviceType, message);
+
+            // 1.5 触发数据流转规则（webhook/HTTP DataSink 等）
+            // v19 修复：原 v18 修复 4 挂在 IotDeviceMessageServiceImpl.handleUpstreamDeviceMessage 上，
+            // 但该方法在 ch_ibms 分叉里是死代码（零调用方），导致永不触发。
+            // 真实上行消息经 RocketMQ DEVICE_EVENT_REPORTED → 本 Consumer，故迁移至此。
+            try {
+                if (dataRuleService != null) {
+                    dataRuleService.executeDataRule(message);
+                }
+            } catch (Exception e) {
+                log.error("[DeviceEventConsumer] 触发数据流转规则失败: deviceId={}, eventType={}",
+                        deviceId, eventType, e);
+            }
 
             // 2. 推送到前端
             // 门禁事件：由门禁专用链路（AccessEventHandler/IotAccessEventLogServiceImpl）负责 push，避免重复推送
