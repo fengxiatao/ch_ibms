@@ -16,6 +16,7 @@ import cn.iocoder.yudao.module.iot.service.access.dto.DispatchResult;
 import cn.iocoder.yudao.module.iot.service.access.event.DispatchTaskCreatedEvent;
 import cn.iocoder.yudao.module.iot.websocket.AuthTaskProgressPushService;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Async;
@@ -1739,10 +1740,13 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
                     .build();
             personDeviceAuthMapper.insert(auth);
         } else {
-            auth.setAuthStatus(authStatus);
-            auth.setLastDispatchTime(LocalDateTime.now());
-            auth.setLastDispatchResult(result);
-            personDeviceAuthMapper.updateById(auth);
+            // 修复：result=null 时 updateById 会被 FieldStrategy.NOT_NULL 忽略，
+            // 导致从失败/已撤销切到授权中/撤销中时残留旧 result。改用 lambdaUpdate 显式 set null。
+            personDeviceAuthMapper.update(null, Wrappers.<IotAccessPersonDeviceAuthDO>lambdaUpdate()
+                    .set(IotAccessPersonDeviceAuthDO::getAuthStatus, authStatus)
+                    .set(IotAccessPersonDeviceAuthDO::getLastDispatchTime, LocalDateTime.now())
+                    .set(IotAccessPersonDeviceAuthDO::getLastDispatchResult, result)
+                    .eq(IotAccessPersonDeviceAuthDO::getId, auth.getId()));
         }
     }
 
@@ -2053,13 +2057,18 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
                     .build();
             personDeviceAuthMapper.insert(auth);
         } else {
-            auth.setAuthStatus(authStatus);
-            auth.setLastDispatchTime(LocalDateTime.now());
-            auth.setLastDispatchResult(result);
+            // 修复：result=null 时 updateById 会被 FieldStrategy.NOT_NULL 忽略，
+            // 导致从失败切到授权中时残留旧 result。改用 lambdaUpdate 显式 set null；
+            // credentialHash 仍维持"非 null 才更新"语义（null 表示本次未重算，应保留旧 hash）。
+            var lambdaUpdate = Wrappers.<IotAccessPersonDeviceAuthDO>lambdaUpdate()
+                    .set(IotAccessPersonDeviceAuthDO::getAuthStatus, authStatus)
+                    .set(IotAccessPersonDeviceAuthDO::getLastDispatchTime, LocalDateTime.now())
+                    .set(IotAccessPersonDeviceAuthDO::getLastDispatchResult, result)
+                    .eq(IotAccessPersonDeviceAuthDO::getId, auth.getId());
             if (credentialHash != null) {
-                auth.setCredentialHash(credentialHash);
+                lambdaUpdate.set(IotAccessPersonDeviceAuthDO::getCredentialHash, credentialHash);
             }
-            personDeviceAuthMapper.updateById(auth);
+            personDeviceAuthMapper.update(null, lambdaUpdate);
         }
     }
 
