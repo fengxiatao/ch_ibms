@@ -280,7 +280,8 @@ public class IbmsChannelServiceImpl implements IbmsChannelService {
         ch.setDeviceName(device.getName());
         ch.setDeviceSn(device.getSn());
         // 默认 IBMS 语义字段：NVR 通道 = 视频通道
-        ch.setBusiness(StrUtil.isNotBlank(device.getGroupCode()) ? device.getGroupCode().toLowerCase() : "security");
+        // 注意：business 若为 null，紧随其后的 deriveBusinessFromSystemType() 会按 systemType（下方兜底 "VI"）推导覆盖
+        ch.setBusiness(StrUtil.isNotBlank(device.getGroupCode()) ? device.getGroupCode().toLowerCase() : null);
         ch.setTypeCode("VT");
         ch.setSystemType(StrUtil.isNotBlank(device.getSystemCode()) ? device.getSystemCode() : "VI");
         ch.setDataSource("NVR");
