@@ -152,11 +152,20 @@ public class ScheduledTaskConfigServiceImpl implements ScheduledTaskConfigServic
         // 计算下次执行时间：启用→重新计算；禁用→显式置 null
         LocalDateTime nextExecutionTime = enabled ? calculateNextExecutionTime(task) : null;
 
-        // 用 LambdaUpdateWrapper 显式 set，避免 MyBatis-Plus 默认 FieldStrategy.NOT_NULL
-        // 导致禁用时 nextExecutionTime=null 被忽略，残留旧执行时间
+        // 分两步 update，规避两个问题：
+        // 1) enabled 列 DO 上声明了 BooleanToIntTypeHandler，但 LambdaUpdateWrapper.set(lambda,value)
+        //    不读取 DO 字段上的 @TableField(typeHandler=...)，会按默认 setBoolean 对 bit(1) 触发
+        //    "Data too long for column 'enabled'" 截断。因此 enabled 必须走 updateById(entity) 路径。
+        // 2) nextExecutionTime=null 时若走 updateById 会被 FieldStrategy.NOT_NULL 忽略，残留旧值。
+        //    因此必须用 LambdaUpdateWrapper.set(lambda, null) 显式 set。
+        // 方法被 @Transactional 包裹，两步原子。
+        ScheduledTaskConfigDO enabledUpdate = new ScheduledTaskConfigDO();
+        enabledUpdate.setId(id);
+        enabledUpdate.setEnabled(enabled);
+        taskConfigMapper.updateById(enabledUpdate);
+
         taskConfigMapper.update(null,
                 com.baomidou.mybatisplus.core.toolkit.Wrappers.<ScheduledTaskConfigDO>lambdaUpdate()
-                        .set(ScheduledTaskConfigDO::getEnabled, enabled)
                         .set(ScheduledTaskConfigDO::getNextExecutionTime, nextExecutionTime)
                         .eq(ScheduledTaskConfigDO::getId, id));
     }
