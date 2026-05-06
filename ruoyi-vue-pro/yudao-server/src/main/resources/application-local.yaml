@@ -205,6 +205,8 @@ yudao:
   iot:
     message-bus:
       consumer-group-prefix: local- # 本地开发环境使用 local- 前缀，避免与其他环境消费者组冲突
+    debug-endpoints:
+      enabled: true # v24: 本地开发开启 IotDebugDeviceMessageController 调试端点（test-publish-state-change 等）；prod/dev profile 缺省 false 仍 404
   captcha:
     enable: false # 启用图片验证码
   pay:

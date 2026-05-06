@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.rule.IotDataSinkDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.rule.IotDataSinkMapper;
 import cn.iocoder.yudao.module.iot.dal.redis.RedisKeyConstants;
 import jakarta.annotation.Resource;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,7 @@ public class IotDataSinkServiceImpl implements IotDataSinkService {
     }
 
     @Override
+    @CacheEvict(value = RedisKeyConstants.DATA_SINK, key = "#updateReqVO.id")
     public void updateDataSink(IotDataSinkSaveReqVO updateReqVO) {
         // 校验存在
         validateDataBridgeExists(updateReqVO.getId());
@@ -54,6 +56,7 @@ public class IotDataSinkServiceImpl implements IotDataSinkService {
     }
 
     @Override
+    @CacheEvict(value = RedisKeyConstants.DATA_SINK, key = "#id")
     public void deleteDataSink(Long id) {
         // 校验存在
         validateDataBridgeExists(id);
