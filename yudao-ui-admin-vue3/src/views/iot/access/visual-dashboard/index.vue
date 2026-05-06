@@ -3,9 +3,9 @@ import type { EChartsOption } from 'echarts'
 import dayjs from 'dayjs'
 import {
   getAccessDashboardStatistics,
+  getAccessTrend,
   type AccessDashboardStatisticsRespVO
 } from '@/api/iot/access/dashboard'
-import { getHourlyTrafficStatistics } from '@/api/iot/access/record'
 
 defineOptions({ name: 'AccessVisualDashboard' })
 
@@ -32,11 +32,13 @@ const customData = ref<ChartDataSet | null>(null)
 const showAccess = ref(true)
 const showReject = ref(true)
 
-// === 真实数据（M2-A 接入 GAP-001：AccessDashboardController.statistics + AccessRecordController.hourly）===
-// 其余视图 / 图表（week/month/year 趋势、告警分类、告警趋势、公司排行）后端尚无聚合端点，
-// 暂保留 mock，待 M2 后期补全；详见 docs/ibms-bidirectional-gap.md GAP-001/GAP-007。
+// === 真实数据（M2-A + M2-D：AccessDashboardController.statistics + trend）===
+// statistics 接口提供 4 metric 卡片 + 设备分布 + 通行类型分布。
+// trend 接口 today/week/month/year 全部走真实数据（同日 24 槽，跨日逐日槽）。
+// 告警分类饰图 / 告警趋势 / 公司排行 后端尚无聚合端点，保留 mock。
+// 详见 docs/ibms-bidirectional-gap.md GAP-001/GAP-007。
 const liveStats = ref<AccessDashboardStatisticsRespVO | null>(null)
-const liveTodayHourly = ref<AccessTrendData | null>(null)
+const liveTrendByRange = ref<Partial<Record<DateRangeKey, AccessTrendData>>>({})
 
 const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN').format(value)
 const sum = (arr: number[]) => arr.reduce((acc, cur) => acc + cur, 0)
@@ -243,19 +245,17 @@ const buildCustomData = (startDate: string, endDate: string): ChartDataSet | nul
   }
 }
 
-const todayDataSet = computed<ChartDataSet>(() => {
-  // 用真实 hourly 替换 today 的 accessTrend；其余三块（告警分类/告警趋势/公司排行）保留 mock。
-  if (!liveTodayHourly.value) return builtinData.today
-  return {
-    ...builtinData.today,
-    accessTrend: liveTodayHourly.value
-  }
-})
-
 const effectiveData = computed<ChartDataSet>(() => {
-  if (dateRange.value === 'today') return todayDataSet.value
-  if (dateRange.value === 'custom') return customData.value ?? todayDataSet.value
-  return builtinData[dateRange.value]
+  if (dateRange.value === 'custom') {
+    return customData.value ?? (liveTrendByRange.value.today
+      ? { ...builtinData.today, accessTrend: liveTrendByRange.value.today }
+      : builtinData.today)
+  }
+  // 优先使用真实 trend 数据，没有时 fallback 到 mock
+  const liveTrend = liveTrendByRange.value[dateRange.value]
+  const baseMock = builtinData[dateRange.value]
+  if (liveTrend) return { ...baseMock, accessTrend: liveTrend }
+  return baseMock
 })
 
 const metrics = computed(() => {
@@ -289,39 +289,73 @@ const growth = computed(() => {
   }
 })
 
-// === onMounted：拉取真实统计 + 24h 趋势 ===
-const loadLiveData = async () => {
+// === 拉取真实 statistics + trend（按当前日期范围）===
+const rangeToDates = (range: DateRangeKey): { startTime: string; endTime: string } | null => {
+  const today = dayjs()
+  switch (range) {
+    case 'today':
+      return {
+        startTime: today.startOf('day').format('YYYY-MM-DD'),
+        endTime: today.endOf('day').format('YYYY-MM-DD')
+      }
+    case 'week':
+      return {
+        startTime: today.subtract(6, 'day').format('YYYY-MM-DD'),
+        endTime: today.format('YYYY-MM-DD')
+      }
+    case 'month':
+      return {
+        startTime: today.subtract(29, 'day').format('YYYY-MM-DD'),
+        endTime: today.format('YYYY-MM-DD')
+      }
+    case 'year':
+      return {
+        startTime: today.subtract(11, 'month').startOf('month').format('YYYY-MM-DD'),
+        endTime: today.format('YYYY-MM-DD')
+      }
+    default:
+      return null
+  }
+}
+
+const loadStats = async () => {
   try {
     liveStats.value = await getAccessDashboardStatistics()
   } catch (err) {
     console.warn('[AccessVisualDashboard] statistics 接口失败，回退至 mock 数据', err)
   }
+}
+
+const loadTrend = async (range: DateRangeKey) => {
+  const dates = rangeToDates(range)
+  if (!dates) return
   try {
-    const hourly = await getHourlyTrafficStatistics({})
-    if (Array.isArray(hourly) && hourly.length > 0) {
-      // 后端按 0~23 小时分组，可能不连续，需补齐 24 个槽位
-      const inByHour = new Array<number>(24).fill(0)
-      const outByHour = new Array<number>(24).fill(0)
-      for (const row of hourly) {
-        const h = Number(row?.hour)
-        if (Number.isInteger(h) && h >= 0 && h < 24) {
-          inByHour[h] = Number(row?.inCount ?? 0)
-          outByHour[h] = Number(row?.outCount ?? 0)
+    const trend = await getAccessTrend(dates)
+    if (trend && Array.isArray(trend.labels) && trend.labels.length > 0) {
+      liveTrendByRange.value = {
+        ...liveTrendByRange.value,
+        [range]: {
+          labels: trend.labels,
+          accessData: (trend.inData ?? trend.accessData ?? []).map(Number),
+          rejectData: (trend.rejectData ?? []).map(Number)
         }
-      }
-      liveTodayHourly.value = {
-        labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
-        accessData: inByHour,
-        rejectData: outByHour // 注：后端暂用 outCount 表示出场，非"拒绝"。toggle 仍可用
       }
     }
   } catch (err) {
-    console.warn('[AccessVisualDashboard] hourly 接口失败，回退至 mock 数据', err)
+    console.warn(`[AccessVisualDashboard] trend(${range}) 接口失败，回退至 mock 数据`, err)
   }
 }
 
 onMounted(() => {
-  loadLiveData()
+  loadStats()
+  loadTrend('today')
+})
+
+// 切换日期范围时按需拉取（带缓存）
+watch(dateRange, (range) => {
+  if (range !== 'custom' && !liveTrendByRange.value[range]) {
+    loadTrend(range)
+  }
 })
 
 const accessTrendTitle = computed(() => {
