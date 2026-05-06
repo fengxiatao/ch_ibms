@@ -8,9 +8,9 @@
 
 ## 当前推进状态
 
-- **当前活动阶段**：M0（计划基线建立）
-- **下一阶段建议**：M1（完整盘点）
-- **已完成阶段**：—
+- **当前活动阶段**：M1（完整盘点 ✅ 完成）→ M1.5 双向校验 + M1.6 僵尸候选（本会话进行中）
+- **下一阶段建议**：M2（后端能力补齐）
+- **已完成阶段**：M0、M1
 - **阻塞决策点**：D-001（智慧能源前端保留方案）、D-002（物联模块隐藏方式）
 
 ---
@@ -22,6 +22,7 @@
 | 2026-05-06 | M0 | 创建主计划 + 覆盖矩阵 + 进度跟踪三件套 | `docs/ibms-unified-data-source-plan.md` / `docs/ibms-coverage-matrix.md` / 本文件 | AI/主程 | 基于本日五大模块对接现状调研产出 |
 | 2026-05-06 | M0 | 基线现状调研 | 调研报告写入主计划 §2 | AI/主程 | 关键发现：DB 已无 `iot_device` 表；`access` 后端已混用 `IbmsDeviceMapper` |
 | 2026-05-06 | M0 | 三件套 commit + push（origin + chvm1） | commit `6630bc0` | AI/主程 | M0 完成，进入 M1 待启动 |
+| 2026-05-06 | M1 | 109 个 `index.vue` 全量盘点 + 自动判定 + 5 项关键页人工复核 | `docs/ibms-coverage-matrix.md` 完整版（§1~§10） + `.tmp_sql/m1-{scan,classify-v2,gen-matrix,gen-gap}.ps1` | AI/主程 | 状态分布：IBMS=4 / AGG=20 / ACCESS=21 / LEGACY=25 / MOCK=27 / SHELL=12；待改造 93 项（P0=28, P1=33, P2=32） |
 
 ---
 
