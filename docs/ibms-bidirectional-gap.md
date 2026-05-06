@@ -10,7 +10,7 @@
 ## 0. 关键发现（先看）
 
 1. **🟡聚合层 ≠ "底层未对接 IBMS"**：`IotSecurityOverviewServiceImpl`、`IbmsBacController`、`IbmsEnergyController`、`IbmsEnvController`、`IbmsLightingController` 实测代码内含大量 `IbmsDeviceMapper` / `ibms_*` 查询（仅 SecurityOverview Service 就有 27 处 `IbmsXxx` 引用）。**M1 矩阵中标为🟡聚合层的页面，绝大多数底层已经在查 ibms_***。
-2. **`AccessDashboardController` 已经提供 6 个聚合端点**（`statistics` / `real-time` / `trend` / `device-status` / `heatmap` / `abnormal-events`），但前端 `iot/access/visual-dashboard/index.vue` 至今 **0 调用**——这是"后端有，前端没用"的典型缺口。
+2. **`AccessDashboardController` 已经提供 6 个聚合端点**（`statistics` / `real-time` / `trend` / `device-status` / `heatmap` / `abnormal-events`）。**M2-A 接入 + M2-D 根因修复完成（2026-05-06，commit `0b62d00`）**：原后端实现注入的 `AccessRecordMapper`/`AccessAlarmMapper` DO 标注 `iot_access_record`/`iot_access_alarm` 表在 DB 中**不存在**，导致 statistics/real-time 端点也只是"假上线"，trend/device-status/heatmap/abnormal-events 是显式 stub。本次全部迁到真实表 `iot_access_event_log`（56448 行真数据），4 个 stub 全部落地。
 3. **真正的"后端缺"主要集中在 security 子模块**：周界 VisualBoard / 电子巡更可视化板 / 视频巡更计划 / 人员管控（7 子页全 mock）等大屏，目前都是前端硬编码假数据，**且后端尚无对应聚合 controller**。
 4. **后端 0 行表与备份表是后端富余 / 待清理资产**：`ibms_device_message`、`ibms_device_property_history`、`ibms_lighting_scene_circuit` 当前 0 行；`ibms_channel_bak_20260504_business`、`ibms_channel_bak_20260505_legacy`、`ibms_device_bak_20260505_legacy` 是 v23 治理留下的备份，应在 M2 清理评估。
 
@@ -186,7 +186,7 @@
 
 | 编号 | 业务页面 | 需求 | 后端缺什么 | 优先级 | 目标 M 阶段 |
 |---|---|---|---|---|---|
-| GAP-001 | `iot/access/visual-dashboard` | **后端实际已有！** `AccessDashboardController` 已提供 6 端点 | 🚫 非缺口 → 前端 M3 直接接入 | P0 | M3（前端任务） |
+| GAP-001 | `iot/access/visual-dashboard` | ✅ **2026-05-06 已修复**（M2-A `ed251c6` + M2-D `0b62d00`）：6 端点全部真实落地 + 前端切到 trend 端点 + 4 metric 卡片 + today/week/month/year 趋势走真数据 | ~~后端 record/alarm 表不存在，trend/device-status/heatmap/abnormal-events 是 stub~~ → 已迁到 `iot_access_event_log` 并实现 4 stub | P0 | ✅ 已完成 |
 | GAP-002 | `iot/building/building-visual-dashboard` | 按空间树聚合的设备数 / 在线率 / 告警计数 / 楼层热力 | `IbmsSpaceController` 缺 `/dashboard-stats` 聚合端点 | P0 | M2 → M4 |
 | GAP-003 | `energy/DeviceManagement` | 表具按 `meter_type/group_code` 分组统计、批量 CRUD | `IbmsEnergyController` 已有 meter CRUD，**缺分组统计端点** | P0 | M2 → M5 |
 | GAP-004 | `security/PerimeterIntrusion/VisualBoard` | 周界大屏：防区状态分布 / 24h 报警折线 / 主机在线率 | 缺 `/iot/alarm/host/dashboard` 聚合（基于 alarm_host + alarm_event） | P0 | M2 → M6 |
@@ -210,7 +210,7 @@
 
 | 资产 | 类型 | 引用 | 处置建议 |
 |---|---|---|---|
-| `AccessDashboardController.{statistics,real-time,trend,device-status,heatmap,abnormal-events}` | API（6 端点） | 前端 0 调用 | **M3 优先**：`iot/access/visual-dashboard` 直接接入，不需补后端 |
+| `AccessDashboardController.{statistics,real-time,trend,device-status,heatmap,abnormal-events}` | API（6 端点） | ✅ 已被 `iot/access/visual-dashboard` 接入（commit `0b62d00`） | ~~M3 优先：直接接入~~ → 已完成（M2-A + M2-D） |
 | `IbmsBacController.*` | API | 仅 `bac/monitor`、`bac/ledger` 用 | M4 让 `bac/alarm`、`bac/log` 接入 |
 | `IbmsEnergyController.*` | API | `energy/Overview`、`Consumption` 等已用 | M5 让 `DeviceManagement`、`SystemSettings` 接入 |
 | `IbmsEnvController.*` | API | `env/overview/sensor` 已用 | M4 让 `env/alarm`、`env/settings` 接入 |
