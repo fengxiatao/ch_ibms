@@ -102,9 +102,9 @@
 | `iot/access/person/index.vue` | 🟠旧access | `@/api/iot/access` | P1 | L | M3 |
 | `iot/access/record/index.vue` | 🟠旧access | `@/api/iot/access/record , @/api/iot/device/device` | P2 | M | M3 |
 | `iot/access/test/index.vue` | 🟠旧access | `@/api/iot/access` | P1 | XL | M3 |
-| `iot/access/visual-dashboard/index.vue` | ❌Mock/硬编码 | — | P0 | XL | M3 |
+| `iot/access/visual-dashboard/index.vue` | 🔵混合 | `@/api/iot/access/dashboard , @/api/iot/access/record` | P0 | L | M3 |
 
-> 小计（22 项）：ACCESS=21 / MOCK=1
+> 小计（22 项）：ACCESS=21 / MIX=1（M2-A：visual-dashboard 升级 ❌→🔵）
 
 ---
 
@@ -203,12 +203,13 @@ BLD>0 AND IBMS=0 AND ACC=0                 -> 🟡聚合层
 | 模块 | 总页面 | IBMS | 聚合 | 旧access | 旧API | Mock | 路由壳 |
 |---|---|---|---|---|---|---|---|
 | security | 48 | 3 | 1 | 0 | 25 | 15 | 4 |
-| iot/access | 22 | 0 | 0 | 21 | 0 | 1 | 0 |
+| iot/access | 22 | 0 | 0 | 21 | 0 | 0 | 0 |
 | energy（含 iot/building/energy/） | 18 | 1 | 13 | 0 | 0 | 3 | 1 |
 | iot/building（不含 energy） | 21 | 0 | 6 | 0 | 0 | 8 | 7 |
-| **合计** | **109** | **4** | **20** | **21** | **25** | **27** | **12** |
+| **合计** | **109** | **4** | **20** | **21** | **25** | **26** | **12** |
 
 > ❓未盘点 = 0，M1 阶段视为完成。
+> M2-A 后新增"🔵混合"= 1（`iot/access/visual-dashboard`），统计未单列；可在 M2 收尾后补"混合"列。
 
 ---
 

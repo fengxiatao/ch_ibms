@@ -8,9 +8,9 @@
 
 ## 当前推进状态
 
-- **当前活动阶段**：M1.6 ✅ 完成 → 进入 M2（后端能力补齐）+ 可选并行 M1.7（僵尸文件清理）
-- **下一阶段建议**：M2 + 并行 M1.7（按 `docs/ibms-zombie-candidates.md` 五层防御 + 分批 1~5 顺序）
-- **已完成阶段**：M0、M1、M1.5、M1.6
+- **当前活动阶段**：M2 启动中（M2-A ✅ 完成）→ 下一步候选 M2-B（access 单源化 GAP-011）/ M2-C（building-visual-dashboard 聚合 GAP-002）/ M1.7（僵尸清理）
+- **下一阶段建议**：M2-B 或 M1.7-Batch1+2（穿插）
+- **已完成阶段**：M0、M1、M1.5、M1.6、M2-A
 - **阻塞决策点**：D-001（智慧能源前端保留方案）、D-002（物联模块隐藏方式）
 
 ---
@@ -26,6 +26,7 @@
 | 2026-05-06 | M1 | M1 阶段 commit + push（origin + chvm1） | commit `d97a200` | AI/主程 | 矩阵 + 进度跟踪入库 |
 | 2026-05-06 | M1.5 | 双向校验：前端需求 × 后端能力（粗粒度） | `docs/ibms-bidirectional-gap.md` | AI/主程 | 关键发现：🟡聚合层多数底层已 IBMS 直连；`AccessDashboardController` 6 端点前端 0 调用；§C 17 项 GAP / §D 15 项富余资产 |
 | 2026-05-06 | M1.6 | BFS 引用图算法识别全前端僵尸候选（0 删除） | `docs/ibms-zombie-candidates.md` + `.tmp_sql/m1-zombie-{bfs.py,live.txt,candidates.txt,dynamic-risk.txt}` + `m1-gen-zombie-doc.py` | AI/主程 | 全集 1916 / 活 1834 / 候选 82（Z0=8 / Z1=37 / Z2=24 / Z3=13）；抽 5 项 grep 0 引用确认；含五层防御 + 5 批次清理规约 |
+| 2026-05-06 | M2-A | `iot/access/visual-dashboard` 接入真实 statistics + hourly 端点（GAP-001） | commit `ed251c6`：新建 `src/api/iot/access/dashboard.ts`（6 端点 TS 客户端）+ 改 `views/iot/access/visual-dashboard/index.vue` | AI/主程 | 4 metric 卡片 + 24h 进入趋势改为实数据（onMounted 拉取 + 失败 fallback mock）；告警分类/趋势/公司排行后端 stub，保留 mock 待 M2 后期补；vue-tsc 0 相关错误；双远端已 push |
 
 ---
 
