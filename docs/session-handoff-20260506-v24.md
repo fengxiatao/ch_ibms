@@ -179,4 +179,33 @@ Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
 - `.cursor/rules/14-local-build.mdc`  本机构建硬规则（v25 候选 #1 待补 mvn 静默失败陷阱）
 - `AGENTS.md`  AI Agent 项目承接规范（六大锚点）
 - 本文件  v24 完整闭环 handoff
+
+---
+
+## 10. v25+ 长期治理计划入口（IBMS 统一数据源）
+
+**目标**：让 4 个业务模块（智慧安防/通行/能源/建筑）的所有设备/空间/通道/状态展示**100% 来源于"智慧物联"模块运维配置**，最终物联模块可隐藏、业务模块独立交付客户。
+
+**新会话承接顺序**（必读）：
+
+1. `AGENTS.md`
+2. `docs/ibms-unified-data-source-plan.md` 主计划（M0~M7 阶段路线图）
+3. `docs/ibms-coverage-matrix.md` 覆盖矩阵（每页面对接现状）
+4. `docs/ibms-unified-progress.md` 进度跟踪（append-only）
+5. 本 handoff（v24）
+
+**当前阶段**：M0 已完成（计划基线落地），下一步进入 M1（完整盘点 50+ vue 页面）。
+
+**5 大核心断点**（详见主计划 §2.3）：
+
+1. 智慧通行 access 模块前后端双轨（IotDeviceDO + IbmsDeviceDO）
+2. 3 个可视化大屏完全 mock（`access/visual-dashboard`、`building-visual-dashboard`、`energy/DeviceManagement`）
+3. 智慧能源前端两套并存（`views/energy/` 与 `views/iot/building/energy/`）
+4. 业务大类 `groupCode/systemCode` 筛选机制使用率低
+5. SecurityOverview 等聚合层底层未必查 ibms_*
+
+**待决策点**：
+
+- D-001：智慧能源前端保留方案（`views/energy/` vs `views/iot/building/energy/`，M5 前置）
+- D-002：物联模块隐藏方式（菜单权限 vs 环境变量，M7 前置）
 - `docs/session-handoff-20260506-v23.md`  上一份 handoff
