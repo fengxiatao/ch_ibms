@@ -21,6 +21,7 @@
 |---|---|---|---|---|---|
 | 2026-05-06 | M0 | 创建主计划 + 覆盖矩阵 + 进度跟踪三件套 | `docs/ibms-unified-data-source-plan.md` / `docs/ibms-coverage-matrix.md` / 本文件 | AI/主程 | 基于本日五大模块对接现状调研产出 |
 | 2026-05-06 | M0 | 基线现状调研 | 调研报告写入主计划 §2 | AI/主程 | 关键发现：DB 已无 `iot_device` 表；`access` 后端已混用 `IbmsDeviceMapper` |
+| 2026-05-06 | M0 | 三件套 commit + push（origin + chvm1） | commit `6630bc0` | AI/主程 | M0 完成，进入 M1 待启动 |
 
 ---
 
