@@ -4,8 +4,10 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
+import cn.iocoder.yudao.module.iot.core.enums.IotDeviceMessageMethodEnum;
 import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
 import cn.iocoder.yudao.module.iot.core.gateway.dto.DeviceStateChangeMessage;
+import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageBus;
 import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageSubscriber;
 import cn.iocoder.yudao.module.iot.core.messagebus.topics.IotMessageTopics;
@@ -23,6 +25,7 @@ import cn.iocoder.yudao.module.iot.service.access.IotAccessAuthDispatchService;
 import cn.iocoder.yudao.module.iot.service.changhui.upgrade.ChanghuiUpgradeService;
 import cn.iocoder.yudao.module.iot.service.ibms.channel.IbmsChannelService;
 import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceGatewaySupportService;
+import cn.iocoder.yudao.module.iot.service.rule.data.IotDataRuleService;
 import cn.iocoder.yudao.module.iot.service.device.activation.DeviceActivationStateManager;
 import cn.iocoder.yudao.module.iot.service.device.discovery.DiscoveredDeviceService;
 import cn.iocoder.yudao.module.iot.websocket.DeviceMessagePushService;
@@ -33,10 +36,12 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -111,6 +116,14 @@ public class DeviceStateChangeConsumer implements IotMessageSubscriber<DeviceSta
 
     @Resource
     private IbmsDeviceGatewaySupportService ibmsDeviceGatewaySupportService;
+
+    /**
+     * 数据流转规则服务（v21 新增：补齐 STATE_UPDATE 路径，与 DeviceEventConsumer / DeviceServiceResultConsumer 行为一致）
+     * 用 @Lazy 避免与 IotDataRuleService -> ... 形成的潜在循环依赖
+     */
+    @Resource
+    @Lazy
+    private IotDataRuleService dataRuleService;
 
     /**
      * 构造函数
@@ -253,6 +266,18 @@ public class DeviceStateChangeConsumer implements IotMessageSubscriber<DeviceSta
             // 8. 长辉设备状态变化时执行长辉特定逻辑
             if (isChanghuiDevice(deviceType)) {
                 handleChanghuiStateChange(deviceId, newState, message);
+            }
+
+            // 9. 触发数据流转规则（v21 修复：之前 DeviceEventConsumer / DeviceServiceResultConsumer 已挂，
+            //     STATE_UPDATE 路径未挂导致 thing.state.update 类型规则永不触发）
+            try {
+                if (dataRuleService != null) {
+                    IotDeviceMessage stateMsg = buildStateUpdateMessage(message);
+                    dataRuleService.executeDataRule(stateMsg);
+                }
+            } catch (Exception e) {
+                log.error("[DeviceStateChangeConsumer] 触发数据流转规则失败: deviceId={}, newState={}",
+                        deviceId, newState, e);
             }
 
             log.info("[DeviceStateChangeConsumer] 状态变更处理完成: deviceId={}, deviceType={}, newState={}",
@@ -684,6 +709,31 @@ public class DeviceStateChangeConsumer implements IotMessageSubscriber<DeviceSta
         }
     }
     
+    /**
+     * 将 DeviceStateChangeMessage 适配为 IotDeviceMessage（method=thing.state.update），用于喂给数据流转规则引擎
+     *
+     * <p>规则引擎按 IotDeviceMessage 的 method/deviceId/identifier 进行匹配，需要先做一层适配。</p>
+     *
+     * @param src 状态变更消息
+     * @return 适配后的设备消息
+     */
+    IotDeviceMessage buildStateUpdateMessage(DeviceStateChangeMessage src) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("state", src.getNewState());
+        params.put("stateName", src.getNewStateName());
+        params.put("previousState", src.getPreviousState());
+        params.put("reason", src.getReason());
+        IotDeviceMessage msg = IotDeviceMessage.requestOf(
+                src.getRequestId(),
+                IotDeviceMessageMethodEnum.STATE_UPDATE.getMethod(),
+                params);
+        msg.setDeviceId(src.getDeviceId());
+        msg.setDeviceName(src.getDeviceName());
+        msg.setProductId(src.getProductId());
+        msg.setTenantId(src.getTenantId());
+        return msg;
+    }
+
     /**
      * 同步报警主机状态
      * 
