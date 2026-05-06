@@ -112,6 +112,7 @@ public class DeviceCommandExecutorService {
      *
      * @param handler    设备处理器
      * @param deviceId   设备ID
+     * @param tenantId   租户ID（v24 新增），从请求透传到 reply，避免下游 NPE
      * @param deviceType 设备类型
      * @param command    设备命令
      * @param requestId  请求ID
@@ -122,6 +123,7 @@ public class DeviceCommandExecutorService {
     public CompletableFuture<CommandResult> executeAsync(
             DeviceHandler handler,
             Long deviceId,
+            Long tenantId,
             String deviceType,
             DeviceCommand command,
             String requestId,
@@ -161,7 +163,7 @@ public class DeviceCommandExecutorService {
                 finalResult = CommandResult.failure("异步执行异常: " + throwable.getMessage());
             }
             recordCommandMetric(deviceType, command.getCommandType(), finalResult, params);
-            publishCommandResult(requestId, deviceId, method, params, finalResult);
+            publishCommandResult(requestId, deviceId, tenantId, method, params, finalResult);
         });
     }
 
@@ -273,7 +275,13 @@ public class DeviceCommandExecutorService {
         return sb.toString();
     }
 
-    private void publishCommandResult(String requestId, Long deviceId, String method,
+    /**
+     * 发布命令执行结果。
+     *
+     * <p>v24 修复：增加 {@code tenantId} 参数，从请求透传到 reply 消息，
+     * 避免 reply 路径下游（如 {@code IotHttpDataSinkAction}）因 {@code tenantId == null} 抛 NPE。</p>
+     */
+    private void publishCommandResult(String requestId, Long deviceId, Long tenantId, String method,
                                       Map<String, Object> params, CommandResult result) {
         try {
             // 统一补齐 code/msg，避免下游判空导致结果丢失
@@ -286,6 +294,7 @@ public class DeviceCommandExecutorService {
             IotDeviceMessage resultMessage = IotDeviceMessage.builder()
                     .requestId(requestId)
                     .deviceId(deviceId)
+                    .tenantId(tenantId)
                     .method(method)
                     .params(params)
                     .code(code)

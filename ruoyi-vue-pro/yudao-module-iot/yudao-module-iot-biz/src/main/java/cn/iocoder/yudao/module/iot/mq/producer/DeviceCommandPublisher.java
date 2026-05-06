@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.iot.mq.producer;
 
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageBus;
 import cn.iocoder.yudao.module.iot.core.messagebus.topics.IotMessageTopics;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
@@ -64,9 +65,27 @@ public class DeviceCommandPublisher {
 
     /**
      * 发布设备命令（可指定 requestId，用于与 {@link cn.iocoder.yudao.module.iot.mq.manager.DeviceCommandResponseManager} 预先注册一致）
+     *
+     * <p>tenantId 优先级（高 → 低）：当前 TenantContextHolder → null（由调用方使用下方 6 参重载显式传）</p>
      */
     public String publishCommand(String deviceType, Long deviceId,
                                   String commandType, Map<String, Object> params, String fixedRequestId) {
+        return publishCommand(deviceType, deviceId, commandType, params, fixedRequestId, null);
+    }
+
+    /**
+     * 发布设备命令（可指定 requestId 与 tenantId，v24 新增）
+     *
+     * <p>当调用方所在线程的 {@link TenantContextHolder} 不可靠（如某些过滤器豁免、@PreAuthorize 切换上下文导致为 null）时，
+     * 可通过 explicitTenantId 显式传入设备所属租户（推荐从 ibms_device.tenant_id / iot_device.tenant_id 取）。</p>
+     *
+     * <p>tenantId 优先级（高 → 低）：explicitTenantId → TenantContextHolder.getTenantId() → null</p>
+     *
+     * @param explicitTenantId 显式租户 ID；若为 null，则回退到 TenantContextHolder
+     */
+    public String publishCommand(String deviceType, Long deviceId,
+                                  String commandType, Map<String, Object> params,
+                                  String fixedRequestId, Long explicitTenantId) {
         // 参数校验
         if (deviceType == null || deviceType.isEmpty()) {
             throw new IllegalArgumentException("deviceType 不能为空");
@@ -90,6 +109,12 @@ public class DeviceCommandPublisher {
         IotDeviceMessage message = IotDeviceMessage.requestOf(requestId, commandType, messageParams);
         message.setDeviceId(deviceId);
         message.setMessageVersion(1);
+        // v24 修复：tenantId 优先用显式传入值，回退到 TenantContextHolder
+        // 避免 reply 路径下游 (IotDataRuleServiceImpl/IotHttpDataSinkAction) 因 tenantId == null 抛 NPE
+        Long resolvedTenantId = explicitTenantId != null
+                ? explicitTenantId
+                : TenantContextHolder.getTenantId();
+        message.setTenantId(resolvedTenantId);
         if (messageParams != null) {
             Object brand = messageParams.get("brand");
             if (brand != null) {

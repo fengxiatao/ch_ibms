@@ -178,16 +178,19 @@ public class DeviceCommandConsumer implements IotMessageSubscriber<IotMessageEnv
             log.debug("[DeviceCommandConsumer] 解析命令参数: deviceId={}, deviceType={}, commandType={}",
                     deviceId, deviceType, commandType);
 
+            // v24 修复：透传请求侧 tenantId，便于 reply 路径下游（如 IotHttpDataSinkAction）使用
+            Long tenantId = message.getTenantId();
+
             // 验证必要参数
             if (deviceType == null || deviceType.trim().isEmpty()) {
                 log.error("[DeviceCommandConsumer] 设备类型为空: deviceId={}", deviceId);
-                publishCommandResult(requestId, deviceId, method, params, CommandResult.failure("设备类型为空"));
+                publishCommandResult(requestId, deviceId, tenantId, method, params, CommandResult.failure("设备类型为空"));
                 return;
             }
 
             if (commandType == null || commandType.trim().isEmpty()) {
                 log.error("[DeviceCommandConsumer] 命令类型为空: deviceId={}", deviceId);
-                publishCommandResult(requestId, deviceId, method, params, CommandResult.failure("命令类型为空"));
+                publishCommandResult(requestId, deviceId, tenantId, method, params, CommandResult.failure("命令类型为空"));
                 return;
             }
 
@@ -195,7 +198,7 @@ public class DeviceCommandConsumer implements IotMessageSubscriber<IotMessageEnv
             DeviceHandler handler = pluginRegistry.getHandler(deviceType);
             if (handler == null) {
                 log.error("[DeviceCommandConsumer] 未找到设备处理器: deviceId={}, deviceType={}", deviceId, deviceType);
-                publishCommandResult(requestId, deviceId, method, params, CommandResult.failure("未找到设备处理器: " + deviceType));
+                publishCommandResult(requestId, deviceId, tenantId, method, params, CommandResult.failure("未找到设备处理器: " + deviceType));
                 return;
             }
 
@@ -211,6 +214,7 @@ public class DeviceCommandConsumer implements IotMessageSubscriber<IotMessageEnv
             commandExecutorService.executeAsync(
                     handler,
                     deviceId,
+                    tenantId,
                     deviceType,
                     command,
                     requestId,
@@ -223,7 +227,7 @@ public class DeviceCommandConsumer implements IotMessageSubscriber<IotMessageEnv
 
         } catch (Exception e) {
             log.error("[DeviceCommandConsumer] 命令处理异常: deviceId={}", deviceId, e);
-            publishCommandResult(requestId, deviceId, method, parseParams(message),
+            publishCommandResult(requestId, deviceId, message.getTenantId(), method, parseParams(message),
                     CommandResult.failure("命令处理异常: " + e.getMessage()));
         }
     }
@@ -252,6 +256,10 @@ public class DeviceCommandConsumer implements IotMessageSubscriber<IotMessageEnv
                 message.setVendorKey(extractString(map, "vendorKey"));
                 message.setPluginId(extractString(map, "pluginId"));
                 message.setMessageVersion(extractInteger(map, "messageVersion"));
+                // v24 修复：补提取 tenantId/id，避免 reply 路径下游 (IotHttpDataSinkAction 等) tenantId NPE
+                // 注：reportTime 是 LocalDateTime 类型，不在此处提取（biz 侧通常会重新生成）
+                message.setTenantId(extractLong(map, "tenantId"));
+                message.setId(extractString(map, "id"));
                 return message;
             } catch (Exception e) {
                 log.warn("[DeviceCommandConsumer] 解析 Map payload 失败: {}", e.getMessage());
@@ -339,8 +347,11 @@ public class DeviceCommandConsumer implements IotMessageSubscriber<IotMessageEnv
 
     /**
      * 发布命令执行结果
+     *
+     * <p>v24 修复：增加 {@code tenantId} 参数，从请求消息透传到 reply 消息，
+     * 避免 reply 路径下游（如 {@code IotHttpDataSinkAction}）因 {@code tenantId == null} 抛 NPE。</p>
      */
-    private void publishCommandResult(String requestId, Long deviceId, String method,
+    private void publishCommandResult(String requestId, Long deviceId, Long tenantId, String method,
                                       Map<String, Object> params, CommandResult result) {
         try {
             // 将请求的 method/params 一并回传，便于 biz 侧提取 deviceType、serviceIdentifier 等信息
@@ -355,6 +366,7 @@ public class DeviceCommandConsumer implements IotMessageSubscriber<IotMessageEnv
             IotDeviceMessage resultMessage = IotDeviceMessage.builder()
                     .requestId(requestId)
                     .deviceId(deviceId)
+                    .tenantId(tenantId)
                     .method(method)
                     .params(params)
                     .code(code)

@@ -171,7 +171,11 @@ public class IbmsChannelServiceImpl implements IbmsChannelService {
         CompletableFuture<IotDeviceMessage> future = responseManager.registerRequest(requestId);
 
         Map<String, Object> params = buildNvrCommandParams(ibmsDevice);
-        deviceCommandPublisher.publishCommand(DEVICE_TYPE_NVR, ibmsDeviceId, "QUERY_CHANNELS", params, requestId);
+        // v24 修复：显式传入 ibms_device.tenant_id，避免 publish 时 TenantContextHolder 不可靠
+        // 导致 reply 路径下游 IotHttpDataSinkAction 因 message.tenantId == null 抛 NPE
+        deviceCommandPublisher.publishCommand(
+                DEVICE_TYPE_NVR, ibmsDeviceId, "QUERY_CHANNELS", params, requestId,
+                ibmsDevice.getTenantId());
 
         IotDeviceMessage response = responseManager.waitForResponse(requestId, future, SYNC_TIMEOUT_SECONDS);
         if (response == null || (response.getCode() != null && response.getCode() != 0)) {
