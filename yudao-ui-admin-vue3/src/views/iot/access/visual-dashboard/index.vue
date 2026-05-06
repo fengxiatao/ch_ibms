@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import type { EChartsOption } from 'echarts'
 import dayjs from 'dayjs'
+import {
+  getAccessDashboardStatistics,
+  type AccessDashboardStatisticsRespVO
+} from '@/api/iot/access/dashboard'
+import { getHourlyTrafficStatistics } from '@/api/iot/access/record'
 
 defineOptions({ name: 'AccessVisualDashboard' })
 
@@ -26,6 +31,12 @@ const customData = ref<ChartDataSet | null>(null)
 
 const showAccess = ref(true)
 const showReject = ref(true)
+
+// === 真实数据（M2-A 接入 GAP-001：AccessDashboardController.statistics + AccessRecordController.hourly）===
+// 其余视图 / 图表（week/month/year 趋势、告警分类、告警趋势、公司排行）后端尚无聚合端点，
+// 暂保留 mock，待 M2 后期补全；详见 docs/ibms-bidirectional-gap.md GAP-001/GAP-007。
+const liveStats = ref<AccessDashboardStatisticsRespVO | null>(null)
+const liveTodayHourly = ref<AccessTrendData | null>(null)
 
 const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN').format(value)
 const sum = (arr: number[]) => arr.reduce((acc, cur) => acc + cur, 0)
@@ -232,24 +243,86 @@ const buildCustomData = (startDate: string, endDate: string): ChartDataSet | nul
   }
 }
 
+const todayDataSet = computed<ChartDataSet>(() => {
+  // 用真实 hourly 替换 today 的 accessTrend；其余三块（告警分类/告警趋势/公司排行）保留 mock。
+  if (!liveTodayHourly.value) return builtinData.today
+  return {
+    ...builtinData.today,
+    accessTrend: liveTodayHourly.value
+  }
+})
+
 const effectiveData = computed<ChartDataSet>(() => {
-  if (dateRange.value === 'custom') return customData.value ?? builtinData.today
+  if (dateRange.value === 'today') return todayDataSet.value
+  if (dateRange.value === 'custom') return customData.value ?? todayDataSet.value
   return builtinData[dateRange.value]
 })
 
 const metrics = computed(() => {
-  const accessTotal = sum(effectiveData.value.accessTrend.accessData)
+  const stats = liveStats.value
+  const accessTotal = stats?.todayAccessCount ?? sum(effectiveData.value.accessTrend.accessData)
+  // 在岗人员通行人次：后端暂未细分员工/访客/车辆，使用 accessTypeDistribution.employee 优先；
+  // 否则按 92% 估算（mock fallback）。
+  const staffAccessTotal =
+    stats?.accessTypeDistribution?.employee ?? Math.floor(accessTotal * 0.92)
+  const alertTotal = stats?.todayAlarmCount ?? 48
+  const devicesTotal = stats?.totalDeviceCount ?? 28
+  const devicesOnline = stats?.onlineDeviceCount ?? 26
+  const devicesOffline = Math.max(0, devicesTotal - devicesOnline)
   return {
     accessTotal,
-    staffAccessTotal: Math.floor(accessTotal * 0.92),
-    alertTotal: 48,
-    devicesTotal: 28,
-    devicesOnline: 26,
-    devicesOffline: 2
+    staffAccessTotal,
+    alertTotal,
+    devicesTotal,
+    devicesOnline,
+    devicesOffline
   }
 })
 
-const growth = computed(() => ({ total: 12.8, staff: 8.5, alert: 15.3, device: 6.2 }))
+const growth = computed(() => {
+  const stats = liveStats.value
+  return {
+    total: stats?.accessCountGrowth ?? 12.8,
+    staff: stats?.visitorCountGrowth ?? 8.5,
+    alert: 15.3, // 后端暂无告警增长率字段
+    device: stats?.vehicleCountGrowth ?? 6.2
+  }
+})
+
+// === onMounted：拉取真实统计 + 24h 趋势 ===
+const loadLiveData = async () => {
+  try {
+    liveStats.value = await getAccessDashboardStatistics()
+  } catch (err) {
+    console.warn('[AccessVisualDashboard] statistics 接口失败，回退至 mock 数据', err)
+  }
+  try {
+    const hourly = await getHourlyTrafficStatistics({})
+    if (Array.isArray(hourly) && hourly.length > 0) {
+      // 后端按 0~23 小时分组，可能不连续，需补齐 24 个槽位
+      const inByHour = new Array<number>(24).fill(0)
+      const outByHour = new Array<number>(24).fill(0)
+      for (const row of hourly) {
+        const h = Number(row?.hour)
+        if (Number.isInteger(h) && h >= 0 && h < 24) {
+          inByHour[h] = Number(row?.inCount ?? 0)
+          outByHour[h] = Number(row?.outCount ?? 0)
+        }
+      }
+      liveTodayHourly.value = {
+        labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
+        accessData: inByHour,
+        rejectData: outByHour // 注：后端暂用 outCount 表示出场，非"拒绝"。toggle 仍可用
+      }
+    }
+  } catch (err) {
+    console.warn('[AccessVisualDashboard] hourly 接口失败，回退至 mock 数据', err)
+  }
+}
+
+onMounted(() => {
+  loadLiveData()
+})
 
 const accessTrendTitle = computed(() => {
   if (dateRange.value === 'today') return '24小时进入趋势'
