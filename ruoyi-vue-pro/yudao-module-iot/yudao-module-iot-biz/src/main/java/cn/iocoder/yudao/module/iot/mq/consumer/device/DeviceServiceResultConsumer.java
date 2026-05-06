@@ -9,9 +9,8 @@ import cn.iocoder.yudao.module.iot.mq.consumer.device.handler.DeviceResultHandle
 import cn.iocoder.yudao.module.iot.mq.manager.DeviceCommandResponseManager;
 import cn.iocoder.yudao.module.iot.service.channel.ChannelSyncRetryTemplate;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
-import cn.iocoder.yudao.module.iot.service.rule.data.IotDataRuleService;
+import cn.iocoder.yudao.module.iot.service.rule.data.IotDataRuleDispatcher;
 import jakarta.annotation.Resource;
-import org.springframework.context.annotation.Lazy;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService.AccessChannelSyncInfo;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService.AccessChannelSyncResult;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService.NvrChannelSyncInfo;
@@ -85,11 +84,10 @@ public class DeviceServiceResultConsumer implements IotMessageSubscriber<IotDevi
     private final DeviceActivationStateManager activationStateManager;
 
     /**
-     * 数据流转规则服务（v19 修复：service.invoke reply 路径也挂上数据流转）
+     * 数据流转规则统一分发器（v22 抽切面）
      */
     @Resource
-    @Lazy
-    private IotDataRuleService dataRuleService;
+    private IotDataRuleDispatcher dataRuleDispatcher;
 
     /**
      * 构造函数
@@ -204,14 +202,8 @@ public class DeviceServiceResultConsumer implements IotMessageSubscriber<IotDevi
             routeToHandler(deviceType, message);
 
             // 2.5 触发数据流转规则（v19 顺手挂：service.invoke reply 也走 DataSink）
-            try {
-                if (dataRuleService != null) {
-                    dataRuleService.executeDataRule(message);
-                }
-            } catch (Exception ex) {
-                log.error("[DeviceServiceResultConsumer] 触发数据流转规则失败: deviceId={}, requestId={}",
-                        deviceId, requestId, ex);
-            }
+            // v22 抽切面：错误处理统一委托给 IotDataRuleDispatcher
+            dataRuleDispatcher.dispatch(message, "DeviceServiceResultConsumer");
 
             // 3. 推送到前端
             pushToFrontend(deviceId, deviceType, requestId, success, message);

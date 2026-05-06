@@ -25,7 +25,7 @@ import cn.iocoder.yudao.module.iot.service.access.IotAccessAuthDispatchService;
 import cn.iocoder.yudao.module.iot.service.changhui.upgrade.ChanghuiUpgradeService;
 import cn.iocoder.yudao.module.iot.service.ibms.channel.IbmsChannelService;
 import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceGatewaySupportService;
-import cn.iocoder.yudao.module.iot.service.rule.data.IotDataRuleService;
+import cn.iocoder.yudao.module.iot.service.rule.data.IotDataRuleDispatcher;
 import cn.iocoder.yudao.module.iot.service.device.activation.DeviceActivationStateManager;
 import cn.iocoder.yudao.module.iot.service.device.discovery.DiscoveredDeviceService;
 import cn.iocoder.yudao.module.iot.websocket.DeviceMessagePushService;
@@ -36,7 +36,6 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
@@ -118,12 +117,10 @@ public class DeviceStateChangeConsumer implements IotMessageSubscriber<DeviceSta
     private IbmsDeviceGatewaySupportService ibmsDeviceGatewaySupportService;
 
     /**
-     * 数据流转规则服务（v21 新增：补齐 STATE_UPDATE 路径，与 DeviceEventConsumer / DeviceServiceResultConsumer 行为一致）
-     * 用 @Lazy 避免与 IotDataRuleService -> ... 形成的潜在循环依赖
+     * 数据流转规则统一分发器（v22 抽切面：三个 consumer 统一调用口）
      */
     @Resource
-    @Lazy
-    private IotDataRuleService dataRuleService;
+    private IotDataRuleDispatcher dataRuleDispatcher;
 
     /**
      * 构造函数
@@ -270,15 +267,9 @@ public class DeviceStateChangeConsumer implements IotMessageSubscriber<DeviceSta
 
             // 9. 触发数据流转规则（v21 修复：之前 DeviceEventConsumer / DeviceServiceResultConsumer 已挂，
             //     STATE_UPDATE 路径未挂导致 thing.state.update 类型规则永不触发）
-            try {
-                if (dataRuleService != null) {
-                    IotDeviceMessage stateMsg = buildStateUpdateMessage(message);
-                    dataRuleService.executeDataRule(stateMsg);
-                }
-            } catch (Exception e) {
-                log.error("[DeviceStateChangeConsumer] 触发数据流转规则失败: deviceId={}, newState={}",
-                        deviceId, newState, e);
-            }
+            // v22 抽切面：错误处理统一委托给 IotDataRuleDispatcher；build 适配仍留在本 consumer（其他 consumer 不需要）
+            IotDeviceMessage stateMsg = buildStateUpdateMessage(message);
+            dataRuleDispatcher.dispatch(stateMsg, "DeviceStateChangeConsumer");
 
             log.info("[DeviceStateChangeConsumer] 状态变更处理完成: deviceId={}, deviceType={}, newState={}",
                     deviceId, deviceType, message.getNewStateName());
