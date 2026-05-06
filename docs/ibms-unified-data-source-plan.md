@@ -71,6 +71,25 @@
   3. 输出"高/中/低"3 档优先级的差距清单
 - **风险**：vue 文件数量较多，初次扫描可能漏 sub-tab 类页面 → 用 `Get-ChildItem -Recurse -Filter index.vue` 全量扫，配合关键 API 字符串 grep 二次校验
 
+### M1.5：双向校验（前端需求 × 后端能力，本会话已完成）
+
+- **目标**：识别"前端要而后端没有"（→ M2 补全）+ "后端有而前端没用"（→ M3~M6 接入）的双向缺口
+- **输出物**：`docs/ibms-bidirectional-gap.md`
+- **关键发现**：
+  1. 矩阵中标 🟡 聚合层的页面，**底层服务实测已查 ibms_***（如 `IotSecurityOverviewServiceImpl` 27 处 `IbmsXxx` 引用、`IbmsBac/Energy/Env/Lighting Controller` 全是 IBMS 直连）
+  2. `AccessDashboardController` 已提供 6 个聚合端点，但前端 `iot/access/visual-dashboard` **0 调用** —— 是"后端有，前端没用"，不需补后端
+  3. 真正缺后端的：周界 VisualBoard / 电子巡更可视化板 / 视频巡更大屏 / `PersonnelControl/*` 7 子页 / 建筑大屏空间聚合 等约 12 项 GAP
+- **DoD**：✅ `docs/ibms-bidirectional-gap.md` § A/§ B/§ C/§ D 完整 + § C 17 项 GAP 编号 + § D 15 项富余资产处置建议
+
+### M1.6：全前端僵尸文件候选清单（本会话已完成，0 删除）
+
+- **目标**：用 BFS 引用图算法识别"任意活路径不可达"的文件作为清理候选；本会话仅产出清单
+- **算法**：活根集合（含 `views/**`、`components/DiyEditor/**`、5 个目录树）→ BFS 标可达 → 全集 - 可达 = 僵尸
+- **输出物**：`docs/ibms-zombie-candidates.md` + `.tmp_sql/m1-zombie-{bfs.py,live.txt,candidates.txt}`
+- **结果**：全集 1916 / 活 1834 / 候选 82 → 分级 **Z0=8 / Z1=37 / Z2=24 / Z3=13**
+- **DoD**：✅ BFS 脚本落盘可重复 + Z0~Z3 分级 + Z1 抽样 5 项 0 引用复核 + **0 文件删除**
+- **后续 M1.7（下次会话）**：按 `docs/ibms-zombie-candidates.md` 五层防御（build → vue-tsc → snapshot 分支 → 分批 commit → playwright smoke）+ 分批 1~5 顺序清理
+
 ### M2：后端能力补齐（多次会话，预估 1~2 个工作日）
 
 - **目标**：让所有"业务模块需要的数据"都能从 ibms_* 表查到

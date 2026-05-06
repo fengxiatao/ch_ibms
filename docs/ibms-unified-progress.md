@@ -8,9 +8,9 @@
 
 ## 当前推进状态
 
-- **当前活动阶段**：M1（完整盘点 ✅ 完成）→ M1.5 双向校验 + M1.6 僵尸候选（本会话进行中）
-- **下一阶段建议**：M2（后端能力补齐）
-- **已完成阶段**：M0、M1
+- **当前活动阶段**：M1.6 ✅ 完成 → 进入 M2（后端能力补齐）+ 可选并行 M1.7（僵尸文件清理）
+- **下一阶段建议**：M2 + 并行 M1.7（按 `docs/ibms-zombie-candidates.md` 五层防御 + 分批 1~5 顺序）
+- **已完成阶段**：M0、M1、M1.5、M1.6
 - **阻塞决策点**：D-001（智慧能源前端保留方案）、D-002（物联模块隐藏方式）
 
 ---
@@ -23,6 +23,9 @@
 | 2026-05-06 | M0 | 基线现状调研 | 调研报告写入主计划 §2 | AI/主程 | 关键发现：DB 已无 `iot_device` 表；`access` 后端已混用 `IbmsDeviceMapper` |
 | 2026-05-06 | M0 | 三件套 commit + push（origin + chvm1） | commit `6630bc0` | AI/主程 | M0 完成，进入 M1 待启动 |
 | 2026-05-06 | M1 | 109 个 `index.vue` 全量盘点 + 自动判定 + 5 项关键页人工复核 | `docs/ibms-coverage-matrix.md` 完整版（§1~§10） + `.tmp_sql/m1-{scan,classify-v2,gen-matrix,gen-gap}.ps1` | AI/主程 | 状态分布：IBMS=4 / AGG=20 / ACCESS=21 / LEGACY=25 / MOCK=27 / SHELL=12；待改造 93 项（P0=28, P1=33, P2=32） |
+| 2026-05-06 | M1 | M1 阶段 commit + push（origin + chvm1） | commit `d97a200` | AI/主程 | 矩阵 + 进度跟踪入库 |
+| 2026-05-06 | M1.5 | 双向校验：前端需求 × 后端能力（粗粒度） | `docs/ibms-bidirectional-gap.md` | AI/主程 | 关键发现：🟡聚合层多数底层已 IBMS 直连；`AccessDashboardController` 6 端点前端 0 调用；§C 17 项 GAP / §D 15 项富余资产 |
+| 2026-05-06 | M1.6 | BFS 引用图算法识别全前端僵尸候选（0 删除） | `docs/ibms-zombie-candidates.md` + `.tmp_sql/m1-zombie-{bfs.py,live.txt,candidates.txt,dynamic-risk.txt}` + `m1-gen-zombie-doc.py` | AI/主程 | 全集 1916 / 活 1834 / 候选 82（Z0=8 / Z1=37 / Z2=24 / Z3=13）；抽 5 项 grep 0 引用确认；含五层防御 + 5 批次清理规约 |
 
 ---
 
