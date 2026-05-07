@@ -39,34 +39,6 @@ public final class IbmsDeviceLedgerRuntimeHelper {
     }
 
     /**
-     * 供仍依赖 {@link IotDeviceDO} 的通道同步等逻辑使用：用 IBMS 台账 + 运行态拼出与历史 NVR 设备 config 等价的壳对象。
-     */
-    public static IotDeviceDO buildLegacyNvrDeviceShell(IbmsDeviceDO ibms, IbmsDeviceRuntimeDO runtime) {
-        if (ibms == null) {
-            return null;
-        }
-        IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(ibms, runtime);
-        GenericDeviceConfig cfg = new GenericDeviceConfig();
-        cfg.setDeviceType("NVR");
-        String ip = StringUtils.defaultIfBlank(net.ip, "");
-        cfg.set("ipAddress", ip);
-        cfg.set("ip", ip);
-        cfg.set("username", StringUtils.defaultIfBlank(net.username, "admin"));
-        cfg.set("password", StringUtils.defaultIfBlank(net.password, "admin123"));
-        cfg.set("httpPort", net.httpPort);
-        cfg.set("rtspPort", net.rtspPort);
-        IotDeviceDO d = new IotDeviceDO();
-        d.setId(ibms.getId());
-        d.setDeviceName(ibms.getName());
-        d.setNickname(ibms.getNickname());
-        d.setProductId(ibms.getIbmsProductId() != null ? ibms.getIbmsProductId() : 4L);
-        d.setConfig(cfg);
-        Integer st = resolveDeviceState(ibms, runtime);
-        d.setState(st);
-        return d;
-    }
-
-    /**
      * 供 {@link cn.iocoder.yudao.module.iot.collector.camera.UniversalCameraCollector} 等仍依赖 {@link IotDeviceDO} 的轮询逻辑使用。
      */
     public static IotDeviceDO buildLegacyCameraCollectorShell(IbmsDeviceDO ibms, IbmsDeviceRuntimeDO runtime) {

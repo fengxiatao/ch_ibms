@@ -21,6 +21,7 @@ import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
 import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
 import cn.iocoder.yudao.module.iot.service.channel.support.IotGisSpatialLocationBuilder;
 import cn.iocoder.yudao.module.iot.service.ibms.channel.IbmsChannelService;
+import cn.iocoder.yudao.module.iot.service.video.IbmsDeviceVideoNetworkResolver;
 import cn.iocoder.yudao.module.iot.service.video.nvr.NvrQueryService;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import jakarta.annotation.Resource;
@@ -297,12 +298,13 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
                     }
                 }
 
-                IotDeviceDO nvrForSync = IbmsDeviceLedgerRuntimeHelper.buildLegacyNvrDeviceShell(
+                // M2-D：直接解析 NVR 网络参数，不再走 buildLegacyNvrDeviceShell 的 round-trip
+                IbmsDeviceVideoNetworkResolver.NetworkParams nvrNet = IbmsDeviceVideoNetworkResolver.resolve(
                         ibmsDevice, ibmsDeviceRuntimeService.getByDeviceId(deviceId));
-                
+
                 // 同步通道（新增或更新）
                 for (var ch : sdkChannels) {
-                    syncNvrChannelToIbms(deviceId, ibmsDevice, nvrForSync, ch.toLegacyChannelDeviceForSync(deviceId));
+                    syncNvrChannelToIbms(deviceId, ibmsDevice, nvrNet, ch.toLegacyChannelDeviceForSync(deviceId));
                     syncCount++;
                 }
                 
@@ -1046,7 +1048,7 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
      */
     private void syncNvrChannelToIbms(Long nvrId,
                                       IbmsDeviceDO ibmsNvr,
-                                      IotDeviceDO nvrDevice,
+                                      IbmsDeviceVideoNetworkResolver.NetworkParams nvrNet,
                                       IotDeviceDO channelInfo) {
         // 从config中获取通道号和云台支持信息
         String configStr = null;
@@ -1120,22 +1122,12 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
             return;
         }
 
-        // 获取NVR配置信息（用于生成URL）
-        String nvrIp = DeviceConfigHelper.getIpAddress(nvrDevice);
-        String username = "admin";
-        String password = "admin123";
-        Integer rtspPort = 554;
-        Integer httpPort = 80;
-
-        if (nvrDevice.getConfig() != null) {
-            try {
-                Map<String, Object> nvrConfigMap = nvrDevice.getConfig().toMap();
-                username = nvrConfigMap.get("username") != null ? nvrConfigMap.get("username").toString() : "admin";
-                password = nvrConfigMap.get("password") != null ? nvrConfigMap.get("password").toString() : "admin123";
-                rtspPort = nvrConfigMap.get("rtspPort") != null ? Integer.parseInt(nvrConfigMap.get("rtspPort").toString()) : 554;
-                httpPort = nvrConfigMap.get("httpPort") != null ? Integer.parseInt(nvrConfigMap.get("httpPort").toString()) : 80;
-            } catch (Exception ignored) {}
-        }
+        // 获取NVR配置信息（用于生成URL）— M2-D：直接消费 NetworkParams，去除 GenericDeviceConfig round-trip
+        String nvrIp = StrUtil.blankToDefault(nvrNet.ip, "");
+        String username = StrUtil.blankToDefault(nvrNet.username, "admin");
+        String password = StrUtil.blankToDefault(nvrNet.password, "admin123");
+        int rtspPort = nvrNet.rtspPort;
+        int httpPort = nvrNet.httpPort;
 
         String streamUrlMain = generateStreamUrl(nvrIp, channelNo, "main", username, password, rtspPort);
         String streamUrlSub = generateStreamUrl(nvrIp, channelNo, "sub", username, password, rtspPort);
@@ -1749,17 +1741,14 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
             return AccessChannelSyncResult.failure("设备ID不能为空");
         }
 
-        // 2. 校验设备（IoT 全量或 IBMS NVR 壳）
+        // 2. 校验设备（IBMS 单台账）
         IbmsDeviceDO ibmsNvr = ibmsDeviceMapper.selectById(deviceId);
-        IotDeviceDO nvrDevice;
         if (ibmsNvr == null) {
             return AccessChannelSyncResult.failure("设备不存在: deviceId=" + deviceId);
         }
-        nvrDevice = IbmsDeviceLedgerRuntimeHelper.buildLegacyNvrDeviceShell(ibmsNvr,
-                ibmsDeviceRuntimeService.getByDeviceId(deviceId));
-        if (nvrDevice == null) {
-            return AccessChannelSyncResult.failure("设备不存在: deviceId=" + deviceId);
-        }
+        // M2-D：直接解析 NVR 网络参数，不再走 buildLegacyNvrDeviceShell 的 round-trip
+        IbmsDeviceVideoNetworkResolver.NetworkParams nvrNet = IbmsDeviceVideoNetworkResolver.resolve(
+                ibmsNvr, ibmsDeviceRuntimeService.getByDeviceId(deviceId));
 
         if (channelList == null) {
             channelList = new ArrayList<>();
@@ -1818,7 +1807,7 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
             }
             channelDevice.setConfig(cfg);
 
-            syncNvrChannelToIbms(deviceId, ibmsNvr, nvrDevice, channelDevice);
+            syncNvrChannelToIbms(deviceId, ibmsNvr, nvrNet, channelDevice);
 
             if (exists) {
                 updatedCount++;
