@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.iot.service.access.dto;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDateTime;
 
@@ -36,11 +37,15 @@ public final class AccessDeviceView {
     }
 
     // ===== 直通访问器（消费方有需要时直接拿原对象） =====
+    // @JsonIgnore：避免 Jackson 把 ledger/runtime 整体序列化，保持响应体与原
+    // IotDeviceDO 平铺结构兼容（业务代码仍可通过 getter 访问内部对象）。
 
+    @JsonIgnore
     public IbmsDeviceDO getLedger() {
         return ledger;
     }
 
+    @JsonIgnore
     public IbmsDeviceRuntimeDO getRuntime() {
         return runtime;
     }
