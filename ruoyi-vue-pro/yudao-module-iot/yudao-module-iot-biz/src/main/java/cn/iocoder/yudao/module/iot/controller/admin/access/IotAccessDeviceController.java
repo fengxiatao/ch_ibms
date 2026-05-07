@@ -2,8 +2,8 @@ package cn.iocoder.yudao.module.iot.controller.admin.access;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.iot.controller.admin.access.vo.device.IotAccessDeviceActivateReqVO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.service.access.IotAccessDeviceService;
+import cn.iocoder.yudao.module.iot.service.access.dto.AccessDeviceView;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -49,14 +49,14 @@ public class IotAccessDeviceController {
     @GetMapping("/list")
     @Operation(summary = "获取门禁设备列表")
     @PreAuthorize("@ss.hasPermission('iot:access-device:query')")
-    public CommonResult<List<IotDeviceDO>> getAccessDevices() {
+    public CommonResult<List<AccessDeviceView>> getAccessDevices() {
         return success(accessDeviceService.getAccessDevices());
     }
 
     @GetMapping("/online")
     @Operation(summary = "获取在线门禁设备列表")
     @PreAuthorize("@ss.hasPermission('iot:access-device:query')")
-    public CommonResult<List<IotDeviceDO>> getOnlineAccessDevices() {
+    public CommonResult<List<AccessDeviceView>> getOnlineAccessDevices() {
         return success(accessDeviceService.getOnlineAccessDevices());
     }
 
@@ -64,14 +64,13 @@ public class IotAccessDeviceController {
     @Operation(summary = "获取设备详情")
     @Parameter(name = "id", description = "设备ID", required = true)
     @PreAuthorize("@ss.hasPermission('iot:access-device:query')")
-    public CommonResult<IotDeviceDO> getDevice(@RequestParam("id") Long id) {
-        List<IotDeviceDO> devices = accessDeviceService.getAccessDevices();
-        for (IotDeviceDO device : devices) {
-            if (device.getId().equals(id)) {
-                return success(device);
-            }
+    public CommonResult<AccessDeviceView> getDevice(@RequestParam("id") Long id) {
+        // 与原实现保持一致：找不到/非 access 子系统设备时返回 success(null)
+        try {
+            return success(accessDeviceService.getAccessDevice(id));
+        } catch (Exception e) {
+            return success(null);
         }
-        return success(null);
     }
 
     @GetMapping("/config/{id}")
