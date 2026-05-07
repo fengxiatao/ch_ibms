@@ -1,0 +1,70 @@
+# M1.7 方案 B 清理清单（基线：snapshot/20260423-full @ 27bdadb，snapshot 分支 pre-zombie-cleanup-20260507）
+# 路径相对 yudao-ui-admin-vue3/
+
+## Batch-1: 4 个 test（被测 utils 在 Z1 的，被测+测试同步删）
+src/utils/accessEventInsertion.test.ts
+src/utils/cardUtils.test.ts
+src/utils/deviceTreeUtils.test.ts
+src/utils/personCodeUtils.test.ts
+
+## Batch-3: 18 个 Z2 独立组件库
+src/components/Tinyflow/ui/index.d.ts
+src/components/Tinyflow/ui/index.umd.js
+src/components/bpmnProcessDesigner/package/penal/listeners/template.js
+src/components/bpmnProcessDesigner/src/highlight/index.js
+src/components/bpmnProcessDesigner/src/modules/custom-renderer/CustomRenderer.js
+src/components/bpmnProcessDesigner/src/modules/custom-renderer/index.js
+src/components/bpmnProcessDesigner/src/modules/rules/CustomRules.js
+src/components/bpmnProcessDesigner/src/modules/rules/index.js
+src/components/bpmnProcessDesigner/src/translations.ts
+src/components/bpmnProcessDesigner/src/utils/directive/clickOutSide.js
+src/components/bpmnProcessDesigner/src/utils/index.js
+src/components/bpmnProcessDesigner/src/utils/xml2json.js
+src/components/parkDigitalTwin/modules/GeometryEdit/index.js
+src/components/parkDigitalTwin/modules/Lights/Light.js
+src/components/parkDigitalTwin/modules/SunLensflare/index.js
+src/components/parkDigitalTwin/modules/Weather/SunLensflare.js
+src/components/parkDigitalTwin/modules/WeatherControl/index.js
+src/components/parkDigitalTwin/shaders/fragmentGress.js
+
+## Batch-4: 38 项（Z1 中 32 + Z2 中 6）
+# Z1 32 项
+src/api/access/accessControl/accessAuthorization/index.ts
+src/api/access/accessControl/accessRecord/index.ts
+src/api/access/accessControl/device/index.ts
+src/api/access/accessControl/dispatchCenter/index.ts
+src/api/access/accessControl/guardManagement/index.ts
+src/api/access/elevator/elevatorManagement/index.ts
+src/api/access/parking/parkingManagement/index.ts
+src/api/access/vehicle/vehicleManagement/index.ts
+src/api/bpm/simple/index.ts
+src/api/iot/camera.ts
+src/api/iot/device/config.ts
+src/api/iot/device/display/index.ts
+src/api/iot/device/event.ts
+src/api/iot/device/group/index.ts
+src/api/iot/device/jobConfig.ts
+src/api/iot/device/location.ts
+src/api/iot/device/service.ts
+src/api/iot/jobType/index.ts
+src/api/iot/product/category/index.ts
+src/api/iot/product/jobConfig.ts
+src/api/iot/recording/types.ts
+src/api/iot/task/index.ts
+src/api/iot/videoView/index.ts
+src/api/security/camera/index.ts
+src/assets/floorplan-icons/iconConfig.ts
+src/hooks/iot/useDeviceDisplay.ts
+src/hooks/useAlertWebSocket.ts
+src/utils/accessEventInsertion.ts
+src/utils/cardUtils.ts
+src/utils/coordinate.ts
+src/utils/deviceTreeUtils.ts
+src/utils/personCodeUtils.ts
+# Z2 6 项
+src/components/IoT/DeviceComponents/index.ts
+src/hooks/web/useEmitt.ts
+src/hooks/web/useGuide.ts
+src/hooks/web/useNetwork.ts
+src/hooks/web/useTimeAgo.ts
+src/utils/domUtils.ts
