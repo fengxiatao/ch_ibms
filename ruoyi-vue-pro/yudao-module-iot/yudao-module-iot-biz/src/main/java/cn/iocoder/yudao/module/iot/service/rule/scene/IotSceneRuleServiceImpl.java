@@ -13,6 +13,7 @@ import cn.iocoder.yudao.module.iot.controller.admin.rule.vo.scene.IotSceneRulePa
 import cn.iocoder.yudao.module.iot.controller.admin.rule.vo.scene.IotSceneRuleSaveReqVO;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.OtaDeviceView;
 import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.rule.IotSceneRuleDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.rule.IotSceneRuleMapper;
@@ -192,7 +193,7 @@ public class IotSceneRuleServiceImpl implements IotSceneRuleService {
     @Override
     public void executeSceneRuleByDevice(IotDeviceMessage message) {
         // 1.1 这里的 tenantId，通过设备获取；
-        IotDeviceDO device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(message.getDeviceId());
+        OtaDeviceView device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(message.getDeviceId());
         if (device == null || device.getTenantId() == null) {
             log.warn("[executeSceneRuleByDevice][设备({}) 不存在或缺少租户]", message.getDeviceId());
             return;
@@ -244,7 +245,7 @@ public class IotSceneRuleServiceImpl implements IotSceneRuleService {
         // 1. 匹配设备
         // TODO 缓存 @puhui999：可能需要 getSelf()
         // 1.1 通过 deviceId 获取设备信息
-        IotDeviceDO device = getSelf().dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(message.getDeviceId());
+        OtaDeviceView device = getSelf().dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(message.getDeviceId());
         if (device == null) {
             log.warn("[getMatchedSceneRuleListByMessage][设备({}) 不存在]", message.getDeviceId());
             return List.of();

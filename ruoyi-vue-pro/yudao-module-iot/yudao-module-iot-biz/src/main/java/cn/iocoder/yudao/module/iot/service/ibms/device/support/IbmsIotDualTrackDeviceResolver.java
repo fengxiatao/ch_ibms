@@ -4,7 +4,6 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsProductDO;
@@ -24,8 +23,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 单台账适配：使用 {@code ibms_device} / {@code ibms_device_runtime} 拼 {@link IotDeviceDO} 兼容壳（供仍消费 legacy DTO 的路径使用）。
- * <p>用于场景规则、设备消息下发等仍消费 {@link IotDeviceDO} 的路径；查询侧使用 {@link TenantIgnore}。</p>
+ * 单台账适配：使用 {@code ibms_device} / {@code ibms_device_runtime} 拼 {@link OtaDeviceView}（供仍消费 legacy DTO 字段子集的路径使用）。
+ * <p>用于场景规则、设备消息下发等仍消费 legacy DTO 的路径；查询侧使用 {@link TenantIgnore}。</p>
  */
 @Component
 public class IbmsIotDualTrackDeviceResolver {
@@ -45,14 +44,14 @@ public class IbmsIotDualTrackDeviceResolver {
      * 按设备主键解析兼容壳：仅 IBMS 台账 + 运行态，不允许回退到 {@code iot_device}。
      */
     @TenantIgnore
-    public IotDeviceDO getDeviceShellPreferIbmsThenIot(Long deviceId) {
+    public OtaDeviceView getDeviceShellPreferIbmsThenIot(Long deviceId) {
         if (deviceId == null) {
             return null;
         }
         IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(deviceId);
         if (ibms != null) {
             IbmsDeviceRuntimeDO rt = ibmsDeviceRuntimeService.getByDeviceId(deviceId);
-            return IbmsDeviceLedgerRuntimeHelper.buildLegacyOtaDeviceShell(ibms, rt);
+            return OtaDeviceView.of(ibms, rt);
         }
         return null;
     }
@@ -62,8 +61,8 @@ public class IbmsIotDualTrackDeviceResolver {
      * 不再合并 {@code iot_device.job_config}（单台账收口）。
      */
     @TenantIgnore
-    public List<IotDeviceDO> listDeviceShellsWithJobConfigPreferIbmsMergedWithIot() {
-        Map<Long, IotDeviceDO> byId = new LinkedHashMap<>();
+    public List<OtaDeviceView> listDeviceShellsWithJobConfigPreferIbmsMergedWithIot() {
+        Map<Long, OtaDeviceView> byId = new LinkedHashMap<>();
         List<IbmsDeviceRuntimeDO> runtimes = ibmsDeviceRuntimeMapper.selectList(
                 new LambdaQueryWrapperX<IbmsDeviceRuntimeDO>()
                         .isNotNull(IbmsDeviceRuntimeDO::getJobConfig)
@@ -78,10 +77,9 @@ public class IbmsIotDualTrackDeviceResolver {
                 if (ibms == null) {
                     continue;
                 }
-                IotDeviceDO shell = IbmsDeviceLedgerRuntimeHelper.buildLegacyOtaDeviceShell(ibms, rt);
-                if (shell != null) {
-                    shell.setJobConfig(rt.getJobConfig());
-                    byId.put(did, shell);
+                OtaDeviceView view = OtaDeviceView.of(ibms, rt);
+                if (view != null) {
+                    byId.put(did, view);
                 }
             }
         }
@@ -92,7 +90,7 @@ public class IbmsIotDualTrackDeviceResolver {
      * 按产品主键（与 {@code ibms_device.ibms_product_id} 对齐）列设备壳：仅 IBMS 台账，不允许回退到 {@code iot_device}。
      */
     @TenantIgnore
-    public List<IotDeviceDO> listDeviceShellsByProductIdPreferIbmsThenIot(Long productId) {
+    public List<OtaDeviceView> listDeviceShellsByProductIdPreferIbmsThenIot(Long productId) {
         if (productId == null) {
             return Collections.emptyList();
         }
@@ -100,12 +98,12 @@ public class IbmsIotDualTrackDeviceResolver {
         if (CollUtil.isEmpty(ibmsList)) {
             return Collections.emptyList();
         }
-        List<IotDeviceDO> shells = new ArrayList<>(ibmsList.size());
+        List<OtaDeviceView> shells = new ArrayList<>(ibmsList.size());
         for (IbmsDeviceDO ibms : ibmsList) {
             IbmsDeviceRuntimeDO rt = ibmsDeviceRuntimeService.getByDeviceId(ibms.getId());
-            IotDeviceDO shell = IbmsDeviceLedgerRuntimeHelper.buildLegacyOtaDeviceShell(ibms, rt);
-            if (shell != null) {
-                shells.add(shell);
+            OtaDeviceView view = OtaDeviceView.of(ibms, rt);
+            if (view != null) {
+                shells.add(view);
             }
         }
         return shells;
@@ -136,14 +134,14 @@ public class IbmsIotDualTrackDeviceResolver {
      * 离线检测 Job：在线设备 = IBMS 运行态在线（单台账收口）。
      */
     @TenantIgnore
-    public List<IotDeviceDO> listOnlineDeviceShellsMergedForOfflineCheck() {
-        Map<Long, IotDeviceDO> byId = new LinkedHashMap<>();
+    public List<OtaDeviceView> listOnlineDeviceShellsMergedForOfflineCheck() {
+        Map<Long, OtaDeviceView> byId = new LinkedHashMap<>();
         List<Long> ibmsOnlineIds = ibmsDeviceRuntimeMapper.selectOnlineDeviceIds();
         if (CollUtil.isNotEmpty(ibmsOnlineIds)) {
             for (Long bid : ibmsOnlineIds) {
-                IotDeviceDO shell = getDeviceShellPreferIbmsThenIot(bid);
-                if (shell != null && shell.getId() != null) {
-                    byId.put(shell.getId(), shell);
+                OtaDeviceView view = getDeviceShellPreferIbmsThenIot(bid);
+                if (view != null && view.getId() != null) {
+                    byId.put(view.getId(), view);
                 }
             }
         }

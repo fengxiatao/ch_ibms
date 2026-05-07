@@ -14,7 +14,7 @@ import cn.iocoder.yudao.module.iot.controller.admin.statistics.vo.IotStatisticsD
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.core.mq.producer.IotDeviceMessageProducer;
 import cn.iocoder.yudao.module.iot.core.util.IotDeviceMessageUtils;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.OtaDeviceView;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceMessageDO;
 import cn.iocoder.yudao.module.iot.dal.tdengine.IotDeviceMessageMapper;
 import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsIotDualTrackDeviceResolver;
@@ -89,7 +89,7 @@ public class IotDeviceMessageServiceImpl implements IotDeviceMessageService {
 
     @Override
     public IotDeviceMessage sendDeviceMessage(IotDeviceMessage message) {
-        IotDeviceDO device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(message.getDeviceId());
+        OtaDeviceView device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(message.getDeviceId());
         if (device == null) {
             throw exception(DEVICE_NOT_EXISTS);
         }
@@ -98,11 +98,11 @@ public class IotDeviceMessageServiceImpl implements IotDeviceMessageService {
 
     // TODO @长辉开发团队：针对连接网关的设备，是不是 productKey、deviceName 需要调整下；
     @Override
-    public IotDeviceMessage sendDeviceMessage(IotDeviceMessage message, IotDeviceDO device) {
+    public IotDeviceMessage sendDeviceMessage(IotDeviceMessage message, OtaDeviceView device) {
         return sendDeviceMessage(message, device, null);
     }
 
-    private IotDeviceMessage sendDeviceMessage(IotDeviceMessage message, IotDeviceDO device, String serverId) {
+    private IotDeviceMessage sendDeviceMessage(IotDeviceMessage message, OtaDeviceView device, String serverId) {
         // 1. 补充信息
         appendDeviceMessage(message, device);
 
@@ -139,7 +139,7 @@ public class IotDeviceMessageServiceImpl implements IotDeviceMessageService {
      * @param message 消息
      * @param device  设备信息
      */
-    private void appendDeviceMessage(IotDeviceMessage message, IotDeviceDO device) {
+    private void appendDeviceMessage(IotDeviceMessage message, OtaDeviceView device) {
         message.setId(IotDeviceMessageUtils.generateMessageId()).setReportTime(LocalDateTime.now())
                 .setDeviceId(device.getId()).setTenantId(device.getTenantId());
         // 特殊：如果设备没有指定 requestId，则使用 messageId

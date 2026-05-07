@@ -8,8 +8,8 @@ import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.ota.vo.task.record.IotOtaTaskRecordPageReqVO;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.OtaDeviceView;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaFirmwareDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaTaskRecordDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
@@ -52,7 +52,7 @@ public class IotOtaTaskRecordServiceImpl implements IotOtaTaskRecordService {
     private IbmsDeviceRuntimeService ibmsDeviceRuntimeService;
 
     @Override
-    public void createOtaTaskRecordList(List<IotDeviceDO> devices, Long firmwareId, Long taskId) {
+    public void createOtaTaskRecordList(List<OtaDeviceView> devices, Long firmwareId, Long taskId) {
         List<IotOtaTaskRecordDO> records = convertList(devices, device ->
                 IotOtaTaskRecordDO.builder().firmwareId(firmwareId).taskId(taskId)
                         .deviceId(device.getId()).fromFirmwareId(Convert.toLong(device.getFirmwareId()))
@@ -134,7 +134,7 @@ public class IotOtaTaskRecordServiceImpl implements IotOtaTaskRecordService {
     }
 
     @Override
-    public boolean pushOtaTaskRecord(IotOtaTaskRecordDO record, IotOtaFirmwareDO fireware, IotDeviceDO device) {
+    public boolean pushOtaTaskRecord(IotOtaTaskRecordDO record, IotOtaFirmwareDO fireware, OtaDeviceView device) {
         try {
             // 1. 推送 OTA 任务记录
             IotDeviceMessage message = IotDeviceMessage.buildOtaUpgrade(
@@ -168,7 +168,7 @@ public class IotOtaTaskRecordServiceImpl implements IotOtaTaskRecordService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @SuppressWarnings("unchecked")
-    public void updateOtaRecordProgress(IotDeviceDO device, IotDeviceMessage message) {
+    public void updateOtaRecordProgress(OtaDeviceView device, IotDeviceMessage message) {
         // 1.1 参数解析
         Map<String, Object> params = (Map<String, Object>) message.getParams();
         String version = MapUtil.getStr(params, "version");

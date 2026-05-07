@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.iot.core.enums.IotDeviceMessageMethodEnum;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.rule.IotSceneRuleDO;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.OtaDeviceView;
 import cn.iocoder.yudao.module.iot.enums.rule.IotSceneRuleActionTypeEnum;
 import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsIotDualTrackDeviceResolver;
 import cn.iocoder.yudao.module.iot.service.device.message.IotDeviceMessageService;
@@ -57,7 +58,7 @@ public class IotDeviceServiceInvokeSceneRuleAction implements IotSceneRuleAction
     private void executeForSingleDevice(cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage message,
                                         IotSceneRuleDO rule, IotSceneRuleDO.Action actionConfig) {
         // 1. 获取设备信息
-        IotDeviceDO device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(actionConfig.getDeviceId());
+        OtaDeviceView device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(actionConfig.getDeviceId());
         if (device == null) {
             log.error("[executeForSingleDevice][规则场景({}) 动作配置({}) 对应的设备({}) 不存在]",
                     rule.getId(), actionConfig, actionConfig.getDeviceId());
@@ -80,7 +81,7 @@ public class IotDeviceServiceInvokeSceneRuleAction implements IotSceneRuleAction
         }
 
         // 2. 获取产品下的所有设备
-        List<IotDeviceDO> devices = dualTrackDeviceResolver.listDeviceShellsByProductIdPreferIbmsThenIot(actionConfig.getProductId());
+        List<OtaDeviceView> devices = dualTrackDeviceResolver.listDeviceShellsByProductIdPreferIbmsThenIot(actionConfig.getProductId());
         if (CollUtil.isEmpty(devices)) {
             log.warn("[executeForAllDevices][规则场景({}) 动作配置({}) 产品({}) 下没有设备]",
                     rule.getId(), actionConfig, actionConfig.getProductId());
@@ -88,7 +89,7 @@ public class IotDeviceServiceInvokeSceneRuleAction implements IotSceneRuleAction
         }
 
         // 3. 遍历所有设备执行服务调用
-        for (IotDeviceDO device : devices) {
+        for (OtaDeviceView device : devices) {
             executeServiceInvokeForDevice(rule, actionConfig, device);
         }
     }
@@ -96,7 +97,7 @@ public class IotDeviceServiceInvokeSceneRuleAction implements IotSceneRuleAction
     /**
      * 为指定设备执行服务调用
      */
-    private void executeServiceInvokeForDevice(IotSceneRuleDO rule, IotSceneRuleDO.Action actionConfig, IotDeviceDO device) {
+    private void executeServiceInvokeForDevice(IotSceneRuleDO rule, IotSceneRuleDO.Action actionConfig, OtaDeviceView device) {
         // 1. 构建服务调用消息
         IotDeviceMessage downstreamMessage = buildServiceInvokeMessage(actionConfig, device);
         if (downstreamMessage == null) {
@@ -123,7 +124,7 @@ public class IotDeviceServiceInvokeSceneRuleAction implements IotSceneRuleAction
      * @param device       设备信息
      * @return 设备消息
      */
-    private IotDeviceMessage buildServiceInvokeMessage(IotSceneRuleDO.Action actionConfig, IotDeviceDO device) {
+    private IotDeviceMessage buildServiceInvokeMessage(IotSceneRuleDO.Action actionConfig, OtaDeviceView device) {
         try {
             // 服务调用参数格式: {"identifier": "serviceId", "params": {...}}
             Object params = Map.of(

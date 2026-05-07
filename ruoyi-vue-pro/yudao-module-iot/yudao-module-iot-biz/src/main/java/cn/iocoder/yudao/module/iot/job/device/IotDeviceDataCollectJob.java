@@ -6,7 +6,7 @@ import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.quartz.core.enums.JobBusinessType;
 import cn.iocoder.yudao.framework.quartz.core.enums.JobPriority;
 import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.OtaDeviceView;
 import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceRuntimeMapper;
 import cn.iocoder.yudao.module.iot.framework.job.IotBusinessJobHandler;
 import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsIotDualTrackDeviceResolver;
@@ -189,7 +189,7 @@ public class IotDeviceDataCollectJob extends IotBusinessJobHandler {
             log.info("采集产品ID为 {} 的所有在线设备", param.getProductId());
             return dualTrackDeviceResolver.listDeviceShellsByProductIdPreferIbmsThenIot(param.getProductId()).stream()
                     .filter(d -> d.getState() != null && IotDeviceStateEnum.isOnline(d.getState()))
-                    .map(IotDeviceDO::getId)
+                    .map(OtaDeviceView::getId)
                     .collect(Collectors.toList());
         }
         

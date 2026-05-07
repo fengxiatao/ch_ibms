@@ -5,7 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.quartz.core.enums.JobBusinessType;
 import cn.iocoder.yudao.framework.quartz.core.enums.JobPriority;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.OtaDeviceView;
 import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
 import cn.iocoder.yudao.module.iot.framework.job.IotBusinessJobHandler;
 import cn.iocoder.yudao.module.iot.job.unified.config.JobConfig;
@@ -191,14 +191,14 @@ public class UnifiedJobScheduler extends IotBusinessJobHandler {
                 JobConfig jobConfig = JsonUtils.parseObject(jobConfigStr, JobConfig.class);
                 
                 // 获取该产品下的所有设备
-                List<IotDeviceDO> devices = dualTrackDeviceResolver.listDeviceShellsByProductIdPreferIbmsThenIot(productId);
+                List<OtaDeviceView> devices = dualTrackDeviceResolver.listDeviceShellsByProductIdPreferIbmsThenIot(productId);
                 
                 if (CollUtil.isEmpty(devices)) {
                     continue;
                 }
                 
                 // 为每个设备应用产品的任务配置
-                for (IotDeviceDO device : devices) {
+                for (OtaDeviceView device : devices) {
                     Long deviceId = device.getId();
                     
                     // 处理离线检查任务
@@ -266,9 +266,9 @@ public class UnifiedJobScheduler extends IotBusinessJobHandler {
      */
     private void collectDeviceTasksWithOverride(Map<String, ScheduledTask> taskMap) {
         // 获取所有配置了 jobConfig 的设备
-        List<IotDeviceDO> devices = dualTrackDeviceResolver.listDeviceShellsWithJobConfigPreferIbmsMergedWithIot();
+        List<OtaDeviceView> devices = dualTrackDeviceResolver.listDeviceShellsWithJobConfigPreferIbmsMergedWithIot();
         
-        for (IotDeviceDO device : devices) {
+        for (OtaDeviceView device : devices) {
             Long deviceId = device.getId();
             String jobConfigStr = device.getJobConfig();
             
@@ -607,9 +607,9 @@ public class UnifiedJobScheduler extends IotBusinessJobHandler {
         List<ScheduledTask> tasks = new ArrayList<>();
         
         // 获取所有配置了 jobConfig 的设备
-        List<IotDeviceDO> devices = dualTrackDeviceResolver.listDeviceShellsWithJobConfigPreferIbmsMergedWithIot();
+        List<OtaDeviceView> devices = dualTrackDeviceResolver.listDeviceShellsWithJobConfigPreferIbmsMergedWithIot();
         
-        for (IotDeviceDO device : devices) {
+        for (OtaDeviceView device : devices) {
             Long deviceId = device.getId();
             String jobConfigStr = device.getJobConfig();
             

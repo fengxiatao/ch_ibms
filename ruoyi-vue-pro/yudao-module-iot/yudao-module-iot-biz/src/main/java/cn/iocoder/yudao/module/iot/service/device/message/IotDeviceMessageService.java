@@ -5,8 +5,8 @@ import cn.iocoder.yudao.module.iot.controller.admin.device.vo.message.IotDeviceM
 import cn.iocoder.yudao.module.iot.controller.admin.statistics.vo.IotStatisticsDeviceMessageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.statistics.vo.IotStatisticsDeviceMessageSummaryByDateRespVO;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceMessageDO;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.OtaDeviceView;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
@@ -35,7 +35,7 @@ public interface IotDeviceMessageService {
      * @param device 设备
      * @return 设备消息
      */
-    IotDeviceMessage sendDeviceMessage(IotDeviceMessage message, IotDeviceDO device);
+    IotDeviceMessage sendDeviceMessage(IotDeviceMessage message, OtaDeviceView device);
 
     /**
      * 发送设备消息

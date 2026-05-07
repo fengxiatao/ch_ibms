@@ -6,7 +6,6 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.iot.controller.admin.ota.vo.task.IotOtaTaskCreateReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.ota.vo.task.IotOtaTaskPageReqVO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaFirmwareDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaTaskDO;
@@ -18,7 +17,7 @@ import cn.iocoder.yudao.module.iot.enums.ota.IotOtaTaskDeviceScopeEnum;
 import cn.iocoder.yudao.module.iot.enums.ota.IotOtaTaskRecordStatusEnum;
 import cn.iocoder.yudao.module.iot.enums.ota.IotOtaTaskStatusEnum;
 import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
-import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.OtaDeviceView;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
@@ -69,7 +68,7 @@ public class IotOtaTaskServiceImpl implements IotOtaTaskService {
             throw exception(OTA_TASK_CREATE_FAIL_NAME_DUPLICATE);
         }
         // 1.3 校验设备范围信息
-        List<IotDeviceDO> devices = validateOtaTaskDeviceScope(createReqVO, firmware.getProductId());
+        List<OtaDeviceView> devices = validateOtaTaskDeviceScope(createReqVO, firmware.getProductId());
 
         // 2. 保存升级任务，直接转换
         IotOtaTaskDO task = BeanUtils.toBean(createReqVO, IotOtaTaskDO.class)
@@ -120,7 +119,7 @@ public class IotOtaTaskServiceImpl implements IotOtaTaskService {
         }
     }
 
-    private List<IotDeviceDO> validateOtaTaskDeviceScope(IotOtaTaskCreateReqVO createReqVO, Long productId) {
+    private List<OtaDeviceView> validateOtaTaskDeviceScope(IotOtaTaskCreateReqVO createReqVO, Long productId) {
         // 情况一：选择设备（收口后：仅使用 IBMS 台账）
         if (Objects.equals(createReqVO.getDeviceScope(), IotOtaTaskDeviceScopeEnum.SELECT.getScope())) {
             List<Long> ids = createReqVO.getDeviceIds();
@@ -150,26 +149,29 @@ public class IotOtaTaskServiceImpl implements IotOtaTaskService {
     /**
      * 勾选设备：IBMS 台账存在且数量与入参一致时，按 ibms_product_id 与运行态固件校验。
      */
-    private List<IotDeviceDO> validateIbmsDevicesForOtaSelect(List<IbmsDeviceDO> ibmsList, Long productId,
-                                                              IotOtaTaskCreateReqVO createReqVO) {
+    private List<OtaDeviceView> validateIbmsDevicesForOtaSelect(List<IbmsDeviceDO> ibmsList, Long productId,
+                                                                IotOtaTaskCreateReqVO createReqVO) {
         for (IbmsDeviceDO ibms : ibmsList) {
             if (!Objects.equals(ibms.getIbmsProductId(), productId)) {
                 throw exception(DEVICE_NOT_EXISTS);
             }
         }
-        List<IotDeviceDO> shells = new ArrayList<>(ibmsList.size());
+        List<OtaDeviceView> shells = new ArrayList<>(ibmsList.size());
         for (IbmsDeviceDO ibms : ibmsList) {
-            shells.add(IbmsDeviceLedgerRuntimeHelper.buildLegacyOtaDeviceShell(ibms,
-                    ibmsDeviceRuntimeService.getByDeviceId(ibms.getId())));
+            OtaDeviceView view = OtaDeviceView.of(ibms,
+                    ibmsDeviceRuntimeService.getByDeviceId(ibms.getId()));
+            if (view != null) {
+                shells.add(view);
+            }
         }
-        for (IotDeviceDO device : shells) {
+        for (OtaDeviceView device : shells) {
             if (Objects.equals(device.getFirmwareId(), createReqVO.getFirmwareId())) {
                 throw exception(OTA_TASK_CREATE_FAIL_DEVICE_FIRMWARE_EXISTS, device.getDeviceName());
             }
         }
         List<IotOtaTaskRecordDO> records = otaTaskRecordService.getOtaTaskRecordListByDeviceIdAndStatus(
-                convertSet(shells, IotDeviceDO::getId), IotOtaTaskRecordStatusEnum.IN_PROCESS_STATUSES);
-        for (IotDeviceDO device : shells) {
+                convertSet(shells, OtaDeviceView::getId), IotOtaTaskRecordStatusEnum.IN_PROCESS_STATUSES);
+        for (OtaDeviceView device : shells) {
             if (CollUtil.contains(records, item -> item.getDeviceId().equals(device.getId()))) {
                 throw exception(OTA_TASK_CREATE_FAIL_DEVICE_OTA_IN_PROCESS, device.getDeviceName());
             }
@@ -180,21 +182,24 @@ public class IotOtaTaskServiceImpl implements IotOtaTaskService {
     /**
      * 全部设备：仅 IBMS 台账列表（与固件 productId = ibms_product.id 对齐）。
      */
-    private List<IotDeviceDO> validateIbmsDevicesForOtaAll(List<IbmsDeviceDO> ibmsList, Long productId,
-                                                           IotOtaTaskCreateReqVO createReqVO) {
+    private List<OtaDeviceView> validateIbmsDevicesForOtaAll(List<IbmsDeviceDO> ibmsList, Long productId,
+                                                             IotOtaTaskCreateReqVO createReqVO) {
         for (IbmsDeviceDO ibms : ibmsList) {
             if (!Objects.equals(ibms.getIbmsProductId(), productId)) {
                 throw exception(DEVICE_NOT_EXISTS);
             }
         }
-        List<IotDeviceDO> devices = new ArrayList<>(ibmsList.size());
+        List<OtaDeviceView> devices = new ArrayList<>(ibmsList.size());
         for (IbmsDeviceDO ibms : ibmsList) {
-            devices.add(IbmsDeviceLedgerRuntimeHelper.buildLegacyOtaDeviceShell(ibms,
-                    ibmsDeviceRuntimeService.getByDeviceId(ibms.getId())));
+            OtaDeviceView view = OtaDeviceView.of(ibms,
+                    ibmsDeviceRuntimeService.getByDeviceId(ibms.getId()));
+            if (view != null) {
+                devices.add(view);
+            }
         }
         devices.removeIf(d -> Objects.equals(d.getFirmwareId(), createReqVO.getFirmwareId()));
         List<IotOtaTaskRecordDO> records = otaTaskRecordService.getOtaTaskRecordListByDeviceIdAndStatus(
-                convertSet(devices, IotDeviceDO::getId), IotOtaTaskRecordStatusEnum.IN_PROCESS_STATUSES);
+                convertSet(devices, OtaDeviceView::getId), IotOtaTaskRecordStatusEnum.IN_PROCESS_STATUSES);
         devices.removeIf(d -> CollUtil.contains(records, r -> r.getDeviceId().equals(d.getId())));
         if (CollUtil.isEmpty(devices)) {
             throw exception(OTA_TASK_CREATE_FAIL_DEVICE_EMPTY);

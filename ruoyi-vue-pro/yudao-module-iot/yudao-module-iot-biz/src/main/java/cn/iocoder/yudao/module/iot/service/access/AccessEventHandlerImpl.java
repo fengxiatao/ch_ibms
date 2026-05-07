@@ -8,7 +8,7 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.access.IotAccessEventLogDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.access.IotAccessPersonCredentialDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.access.IotAccessPersonDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.OtaDeviceView;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPersonCredentialMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPersonMapper;
 import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
@@ -113,7 +113,7 @@ public class AccessEventHandlerImpl implements AccessEventHandler {
         Long tenantId = event.getTenantId();
         if (tenantId == null && event.getDeviceId() != null) {
             // 使用 getDeviceFromCache 方法（带 @TenantIgnore）获取设备的租户ID
-            IotDeviceDO device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(event.getDeviceId());
+            OtaDeviceView device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(event.getDeviceId());
             if (device != null) {
                 tenantId = device.getTenantId();
                 log.debug("[handleEvent] 从设备信息获取租户ID: deviceId={}, tenantId={}", 
@@ -283,7 +283,7 @@ public class AccessEventHandlerImpl implements AccessEventHandler {
         
         try {
             // 查找设备信息
-            IotDeviceDO device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(deviceId);
+            OtaDeviceView device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(deviceId);
             if (device == null) {
                 log.warn("[pushDoorStateChangeToWebSocket] 未找到设备: deviceId={}", deviceId);
                 return;
@@ -559,7 +559,7 @@ public class AccessEventHandlerImpl implements AccessEventHandler {
         String deviceName = null;
         if (event.getDeviceId() != null) {
             try {
-                IotDeviceDO device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(event.getDeviceId());
+                OtaDeviceView device = dualTrackDeviceResolver.getDeviceShellPreferIbmsThenIot(event.getDeviceId());
                 if (device != null) {
                     deviceName = device.getDeviceName();
                 }

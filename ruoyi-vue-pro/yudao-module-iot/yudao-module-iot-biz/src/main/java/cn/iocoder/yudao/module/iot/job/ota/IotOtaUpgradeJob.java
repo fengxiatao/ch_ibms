@@ -13,7 +13,7 @@ import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.enums.ota.IotOtaTaskRecordStatusEnum;
 import cn.iocoder.yudao.module.iot.framework.job.IotBusinessJobHandler;
 import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
-import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.OtaDeviceView;
 import cn.iocoder.yudao.module.iot.service.ota.IotOtaFirmwareService;
 import cn.iocoder.yudao.module.iot.service.ota.IotOtaTaskRecordService;
 import jakarta.annotation.Resource;
@@ -113,10 +113,10 @@ public class IotOtaUpgradeJob extends IotBusinessJobHandler {
         return StrUtil.format("升级任务推送成功：{} 条，送失败：{} 条", successCount, failureCount);
     }
 
-    private cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO resolveDeviceForOta(Long deviceId) {
+    private OtaDeviceView resolveDeviceForOta(Long deviceId) {
         IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(deviceId);
         if (ibms != null) {
-            return IbmsDeviceLedgerRuntimeHelper.buildLegacyOtaDeviceShell(ibms,
+            return OtaDeviceView.of(ibms,
                     ibmsDeviceRuntimeService.getByDeviceId(deviceId));
         }
         return null;

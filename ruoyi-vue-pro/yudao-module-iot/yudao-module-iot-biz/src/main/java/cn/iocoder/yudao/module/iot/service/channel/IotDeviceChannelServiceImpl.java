@@ -274,9 +274,6 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
         if (ibmsDevice == null) {
             throw exception(DEVICE_NOT_EXISTS);
         }
-        IotDeviceDO deviceShell = IbmsDeviceLedgerRuntimeHelper.buildLegacyOtaDeviceShell(
-                ibmsDevice, ibmsDeviceRuntimeService.getByDeviceId(deviceId));
-
         // 2. 根据设备类型同步通道
         int syncCount = 0;
         boolean isNvr = isIbmsNvr(ibmsDevice);
@@ -324,10 +321,10 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
                     log.info("[通道同步] 删除了 {} 个不存在的通道", deletedCount);
                 }
             }
-        } else if (deviceShell != null && "IPC".equals(deviceShell.getDeviceType())) {
-            // 球机或普通IPC：通过 ONVIF 查询设备通道数
-            syncCount = syncIpcChannelsViaOnvifToIbms(deviceId, ibmsDevice, deviceShell);
         }
+        // M2-D 阶段二 OTA 单源化：原营业代码中调用了 syncIpcChannelsViaOnvifToIbms 的 IPC 分支，
+        // 其判断条件 "IPC".equals(deviceShell.getDeviceType()) 中 deviceType 为 Integer，永返 false，与该分支内代码同为死代码，
+        // 故仅保留 NVR 分支。IPC 通道同步现走 ONVIF/其他入口，后续清理。
 
         log.info("[通道管理] 同步设备通道完成: deviceId={}, syncCount={}", deviceId, syncCount);
         return syncCount;

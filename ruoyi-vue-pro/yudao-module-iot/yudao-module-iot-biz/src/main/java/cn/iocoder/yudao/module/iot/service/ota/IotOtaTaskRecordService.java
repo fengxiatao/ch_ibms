@@ -3,8 +3,8 @@ package cn.iocoder.yudao.module.iot.service.ota;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.ota.vo.task.record.IotOtaTaskRecordPageReqVO;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaFirmwareDO;
+import cn.iocoder.yudao.module.iot.service.ibms.device.support.OtaDeviceView;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaTaskRecordDO;
 import jakarta.validation.Valid;
 
@@ -24,7 +24,7 @@ public interface IotOtaTaskRecordService {
      * @param firmwareId   固件编号
      * @param taskId       任务编号
      */
-    void createOtaTaskRecordList(List<IotDeviceDO> devices, Long firmwareId, Long taskId);
+    void createOtaTaskRecordList(List<OtaDeviceView> devices, Long firmwareId, Long taskId);
 
     /**
      * 获取 OTA 升级记录的状态统计
@@ -90,7 +90,7 @@ public interface IotOtaTaskRecordService {
      * @param device   设备信息
      * @return 是否推送成功
      */
-    boolean pushOtaTaskRecord(IotOtaTaskRecordDO record, IotOtaFirmwareDO fireware, IotDeviceDO device);
+    boolean pushOtaTaskRecord(IotOtaTaskRecordDO record, IotOtaFirmwareDO fireware, OtaDeviceView device);
 
     /**
      * 更新 OTA 升级记录进度
@@ -98,6 +98,6 @@ public interface IotOtaTaskRecordService {
      * @param device   设备信息
      * @param message  设备消息
      */
-    void updateOtaRecordProgress(IotDeviceDO device, IotDeviceMessage message);
+    void updateOtaRecordProgress(OtaDeviceView device, IotDeviceMessage message);
 
 }
