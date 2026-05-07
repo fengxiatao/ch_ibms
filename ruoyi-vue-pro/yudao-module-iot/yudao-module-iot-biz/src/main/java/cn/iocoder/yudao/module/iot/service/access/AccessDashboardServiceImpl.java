@@ -196,7 +196,7 @@ public class AccessDashboardServiceImpl implements AccessDashboardService {
         if (sameDay) {
             List<Map<String, Object>> rows = eventLogMapper.selectHourlyTrend(start, end, ALARM_AND_ABNORMAL_TYPES);
             Map<Integer, Map<String, Object>> byHour = rows.stream().collect(
-                    Collectors.toMap(r -> ((Number) r.get("hour")).intValue(), r -> r, (a, b) -> a));
+                    Collectors.toMap(r -> toInt(r.get("hour")), r -> r, (a, b) -> a));
             List<String> labels = new ArrayList<>(24);
             List<Long> access = new ArrayList<>(24);
             List<Long> alarm = new ArrayList<>(24);
@@ -205,10 +205,10 @@ public class AccessDashboardServiceImpl implements AccessDashboardService {
             for (int h = 0; h < 24; h++) {
                 labels.add(h + ":00");
                 Map<String, Object> r = byHour.get(h);
-                long ac = r == null ? 0L : ((Number) r.get("accessCount")).longValue();
-                long al = r == null ? 0L : ((Number) r.getOrDefault("alarmCount", 0)).longValue();
-                long ic = r == null ? 0L : ((Number) r.getOrDefault("inCount", 0)).longValue();
-                long oc = r == null ? 0L : ((Number) r.getOrDefault("outCount", 0)).longValue();
+                long ac = r == null ? 0L : toLong(r.get("accessCount"));
+                long al = r == null ? 0L : toLong(r.get("alarmCount"));
+                long ic = r == null ? 0L : toLong(r.get("inCount"));
+                long oc = r == null ? 0L : toLong(r.get("outCount"));
                 access.add(ac);
                 alarm.add(al);
                 // direction 大量 NULL：当 in+out=0 时用 access 兜底
@@ -243,10 +243,10 @@ public class AccessDashboardServiceImpl implements AccessDashboardService {
                 String key = cur.format(ISO_DATE);
                 labels.add(key);
                 Map<String, Object> r = byDate.get(key);
-                long ac = r == null ? 0L : ((Number) r.get("accessCount")).longValue();
-                long al = r == null ? 0L : ((Number) r.getOrDefault("alarmCount", 0)).longValue();
-                long ic = r == null ? 0L : ((Number) r.getOrDefault("inCount", 0)).longValue();
-                long oc = r == null ? 0L : ((Number) r.getOrDefault("outCount", 0)).longValue();
+                long ac = r == null ? 0L : toLong(r.get("accessCount"));
+                long al = r == null ? 0L : toLong(r.get("alarmCount"));
+                long ic = r == null ? 0L : toLong(r.get("inCount"));
+                long oc = r == null ? 0L : toLong(r.get("outCount"));
                 access.add(ac);
                 alarm.add(al);
                 in.add(ic + oc == 0 ? ac : ic);
@@ -338,6 +338,30 @@ public class AccessDashboardServiceImpl implements AccessDashboardService {
         return v == null ? 0L : v;
     }
 
+    /**
+     * 容错转 long：MyBatis 对 SUM(CASE WHEN ... THEN 1 ELSE 0 END) 的结果列 DECIMAL，
+     * 通过 JDBC + Map<String,Object> 映射后在不同驱动下可能返回 String；这里兼容 Number / String / null。
+     */
+    private static long toLong(Object v) {
+        if (v == null) return 0L;
+        if (v instanceof Number n) return n.longValue();
+        try {
+            return Long.parseLong(v.toString().trim());
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    private static int toInt(Object v) {
+        if (v == null) return 0;
+        if (v instanceof Number n) return n.intValue();
+        try {
+            return Integer.parseInt(v.toString().trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     private static String nullToEmpty(String v) {
         return v == null ? "" : v;
     }
@@ -351,7 +375,7 @@ public class AccessDashboardServiceImpl implements AccessDashboardService {
         long s = 0L;
         for (Map<String, Object> r : rows) {
             if (types.contains(String.valueOf(r.get("eventType")))) {
-                s += ((Number) r.getOrDefault("cnt", 0)).longValue();
+                s += toLong(r.get("cnt"));
             }
         }
         return s;
