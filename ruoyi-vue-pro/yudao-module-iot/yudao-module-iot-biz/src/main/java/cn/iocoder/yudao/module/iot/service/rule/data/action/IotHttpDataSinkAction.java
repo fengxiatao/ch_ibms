@@ -52,7 +52,13 @@ public class IotHttpDataSinkAction implements IotDataRuleAction {
             if (CollUtil.isNotEmpty(config.getHeaders())) {
                 config.getHeaders().forEach(headers::add);
             }
-            headers.add(HEADER_TENANT_ID, message.getTenantId().toString());
+            // 部分 MQ 上游消息（DeviceStateChange/DeviceServiceResult 等）未填 tenantId，
+            // 防御式处理：仅在非空时添加租户头，避免 NPE 阻塞 HTTP DataSink 整条规则链路。
+            if (message.getTenantId() != null) {
+                headers.add(HEADER_TENANT_ID, message.getTenantId().toString());
+            } else {
+                log.warn("[execute][message({}) tenantId 为空，HTTP DataSink 跳过 {} 头]", message, HEADER_TENANT_ID);
+            }
             // 1.2 构建 URL
             UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUriString(config.getUrl());
             if (CollUtil.isNotEmpty(config.getQuery())) {
