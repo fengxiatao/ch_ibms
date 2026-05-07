@@ -3,7 +3,6 @@ package cn.iocoder.yudao.module.iot.service.access;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
@@ -11,7 +10,7 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsProductMapper;
-import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
+import cn.iocoder.yudao.module.iot.service.access.dto.AccessDeviceView;
 import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
 import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.mq.producer.DeviceCommandPublisher;
@@ -97,7 +96,7 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
     /**
      * 根据设备配置获取设备类型
      */
-    private String getDeviceType(IotDeviceDO device) {
+    private String getDeviceType(AccessDeviceView device) {
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
             String configDeviceType = config.getAccessDeviceType();
@@ -117,11 +116,11 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
 
     @Override
     public void activateDevice(Long deviceId) {
-        IotDeviceDO device = validateAccessDevice(deviceId);
+        AccessDeviceView device = validateAccessDevice(deviceId);
         String deviceType = getDeviceType(device);
         
         // 解析设备配置获取连接信息
-        String ip = DeviceConfigHelper.getIpAddress(device);
+        String ip = DeviceConfigHelper.getIpAddress(device.getConfig());
         Integer port = 37777;
         String username = "admin";
         String password = "admin123";
@@ -176,7 +175,7 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
         // 推送设备上线WebSocket消息
         deviceMessagePushService.pushDeviceStatus(deviceId, deviceType, "ONLINE", System.currentTimeMillis());
 
-        // 激活成功后立即刷新能力并写回 iot_device.config（供业务侧按能力精准操作）
+        // 激活成功后立即刷新能力并写回 ibms_device_runtime.config（供业务侧按能力精准操作）
         try {
             Long tenantId = device.getTenantId() != null ? device.getTenantId() : 1L;
             TenantUtils.execute(tenantId, () -> capabilityService.refreshCapability(deviceId));
@@ -189,10 +188,10 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
 
     @Override
     public void deactivateDevice(Long deviceId) {
-        IotDeviceDO device = validateAccessDevice(deviceId);
+        AccessDeviceView device = validateAccessDevice(deviceId);
         String deviceType = getDeviceType(device);
         
-        String ip = DeviceConfigHelper.getIpAddress(device);
+        String ip = DeviceConfigHelper.getIpAddress(device.getConfig());
         Integer port = 37777;
         if (device.getConfig() != null && device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
@@ -219,7 +218,7 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
     }
 
     @Override
-    public List<IotDeviceDO> getAccessDevices() {
+    public List<AccessDeviceView> getAccessDevices() {
         List<IbmsDeviceDO> ibmsDevices = ibmsDeviceMapper.selectList(
                 new LambdaQueryWrapperX<IbmsDeviceDO>()
                         .eq(IbmsDeviceDO::getSubsystemCode, ACCESS_SUBSYSTEM_CODE)
@@ -227,22 +226,22 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
         if (ibmsDevices == null || ibmsDevices.isEmpty()) {
             return List.of();
         }
-        List<IotDeviceDO> devices = new ArrayList<>(ibmsDevices.size());
+        List<AccessDeviceView> devices = new ArrayList<>(ibmsDevices.size());
         for (IbmsDeviceDO ibms : ibmsDevices) {
             if (ibms == null) {
                 continue;
             }
             IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(ibms.getId());
-            IotDeviceDO shell = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibms, runtime);
-            if (shell != null) {
-                devices.add(shell);
+            AccessDeviceView view = AccessDeviceView.of(ibms, runtime);
+            if (view != null) {
+                devices.add(view);
             }
         }
         return devices;
     }
 
     @Override
-    public List<IotDeviceDO> getOnlineAccessDevices() {
+    public List<AccessDeviceView> getOnlineAccessDevices() {
         return getAccessDevices().stream()
                 .filter(d -> IotDeviceStateEnum.ONLINE.getState().equals(d.getState()))
                 .collect(java.util.stream.Collectors.toList());
@@ -250,12 +249,12 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
 
     @Override
     public boolean isDeviceOnline(Long deviceId) {
-        IotDeviceDO device = validateAccessDevice(deviceId);
+        AccessDeviceView device = validateAccessDevice(deviceId);
         return IotDeviceStateEnum.ONLINE.getState().equals(device.getState());
     }
 
     @Override
-    public IotDeviceDO getAccessDevice(Long deviceId) {
+    public AccessDeviceView getAccessDevice(Long deviceId) {
         return validateAccessDevice(deviceId);
     }
 
@@ -298,7 +297,7 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
     @Override
     public cn.iocoder.yudao.module.iot.controller.admin.access.vo.device.IotAccessDeviceConfigRespVO getDeviceConfig(Long deviceId) {
         // 1. 获取设备基本信息
-        IotDeviceDO device = validateAccessDevice(deviceId);
+        AccessDeviceView device = validateAccessDevice(deviceId);
         
         // 2. 获取产品信息
         String productName = null;
@@ -346,7 +345,7 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
         respVO.setDeviceCode(device.getDeviceKey());
         respVO.setProductId(device.getProductId());
         respVO.setProductName(productName);
-        respVO.setIpAddress(DeviceConfigHelper.getIpAddress(device));
+        respVO.setIpAddress(DeviceConfigHelper.getIpAddress(device.getConfig()));
         respVO.setPort(port);
         respVO.setUsername(username);
         respVO.setState(device.getState());
@@ -455,7 +454,7 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
         return "正常";
     }
 
-    private IotDeviceDO validateAccessDevice(Long deviceId) {
+    private AccessDeviceView validateAccessDevice(Long deviceId) {
         IbmsDeviceDO ibmsDevice = ibmsDeviceMapper.selectById(deviceId);
         if (ibmsDevice == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
@@ -465,11 +464,11 @@ public class IotAccessDeviceServiceImpl implements IotAccessDeviceService {
         }
 
         IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(deviceId);
-        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibmsDevice, runtime);
-        if (device == null) {
+        AccessDeviceView view = AccessDeviceView.of(ibmsDevice, runtime);
+        if (view == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
-        return device;
+        return view;
     }
 
 }

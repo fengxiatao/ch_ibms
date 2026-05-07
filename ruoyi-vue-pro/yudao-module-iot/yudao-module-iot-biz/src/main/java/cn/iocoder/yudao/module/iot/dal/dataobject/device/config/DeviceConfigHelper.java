@@ -34,7 +34,13 @@ public final class DeviceConfigHelper {
         if (device == null) {
             return null;
         }
-        DeviceConfig config = device.getConfig();
+        return getIpAddress(device.getConfig());
+    }
+
+    /**
+     * 安全获取 IP 地址（基于 {@link DeviceConfig} 直读，供 IBMS 单源视图使用）。
+     */
+    public static String getIpAddress(DeviceConfig config) {
         if (config == null) {
             return null;
         }
@@ -54,7 +60,13 @@ public final class DeviceConfigHelper {
         if (device == null) {
             return null;
         }
-        DeviceConfig config = device.getConfig();
+        return getPort(device.getConfig());
+    }
+
+    /**
+     * 安全获取端口号（基于 {@link DeviceConfig} 直读，供 IBMS 单源视图使用）。
+     */
+    public static Integer getPort(DeviceConfig config) {
         if (config == null) {
             return null;
         }

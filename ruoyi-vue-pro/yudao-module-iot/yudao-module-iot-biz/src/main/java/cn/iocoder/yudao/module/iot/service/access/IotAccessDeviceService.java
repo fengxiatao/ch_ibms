@@ -1,7 +1,7 @@
 package cn.iocoder.yudao.module.iot.service.access;
 
 import cn.iocoder.yudao.module.iot.controller.admin.access.vo.device.IotAccessDeviceConfigRespVO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.service.access.dto.AccessDeviceView;
 
 import java.util.List;
 
@@ -33,14 +33,14 @@ public interface IotAccessDeviceService {
      *
      * @return 门禁设备列表
      */
-    List<IotDeviceDO> getAccessDevices();
+    List<AccessDeviceView> getAccessDevices();
 
     /**
      * 获取在线门禁设备列表
      *
      * @return 在线门禁设备列表
      */
-    List<IotDeviceDO> getOnlineAccessDevices();
+    List<AccessDeviceView> getOnlineAccessDevices();
 
     /**
      * 检查设备是否在线
@@ -56,7 +56,7 @@ public interface IotAccessDeviceService {
      * @param deviceId 设备ID
      * @return 设备信息
      */
-    IotDeviceDO getAccessDevice(Long deviceId);
+    AccessDeviceView getAccessDevice(Long deviceId);
 
     /**
      * 获取设备完整配置信息

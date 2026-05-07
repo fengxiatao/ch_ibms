@@ -1,8 +1,8 @@
 package cn.iocoder.yudao.module.iot.service.access;
 
 import cn.iocoder.yudao.module.iot.dal.dataobject.access.*;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
+import cn.iocoder.yudao.module.iot.service.access.dto.AccessDeviceView;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPersonDeviceAuthMapper;
 import cn.iocoder.yudao.module.iot.core.gateway.dto.AccessControlDeviceCommand;
@@ -212,7 +212,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
         // 5. 创建任务明细
         List<IotAccessAuthTaskDetailDO> details = new ArrayList<>();
         for (DeviceChannelKey key : deviceSet) {
-            IotDeviceDO device = deviceService.getAccessDevice(key.deviceId);
+            AccessDeviceView device = deviceService.getAccessDevice(key.deviceId);
             details.add(IotAccessAuthTaskDetailDO.builder()
                     .personId(personId)
                     .personCode(person.getPersonCode())
@@ -281,7 +281,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
             }
             
             // 2. 获取设备信息
-            IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+            AccessDeviceView device = deviceService.getAccessDevice(deviceId);
             if (device == null) {
                 return DispatchResult.failure(-1, "设备不存在");
             }
@@ -466,7 +466,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
         // 4. 创建任务明细
         List<IotAccessAuthTaskDetailDO> details = new ArrayList<>();
         for (IotAccessPersonDeviceAuthDO auth : authorizedList) {
-            IotDeviceDO device = deviceService.getAccessDevice(auth.getDeviceId());
+            AccessDeviceView device = deviceService.getAccessDevice(auth.getDeviceId());
             details.add(IotAccessAuthTaskDetailDO.builder()
                     .personId(personId)
                     .personCode(person.getPersonCode())
@@ -514,7 +514,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
             if (person == null) {
                 continue;
             }
-            IotDeviceDO device = deviceService.getAccessDevice(auth.getDeviceId());
+            AccessDeviceView device = deviceService.getAccessDevice(auth.getDeviceId());
             details.add(IotAccessAuthTaskDetailDO.builder()
                     .personId(auth.getPersonId())
                     .personCode(person.getPersonCode())
@@ -551,7 +551,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
             }
             
             // 2. 获取设备信息
-            IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+            AccessDeviceView device = deviceService.getAccessDevice(deviceId);
             if (device == null) {
                 return DispatchResult.failure(-1, "设备不存在");
             }
@@ -725,7 +725,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
         // 6. 创建任务明细
         List<IotAccessAuthTaskDetailDO> details = new ArrayList<>();
         for (IotAccessPermissionGroupDeviceDO gd : devicesToRevoke) {
-            IotDeviceDO device = deviceService.getAccessDevice(gd.getDeviceId());
+            AccessDeviceView device = deviceService.getAccessDevice(gd.getDeviceId());
             details.add(IotAccessAuthTaskDetailDO.builder()
                     .personId(personId)
                     .personCode(person.getPersonCode())
@@ -1026,7 +1026,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
             }
             
             for (IotAccessPermissionGroupDeviceDO gd : groupDevices) {
-                IotDeviceDO device = deviceService.getAccessDevice(gd.getDeviceId());
+                AccessDeviceView device = deviceService.getAccessDevice(gd.getDeviceId());
                 details.add(IotAccessAuthTaskDetailDO.builder()
                         .personId(personId)
                         .personCode(person.getPersonCode())
@@ -1305,7 +1305,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
             String ip, Integer port, NetAccessUserInfo userInfo) {
         try {
             // 获取设备信息以确定设备类型和登录凭据
-            IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+            AccessDeviceView device = deviceService.getAccessDevice(deviceId);
             String deviceType = device != null ? getAccessDeviceType(device) : AccessDeviceTypeConstants.ACCESS_GEN1;
             String username = device != null ? getDeviceUsername(device) : "admin";
             String password = device != null ? getDevicePassword(device) : "";
@@ -1354,7 +1354,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
     private boolean sendDispatchFaceCommand(Long deviceId, String ip, Integer port, NetAccessFaceInfo faceInfo) {
         try {
             // 获取设备信息以确定设备类型和登录凭据
-            IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+            AccessDeviceView device = deviceService.getAccessDevice(deviceId);
             String deviceType = device != null ? getAccessDeviceType(device) : AccessDeviceTypeConstants.ACCESS_GEN2;
             String username = device != null ? getDeviceUsername(device) : "admin";
             String password = device != null ? getDevicePassword(device) : "";
@@ -1406,7 +1406,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
     private boolean sendDispatchCardCommand(Long deviceId, String ip, Integer port, NetAccessCardInfo cardInfo) {
         try {
             // 获取设备信息以确定设备类型和登录凭据
-            IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+            AccessDeviceView device = deviceService.getAccessDevice(deviceId);
             String deviceType = device != null ? getAccessDeviceType(device) : AccessDeviceTypeConstants.ACCESS_GEN1;
             String username = device != null ? getDeviceUsername(device) : "admin";
             String password = device != null ? getDevicePassword(device) : "";
@@ -1452,7 +1452,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
             NetAccessFingerprintInfo fpInfo) {
         try {
             // 获取设备信息以确定设备类型
-            IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+            AccessDeviceView device = deviceService.getAccessDevice(deviceId);
             String deviceType = device != null ? getAccessDeviceType(device) : AccessDeviceTypeConstants.ACCESS_GEN2;
             
             // 构建命令参数，确保包含 deviceType
@@ -1491,7 +1491,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
     private AccessControlDeviceResponse sendRevokeUserCommand(Long deviceId, String ip, Integer port, String userId) {
         try {
             // 获取设备信息以确定设备类型和登录凭据
-            IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+            AccessDeviceView device = deviceService.getAccessDevice(deviceId);
             String deviceType = device != null ? getAccessDeviceType(device) : AccessDeviceTypeConstants.ACCESS_GEN1;
             String username = device != null ? getDeviceUsername(device) : "admin";
             String password = device != null ? getDevicePassword(device) : "";
@@ -1547,7 +1547,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
             List<String> successCredentials, List<DispatchResult.CredentialError> failedCredentials) {
         try {
             // 获取设备信息以确定设备类型和登录凭据
-            IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+            AccessDeviceView device = deviceService.getAccessDevice(deviceId);
             String deviceType = device != null ? getAccessDeviceType(device) : AccessDeviceTypeConstants.ACCESS_GEN1;
             String username = device != null ? getDeviceUsername(device) : "admin";
             String password = device != null ? getDevicePassword(device) : "";
@@ -1607,7 +1607,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
     /**
      * 获取设备IP地址
      */
-    private String getDeviceIp(IotDeviceDO device) {
+    private String getDeviceIp(AccessDeviceView device) {
         // 从config中获取IP地址
         if (device.getConfig() != null) {
             String ipAddress = device.getConfig().getIpAddress();
@@ -1621,7 +1621,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
     /**
      * 获取设备端口
      */
-    private Integer getDevicePort(IotDeviceDO device) {
+    private Integer getDevicePort(AccessDeviceView device) {
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
             return config.getPort() != null ? config.getPort() : 37777;
@@ -1633,7 +1633,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
      * 获取设备用户名
      * Requirements: 4.1 - 用于设备自动激活
      */
-    private String getDeviceUsername(IotDeviceDO device) {
+    private String getDeviceUsername(AccessDeviceView device) {
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
             return config.getUsername();
@@ -1652,7 +1652,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
      * 获取设备密码
      * Requirements: 4.1 - 用于设备自动激活
      */
-    private String getDevicePassword(IotDeviceDO device) {
+    private String getDevicePassword(AccessDeviceView device) {
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
             return config.getPassword();
@@ -1674,7 +1674,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
      * @param device 设备对象
      * @return 设备类型字符串
      */
-    private String getAccessDeviceType(IotDeviceDO device) {
+    private String getAccessDeviceType(AccessDeviceView device) {
         Boolean supportVideo = null;
         String configDeviceType = null;
 
@@ -1698,7 +1698,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
      * <p>优先读取 config.accessCapabilities（AccessDeviceConfig）或 config["accessCapabilities"]（GenericDeviceConfig）</p>
      */
     @SuppressWarnings("unchecked")
-    private Boolean getAccessCapabilityFlag(IotDeviceDO device, String key) {
+    private Boolean getAccessCapabilityFlag(AccessDeviceView device, String key) {
         if (device == null || device.getConfig() == null || key == null) {
             return null;
         }
@@ -1920,7 +1920,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
         // 5. 创建任务明细
         List<IotAccessAuthTaskDetailDO> details = new ArrayList<>();
         for (DeviceChannelKey key : devicesToDispatch) {
-            IotDeviceDO device = deviceService.getAccessDevice(key.deviceId);
+            AccessDeviceView device = deviceService.getAccessDevice(key.deviceId);
             details.add(IotAccessAuthTaskDetailDO.builder()
                     .personId(personId)
                     .personCode(person.getPersonCode())
@@ -1996,7 +1996,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
         }
         
         // 3. 获取设备信息
-        IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+        AccessDeviceView device = deviceService.getAccessDevice(deviceId);
         if (device == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
@@ -2188,7 +2188,7 @@ public class IotAccessAuthDispatchServiceImpl implements IotAccessAuthDispatchSe
                     continue;
                 }
                 
-                IotDeviceDO device = deviceService.getAccessDevice(gd.getDeviceId());
+                AccessDeviceView device = deviceService.getAccessDevice(gd.getDeviceId());
                 details.add(IotAccessAuthTaskDetailDO.builder()
                         .personId(personId)
                         .personCode(person.getPersonCode())

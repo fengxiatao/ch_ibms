@@ -2,7 +2,6 @@ package cn.iocoder.yudao.module.iot.service.access;
 
 import cn.iocoder.yudao.module.iot.dal.dataobject.access.IotAccessDeviceCapabilityDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.access.IotAccessPersonCredentialDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
 import cn.iocoder.yudao.module.iot.core.gateway.dto.AccessControlDeviceCommand;
@@ -12,8 +11,8 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessDeviceCapabilityMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.service.access.dto.AccessDeviceView;
 import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
-import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
 import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.enums.access.CredentialTypeConstants;
 import cn.iocoder.yudao.module.iot.service.access.dto.CapabilityCheckResult;
@@ -108,12 +107,12 @@ public class IotAccessDeviceCapabilityServiceImpl implements IotAccessDeviceCapa
 
         // ===== 通过消息总线从网关刷新真实能力（避免默认“全支持”导致错误下发/撤销） =====
         try {
-            IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+            AccessDeviceView device = deviceService.getAccessDevice(deviceId);
             if (device == null) {
                 IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(deviceId);
                 if (ibms != null) {
                     IbmsDeviceRuntimeDO rt = ibmsDeviceRuntimeService.getByDeviceId(deviceId);
-                    device = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibms, rt);
+                    device = AccessDeviceView.of(ibms, rt);
                 }
             }
             if (device != null) {
@@ -235,7 +234,7 @@ public class IotAccessDeviceCapabilityServiceImpl implements IotAccessDeviceCapa
                 capability.getSupCardService(), capability.getSupFaceService(), capability.getSupFingerprintService());
     }
 
-    private void updateDeviceConfigCapabilitySnapshot(IotDeviceDO device,
+    private void updateDeviceConfigCapabilitySnapshot(AccessDeviceView device,
                                                       String deviceType,
                                                       AccessControlDeviceResponse.DeviceCapability dc,
                                                       Map<String, Object> rawData) {
@@ -305,11 +304,11 @@ public class IotAccessDeviceCapabilityServiceImpl implements IotAccessDeviceCapa
         ibmsDeviceRuntimeService.saveRuntimeConfig(device.getId(), cfg);
     }
 
-    private String getDeviceIp(IotDeviceDO device) {
+    private String getDeviceIp(AccessDeviceView device) {
         return device != null && device.getConfig() != null ? device.getConfig().getIpAddress() : null;
     }
 
-    private Integer getDevicePort(IotDeviceDO device) {
+    private Integer getDevicePort(AccessDeviceView device) {
         if (device == null || device.getConfig() == null) {
             return 37777;
         }
@@ -337,7 +336,7 @@ public class IotAccessDeviceCapabilityServiceImpl implements IotAccessDeviceCapa
         return 37777;
     }
 
-    private String getDeviceUsername(IotDeviceDO device) {
+    private String getDeviceUsername(AccessDeviceView device) {
         if (device == null || device.getConfig() == null) {
             return null;
         }
@@ -351,7 +350,7 @@ public class IotAccessDeviceCapabilityServiceImpl implements IotAccessDeviceCapa
         return null;
     }
 
-    private String getDevicePassword(IotDeviceDO device) {
+    private String getDevicePassword(AccessDeviceView device) {
         if (device == null || device.getConfig() == null) {
             return null;
         }
@@ -365,7 +364,7 @@ public class IotAccessDeviceCapabilityServiceImpl implements IotAccessDeviceCapa
         return null;
     }
 
-    private String getAccessDeviceType(IotDeviceDO device) {
+    private String getAccessDeviceType(AccessDeviceView device) {
         Boolean supportVideo = null;
         String configDeviceType = null;
         if (device.getConfig() instanceof AccessDeviceConfig) {
@@ -720,7 +719,7 @@ public class IotAccessDeviceCapabilityServiceImpl implements IotAccessDeviceCapa
         
         try {
             // 获取设备信息
-            IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+            AccessDeviceView device = deviceService.getAccessDevice(deviceId);
             if (device == null) {
                 log.warn("[DeviceCapability] 设备不存在: deviceId={}", deviceId);
                 return false;

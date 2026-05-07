@@ -71,7 +71,14 @@ public final class IbmsDeviceLedgerRuntimeHelper {
 
     /**
      * 供门禁能力刷新等仍依赖 {@link IotDeviceDO} 的路径使用：从台账 {@code extra} 与运行态拼 {@link GenericDeviceConfig} 壳。
+     *
+     * @deprecated M2-B 单源化阶段引入 {@code AccessDeviceView}（{@code service.access.dto.AccessDeviceView}），
+     *             门禁子系统应改用 {@code AccessDeviceView.of(IbmsDeviceDO, IbmsDeviceRuntimeDO)}。本方法保留仅供
+     *             {@code AccessManagementServiceImpl} / {@code IotAccessCardServiceImpl} /
+     *             {@code IotAccessChannelServiceImpl} / {@code IotAccessPermissionGroupServiceImpl} /
+     *             {@code IotAccessCredentialServiceImpl} 等尚未迁移路径过渡使用，迁移完成后应删除。
      */
+    @Deprecated
     public static IotDeviceDO buildLegacyAccessDeviceShell(IbmsDeviceDO ibms, IbmsDeviceRuntimeDO runtime) {
         if (ibms == null) {
             return null;

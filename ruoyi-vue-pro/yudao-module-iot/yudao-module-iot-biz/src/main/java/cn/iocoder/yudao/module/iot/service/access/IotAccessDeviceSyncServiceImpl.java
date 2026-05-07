@@ -3,8 +3,8 @@ package cn.iocoder.yudao.module.iot.service.access;
 import cn.iocoder.yudao.module.iot.core.gateway.dto.AccessControlDeviceCommand;
 import cn.iocoder.yudao.module.iot.core.gateway.dto.AccessControlDeviceResponse;
 import cn.iocoder.yudao.module.iot.dal.dataobject.access.*;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
+import cn.iocoder.yudao.module.iot.service.access.dto.AccessDeviceView;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessDeviceSyncRecordMapper;
 import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
@@ -53,7 +53,7 @@ public class IotAccessDeviceSyncServiceImpl implements IotAccessDeviceSyncServic
         log.info("[checkDevice] 开始对账: deviceId={}", deviceId);
 
         // 1. 获取设备信息
-        IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+        AccessDeviceView device = deviceService.getAccessDevice(deviceId);
         if (device == null) {
             log.warn("[checkDevice] 设备不存在: deviceId={}", deviceId);
             return DeviceSyncCheckResult.failure(deviceId, null, "设备不存在");
@@ -136,7 +136,7 @@ public class IotAccessDeviceSyncServiceImpl implements IotAccessDeviceSyncServic
         }
 
         // 3. 逐个删除多余用户
-        IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+        AccessDeviceView device = deviceService.getAccessDevice(deviceId);
         String ip = getDeviceIp(device);
         Integer port = getDevicePort(device);
         String deviceType = getAccessDeviceType(device);
@@ -193,7 +193,7 @@ public class IotAccessDeviceSyncServiceImpl implements IotAccessDeviceSyncServic
         }
 
         // 3. 获取设备关联的通道ID
-        IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+        AccessDeviceView device = deviceService.getAccessDevice(deviceId);
         Long channelId = getDefaultChannelId(deviceId);
 
         // 4. 逐个下发缺失用户
@@ -234,7 +234,7 @@ public class IotAccessDeviceSyncServiceImpl implements IotAccessDeviceSyncServic
     public DeviceSyncCheckResult fullSync(Long deviceId) {
         log.info("[fullSync] 开始全量同步: deviceId={}", deviceId);
 
-        IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+        AccessDeviceView device = deviceService.getAccessDevice(deviceId);
         if (device == null) {
             return DeviceSyncCheckResult.failure(deviceId, null, "设备不存在");
         }
@@ -324,7 +324,7 @@ public class IotAccessDeviceSyncServiceImpl implements IotAccessDeviceSyncServic
     public DeviceSyncCheckResult cleanSpecificUsers(Long deviceId, List<String> userIds) {
         log.info("[cleanSpecificUsers] 清理指定用户: deviceId={}, userIds={}", deviceId, userIds);
 
-        IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+        AccessDeviceView device = deviceService.getAccessDevice(deviceId);
         if (device == null) {
             return DeviceSyncCheckResult.failure(deviceId, null, "设备不存在");
         }
@@ -368,7 +368,7 @@ public class IotAccessDeviceSyncServiceImpl implements IotAccessDeviceSyncServic
         log.info("[queryDeviceUsers] ========== 开始查询设备用户 ==========");
         log.info("[queryDeviceUsers] deviceId={}", deviceId);
 
-        IotDeviceDO device = deviceService.getAccessDevice(deviceId);
+        AccessDeviceView device = deviceService.getAccessDevice(deviceId);
         if (device == null) {
             log.warn("[queryDeviceUsers] 设备不存在: deviceId={}", deviceId);
             return Collections.emptyList();
@@ -730,14 +730,14 @@ public class IotAccessDeviceSyncServiceImpl implements IotAccessDeviceSyncServic
 
     // ========== 设备信息获取辅助方法 ==========
 
-    private String getDeviceIp(IotDeviceDO device) {
+    private String getDeviceIp(AccessDeviceView device) {
         if (device.getConfig() != null) {
             return device.getConfig().getIpAddress();
         }
         return null;
     }
 
-    private Integer getDevicePort(IotDeviceDO device) {
+    private Integer getDevicePort(AccessDeviceView device) {
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
             return config.getPort() != null ? config.getPort() : 37777;
@@ -745,7 +745,7 @@ public class IotAccessDeviceSyncServiceImpl implements IotAccessDeviceSyncServic
         return 37777;
     }
 
-    private String getAccessDeviceType(IotDeviceDO device) {
+    private String getAccessDeviceType(AccessDeviceView device) {
         Boolean supportVideo = null;
         String configDeviceType = null;
 
@@ -764,7 +764,7 @@ public class IotAccessDeviceSyncServiceImpl implements IotAccessDeviceSyncServic
         return AccessDeviceTypeConstants.resolveDeviceType(configDeviceType, supportVideo);
     }
 
-    private String getDeviceUsername(IotDeviceDO device) {
+    private String getDeviceUsername(AccessDeviceView device) {
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
             return config.getUsername();
@@ -776,7 +776,7 @@ public class IotAccessDeviceSyncServiceImpl implements IotAccessDeviceSyncServic
         return null;
     }
 
-    private String getDevicePassword(IotDeviceDO device) {
+    private String getDevicePassword(AccessDeviceView device) {
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
             return config.getPassword();
