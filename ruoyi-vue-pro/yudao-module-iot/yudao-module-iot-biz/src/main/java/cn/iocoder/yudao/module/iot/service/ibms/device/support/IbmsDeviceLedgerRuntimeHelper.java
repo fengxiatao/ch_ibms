@@ -6,11 +6,8 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
-import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.service.video.IbmsDeviceVideoNetworkResolver;
 import org.apache.commons.lang3.StringUtils;
-
-import java.util.Map;
 
 /**
  * 台账 {@link IbmsDeviceDO} 与 {@link IbmsDeviceRuntimeDO} 上可读的状态/展示辅助方法。
@@ -66,84 +63,6 @@ public final class IbmsDeviceLedgerRuntimeHelper {
         d.setConfig(cfg);
         Integer st = resolveDeviceState(ibms, runtime);
         d.setState(st);
-        return d;
-    }
-
-    /**
-     * 供门禁能力刷新等仍依赖 {@link IotDeviceDO} 的路径使用：从台账 {@code extra} 与运行态拼 {@link GenericDeviceConfig} 壳。
-     *
-     * @deprecated M2-B 单源化阶段引入 {@code AccessDeviceView}（{@code service.access.dto.AccessDeviceView}），
-     *             门禁子系统应改用 {@code AccessDeviceView.of(IbmsDeviceDO, IbmsDeviceRuntimeDO)}。本方法保留仅供
-     *             {@code AccessManagementServiceImpl} / {@code IotAccessCardServiceImpl} /
-     *             {@code IotAccessChannelServiceImpl} / {@code IotAccessPermissionGroupServiceImpl} /
-     *             {@code IotAccessCredentialServiceImpl} 等尚未迁移路径过渡使用，迁移完成后应删除。
-     */
-    @Deprecated
-    public static IotDeviceDO buildLegacyAccessDeviceShell(IbmsDeviceDO ibms, IbmsDeviceRuntimeDO runtime) {
-        if (ibms == null) {
-            return null;
-        }
-        IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(ibms, runtime);
-        GenericDeviceConfig cfg = new GenericDeviceConfig();
-        cfg.setDeviceType(AccessDeviceTypeConstants.getAccessDeviceType(ibms));
-        cfg.setIpAddress(StringUtils.defaultIfBlank(net.ip, ""));
-        int port = 37777;
-        if (StrUtil.isNotBlank(ibms.getExtra())) {
-            try {
-                cn.hutool.json.JSONObject ex = JSONUtil.parseObj(ibms.getExtra().trim());
-                Integer p = ex.getInt("tcpPort");
-                if (p == null) {
-                    p = ex.getInt("port");
-                }
-                if (p != null) {
-                    port = p;
-                }
-                Object caps = ex.get("accessCapabilities");
-                if (caps != null) {
-                    cfg.set("accessCapabilities", caps);
-                }
-            } catch (Exception ignored) {
-                // keep defaults
-            }
-        }
-        if (runtime != null && runtime.getConfig() != null) {
-            try {
-                Map<String, Object> m = runtime.getConfig().toMap();
-                Object tcp = m.get("tcpPort");
-                if (tcp instanceof Number) {
-                    port = ((Number) tcp).intValue();
-                } else if (tcp != null) {
-                    try {
-                        port = Integer.parseInt(tcp.toString());
-                    } catch (NumberFormatException ignore) {
-                        // ignore
-                    }
-                }
-            } catch (Exception ignored) {
-                // ignore
-            }
-        }
-        cfg.setPort(port);
-        cfg.set("username", StringUtils.defaultIfBlank(net.username, "admin"));
-        cfg.set("password", StringUtils.defaultIfBlank(net.password, "admin123"));
-
-        IotDeviceDO d = new IotDeviceDO();
-        d.setId(ibms.getId());
-        d.setTenantId(ibms.getTenantId());
-        d.setSubsystemCode(ibms.getSubsystemCode());
-        d.setDeviceName(ibms.getName());
-        d.setNickname(ibms.getNickname());
-        d.setDeviceKey(ibms.getDeviceKey());
-        d.setProductId(ibms.getIbmsProductId());
-        d.setProductKey(ibms.getProductKey());
-        d.setConfig(cfg);
-        d.setState(resolveDeviceState(ibms, runtime));
-        if (runtime != null) {
-            d.setOnlineTime(runtime.getOnlineTime());
-            d.setOfflineTime(runtime.getOfflineTime());
-            d.setActiveTime(runtime.getActiveTime());
-            d.setFirmwareId(runtime.getFirmwareId());
-        }
         return d;
     }
 

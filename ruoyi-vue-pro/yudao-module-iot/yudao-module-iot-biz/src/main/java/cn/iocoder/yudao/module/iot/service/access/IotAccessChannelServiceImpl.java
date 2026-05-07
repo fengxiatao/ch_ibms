@@ -1,7 +1,6 @@
 package cn.iocoder.yudao.module.iot.service.access;
 
 import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
@@ -10,7 +9,7 @@ import cn.iocoder.yudao.module.iot.enums.device.AccessDeviceTypeConstants;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
 import cn.iocoder.yudao.module.iot.mq.producer.DeviceCommandPublisher;
 import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
-import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
+import cn.iocoder.yudao.module.iot.service.access.dto.AccessDeviceView;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -84,7 +83,7 @@ public class IotAccessChannelServiceImpl implements IotAccessChannelService {
      * @param device 设备信息
      * @return 设备类型（ACCESS_GEN1 或 ACCESS_GEN2）
      */
-    private String getDeviceType(IotDeviceDO device) {
+    private String getDeviceType(AccessDeviceView device) {
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
             String configDeviceType = config.getAccessDeviceType();
@@ -112,7 +111,7 @@ public class IotAccessChannelServiceImpl implements IotAccessChannelService {
         }
 
         var runtime = ibmsDeviceRuntimeService.getByDeviceId(deviceId);
-        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibms, runtime);
+        AccessDeviceView device = AccessDeviceView.of(ibms, runtime);
         if (device == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
@@ -343,7 +342,7 @@ public class IotAccessChannelServiceImpl implements IotAccessChannelService {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
         var runtime = ibmsDeviceRuntimeService.getByDeviceId(channel.getDeviceId());
-        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibms, runtime);
+        AccessDeviceView device = AccessDeviceView.of(ibms, runtime);
         if (device == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
@@ -441,11 +440,11 @@ public class IotAccessChannelServiceImpl implements IotAccessChannelService {
         }
         
         // 2. 获取设备信息
-        IotDeviceDO device = null;
+        AccessDeviceView device = null;
         IbmsDeviceDO ibms = ibmsDeviceMapper.selectById(channel.getDeviceId());
         if (ibms != null) {
             var runtime = ibmsDeviceRuntimeService.getByDeviceId(channel.getDeviceId());
-            device = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibms, runtime);
+            device = AccessDeviceView.of(ibms, runtime);
         }
 
         // 3. 构建响应VO

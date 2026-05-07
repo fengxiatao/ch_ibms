@@ -10,8 +10,8 @@ import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
 import cn.iocoder.yudao.module.iot.dal.dataobject.access.IotAccessPersonDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.access.IotAccessPersonDeviceAuthDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
+import cn.iocoder.yudao.module.iot.service.access.dto.AccessDeviceView;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
@@ -139,7 +139,7 @@ public class AccessManagementServiceImpl implements AccessManagementService {
                 .eq(IbmsDeviceDO::getSubsystemCode, ACCESS_SUBSYSTEM_CODE)
                 .orderByDesc(IbmsDeviceDO::getId));
 
-        List<IotDeviceDO> devices = buildAccessDeviceShells(ibmsDevices).stream()
+        List<AccessDeviceView> devices = buildAccessDeviceShells(ibmsDevices).stream()
                 .filter(d -> IotDeviceStateEnum.ONLINE.getState().equals(d.getState()))
                 .collect(Collectors.toList());
 
@@ -160,8 +160,7 @@ public class AccessManagementServiceImpl implements AccessManagementService {
 
         // 2. 组装 legacy 设备壳对象 + 运行态信息
         IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeMapper.selectById(deviceId);
-        IotDeviceDO device = cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper
-                .buildLegacyAccessDeviceShell(ibmsDevice, runtime);
+        AccessDeviceView device = AccessDeviceView.of(ibmsDevice, runtime);
         if (device == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
@@ -204,10 +203,9 @@ public class AccessManagementServiceImpl implements AccessManagementService {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
 
-        // 组装 legacy 设备壳对象（包含 ip/port/username/password/config）
+        // 组装设备视图
         IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeMapper.selectById(deviceId);
-        IotDeviceDO device = cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper
-                .buildLegacyAccessDeviceShell(ibmsDevice, runtime);
+        AccessDeviceView device = AccessDeviceView.of(ibmsDevice, runtime);
         if (device == null) {
             throw exception(ACCESS_DEVICE_NOT_EXISTS);
         }
@@ -230,8 +228,8 @@ public class AccessManagementServiceImpl implements AccessManagementService {
         String deviceType = AccessDeviceTypeConstants.resolveDeviceType(configDeviceType, supportVideo);
 
         Map<String, Object> params = new HashMap<>();
-        params.put("ipAddress", DeviceConfigHelper.getIpAddress(device));
-        params.put("port", DeviceConfigHelper.getPort(device) != null ? DeviceConfigHelper.getPort(device) : 37777);
+        params.put("ipAddress", DeviceConfigHelper.getIpAddress(device.getConfig()));
+        params.put("port", DeviceConfigHelper.getPort(device.getConfig()) != null ? DeviceConfigHelper.getPort(device.getConfig()) : 37777);
         // username/password 对 ACTIVE 设备在线检测通常需要；若配置里没有，newgateway 会按默认处理或失败
         if (device.getConfig() instanceof AccessDeviceConfig) {
             AccessDeviceConfig cfg = (AccessDeviceConfig) device.getConfig();
@@ -252,15 +250,15 @@ public class AccessManagementServiceImpl implements AccessManagementService {
     /**
      * 构建控制器树形结构
      */
-    private List<AccessControllerTreeVO> buildControllerTree(List<IotDeviceDO> devices) {
+    private List<AccessControllerTreeVO> buildControllerTree(List<AccessDeviceView> devices) {
         List<AccessControllerTreeVO> result = new ArrayList<>();
         
-        for (IotDeviceDO device : devices) {
+        for (AccessDeviceView device : devices) {
             AccessControllerTreeVO treeVO = new AccessControllerTreeVO();
             treeVO.setDeviceId(device.getId());
             treeVO.setDeviceName(device.getDeviceName());
             treeVO.setDeviceCode(device.getDeviceKey());
-            treeVO.setIpAddress(DeviceConfigHelper.getIpAddress(device));
+            treeVO.setIpAddress(DeviceConfigHelper.getIpAddress(device.getConfig()));
 
             // 设备类型（ACCESS_GEN1/ACCESS_GEN2）：优先从 config.deviceType 读取，兜底用 supportVideo 推断
             String configDeviceType = null;
@@ -365,7 +363,7 @@ public class AccessManagementServiceImpl implements AccessManagementService {
     /**
      * 构建控制器详情
      */
-    private AccessControllerDetailVO buildControllerDetail(IotDeviceDO device, String productName, 
+    private AccessControllerDetailVO buildControllerDetail(AccessDeviceView device, String productName, 
                                                            List<IotDeviceChannelDO> channels) {
         AccessControllerDetailVO detailVO = new AccessControllerDetailVO();
         
@@ -375,7 +373,7 @@ public class AccessManagementServiceImpl implements AccessManagementService {
         detailVO.setDeviceCode(device.getDeviceKey());
         detailVO.setProductId(device.getProductId());
         detailVO.setProductName(productName);
-        detailVO.setIpAddress(DeviceConfigHelper.getIpAddress(device));
+        detailVO.setIpAddress(DeviceConfigHelper.getIpAddress(device.getConfig()));
 
         // 设备类型（ACCESS_GEN1/ACCESS_GEN2）：优先从 config.deviceType 读取，兜底用 supportVideo 推断
         String configDeviceType = null;
@@ -698,7 +696,7 @@ public class AccessManagementServiceImpl implements AccessManagementService {
     /**
      * 把 {@code ibms_device + ibms_device_runtime} 转成 legacy 壳对象（仅用于现有 VO/命令参数拼装）。
      */
-    private List<IotDeviceDO> buildAccessDeviceShells(List<IbmsDeviceDO> ibmsDevices) {
+    private List<AccessDeviceView> buildAccessDeviceShells(List<IbmsDeviceDO> ibmsDevices) {
         if (ibmsDevices == null || ibmsDevices.isEmpty()) {
             return List.of();
         }
@@ -725,8 +723,7 @@ public class AccessManagementServiceImpl implements AccessManagementService {
                     }
                     cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO runtime =
                             runtimeMap.get(ibms.getId());
-                    return cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper
-                            .buildLegacyAccessDeviceShell(ibms, runtime);
+                    return AccessDeviceView.of(ibms, runtime);
                 })
                 .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
@@ -750,8 +747,7 @@ public class AccessManagementServiceImpl implements AccessManagementService {
         }
 
         IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeMapper.selectById(reqVO.getDeviceId());
-        IotDeviceDO device = cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper
-                .buildLegacyAccessDeviceShell(ibmsDevice, runtime);
+        AccessDeviceView device = AccessDeviceView.of(ibmsDevice, runtime);
         if (device == null) {
             return DoorControlRespVO.failure(reqVO.getDeviceId(), reqVO.getChannelId(),
                     reqVO.getAction(), "设备不存在");
@@ -842,7 +838,7 @@ public class AccessManagementServiceImpl implements AccessManagementService {
         params.put("deviceId", reqVO.getDeviceId());
         params.put("channelId", reqVO.getChannelId());
         params.put("channelNo", channelNo);
-        params.put("ipAddress", DeviceConfigHelper.getIpAddress(device));
+        params.put("ipAddress", DeviceConfigHelper.getIpAddress(device.getConfig()));
         params.put("port", port);
         params.put("username", username);
         params.put("password", password);
@@ -867,7 +863,7 @@ public class AccessManagementServiceImpl implements AccessManagementService {
                     .deviceId(reqVO.getDeviceId())
                     .channelId(reqVO.getChannelId())
                     .channelNo(channelNo)
-                    .ipAddress(DeviceConfigHelper.getIpAddress(device))
+                    .ipAddress(DeviceConfigHelper.getIpAddress(device.getConfig()))
                     .port(port)
                     .username(username)
                     .password(password)
@@ -1124,16 +1120,10 @@ public class AccessManagementServiceImpl implements AccessManagementService {
                 : personMapper.selectBatchIds(personIds).stream()
                         .collect(Collectors.toMap(IotAccessPersonDO::getId, Function.identity()));
         
-        Map<Long, IotDeviceDO> deviceMap = CollectionUtils.isEmpty(deviceIds) 
+        Map<Long, IbmsDeviceDO> deviceMap = CollectionUtils.isEmpty(deviceIds) 
                 ? Map.of() 
                 : ibmsDeviceMapper.selectBatchIds(deviceIds).stream()
-                        .map(ibms -> {
-                            IotDeviceDO shell = new IotDeviceDO();
-                            shell.setId(ibms.getId());
-                            shell.setDeviceName(ibms.getName());
-                            return shell;
-                        })
-                        .collect(Collectors.toMap(IotDeviceDO::getId, Function.identity()));
+                        .collect(Collectors.toMap(IbmsDeviceDO::getId, Function.identity()));
         
         Map<Long, IotDeviceChannelDO> channelMap = CollectionUtils.isEmpty(channelIds)
                 ? Map.of()
@@ -1156,9 +1146,9 @@ public class AccessManagementServiceImpl implements AccessManagementService {
         if (reqVO.getDeviceName() != null && !reqVO.getDeviceName().isEmpty()) {
             filteredRecords = filteredRecords.stream()
                     .filter(auth -> {
-                        IotDeviceDO device = deviceMap.get(auth.getDeviceId());
-                        return device != null && device.getDeviceName() != null 
-                                && device.getDeviceName().contains(reqVO.getDeviceName());
+                        IbmsDeviceDO device = deviceMap.get(auth.getDeviceId());
+                        return device != null && device.getName() != null 
+                                && device.getName().contains(reqVO.getDeviceName());
                     })
                     .collect(Collectors.toList());
         }
@@ -1178,7 +1168,7 @@ public class AccessManagementServiceImpl implements AccessManagementService {
     private PersonDeviceAuthVO convertToPersonDeviceAuthVO(
             IotAccessPersonDeviceAuthDO auth,
             Map<Long, IotAccessPersonDO> personMap,
-            Map<Long, IotDeviceDO> deviceMap,
+            Map<Long, IbmsDeviceDO> deviceMap,
             Map<Long, IotDeviceChannelDO> channelMap) {
         
         PersonDeviceAuthVO vo = new PersonDeviceAuthVO();
@@ -1203,9 +1193,9 @@ public class AccessManagementServiceImpl implements AccessManagementService {
         }
 
         // 关联设备信息
-        IotDeviceDO device = deviceMap.get(auth.getDeviceId());
+        IbmsDeviceDO device = deviceMap.get(auth.getDeviceId());
         if (device != null) {
-            vo.setDeviceName(device.getDeviceName());
+            vo.setDeviceName(device.getName());
         } else {
             vo.setDeviceName("未知设备");
         }

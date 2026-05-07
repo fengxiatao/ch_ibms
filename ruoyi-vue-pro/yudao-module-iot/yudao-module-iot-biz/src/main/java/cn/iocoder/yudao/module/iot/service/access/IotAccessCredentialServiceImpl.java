@@ -9,7 +9,6 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.access.IotAccessPersonDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.access.IotAccessPermissionGroupDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.access.IotAccessPermissionGroupPersonDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPersonCredentialMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPersonMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.access.IotAccessPermissionGroupDeviceMapper;
@@ -21,7 +20,7 @@ import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
 import cn.iocoder.yudao.module.iot.service.access.IotAccessEventLogService;
 import cn.iocoder.yudao.module.iot.service.access.IotAccessOperationLogService;
 import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
-import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
+import cn.iocoder.yudao.module.iot.service.access.dto.AccessDeviceView;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -101,7 +100,7 @@ public class IotAccessCredentialServiceImpl implements IotAccessCredentialServic
                 return respVO;
             }
             IbmsDeviceRuntimeDO runtime = ibmsDeviceRuntimeService.getByDeviceId(channel.getDeviceId());
-            IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(ibmsDevice, runtime);
+            AccessDeviceView device = AccessDeviceView.of(ibmsDevice, runtime);
             if (device == null) {
                 respVO.setMessage("设备不存在");
                 respVO.setFailReason("设备不存在");

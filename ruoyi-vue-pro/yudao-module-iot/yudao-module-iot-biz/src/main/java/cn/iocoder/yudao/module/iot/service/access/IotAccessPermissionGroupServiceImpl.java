@@ -11,7 +11,7 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
 import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
-import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
+import cn.iocoder.yudao.module.iot.service.access.dto.AccessDeviceView;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -292,13 +292,12 @@ public class IotAccessPermissionGroupServiceImpl implements IotAccessPermissionG
             if (device.getDeviceId() != null) {
                 IbmsDeviceDO ibmsDevice = ibmsDeviceMapper.selectById(device.getDeviceId());
                 if (ibmsDevice != null) {
-                    cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO deviceDO =
-                            IbmsDeviceLedgerRuntimeHelper.buildLegacyAccessDeviceShell(
-                                    ibmsDevice,
-                                    ibmsDeviceRuntimeService.getByDeviceId(device.getDeviceId()));
-                    if (deviceDO != null) {
-                        vo.setDeviceName(deviceDO.getDeviceName());
-                        vo.setDeviceIp(DeviceConfigHelper.getIpAddress(deviceDO));
+                    AccessDeviceView deviceView = AccessDeviceView.of(
+                            ibmsDevice,
+                            ibmsDeviceRuntimeService.getByDeviceId(device.getDeviceId()));
+                    if (deviceView != null) {
+                        vo.setDeviceName(deviceView.getDeviceName());
+                        vo.setDeviceIp(DeviceConfigHelper.getIpAddress(deviceView.getConfig()));
                     }
                 }
             }
