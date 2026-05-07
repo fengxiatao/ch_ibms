@@ -6,8 +6,6 @@ import cn.iocoder.yudao.module.iot.controller.admin.camera.vo.IotCameraForGatewa
 import cn.iocoder.yudao.module.iot.controller.admin.camera.vo.IotCameraPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.camera.vo.IotCameraSaveReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.camera.IotCameraDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.camera.IotCameraMapper;
@@ -28,7 +26,7 @@ import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.CAMERA_NOT_EXISTS;
-import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
+import cn.iocoder.yudao.module.iot.service.camera.dto.CameraDeviceView;
 
 /**
  * IoT 摄像头管理 Service实现类
@@ -209,17 +207,16 @@ public class IotCameraServiceImpl implements IotCameraService {
                 .stream()
                 .collect(Collectors.toMap(IbmsDeviceRuntimeDO::getDeviceId, r -> r, (a, b) -> a));
 
-        Map<Long, IotDeviceDO> deviceMap = ibmsDevices.stream()
-                .map(ibms -> IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(
-                        ibms, runtimeMap.get(ibms.getId())))
+        Map<Long, CameraDeviceView> deviceMap = ibmsDevices.stream()
+                .map(ibms -> CameraDeviceView.of(ibms, runtimeMap.get(ibms.getId())))
                 .filter(Objects::nonNull)
-                .collect(Collectors.toMap(IotDeviceDO::getId, device -> device));
+                .collect(Collectors.toMap(CameraDeviceView::getId, device -> device));
         
         // 组装返回结果
         List<IotCameraForGatewayRespVO> result = new ArrayList<>();
         for (IotCameraDO camera : cameras) {
-            IotDeviceDO device = deviceMap.get(camera.getDeviceId());
-            String ipAddress = DeviceConfigHelper.getIpAddress(device);
+            CameraDeviceView device = deviceMap.get(camera.getDeviceId());
+            String ipAddress = device != null ? device.getIp() : null;
             if (device == null || ipAddress == null) {
                 log.warn("[listForGateway] 设备不存在或IP为空，跳过: deviceId={}", camera.getDeviceId());
                 continue;

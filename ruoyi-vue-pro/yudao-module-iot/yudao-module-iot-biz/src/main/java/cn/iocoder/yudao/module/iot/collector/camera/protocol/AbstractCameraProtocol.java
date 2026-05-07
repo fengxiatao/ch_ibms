@@ -3,7 +3,7 @@ package cn.iocoder.yudao.module.iot.collector.camera.protocol;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpRequest;
 import cn.hutool.http.HttpResponse;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.service.camera.dto.CameraDeviceView;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
@@ -89,35 +89,10 @@ public abstract class AbstractCameraProtocol implements CameraProtocol {
     }
     
     /**
-     * 从设备配置中获取值
-     */
-    protected String getConfigValue(IotDeviceDO device, String key, String defaultValue) {
-        try {
-            if (device.getConfig() != null) {
-                Map<String, Object> configMap = device.getConfig().toMap();
-                if (configMap.containsKey(key)) {
-                    Object value = configMap.get(key);
-                    return value != null ? value.toString() : defaultValue;
-                }
-            }
-        } catch (Exception e) {
-            log.debug("[getConfigValue][获取配置失败: key={}, device={}]", key, device.getDeviceName(), e);
-        }
-        return defaultValue;
-    }
-    
-    /**
-     * 从设备配置中获取vendor
-     */
-    protected String getVendor(IotDeviceDO device) {
-        return getConfigValue(device, "vendor", "");
-    }
-    
-    /**
      * 测试设备连接（通用实现）
      */
     @Override
-    public boolean testConnection(IotDeviceDO device) {
+    public boolean testConnection(CameraDeviceView device) {
         try {
             Map<String, Object> properties = getDeviceProperties(device);
             return properties != null && !properties.isEmpty();

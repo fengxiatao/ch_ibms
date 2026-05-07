@@ -7,9 +7,7 @@ import cn.iocoder.yudao.module.iot.controller.admin.device.config.vo.*;
 import cn.iocoder.yudao.module.iot.core.messagebus.core.IotMessageBus;
 import cn.iocoder.yudao.module.iot.core.device.OnvifConfigMessage;
 import cn.iocoder.yudao.module.iot.core.messagebus.topics.IotMessageTopics;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
 import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +15,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
-import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
+import cn.iocoder.yudao.module.iot.service.camera.dto.CameraDeviceView;
 
 import java.util.Arrays;
 import java.util.UUID;
@@ -57,7 +55,7 @@ public class IotDeviceConfigServiceImpl implements IotDeviceConfigService {
         if (ibmsDevice == null) {
             throw exception(DEVICE_NOT_EXISTS);
         }
-        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(
+        CameraDeviceView device = CameraDeviceView.of(
                 ibmsDevice, ibmsDeviceRuntimeService.getByDeviceId(deviceId));
         if (device == null) {
             throw exception(DEVICE_NOT_EXISTS);
@@ -171,7 +169,7 @@ public class IotDeviceConfigServiceImpl implements IotDeviceConfigService {
         // 2. 发布配置同步请求到Gateway
         OnvifConfigMessage syncRequest = new OnvifConfigMessage();
         syncRequest.setRequestId(UUID.randomUUID().toString());
-        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(
+        CameraDeviceView device = CameraDeviceView.of(
                 ibmsDevice, ibmsDeviceRuntimeService.getByDeviceId(deviceId));
         if (device == null) {
             throw exception(DEVICE_NOT_EXISTS);
@@ -222,7 +220,7 @@ public class IotDeviceConfigServiceImpl implements IotDeviceConfigService {
         // 2. 重新构建默认配置
         IbmsDeviceDO ibmsDevice = ibmsDeviceMapper.selectById(deviceId);
         if (ibmsDevice != null) {
-            IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(
+            CameraDeviceView device = CameraDeviceView.of(
                     ibmsDevice, ibmsDeviceRuntimeService.getByDeviceId(deviceId));
             if (device != null) {
             DeviceConfigRespVO defaultConfig = buildDefaultConfig(device);
@@ -242,7 +240,7 @@ public class IotDeviceConfigServiceImpl implements IotDeviceConfigService {
         if (ibmsDevice == null) {
             throw exception(DEVICE_NOT_EXISTS);
         }
-        IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(
+        CameraDeviceView device = CameraDeviceView.of(
                 ibmsDevice, ibmsDeviceRuntimeService.getByDeviceId(deviceId));
         if (device == null) {
             throw exception(DEVICE_NOT_EXISTS);
@@ -281,14 +279,14 @@ public class IotDeviceConfigServiceImpl implements IotDeviceConfigService {
     /**
      * 构建默认配置
      */
-    private DeviceConfigRespVO buildDefaultConfig(IotDeviceDO device) {
+    private DeviceConfigRespVO buildDefaultConfig(CameraDeviceView device) {
         DeviceConfigRespVO config = new DeviceConfigRespVO();
         config.setDeviceId(device.getId());
         config.setDeviceName(device.getDeviceName());
 
-        // 网络配置（从 config 中获取 IP 地址）
+        // 网络配置（从 IBMS 视图直取 IP）
         DeviceConfigRespVO.NetworkConfig networkConfig = new DeviceConfigRespVO.NetworkConfig();
-        networkConfig.setIpAddress(DeviceConfigHelper.getIpAddress(device));
+        networkConfig.setIpAddress(device.getIp());
         networkConfig.setSubnetMask("255.255.255.0");
         networkConfig.setGateway("192.168.1.1");
         networkConfig.setDns("8.8.8.8");

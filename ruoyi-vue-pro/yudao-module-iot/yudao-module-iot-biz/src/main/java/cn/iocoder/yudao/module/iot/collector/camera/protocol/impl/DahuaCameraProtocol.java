@@ -1,8 +1,8 @@
 package cn.iocoder.yudao.module.iot.collector.camera.protocol.impl;
 
 import cn.hutool.core.util.StrUtil;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.collector.camera.protocol.AbstractCameraProtocol;
+import cn.iocoder.yudao.module.iot.service.camera.dto.CameraDeviceView;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -24,23 +24,22 @@ public class DahuaCameraProtocol extends AbstractCameraProtocol {
     }
     
     @Override
-    public boolean supports(IotDeviceDO device) {
-        String vendor = getVendor(device);
-        return "dahua".equalsIgnoreCase(vendor);
+    public boolean supports(CameraDeviceView device) {
+        return "dahua".equalsIgnoreCase(device.getVendor());
     }
     
     @Override
-    public Map<String, Object> getDeviceProperties(IotDeviceDO device) {
+    public Map<String, Object> getDeviceProperties(CameraDeviceView device) {
         Map<String, Object> properties = new HashMap<>();
         
-        String ip = cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper.getIpAddress(device);
+        String ip = device.getIp();
         if (StrUtil.isBlank(ip)) {
             log.warn("[getDeviceProperties][设备({}) IP地址为空]", device.getDeviceName());
             return properties;
         }
         
-        String username = getConfigValue(device, "username", "admin");
-        String password = getConfigValue(device, "password", "admin123");
+        String username = device.getUsername();
+        String password = device.getPassword();
         
         try {
             // 获取系统信息

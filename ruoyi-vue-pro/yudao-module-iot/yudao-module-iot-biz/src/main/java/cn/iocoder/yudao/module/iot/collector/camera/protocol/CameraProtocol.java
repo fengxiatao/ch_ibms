@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.iot.collector.camera.protocol;
 
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.service.camera.dto.CameraDeviceView;
 
 import java.util.Map;
 
@@ -26,7 +26,7 @@ public interface CameraProtocol {
      * @param device 设备信息
      * @return 是否支持
      */
-    boolean supports(IotDeviceDO device);
+    boolean supports(CameraDeviceView device);
     
     /**
      * 获取设备属性
@@ -34,7 +34,7 @@ public interface CameraProtocol {
      * @param device 设备信息
      * @return 属性键值对
      */
-    Map<String, Object> getDeviceProperties(IotDeviceDO device);
+    Map<String, Object> getDeviceProperties(CameraDeviceView device);
     
     /**
      * 测试设备连接
@@ -42,5 +42,5 @@ public interface CameraProtocol {
      * @param device 设备信息
      * @return 是否在线
      */
-    boolean testConnection(IotDeviceDO device);
+    boolean testConnection(CameraDeviceView device);
 }

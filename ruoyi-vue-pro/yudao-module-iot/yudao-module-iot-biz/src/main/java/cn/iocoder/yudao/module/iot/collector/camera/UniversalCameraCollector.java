@@ -4,11 +4,10 @@ import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.core.mq.producer.IotDeviceMessageProducer;
 import cn.iocoder.yudao.module.iot.collector.camera.protocol.CameraProtocol;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
+import cn.iocoder.yudao.module.iot.service.camera.dto.CameraDeviceView;
 import cn.iocoder.yudao.module.iot.service.ibms.device.IbmsDeviceRuntimeService;
-import cn.iocoder.yudao.module.iot.service.ibms.device.support.IbmsDeviceLedgerRuntimeHelper;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -92,7 +91,7 @@ public class UniversalCameraCollector {
                 log.info("[pollCameraStatus][开始轮询产品(ibms_product_id={}) 的 {} 个设备]", productId, ledgers.size());
 
                 for (IbmsDeviceDO ledger : ledgers) {
-                    IotDeviceDO device = IbmsDeviceLedgerRuntimeHelper.buildLegacyCameraCollectorShell(ledger,
+                    CameraDeviceView device = CameraDeviceView.of(ledger,
                             ibmsDeviceRuntimeService.getByDeviceId(ledger.getId()));
                     if (device == null) {
                         continue;
@@ -112,7 +111,7 @@ public class UniversalCameraCollector {
     /**
      * 轮询单个设备
      */
-    private void pollSingleDevice(IotDeviceDO device) {
+    private void pollSingleDevice(CameraDeviceView device) {
         log.debug("[pollSingleDevice][开始轮询设备: {}]", device.getDeviceName());
         
         // 1. 获取或选择协议
@@ -150,7 +149,7 @@ public class UniversalCameraCollector {
     /**
      * 获取设备对应的协议
      */
-    private CameraProtocol getProtocol(IotDeviceDO device) {
+    private CameraProtocol getProtocol(CameraDeviceView device) {
         // 1. 从缓存获取
         CameraProtocol cached = protocolCache.get(device.getId());
         if (cached != null && cached.supports(device)) {
@@ -174,7 +173,7 @@ public class UniversalCameraCollector {
     /**
      * 上报离线状态
      */
-    private void reportOfflineStatus(IotDeviceDO device) {
+    private void reportOfflineStatus(CameraDeviceView device) {
         Map<String, Object> properties = Map.of("device_status", 0);
         
         IotDeviceMessage message = IotDeviceMessage.builder()
