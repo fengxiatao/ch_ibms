@@ -1,6 +1,5 @@
 package cn.iocoder.yudao.module.iot.service.device;
 
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.gis.FloorDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
@@ -176,8 +175,8 @@ public class DeviceCoordinateSyncService {
         result.getLogs().add("开始匹配数据库中的设备...");
         
         for (DxfDeviceRecognizer.RecognizedDevice dxfDevice : dxfDevices) {
-            // 尝试多种方式匹配设备
-            IotDeviceDO device = findMatchingDevice(floorId, dxfDevice);
+            // 尝试多种方式匹配设备（直接返回 IBMS 台账）
+            IbmsDeviceDO device = findMatchingDevice(floorId, dxfDevice);
             
             if (device != null) {
                 result.setMatched(result.getMatched() + 1);
@@ -194,7 +193,7 @@ public class DeviceCoordinateSyncService {
                     result.setUpdated(result.getUpdated() + 1);
                     
                     result.getLogs().add(String.format("✅ 更新设备 [%s]: (%.2fm, %.2fm, %.2fm)",
-                        device.getDeviceName(),
+                        device.getName(),
                         dxfDevice.getX(),
                         dxfDevice.getY(),
                         dxfDevice.getZ()
@@ -202,7 +201,7 @@ public class DeviceCoordinateSyncService {
                     
                 } catch (Exception e) {
                     result.setFailed(result.getFailed() + 1);
-                    result.getLogs().add("❌ 更新失败 [" + device.getDeviceName() + "]: " + e.getMessage());
+                    result.getLogs().add("❌ 更新失败 [" + device.getName() + "]: " + e.getMessage());
                     log.error("【设备坐标同步】更新设备坐标失败: {}", device.getId(), e);
                 }
             } else {
@@ -249,24 +248,24 @@ public class DeviceCoordinateSyncService {
     }
 
     /**
-     * 查找匹配的设备
+     * 查找匹配的设备（返回 IBMS 台账 DO）
      * 匹配策略：
-     * 1. 优先按设备序列号匹配（device.serialNumber == dxfDevice.blockName）
-     * 2. 按设备Key匹配（device.deviceKey 包含 dxfDevice.blockName）
-     * 3. 按设备名称匹配（device.deviceName 包含 dxfDevice.name）
+     * 1. 优先按序列号匹配（ibms_device.sn == dxfDevice.code）
+     * 2. 按块名称匹配（sn 或 device_key 包含 dxfDevice.blockName）
+     * 3. 按设备名称模糊匹配（ibms_device.name 前缀）
      * 4. 最后按设备类型+图层匹配
      */
-    private IotDeviceDO findMatchingDevice(Long floorId, DxfDeviceRecognizer.RecognizedDevice dxfDevice) {
+    private IbmsDeviceDO findMatchingDevice(Long floorId, DxfDeviceRecognizer.RecognizedDevice dxfDevice) {
         // 说明：ibms_device 不直接落地 floor/localX 等字段；此处仅做“可编译”的匹配收敛，
         // 坐标落库仍写入 ibms_device_runtime（已完成）。
 
-        // 策略1：按序列号匹配（iot_device.serialNumber -> ibms_device.sn）
+        // 策略1：按序列号匹配【ibms_device.sn】
         if (dxfDevice.getCode() != null && !dxfDevice.getCode().isEmpty()) {
             IbmsDeviceDO ibms = ibmsDeviceMapper.selectOne(new LambdaQueryWrapper<IbmsDeviceDO>()
                     .eq(IbmsDeviceDO::getSn, dxfDevice.getCode()));
             if (ibms != null) {
                 log.debug("【匹配】按序列号匹配成功: {}", dxfDevice.getCode());
-                return buildDeviceShell(ibms);
+                return ibms;
             }
         }
 
@@ -278,7 +277,7 @@ public class DeviceCoordinateSyncService {
                             .or().like(IbmsDeviceDO::getDeviceKey, blockName)));
             if (ibms != null) {
                 log.debug("【匹配】按块名称匹配成功: {}", dxfDevice.getBlockName());
-                return buildDeviceShell(ibms);
+                return ibms;
             }
         }
 
@@ -293,7 +292,7 @@ public class DeviceCoordinateSyncService {
 
             if (!ibmsList.isEmpty()) {
                 log.debug("【匹配】按名称前缀匹配成功: {} (找到 {} 个)", namePrefix, ibmsList.size());
-                return buildDeviceShell(ibmsList.get(0));
+                return ibmsList.get(0);
             }
         }
 
@@ -305,7 +304,7 @@ public class DeviceCoordinateSyncService {
 
             if (!ibmsList.isEmpty()) {
                 log.debug("【匹配】按图层名称匹配成功: 监控系统 -> 摄像头 (找到 {} 个)", ibmsList.size());
-                return buildDeviceShell(ibmsList.get(0));
+                return ibmsList.get(0);
             }
         }
 
@@ -315,18 +314,6 @@ public class DeviceCoordinateSyncService {
                 dxfDevice.getBlockName());
 
         return null;
-    }
-
-    private IotDeviceDO buildDeviceShell(IbmsDeviceDO ibms) {
-        if (ibms == null) {
-            return null;
-        }
-        IotDeviceDO d = new IotDeviceDO();
-        d.setId(ibms.getId());
-        d.setDeviceName(ibms.getName());
-        d.setDeviceKey(ibms.getDeviceKey());
-        d.setNickname(ibms.getNickname());
-        return d;
     }
 
     /**
