@@ -26,6 +26,27 @@
 
 历史 fallback mock（M2-A `ed251c6` / M2-D `0b62d00` 留的）已纳入清理清单 `M2-D-FOLLOWUP`（M2-D 闭环子任务）。
 
+### 1.2 全局硬规则：单源数据（2026-05-08 用户明确指示）
+
+**专业业务模块禁止再定义自己的设备/空间/通道数据体系，必须统一使用智慧物联（IBMS）设备中台数据**。
+
+1. **禁止新建业务专属的设备/通道/空间表**：禁 `SecurityDeviceDO` / `AccessDeviceDO` / `EnergyDeviceDO` 等；业务模块只从 `ibms_device` / `ibms_channel` / `ibms_space` 读取
+2. **业务表引用设备/空间字段必须用外键 ID**：例 `security_personnel_control.control_cameras` JSON 必须存 `ibms_device.id` 数组；`control_areas` JSON 必须存 `ibms_space.id` 数组
+3. **业务 Service 只可注入 `Ibms*Mapper`**：`IbmsDeviceMapper` / `IbmsChannelMapper` / `IbmsSpaceMapper`；禁 `IotDeviceMapper` / `IotAccessDeviceMapper` / `SpatialXxxMapper` 老体系
+4. **业务 RespVO 中的设备字段只用 `IbmsDeviceRespVO` / `IbmsDeviceRespVO.Simple`**，禁嵌入 `IotDeviceRespVO` 等老类型
+5. **新代码 grep self-check**：提交前 grep `iot_device` / `IotDeviceDO` / `spatial_` 新增 0 命中方可提交
+6. 历史违规代码列入清理清单：`IotAccessDeviceServiceImpl` 混用 `IotDeviceDO` → GAP-011 / M2-B
+
+**每个新建/改动模块的 DoD 必须新增一条**：本次改动 0 违规引用（grep `iot_device`/`IotDeviceDO`/`spatial_` 对比基线 0 新增）。
+
+### 1.3 规则优先级与交互
+
+**规则先后**：
+
+- 先立规则（§1.1 零 Mock + §1.2 单源数据）→ 再推进任何新代码
+- M2-B（access 单源化）完成后再进 M6-A（安防业务补齐）——避免 M6-A 新代码引用仍未单源化的 access 模块，形成新债
+- 若并行推进，M6-A 所有新 Java 代码必须**严格遵守 §1.2**，禁引用 `IotDeviceDO` 等老类型
+
 ---
 
 ## 2. 现状基线（2026-05-06 调研结果）

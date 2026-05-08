@@ -26,7 +26,19 @@
 - 每个 M 阶段 DoD 必须包含「该阶段 0 mock 残留」一项
 - 详见主计划 `docs/ibms-unified-data-source-plan.md` §1.1
 
-### 1.2 本地端口（2026-05-08）
+### 1.2 全局硬规则：单源数据（2026-05-08）
+
+**业务模块禁止再定义自己的设备/空间/通道数据体系，必须统一使用 IBMS 设备中台数据**。
+
+- **禁新建业务专属设备/通道/空间表**：禁 SecurityDeviceDO / AccessDeviceDO / EnergyDeviceDO 等
+- **业务表引用设备/空间字段必须用 `ibms_device.id` / `ibms_channel.id` / `ibms_space.id`**（Long 或 JSON ID 数组）
+- **业务 Service 只可注入 `Ibms*Mapper`**；禁 `IotDeviceMapper` / `IotAccessDeviceMapper` / `SpatialXxxMapper` 老体系
+- **业务 RespVO 设备信息字段只用 `IbmsDeviceRespVO` / `IbmsDeviceRespVO.Simple`**
+- **新代码 grep self-check**：提交前 grep `iot_device` / `IotDeviceDO` / `spatial_` 新增 0 命中方可提交
+- 历史违规（如 `IotAccessDeviceServiceImpl` 混用 `IotDeviceDO`）→ GAP-011 / M2-B 清理中
+- 详见主计划 `docs/ibms-unified-data-source-plan.md` §1.2
+
+### 1.3 本地端口（2026-05-08）
 
 - **后端 yudao-server**：`http://127.0.0.1:48888`（非默认 48080）
 - **前端 yudao-ui-admin-vue3**：`http://127.0.0.1:3000`（非 Vite 默认 5173）
