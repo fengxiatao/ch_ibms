@@ -8,8 +8,6 @@ import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.iot.controller.admin.video.vo.NvrChannelRespVO;
 import cn.iocoder.yudao.module.iot.controller.admin.video.vo.NvrRespVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
 import cn.iocoder.yudao.module.iot.service.channel.IotDeviceChannelService;
@@ -37,9 +35,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
@@ -799,31 +795,6 @@ public class NvrController {
                 .orElseGet(() -> ibmsDeviceMapper.selectById(nvrId));
     }
 
-    /**
-     * 将数据库通道转换为设备对象（用于兼容现有逻辑）
-     */
-    private List<IotDeviceDO> convertChannelsToDevices(List<IotDeviceChannelDO> channels) {
-        return channels.stream().map(ch -> {
-            IotDeviceDO device = new IotDeviceDO();
-            device.setId(ch.getId());
-            device.setDeviceName(ch.getChannelName());
-            device.setNickname(ch.getChannelName());
-            device.setState(ch.getOnlineStatus());
-            
-            // 构建config - 使用 AccessDeviceConfig 作为通用配置，包含 IP 地址
-            Map<String, Object> configMap = new HashMap<>();
-            configMap.put("channel", ch.getChannelNo() != null ? ch.getChannelNo() : 0);
-            if (ch.getTargetIp() != null) {
-                configMap.put("ipAddress", ch.getTargetIp());
-            }
-            AccessDeviceConfig config = new AccessDeviceConfig();
-            config.fromMap(configMap);
-            device.setConfig(config);
-            
-            return device;
-        }).collect(Collectors.toList());
-    }
-    
     /**
      * 从 config JSON 中提取 IP 地址
      * 

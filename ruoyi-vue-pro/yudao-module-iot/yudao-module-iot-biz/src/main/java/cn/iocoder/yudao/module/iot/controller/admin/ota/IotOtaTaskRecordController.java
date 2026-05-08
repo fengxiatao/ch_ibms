@@ -8,7 +8,6 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.iot.controller.admin.ota.vo.task.record.IotOtaTaskRecordPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.ota.vo.task.record.IotOtaTaskRecordRespVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaFirmwareDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ota.IotOtaTaskRecordDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsDeviceMapper;
@@ -75,14 +74,14 @@ public class IotOtaTaskRecordController {
          // 批量查询固件信息
          Map<Long, IotOtaFirmwareDO> firmwareMap = otaFirmwareService.getOtaFirmwareMap(
             convertSet(pageResult.getList(), IotOtaTaskRecordDO::getFromFirmwareId));
-        Map<Long, IotDeviceDO> deviceMap = buildOtaRecordDeviceDisplayMap(
+        Map<Long, IbmsDeviceDO> deviceMap = buildOtaRecordDeviceDisplayMap(
                 convertSet(pageResult.getList(), IotOtaTaskRecordDO::getDeviceId));
         // 转换为响应 VO
         return success(BeanUtils.toBean(pageResult, IotOtaTaskRecordRespVO.class, (vo) -> {
             MapUtils.findAndThen(firmwareMap, vo.getFromFirmwareId(), firmware ->
                 vo.setFromFirmwareVersion(firmware.getVersion()));
             MapUtils.findAndThen(deviceMap, vo.getDeviceId(), device ->
-                vo.setDeviceName(device.getDeviceName()));
+                vo.setDeviceName(device.getName()));
         }));
     }
 
@@ -95,22 +94,18 @@ public class IotOtaTaskRecordController {
         return success(BeanUtils.toBean(upgradeRecord, IotOtaTaskRecordRespVO.class));
     }
 
-    private Map<Long, cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO> buildOtaRecordDeviceDisplayMap(Set<Long> deviceIds) {
+    private Map<Long, IbmsDeviceDO> buildOtaRecordDeviceDisplayMap(Set<Long> deviceIds) {
         if (CollUtil.isEmpty(deviceIds)) {
             return Collections.emptyMap();
         }
         var ibmsList = ibmsDeviceMapper.selectBatchIds(deviceIds);
-        Map<Long, cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO> map = new HashMap<>();
+        Map<Long, IbmsDeviceDO> map = new HashMap<>();
         if (ibmsList != null) {
             for (IbmsDeviceDO ibms : ibmsList) {
                 if (ibms == null || ibms.getId() == null) {
                     continue;
                 }
-                cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO shell =
-                        new cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO();
-                shell.setId(ibms.getId());
-                shell.setDeviceName(ibms.getName());
-                map.put(ibms.getId(), shell);
+                map.put(ibms.getId(), ibms);
             }
         }
         return map;

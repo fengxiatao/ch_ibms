@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.iot.service.device.handler.property;
 
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -42,7 +42,7 @@ public interface IotDevicePropertyHandler {
      * @param properties 属性Map（key=属性标识符，value=属性值）
      * @return true=继续处理，false=终止后续处理
      */
-    default boolean beforePropertyHandle(IotDeviceDO device, Map<String, Object> properties) {
+    default boolean beforePropertyHandle(IbmsDeviceDO device, Map<String, Object> properties) {
         return true;
     }
 
@@ -53,7 +53,7 @@ public interface IotDevicePropertyHandler {
      * @param properties 属性Map（key=属性标识符，value=属性值）
      * @param reportTime 上报时间
      */
-    void handleProperty(IotDeviceDO device, Map<String, Object> properties, LocalDateTime reportTime);
+    void handleProperty(IbmsDeviceDO device, Map<String, Object> properties, LocalDateTime reportTime);
 
     /**
      * 属性处理后置钩子
@@ -61,7 +61,7 @@ public interface IotDevicePropertyHandler {
      * @param device 设备信息
      * @param properties 属性Map（key=属性标识符，value=属性值）
      */
-    default void afterPropertyHandle(IotDeviceDO device, Map<String, Object> properties) {
+    default void afterPropertyHandle(IbmsDeviceDO device, Map<String, Object> properties) {
         // 默认空实现
     }
 

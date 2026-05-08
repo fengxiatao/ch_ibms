@@ -4,7 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.module.iot.core.enums.IotDeviceMessageMethodEnum;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceConstants;
 import cn.iocoder.yudao.module.iot.dal.dataobject.rule.IotSceneRuleDO;
 import cn.iocoder.yudao.module.iot.service.ibms.device.support.OtaDeviceView;
 import cn.iocoder.yudao.module.iot.enums.rule.IotSceneRuleActionTypeEnum;
@@ -45,7 +45,7 @@ public class IotDeviceControlSceneRuleAction implements IotSceneRuleAction {
         }
 
         // 2. 判断是否为全部设备
-        if (IotDeviceDO.DEVICE_ID_ALL.equals(actionConfig.getDeviceId())) {
+        if (IbmsDeviceConstants.DEVICE_ID_ALL.equals(actionConfig.getDeviceId())) {
             executeForAllDevices(message, rule, actionConfig);
         } else {
             executeForSingleDevice(message, rule, actionConfig);

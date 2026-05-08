@@ -14,9 +14,9 @@ import java.time.LocalDateTime;
 /**
  * 摄像头设备只读视图（M2-E GAP-011 单源化）
  *
- * <p>包装 ibms_device 台账 + ibms_device_runtime 运行态，对外提供与历史 IotDeviceDO
+ * <p>包装 ibms_device 台账 + ibms_device_runtime 运行态，对外提供与历史 legacy 设备 DO
  * 同名访问器 + Camera 专属字段（vendor / 网络参数），避免下游消费者继续经手
- * {@code IotDeviceDO} 壳类型与冗余 {@code GenericDeviceConfig} 打包/解包 round-trip。</p>
+ * legacy 设备壳类型与冗余 {@code GenericDeviceConfig} 打包/解包 round-trip。</p>
  *
  * <p>该 View 不参与持久化，仅作为 Service / Protocol 层返回类型；写操作仍走
  * {@code IbmsDeviceService} / {@code IbmsDeviceRuntimeService}。</p>
@@ -88,7 +88,7 @@ public final class CameraDeviceView {
         return net;
     }
 
-    // ===== 与 IotDeviceDO 同名 getter（最小侵入下游 caller） =====
+    // ===== 与 legacy 设备 DO 同名 getter（最小侵入下游 caller） =====
 
     public Long getId() {
         return ledger.getId();
@@ -106,7 +106,7 @@ public final class CameraDeviceView {
         return ledger.getUpdateTime();
     }
 
-    /** 对应 IotDeviceDO.deviceName，映射自 ibms_device.name。 */
+    /** 对应 legacy deviceName，映射自 ibms_device.name。 */
     public String getDeviceName() {
         return ledger.getName();
     }
@@ -123,7 +123,7 @@ public final class CameraDeviceView {
         return ledger.getProductKey();
     }
 
-    /** 对应 IotDeviceDO.productId，映射自 ibms_device.ibms_product_id。 */
+    /** 对应 legacy productId，映射自 ibms_device.ibms_product_id。 */
     public Long getProductId() {
         return ledger.getIbmsProductId();
     }
@@ -137,7 +137,7 @@ public final class CameraDeviceView {
     }
 
     /**
-     * 历史 IotDeviceDO.address 字段在 buildLegacyCameraCollectorShell 中从未被设置，
+     * 历史 legacy device.address 字段在 buildLegacyCameraCollectorShell 中从未被设置，
      * 故现网调用方拿到的始终为 null；此处保持等价行为。如需地址，请改用 {@link #getIp()}
      * 或 {@code getLedger().getExtra()} 自行解析。
      */

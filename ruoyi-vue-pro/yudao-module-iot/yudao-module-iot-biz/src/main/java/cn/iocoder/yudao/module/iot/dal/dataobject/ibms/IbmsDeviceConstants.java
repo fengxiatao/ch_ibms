@@ -3,7 +3,7 @@ package cn.iocoder.yudao.module.iot.dal.dataobject.ibms;
 /**
  * IBMS 设备常量。
  *
- * <p>从历史 {@code IotDeviceDO} 静态常量收敛而来（M2-B-PHASE2 单源化）。</p>
+ * <p>从历史 legacy 设备 DO 静态常量收敛而来（M2-B-PHASE2 单源化）。</p>
  */
 public final class IbmsDeviceConstants {
 

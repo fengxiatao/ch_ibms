@@ -7,9 +7,9 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 
 /**
- * OTA / 场景规则 / 下行消息 / 设备 Job 等仍消费 legacy {@code IotDeviceDO} 字段子集的统一只读视图（M2-D 阶段二 GAP-011 收口）。
+ * OTA / 场景规则 / 下行消息 / 设备 Job 等仍消费 legacy 设备 DO 字段子集的统一只读视图（M2-D 阶段二 GAP-011 收口）。
  *
- * <p>包装 {@link IbmsDeviceDO} 台账 + {@link IbmsDeviceRuntimeDO} 运行态，对外暴露与 {@code IotDeviceDO} 同名 getter
+ * <p>包装 {@link IbmsDeviceDO} 台账 + {@link IbmsDeviceRuntimeDO} 运行态，对外暴露与 legacy 设备 DO 同名 getter
  * （id / tenantId / productId / productKey / deviceName / deviceType / state / firmwareId / jobConfig），
  * 取代 {@code IbmsDeviceLedgerRuntimeHelper#buildLegacyOtaDeviceShell} 的"造壳 + 解壳" round-trip。</p>
  *
@@ -43,7 +43,7 @@ public final class OtaDeviceView {
         return runtime;
     }
 
-    // ===== IotDeviceDO 同名访问器 =====
+    // ===== legacy 设备 DO 同名访问器 =====
 
     public Long getId() {
         return ledger.getId();
@@ -53,7 +53,7 @@ public final class OtaDeviceView {
         return ledger.getTenantId();
     }
 
-    /** 对应 IotDeviceDO.deviceName，映射自 ibms_device.name。 */
+    /** 对应 legacy deviceName，映射自 ibms_device.name。 */
     public String getDeviceName() {
         return ledger.getName();
     }
@@ -70,13 +70,13 @@ public final class OtaDeviceView {
         return ledger.getProductKey();
     }
 
-    /** 对应 IotDeviceDO.productId，映射自 ibms_device.ibms_product_id。 */
+    /** 对应 legacy productId，映射自 ibms_device.ibms_product_id。 */
     public Long getProductId() {
         return ledger.getIbmsProductId();
     }
 
     /**
-     * 设备类型（整型枚举），与 {@code IotDeviceDO.deviceType} 同型；映射自 {@code ibms_device.device_type}。
+     * 设备类型（整型枚举），与 legacy deviceType 同型；映射自 {@code ibms_device.device_type}。
      */
     public Integer getDeviceType() {
         return ledger.getDeviceType();

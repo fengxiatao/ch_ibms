@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.iot.service.device.handler.event;
 
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.service.device.event.IotDeviceEventService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -41,16 +41,16 @@ public class DeviceEventProcessor {
      * @param eventTime 事件时间
      * @return 最后一个处理器的返回结果
      */
-    public Object processEvent(IotDeviceDO device, String eventIdentifier, 
+    public Object processEvent(IbmsDeviceDO device, String eventIdentifier, 
                               Map<String, Object> params, LocalDateTime eventTime) {
         
-        log.info("[事件处理][设备: {}, 事件: {}]", device.getDeviceName(), eventIdentifier);
+        log.info("[事件处理][设备: {}, 事件: {}]", device.getName(), eventIdentifier);
         
         // 1. 记录事件到数据库/日志
         try {
             deviceEventService.saveDeviceEvent(device, eventIdentifier, params, eventTime);
         } catch (Exception e) {
-            log.error("[事件存储失败][设备: {}, 事件: {}]", device.getDeviceName(), eventIdentifier, e);
+            log.error("[事件存储失败][设备: {}, 事件: {}]", device.getName(), eventIdentifier, e);
             // 存储失败不影响后续处理器执行
         }
         
@@ -62,12 +62,12 @@ public class DeviceEventProcessor {
             .collect(Collectors.toList());
         
         if (matchedHandlers.isEmpty()) {
-            log.debug("[无事件处理器][设备: {}, 事件: {}]", device.getDeviceName(), eventIdentifier);
+            log.debug("[无事件处理器][设备: {}, 事件: {}]", device.getName(), eventIdentifier);
             return null;
         }
         
         log.debug("[事件处理器匹配][设备: {}, 事件: {}, 处理器数: {}]", 
-            device.getDeviceName(), eventIdentifier, matchedHandlers.size());
+            device.getName(), eventIdentifier, matchedHandlers.size());
         
         // 3. 执行事件处理器（按优先级）
         Object lastResult = null;
@@ -75,10 +75,10 @@ public class DeviceEventProcessor {
             try {
                 lastResult = handler.handleEvent(device, params, eventTime);
                 log.info("[事件处理成功][设备: {}, 事件: {}, 处理器: {}]", 
-                    device.getDeviceName(), eventIdentifier, handler.getClass().getSimpleName());
+                    device.getName(), eventIdentifier, handler.getClass().getSimpleName());
             } catch (Exception e) {
                 log.error("[事件处理失败][设备: {}, 事件: {}, 处理器: {}]", 
-                    device.getDeviceName(), eventIdentifier, handler.getClass().getSimpleName(), e);
+                    device.getName(), eventIdentifier, handler.getClass().getSimpleName(), e);
                 // 单个处理器失败不影响其他处理器
             }
         }

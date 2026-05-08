@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.iot.service.device.event;
 
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -20,7 +20,7 @@ public interface IotDeviceEventService {
      * @param params 事件参数
      * @param eventTime 事件时间
      */
-    void saveDeviceEvent(IotDeviceDO device, String eventIdentifier, 
+    void saveDeviceEvent(IbmsDeviceDO device, String eventIdentifier, 
                         Map<String, Object> params, LocalDateTime eventTime);
 }
 

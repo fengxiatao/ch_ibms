@@ -3,9 +3,6 @@ package cn.iocoder.yudao.module.iot.enums.device;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.AccessDeviceConfig;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 
 /**
@@ -73,45 +70,17 @@ public final class AccessDeviceTypeConstants {
     }
 
     /**
-     * 【统一入口】从设备对象获取门禁设备类型
-     * <p>
-     * 所有需要获取门禁设备类型的地方都应该调用此方法，确保逻辑一致。
-     * </p>
+     * 【统一入口】从 IBMS 设备台账获取门禁设备类型
+     * <p>从 {@code ibms_device.extra} JSON 解析门禁插件 deviceType。</p>
      * <p>优先级：</p>
      * <ol>
-     *   <li>AccessDeviceConfig.accessDeviceType（显式配置的设备子类型）</li>
-     *   <li>GenericDeviceConfig["deviceType"]（兼容旧格式）</li>
+     *   <li>extra.accessDeviceType（显式配置的设备子类型）</li>
+     *   <li>extra.deviceType（兼容旧格式）</li>
      *   <li>根据 supportVideo 推断（兜底逻辑）</li>
      * </ol>
      *
-     * @param device 设备对象
+     * @param device IBMS 设备台账对象
      * @return ACCESS_GEN1 或 ACCESS_GEN2，如果无法判断则返回 ACCESS_GEN1
-     */
-    public static String getAccessDeviceType(IotDeviceDO device) {
-        if (device == null || device.getConfig() == null) {
-            return ACCESS_GEN1;
-        }
-
-        String configDeviceType = null;
-        Boolean supportVideo = null;
-
-        if (device.getConfig() instanceof AccessDeviceConfig) {
-            AccessDeviceConfig config = (AccessDeviceConfig) device.getConfig();
-            configDeviceType = config.getAccessDeviceType();
-            supportVideo = config.getSupportVideo();
-        } else if (device.getConfig() instanceof GenericDeviceConfig) {
-            GenericDeviceConfig config = (GenericDeviceConfig) device.getConfig();
-            Object dt = config.get("deviceType");
-            Object sv = config.get("supportVideo");
-            configDeviceType = dt != null ? dt.toString() : null;
-            supportVideo = (sv instanceof Boolean) ? (Boolean) sv : null;
-        }
-
-        return resolveDeviceType(configDeviceType, supportVideo);
-    }
-
-    /**
-     * 从 {@code ibms_device.extra} JSON 解析门禁插件 deviceType（与 {@link #getAccessDeviceType(IotDeviceDO)} 语义对齐）。
      */
     public static String getAccessDeviceType(IbmsDeviceDO device) {
         if (device == null || StrUtil.isBlank(device.getExtra())) {

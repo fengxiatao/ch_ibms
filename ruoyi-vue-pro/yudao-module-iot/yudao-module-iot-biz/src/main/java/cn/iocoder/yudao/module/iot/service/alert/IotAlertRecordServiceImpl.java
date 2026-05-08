@@ -49,25 +49,4 @@ public class IotAlertRecordServiceImpl implements IotAlertRecordService {
                 .processStatus(true).processRemark(processRemark).build());
     }
 
-//    @Override
-//    public Long createAlertRecord(IotAlertConfigDO config, Long sceneRuleId, IotDeviceMessage message) {
-//        // 构建告警记录
-//        IotAlertRecordDO.IotAlertRecordDOBuilder builder = IotAlertRecordDO.builder()
-//                .configId(config.getId()).configName(config.getName()).configLevel(config.getLevel())
-//                .sceneRuleId(sceneRuleId).processStatus(false);
-//        if (message != null) {
-//            builder.deviceMessage(message);
-//            // 填充设备信息
-//            IotDeviceDO device = deviceService.getDeviceFromCache(message.getDeviceId());
-//            if (device != null) {
-//                builder.productId(device.getProductId()).deviceId(device.getId());
-//            }
-//        }
-//
-//        // 插入记录
-//        IotAlertRecordDO record = builder.build();
-//        alertRecordMapper.insert(record);
-//        return record.getId();
-//    }
-
 }

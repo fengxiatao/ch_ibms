@@ -263,13 +263,11 @@ public final class IbmsDeviceConstants {
 
 | Batch | 文件数 | 状态 | commit |
 |---|---|---|---|
-| 1 - JavaDoc-only | 11 | 🔄 5/11（45%）| `[本批 v34]` |
-| 2 - Controller | 2 | ⏳ 待开始 | - |
-| 3 - 轻量 Service | 6 | ⏳ 待开始 | - |
-| 4 - handler/property | 6 | ⏳ 待开始 | - |
-| 5 - rule | 4 | ⏳ 待开始 | - |
-| 6 - device/property+support | 5 | ⏳ 待开始 | - |
-| 7 - channel+changhui | 2 | ⏳ 待开始 | - |
-| 8 - IotDeviceService 核心 | 1 | ⏳ 待开始 | - |
-| 9 - 删除 IotDeviceDO.java | 1 | ⏳ 待开始 | - |
-| **总计** | **38** | **0% 完成** | - |
+| 1 - JavaDoc-only | 11 | ✅ 10/11（`DeviceConfigHelper`/`IotDevicePropertyMapper` 推迟到 6/4）| `本批` |
+| 2 - Controller | 2 | ✅ 完成（NvrController 删除 0 调用方 `convertChannelsToDevices` 死代码） | `本批` |
+| 3 - 轻量 Service | 7 | ✅ 完成（**event 链整体闭环死代码**：`DeviceEventProcessor.processEvent` 0 调用方 + 注释清理 2 文件） | `本批` |
+| 4 - handler/property + Mapper | 6+1xml | ✅ 完成（**property 链整体闭环死代码**：`saveDeviceProperty` 0 外部调用，含 `IotDevicePropertyMapper.insert` 签名 + XML OGNL `device.productId`→`device.ibmsProductId`） | `本批` |
+| 5 - rule scene action（端点） | 3 | ✅ 完成（仅 `DEVICE_ID_ALL` 切到 `IbmsDeviceConstants` + `IbmsDeviceConstants` 自身 JavaDoc）；rule 子树剩 `IotSceneRuleServiceImpl`/`IotDataRuleServiceImpl` 留 Batch 6 | `本批` |
+| 6 - 核心连锁（device service + support + 剩余 rule + channel + changhui） | 13 | ⏳ 待开始（`IotDeviceService` 24 处 + `ChanghuiDeviceServiceImpl` 16 + `IotDeviceChannelServiceImpl` 8 + `DeviceConfigHelper` 6 + 其他） | - |
+| 7 - 删除 `IotDeviceDO.java` | 1 | ⏳ 待开始（最后一步，所有调用方清完后） | - |
+| **总计** | **38** | **23 / 38 完成（60%），mvn compile 全通过** | - |

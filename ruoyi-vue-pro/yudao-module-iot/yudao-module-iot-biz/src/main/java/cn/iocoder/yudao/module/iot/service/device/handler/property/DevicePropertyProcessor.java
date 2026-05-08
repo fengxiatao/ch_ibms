@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.iot.service.device.handler.property;
 
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.service.device.property.IotDevicePropertyService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +40,7 @@ public class DevicePropertyProcessor {
      * @param properties 属性Map
      * @param reportTime 上报时间
      */
-    public void processProperty(IotDeviceDO device, Map<String, Object> properties, LocalDateTime reportTime) {
+    public void processProperty(IbmsDeviceDO device, Map<String, Object> properties, LocalDateTime reportTime) {
         
         // 1. 获取适用的处理器（按优先级排序）
         List<IotDevicePropertyHandler> applicableHandlers = propertyHandlers.stream()
@@ -49,19 +49,19 @@ public class DevicePropertyProcessor {
             .collect(Collectors.toList());
         
         log.debug("[属性处理][设备: {}, 适用处理器数: {}]", 
-            device.getDeviceName(), applicableHandlers.size());
+            device.getName(), applicableHandlers.size());
         
         // 2. 前置处理钩子
         for (IotDevicePropertyHandler handler : applicableHandlers) {
             try {
                 if (!handler.beforePropertyHandle(device, properties)) {
                     log.warn("[属性处理终止][设备: {}, 处理器: {}]", 
-                        device.getDeviceName(), handler.getClass().getSimpleName());
+                        device.getName(), handler.getClass().getSimpleName());
                     return;
                 }
             } catch (Exception e) {
                 log.error("[属性前置处理失败][设备: {}, 处理器: {}]", 
-                    device.getDeviceName(), handler.getClass().getSimpleName(), e);
+                    device.getName(), handler.getClass().getSimpleName(), e);
             }
         }
         
@@ -69,7 +69,7 @@ public class DevicePropertyProcessor {
         try {
             devicePropertyService.saveDevicePropertyToTDengine(device, properties, reportTime);
         } catch (Exception e) {
-            log.error("[属性存储失败][设备: {}]", device.getDeviceName(), e);
+            log.error("[属性存储失败][设备: {}]", device.getName(), e);
             // 存储失败不影响后续处理器执行
         }
         
@@ -81,11 +81,11 @@ public class DevicePropertyProcessor {
                 if (identifier == null || properties.containsKey(identifier)) {
                     handler.handleProperty(device, properties, reportTime);
                     log.debug("[属性处理成功][设备: {}, 处理器: {}]", 
-                        device.getDeviceName(), handler.getClass().getSimpleName());
+                        device.getName(), handler.getClass().getSimpleName());
                 }
             } catch (Exception e) {
                 log.error("[属性处理失败][设备: {}, 处理器: {}]", 
-                    device.getDeviceName(), handler.getClass().getSimpleName(), e);
+                    device.getName(), handler.getClass().getSimpleName(), e);
                 // 单个处理器失败不影响其他处理器
             }
         }
@@ -96,7 +96,7 @@ public class DevicePropertyProcessor {
                 handler.afterPropertyHandle(device, properties);
             } catch (Exception e) {
                 log.error("[属性后置处理失败][设备: {}, 处理器: {}]", 
-                    device.getDeviceName(), handler.getClass().getSimpleName(), e);
+                    device.getName(), handler.getClass().getSimpleName(), e);
             }
         }
     }

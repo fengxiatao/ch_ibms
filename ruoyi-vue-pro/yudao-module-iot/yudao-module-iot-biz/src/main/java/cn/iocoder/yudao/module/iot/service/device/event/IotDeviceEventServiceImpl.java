@@ -1,7 +1,7 @@
 package cn.iocoder.yudao.module.iot.service.device.event;
 
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -24,22 +24,13 @@ public class IotDeviceEventServiceImpl implements IotDeviceEventService {
     // private IotDeviceEventMapper deviceEventMapper;
 
     @Override
-    public void saveDeviceEvent(IotDeviceDO device, String eventIdentifier, 
+    public void saveDeviceEvent(IbmsDeviceDO device, String eventIdentifier, 
                                Map<String, Object> params, LocalDateTime eventTime) {
         // 目前仅记录日志，后续可扩展为存储到数据库
         log.info("[事件记录][设备: {}, 事件: {}, 参数: {}, 时间: {}]", 
-            device.getDeviceName(), eventIdentifier, JsonUtils.toJsonString(params), eventTime);
+            device.getName(), eventIdentifier, JsonUtils.toJsonString(params), eventTime);
         
-        // TODO @长辉开发团队：实现事件存储逻辑
-        // IotDeviceEventDO eventDO = IotDeviceEventDO.builder()
-        //     .deviceId(device.getId())
-        //     .deviceName(device.getDeviceName())
-        //     .productKey(device.getProductKey())
-        //     .eventIdentifier(eventIdentifier)
-        //     .eventParams(JsonUtils.toJsonString(params))
-        //     .eventTime(eventTime)
-        //     .build();
-        // deviceEventMapper.insert(eventDO);
+        // TODO @长辉开发团队：实现事件存储逻辑（落到 ibms_device_event 表）
     }
 }
 

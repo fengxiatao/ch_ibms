@@ -134,18 +134,6 @@ public class SubsystemServiceImpl implements SubsystemService {
         }
 
         return result;
-        
-        // 旧实现已注释（保留用于参考）：
-        // Long productCount = productMapper.selectCount(
-        //     new LambdaQueryWrapper<IotProductDO>()
-        //         .eq(IotProductDO::getSubsystemCode, subsystem.getCode())
-        // );
-        // vo.setProductCount(productCount.intValue());
-        // Long deviceCount = deviceMapper.selectCount(
-        //     new LambdaQueryWrapper<IotDeviceDO>()
-        //         .eq(IotDeviceDO::getSubsystemCode, subsystem.getCode())
-        // );
-        // vo.setDeviceCount(deviceCount.intValue());
     }
 
     /**

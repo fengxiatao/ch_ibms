@@ -10,8 +10,8 @@ import cn.iocoder.yudao.framework.common.util.object.ObjectUtils;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.property.IotDevicePropertyHistoryListReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.property.IotDevicePropertyRespVO;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDevicePropertyDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 // MySQL版本：移除未使用的 import
 // import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.thingmodel.IotThingModelDO;
@@ -99,7 +99,7 @@ public class IotDevicePropertyServiceImpl implements IotDevicePropertyService {
     // MySQL版本：不再需要buildTableFieldList方法，因为使用统一表结构
 
     @Override
-    public void saveDeviceProperty(IotDeviceDO device, IotDeviceMessage message) {
+    public void saveDeviceProperty(IbmsDeviceDO device, IotDeviceMessage message) {
         if (!(message.getParams() instanceof Map)) {
             log.error("[saveDeviceProperty][消息内容({}) 的 data 类型不正确]", message);
             return;
@@ -107,7 +107,7 @@ public class IotDevicePropertyServiceImpl implements IotDevicePropertyService {
 
         // 1. 根据物模型，拼接合法的属性
         // TODO @长辉开发团队：【待定 004】赋能后，属性到底以 thingModel 为准（ik），还是 db 的表结构为准（tl）？
-        List<IotThingModelDO> thingModels = thingModelService.getThingModelListByProductIdFromCache(device.getProductId());
+        List<IotThingModelDO> thingModels = thingModelService.getThingModelListByProductIdFromCache(device.getIbmsProductId());
         Map<String, Object> properties = new HashMap<>();
         ((Map<?, ?>) message.getParams()).forEach((key, value) -> {
             IotThingModelDO thingModel = CollUtil.findOne(thingModels, o -> o.getIdentifier().equals(key));
@@ -133,7 +133,7 @@ public class IotDevicePropertyServiceImpl implements IotDevicePropertyService {
     }
 
     @Override
-    public void saveDevicePropertyToTDengine(IotDeviceDO device, Map<String, Object> properties, LocalDateTime reportTime) {
+    public void saveDevicePropertyToTDengine(IbmsDeviceDO device, Map<String, Object> properties, LocalDateTime reportTime) {
         // MySQL版本：直接插入到统一的 ibms_device_property_history 表
         if (CollUtil.isEmpty(properties)) {
             log.warn("[saveDevicePropertyToTDengine][属性为空，跳过存储]");

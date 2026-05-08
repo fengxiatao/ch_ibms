@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.iot.service.device.handler.property.impl;
 
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.service.device.handler.property.IotDevicePropertyHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -37,7 +37,7 @@ public class TemperatureAlarmPropertyHandler implements IotDevicePropertyHandler
     }
 
     @Override
-    public void handleProperty(IotDeviceDO device, Map<String, Object> properties, LocalDateTime reportTime) {
+    public void handleProperty(IbmsDeviceDO device, Map<String, Object> properties, LocalDateTime reportTime) {
         Object tempObj = properties.get("temperature");
         if (tempObj == null) {
             return;
@@ -58,20 +58,20 @@ public class TemperatureAlarmPropertyHandler implements IotDevicePropertyHandler
             
             // 正常温度
             else {
-                log.debug("[温度正常][设备: {}, 温度: {}°C]", device.getDeviceName(), temperature);
+                log.debug("[温度正常][设备: {}, 温度: {}°C]", device.getName(), temperature);
             }
             
         } catch (NumberFormatException e) {
-            log.error("[温度解析失败][设备: {}, 值: {}]", device.getDeviceName(), tempObj, e);
+            log.error("[温度解析失败][设备: {}, 值: {}]", device.getName(), tempObj, e);
         }
     }
 
     /**
      * 处理高温告警
      */
-    private void handleHighTemperatureAlarm(IotDeviceDO device, double temperature, LocalDateTime reportTime) {
+    private void handleHighTemperatureAlarm(IbmsDeviceDO device, double temperature, LocalDateTime reportTime) {
         log.warn("[高温告警][设备: {}, 温度: {}°C, 时间: {}]", 
-            device.getDeviceName(), temperature, reportTime);
+            device.getName(), temperature, reportTime);
         
         // TODO @长辉开发团队：集成告警服务
         // alarmService.createAlarm(AlarmCreateReqBO.builder()
@@ -90,9 +90,9 @@ public class TemperatureAlarmPropertyHandler implements IotDevicePropertyHandler
     /**
      * 处理低温告警
      */
-    private void handleLowTemperatureAlarm(IotDeviceDO device, double temperature, LocalDateTime reportTime) {
+    private void handleLowTemperatureAlarm(IbmsDeviceDO device, double temperature, LocalDateTime reportTime) {
         log.info("[低温告警][设备: {}, 温度: {}°C, 时间: {}]", 
-            device.getDeviceName(), temperature, reportTime);
+            device.getName(), temperature, reportTime);
         
         // TODO @长辉开发团队：集成告警服务
         // alarmService.createAlarm(AlarmCreateReqBO.builder()

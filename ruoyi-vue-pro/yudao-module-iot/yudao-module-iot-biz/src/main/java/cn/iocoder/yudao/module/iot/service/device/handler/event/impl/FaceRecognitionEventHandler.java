@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.iot.service.device.handler.event.impl;
 
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.service.device.handler.event.IotDeviceEventHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -38,8 +38,8 @@ public class FaceRecognitionEventHandler implements IotDeviceEventHandler {
     }
 
     @Override
-    public Object handleEvent(IotDeviceDO device, Map<String, Object> params, LocalDateTime eventTime) {
-        log.info("[人脸识别事件][设备: {}, 参数: {}]", device.getDeviceName(), params);
+    public Object handleEvent(IbmsDeviceDO device, Map<String, Object> params, LocalDateTime eventTime) {
+        log.info("[人脸识别事件][设备: {}, 参数: {}]", device.getName(), params);
         
         // 1. 提取事件参数
         String faceImageUrl = (String) params.get("image_url");
@@ -64,9 +64,9 @@ public class FaceRecognitionEventHandler implements IotDeviceEventHandler {
     /**
      * 处理已识别人脸
      */
-    private Object handleRecognizedFace(IotDeviceDO device, String faceId, Float similarity, LocalDateTime eventTime) {
+    private Object handleRecognizedFace(IbmsDeviceDO device, String faceId, Float similarity, LocalDateTime eventTime) {
         log.info("[人脸识别成功][设备: {}, 人员ID: {}, 相似度: {}%]", 
-            device.getDeviceName(), faceId, similarity * 100);
+            device.getName(), faceId, similarity * 100);
         
         // TODO @长辉开发团队：记录通行日志
         // accessControlService.recordFaceAccess(FaceAccessRecordBO.builder()
@@ -95,9 +95,9 @@ public class FaceRecognitionEventHandler implements IotDeviceEventHandler {
     /**
      * 处理未识别人脸（陌生人）
      */
-    private Object handleUnknownFace(IotDeviceDO device, String faceImageUrl, Float similarity, LocalDateTime eventTime) {
+    private Object handleUnknownFace(IbmsDeviceDO device, String faceImageUrl, Float similarity, LocalDateTime eventTime) {
         log.warn("[陌生人检测][设备: {}, 相似度: {}%, 图片: {}]", 
-            device.getDeviceName(), similarity * 100, faceImageUrl);
+            device.getName(), similarity * 100, faceImageUrl);
         
         // TODO @长辉开发团队：触发陌生人告警
         // alarmService.createAlarm(AlarmCreateReqBO.builder()

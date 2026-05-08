@@ -4,7 +4,8 @@ import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.dal.dataobject.alert.IotAlertConfigDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceConstants;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.thingmodel.IotThingModelDO;
 import cn.iocoder.yudao.module.iot.enums.rule.IotSceneRuleActionTypeEnum;
@@ -98,8 +99,8 @@ public class IotSceneRuleDO extends TenantBaseDO {
         /**
          * 设备编号
          *
-         * 关联 {@link IotDeviceDO#getId()}
-         * 特殊：如果为 {@link IotDeviceDO#DEVICE_ID_ALL} 时，则是全部设备
+         * 关联 {@link IbmsDeviceDO#getId()}
+         * 特殊：如果为 {@link IbmsDeviceConstants#DEVICE_ID_ALL} 时，则是全部设备
          */
         private Long deviceId;
         /**
@@ -164,7 +165,7 @@ public class IotSceneRuleDO extends TenantBaseDO {
         /**
          * 设备编号
          *
-         * 关联 {@link IotDeviceDO#getId()}
+         * 关联 {@link IbmsDeviceDO#getId()}
          */
         private Long deviceId;
         /**
@@ -215,7 +216,7 @@ public class IotSceneRuleDO extends TenantBaseDO {
         /**
          * 设备编号
          *
-         * 关联 {@link IotDeviceDO#getId()}
+         * 关联 {@link IbmsDeviceDO#getId()}
          */
         private Long deviceId;
 

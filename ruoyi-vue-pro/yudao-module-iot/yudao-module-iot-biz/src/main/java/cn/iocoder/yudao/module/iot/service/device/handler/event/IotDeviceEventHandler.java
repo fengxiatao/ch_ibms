@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.iot.service.device.handler.event;
 
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -41,7 +41,7 @@ public interface IotDeviceEventHandler {
      * @param eventTime 事件时间
      * @return 处理结果（可选，用于回复设备）
      */
-    Object handleEvent(IotDeviceDO device, Map<String, Object> params, LocalDateTime eventTime);
+    Object handleEvent(IbmsDeviceDO device, Map<String, Object> params, LocalDateTime eventTime);
 
     /**
      * 处理优先级（数字越小优先级越高）

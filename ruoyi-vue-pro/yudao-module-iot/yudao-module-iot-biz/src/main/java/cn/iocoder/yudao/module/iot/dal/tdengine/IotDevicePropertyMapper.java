@@ -2,7 +2,7 @@ package cn.iocoder.yudao.module.iot.dal.tdengine;
 
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.property.IotDevicePropertyHistoryListReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.device.vo.property.IotDevicePropertyRespVO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.framework.tdengine.core.TDengineTableField;
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import org.apache.ibatis.annotations.Mapper;
@@ -82,7 +82,7 @@ public interface IotDevicePropertyMapper {
      * @param properties 属性Map（key为属性标识符，value为属性值）
      * @param reportTime 上报时间戳（毫秒）
      */
-    void insert(@Param("device") IotDeviceDO device,
+    void insert(@Param("device") IbmsDeviceDO device,
                 @Param("properties") Map<String, Object> properties,
                 @Param("reportTime") Long reportTime);
 

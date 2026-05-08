@@ -10,8 +10,8 @@ import java.time.LocalDateTime;
 /**
  * 门禁设备只读视图（M2-B GAP-011 单源化）
  *
- * <p>包装 ibms_device 台账 + ibms_device_runtime 运行态，对外提供与历史 IotDeviceDO
- * 同名访问器，避免下游消费者继续经手 {@code IotDeviceDO} 壳类型。</p>
+ * <p>包装 ibms_device 台账 + ibms_device_runtime 运行态，对外提供与历史 legacy 设备 DO
+ * 同名访问器，避免下游消费者继续经手 legacy 设备壳类型。</p>
  *
  * <p>该 View 不参与持久化，仅作为 Service 层返回类型；写操作仍走
  * {@code IbmsDeviceService} / {@code IbmsDeviceRuntimeService}。</p>
@@ -38,7 +38,7 @@ public final class AccessDeviceView {
 
     // ===== 直通访问器（消费方有需要时直接拿原对象） =====
     // @JsonIgnore：避免 Jackson 把 ledger/runtime 整体序列化，保持响应体与原
-    // IotDeviceDO 平铺结构兼容（业务代码仍可通过 getter 访问内部对象）。
+    //    legacy 设备 DO 平铺结构兼容（业务代码仍可通过 getter 访问内部对象）。
 
     @JsonIgnore
     public IbmsDeviceDO getLedger() {
@@ -50,7 +50,7 @@ public final class AccessDeviceView {
         return runtime;
     }
 
-    // ===== 与 IotDeviceDO 同名 getter（最小侵入下游 caller） =====
+    // ===== 与 legacy 设备 DO 同名 getter（最小侵入下游 caller） =====
 
     public Long getId() {
         return ledger.getId();
@@ -68,7 +68,7 @@ public final class AccessDeviceView {
         return ledger.getUpdateTime();
     }
 
-    /** 对应 IotDeviceDO.deviceName，映射自 ibms_device.name。 */
+    /** 对应 legacy deviceName，映射自 ibms_device.name。 */
     public String getDeviceName() {
         return ledger.getName();
     }
@@ -85,7 +85,7 @@ public final class AccessDeviceView {
         return ledger.getProductKey();
     }
 
-    /** 对应 IotDeviceDO.productId，映射自 ibms_device.ibms_product_id。 */
+    /** 对应 legacy productId，映射自 ibms_device.ibms_product_id。 */
     public Long getProductId() {
         return ledger.getIbmsProductId();
     }
@@ -102,7 +102,7 @@ public final class AccessDeviceView {
         return ledger.getAuthType();
     }
 
-    /** 数值型设备类型（保留兼容历史 IotDeviceDO.deviceType）。 */
+    /** 数值型设备类型（保留兼容历史 legacy deviceType）。 */
     public Integer getDeviceType() {
         return ledger.getDeviceType();
     }
