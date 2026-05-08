@@ -78,7 +78,7 @@ MySQL MCP 只用 mcp4_mysql_query（mysql-ibms）；本机构建硬规则见 .cu
 
 | 工具名 | 连接标识 | 库 | 用途 |
 |---|---|---|---|
-| `mcp4_mysql_query` | `mysql-ibms` | `ch_ibms` @ 127.0.0.1 | CH 本地开发/查询（**只读**） |
+| `mcp4_mysql_query` | `mysql-ibms` | `ch_ibms` @ 127.0.0.1 | CH 本地开发：读 + 写（INSERT/UPDATE/DELETE/DDL）均允许 |
 
 **禁用名单**（即使工具列表里出现也不得调用）：
 
@@ -86,7 +86,11 @@ MySQL MCP 只用 mcp4_mysql_query（mysql-ibms）；本机构建硬规则见 .cu
 - `mcp6_mysql_query`（`mysql-jingyudp`）— **jingyu 项目库，严禁跨项目写入**
 - `mcp7_mysql_query`（`mysql-parkingspace`）— 停车场专用库
 
-**写操作**（INSERT / UPDATE / DELETE / DDL）：`mcp4_mysql_query` 为只读，必须通过 `run_command` 执行 `mysql` 命令行，且需用户明确批准。
+**写操作**（INSERT / UPDATE / DELETE / DDL）：
+
+- 自 2026-05-08 起，`mcp4_mysql_query` 允许直接写入 `ch_ibms`（本地库）
+- 仍可通过 `run_command` 执行 `mysql` 命令行（适合大批量 SQL 文件 source 的场景）
+- AI 写库前应在消息中明示将执行的 SQL；**破坏性操作**（DROP TABLE、TRUNCATE、无 WHERE 的 UPDATE/DELETE）必须先征得用户批准
 
 ---
 
