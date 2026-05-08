@@ -12,7 +12,7 @@ import cn.iocoder.yudao.module.iot.controller.admin.rule.vo.data.rule.IotDataRul
 import cn.iocoder.yudao.module.iot.controller.admin.rule.vo.data.rule.IotDataRuleSaveReqVO;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
 import cn.iocoder.yudao.module.iot.core.util.IotDeviceMessageUtils;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceConstants;
 import cn.iocoder.yudao.module.iot.dal.dataobject.rule.IotDataRuleDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.rule.IotDataSinkDO;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
@@ -125,7 +125,7 @@ public class IotDataRuleServiceImpl implements IotDataRuleService {
 
         // 2. 校验设备（IBMS 台账主键与历史 iot_device 双轨）
         Set<Long> deviceIds = convertSet(sourceConfigs, IotDataRuleDO.SourceConfig::getDeviceId,
-                config -> ObjUtil.notEqual(config.getDeviceId(), IotDeviceDO.DEVICE_ID_ALL));
+                config -> ObjUtil.notEqual(config.getDeviceId(), IbmsDeviceConstants.DEVICE_ID_ALL));
         validateDataRuleDeviceIdsDualTrack(deviceIds);
 
         // 3. 校验物模型存在
@@ -191,7 +191,7 @@ public class IotDataRuleServiceImpl implements IotDataRuleService {
         List<IotDataRuleDO> matchedRules = new ArrayList<>();
         for (IotDataRuleDO rule : rules) {
             IotDataRuleDO.SourceConfig found = CollUtil.findOne(rule.getSourceConfigs(),
-                    config -> ObjectUtils.equalsAny(config.getDeviceId(), deviceId, IotDeviceDO.DEVICE_ID_ALL)
+                    config -> ObjectUtils.equalsAny(config.getDeviceId(), deviceId, IbmsDeviceConstants.DEVICE_ID_ALL)
                             && Objects.equals(config.getMethod(), method)
                             && (StrUtil.isEmpty(config.getIdentifier()) || ObjUtil.equal(config.getIdentifier(), identifier)));
             if (found != null) {

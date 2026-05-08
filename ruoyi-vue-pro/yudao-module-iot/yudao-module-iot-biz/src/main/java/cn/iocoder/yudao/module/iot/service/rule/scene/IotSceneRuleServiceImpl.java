@@ -12,7 +12,7 @@ import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.iot.controller.admin.rule.vo.scene.IotSceneRulePageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.rule.vo.scene.IotSceneRuleSaveReqVO;
 import cn.iocoder.yudao.module.iot.core.mq.message.IotDeviceMessage;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceConstants;
 import cn.iocoder.yudao.module.iot.service.ibms.device.support.OtaDeviceView;
 import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.rule.IotSceneRuleDO;
@@ -175,7 +175,7 @@ public class IotSceneRuleServiceImpl implements IotSceneRuleService {
                         return false;
                     }
                     // 检查是否是全部设备的特殊标识
-                    if (IotDeviceDO.DEVICE_ID_ALL.equals(trigger.getDeviceId())) {
+                    if (IbmsDeviceConstants.DEVICE_ID_ALL.equals(trigger.getDeviceId())) {
                         return true;
                     }
                     // 检查具体设备 ID 是否匹配
