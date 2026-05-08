@@ -9,9 +9,7 @@ import cn.iocoder.yudao.module.iot.controller.admin.channel.vo.NvrWithChannelsRe
 import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.channel.IotDeviceChannelHistoryDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsChannelDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.DeviceConfigHelper;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
 import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.channel.IotDeviceChannelHistoryMapper;
 import cn.iocoder.yudao.module.iot.dal.mysql.ibms.IbmsChannelMapper;
@@ -23,6 +21,7 @@ import cn.iocoder.yudao.module.iot.service.channel.support.IotGisSpatialLocation
 import cn.iocoder.yudao.module.iot.service.ibms.channel.IbmsChannelService;
 import cn.iocoder.yudao.module.iot.service.video.IbmsDeviceVideoNetworkResolver;
 import cn.iocoder.yudao.module.iot.service.video.nvr.NvrQueryService;
+import cn.iocoder.yudao.module.iot.service.video.nvr.dto.NvrScannedChannelRow;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -301,7 +300,7 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
 
                 // 同步通道（新增或更新）
                 for (var ch : sdkChannels) {
-                    syncNvrChannelToIbms(deviceId, ibmsDevice, nvrNet, ch.toLegacyChannelDeviceForSync(deviceId));
+                    syncNvrChannelToIbms(deviceId, ibmsDevice, nvrNet, ch);
                     syncCount++;
                 }
                 
@@ -322,9 +321,7 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
                 }
             }
         }
-        // M2-D 阶段二 OTA 单源化：原营业代码中调用了 syncIpcChannelsViaOnvifToIbms 的 IPC 分支，
-        // 其判断条件 "IPC".equals(deviceShell.getDeviceType()) 中 deviceType 为 Integer，永返 false，与该分支内代码同为死代码，
-        // 故仅保留 NVR 分支。IPC 通道同步现走 ONVIF/其他入口，后续清理。
+        // 注：IPC 通道同步走独立的 ONVIF/其他入口，本方法仅处理 NVR 分支。
 
         log.info("[通道管理] 同步设备通道完成: deviceId={}, syncCount={}", deviceId, syncCount);
         return syncCount;
@@ -349,137 +346,10 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
     }
 
     /**
-     * 通过 ONVIF 同步 IPC（非 NVR）视频通道到 {@code ibms_channel}。
-     *
-     * <p>legacy 的视频字段（PTZ/认证/targetIp/分辨率等）统一放在 {@code ibms_channel.extra}，
-     * 以便 {@link #convertIbmsVideoChannelToLegacy(IbmsChannelDO, IbmsDeviceDO)} 回填。</p>
-     */
-    private int syncIpcChannelsViaOnvifToIbms(Long deviceId, IbmsDeviceDO ibmsDevice, IotDeviceDO device) {
-        int syncCount = 0;
-
-        // 1) 删除旧的 ibms_channel（只删除视频 VT*）
-        List<IbmsChannelDO> existingChannels = ibmsChannelMapper.selectListByDeviceId(deviceId).stream()
-                .filter(ch -> StrUtil.isNotBlank(ch.getTypeCode()) && ch.getTypeCode().toUpperCase().startsWith("VT"))
-                .collect(Collectors.toList());
-        if (!existingChannels.isEmpty()) {
-            log.info("[通道同步] 删除设备旧的 IBMS 视频通道，准备重新同步: deviceId={}, oldChannelCount={}",
-                    deviceId, existingChannels.size());
-            for (IbmsChannelDO channel : existingChannels) {
-                ibmsChannelMapper.deleteById(channel.getId());
-            }
-        }
-
-        // 2) 解析设备配置：ONVIF 连接认证（沿用旧逻辑）
-        String username = "admin";
-        String password = "admin123";
-        try {
-            if (device.getConfig() != null) {
-                Map<String, Object> configMap = device.getConfig().toMap();
-                if (configMap.containsKey("username")) {
-                    Object usernameObj = configMap.get("username");
-                    username = usernameObj != null ? usernameObj.toString() : "admin";
-                }
-                if (configMap.containsKey("password")) {
-                    Object passwordObj = configMap.get("password");
-                    password = passwordObj != null ? passwordObj.toString() : "admin123";
-                }
-            }
-        } catch (Exception e) {
-            log.warn("[通道同步] 解析设备配置失败，使用默认认证信息: deviceId={}", deviceId, e);
-        }
-
-        // 3) ONVIF 查询 profiles
-        String deviceIp = DeviceConfigHelper.getIpAddress(device);
-        log.info("[通道同步] 开始通过ONVIF查询IPC通道: deviceId={}, ip={}", deviceId, deviceIp);
-
-        List<cn.iocoder.yudao.module.iot.service.onvif.OnvifChannelInfo> channelInfoList;
-        try {
-            cn.iocoder.yudao.module.iot.service.onvif.OnvifClient onvifClient =
-                    new cn.iocoder.yudao.module.iot.service.onvif.OnvifClient(deviceIp, username, password);
-            channelInfoList = onvifClient.getProfiles();
-        } catch (Exception e) {
-            log.error("[通道同步] ONVIF查询失败，将使用默认通道配置: deviceId={}, ip={}",
-                    deviceId, deviceIp, e);
-            channelInfoList = null;
-        }
-
-        if (channelInfoList == null || channelInfoList.isEmpty()) {
-            log.warn("[通道同步] ONVIF查询返回空结果，使用默认配置: deviceId={}, ip={}", deviceId, deviceIp);
-            channelInfoList = createDefaultChannelInfo(device);
-        }
-
-        // 4) 写入 ibms_channel（typeCode=VT）
-        String dc = StrUtil.blankToDefault(ibmsDevice.getDeviceCode(), "D" + deviceId);
-        // business 取小写大类码（sa/st/sb/se/sf），兜底 sa
-        String business = StrUtil.isNotBlank(ibmsDevice.getGroupCode()) ? ibmsDevice.getGroupCode().toLowerCase() : "sa";
-        String systemType = StrUtil.isNotBlank(ibmsDevice.getSystemCode()) ? ibmsDevice.getSystemCode() : "VI";
-
-        // device.getState() 沿用旧逻辑：1=在线，2=离线
-        String status = (device.getState() != null && device.getState() == 1) ? "online" : "offline";
-
-        for (cn.iocoder.yudao.module.iot.service.onvif.OnvifChannelInfo info : channelInfoList) {
-            int channelNo = info.getChannelNo();
-            if (channelNo <= 0) {
-                continue;
-            }
-
-            String channelName = info.getChannelName() != null
-                    ? info.getChannelName()
-                    : device.getDeviceName() + "-通道" + channelNo;
-
-            IbmsChannelDO channel = new IbmsChannelDO();
-            channel.setId(null);
-            channel.setTenantId(ibmsDevice.getTenantId());
-            channel.setDeviceId(deviceId);
-            channel.setChannelNo(channelNo);
-            channel.setTypeCode("VT");
-            channel.setSystemType(systemType);
-            channel.setBusiness(business);
-            channel.setDataSource("IPC");
-            channel.setCategory("视频通道");
-            channel.setCurrentValue("--");
-            channel.setIp(deviceIp);
-            channel.setStatus(status);
-            channel.setName(channelName);
-            channel.setCode(dc + "-VT" + String.format("%02d", channelNo));
-
-            cn.hutool.json.JSONObject extra = cn.hutool.json.JSONUtil.createObj();
-            extra.set("enableStatus", 1);
-            extra.set("isPatrol", 0);
-            extra.set("isMonitor", 0);
-            extra.set("sort", channelNo);
-            extra.set("monitorPosition", Integer.MAX_VALUE);
-
-            extra.set("channelSubType", info.isPtzSupport() ? "PTZ" : "IPC");
-            extra.set("ptzSupport", info.isPtzSupport());
-            extra.set("audioSupport", info.isAudioSupport());
-            if (info.getResolution() != null) {
-                extra.set("resolution", info.getResolution());
-            }
-
-            extra.set("protocol", "ONVIF");
-            extra.set("username", username);
-            extra.set("password", password);
-
-            extra.set("targetIp", deviceIp);
-            extra.set("targetChannelNo", channelNo);
-
-            extra.set("lastSyncTime", LocalDateTime.now().toString());
-
-            channel.setExtra(extra.toString());
-            ibmsChannelMapper.insert(channel);
-            syncCount++;
-        }
-
-        updateIbmsDevicePointCount(deviceId);
-        return syncCount;
-    }
-
-    /**
      * 将 IBMS 通道（视频类）转换为旧版 {@link IotDeviceChannelDO}，供 NVR/摄像头链路复用。
      *
      * <p>约定：legacy 字段统一存放在 {@code ibms_channel.extra} 中，关键键位在本类的
-     * {@link #syncNvrChannelToIbms(Long, IbmsDeviceDO, IbmsDeviceVideoNetworkResolver.NetworkParams, IotDeviceDO)} 中写入。</p>
+     * {@link #syncNvrChannelToIbms(Long, IbmsDeviceDO, IbmsDeviceVideoNetworkResolver.NetworkParams, NvrScannedChannelRow)} 中写入。</p>
      */
     private IotDeviceChannelDO convertIbmsVideoChannelToLegacy(IbmsChannelDO ibmsChannel, IbmsDeviceDO ibmsDevice) {
         IotDeviceChannelDO c = new IotDeviceChannelDO();
@@ -748,166 +618,40 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
     }
     
     /**
-     * 通过 ONVIF 同步 IPC 设备通道（包括球机）
-     * 
-     * @param deviceId 设备ID
-     * @param device 设备信息
-     * @return 同步的通道数量
-     */
-    private int syncIpcChannelsViaOnvif(Long deviceId, IotDeviceDO device) {
-        // G4 清理 iot_ 持久层后：IPC 通道不再落库到 iot_device_channel
-        // 当前仍走 ibms_device_runtime + ibms_channel 的收敛链路。
-        return 0;
-    }
-    
-    /**
-     * 创建默认通道信息列表
-     */
-    private List<cn.iocoder.yudao.module.iot.service.onvif.OnvifChannelInfo> createDefaultChannelInfo(IotDeviceDO device) {
-        List<cn.iocoder.yudao.module.iot.service.onvif.OnvifChannelInfo> list = new ArrayList<>();
-        cn.iocoder.yudao.module.iot.service.onvif.OnvifChannelInfo info = 
-                new cn.iocoder.yudao.module.iot.service.onvif.OnvifChannelInfo();
-        info.setChannelNo(1);
-        info.setChannelName(device.getDeviceName());
-        info.setPtzSupport(false);
-        info.setAudioSupport(false);
-        list.add(info);
-        return list;
-    }
-    
-    /**
-     * 创建默认通道（当 ONVIF 查询失败时）
-     */
-    private int createDefaultChannel(Long deviceId, IotDeviceDO device, String username, String password) {
-        IotDeviceChannelDO channel = new IotDeviceChannelDO();
-        channel.setDeviceId(deviceId);
-        channel.setProductId(device.getProductId());
-        channel.setDeviceType(convertDeviceType(device.getDeviceType()));
-        channel.setChannelNo(1);
-        channel.setChannelName(device.getDeviceName() + "-默认通道");
-        channel.setChannelCode("CH-" + device.getDeviceKey() + "-1");
-        channel.setChannelType("VIDEO");
-        channel.setChannelSubType("IPC");
-        channel.setPtzSupport(false);
-        channel.setAudioSupport(false);
-        
-        // 设置目标设备信息
-        channel.setTargetDeviceId(deviceId);
-        channel.setTargetIp(DeviceConfigHelper.getIpAddress(device));
-        channel.setTargetPort(80);
-        channel.setTargetChannelNo(1);
-        
-        // 设置协议和认证信息
-        channel.setProtocol("ONVIF");
-        channel.setUsername(username);
-        channel.setPassword(password);
-        
-        // 设置状态
-        channel.setOnlineStatus(device.getState());
-        channel.setEnableStatus(1);
-        channel.setAlarmStatus(0);
-        channel.setSort(1);
-        
-        // G4 清理 iot_ 持久层后：默认通道不再落库到 iot_device_channel
-        log.info("[通道同步] 创建默认通道: deviceId={}, channelNo=1", deviceId);
-        return 1;
-    }
-    
-    /**
-     * 将设备类型 Integer 转换为 String
-     */
-    private String convertDeviceType(Integer deviceType) {
-        if (deviceType == null) {
-            return "UNKNOWN";
-        }
-        // 根据枚举值转换
-        // 1=直连设备, 2=网关子设备, 3=网关设备
-        switch (deviceType) {
-            case 1: return "DIRECT";
-            case 2: return "GATEWAY_SUB";
-            case 3: return "GATEWAY";
-            default: return "UNKNOWN";
-        }
-    }
-
-    /**
      * 同步NVR通道到 {@code ibms_channel}（legacy 字段写入 extra），供 NVR 视频链路读取。
      */
     private void syncNvrChannelToIbms(Long nvrId,
                                       IbmsDeviceDO ibmsNvr,
                                       IbmsDeviceVideoNetworkResolver.NetworkParams nvrNet,
-                                      IotDeviceDO channelInfo) {
-        // 从config中获取通道号和云台支持信息
-        String configStr = null;
-        if (channelInfo.getConfig() != null) {
-            try {
-                configStr = JsonUtils.toJsonString(channelInfo.getConfig().toMap());
-            } catch (Exception e) {
-                log.warn("[通道同步] 序列化config失败: {}", e.getMessage());
-            }
-        }
-        if (configStr == null || configStr.isEmpty()) {
+                                      NvrScannedChannelRow row) {
+        if (row == null || row.getChannelNo() == null) {
             return;
         }
 
-        Integer channelNo;
-        Boolean ptzSupport = false;
-        Boolean audioSupport = false;
-        String deviceType = null;
-        String resolution = null;
-        String sdkChannelName = null;
+        Integer channelNo = row.getChannelNo();
+        String sdkChannelName = row.getChannelName();
+        String deviceType = row.getDeviceType();
+        String channelIp = row.getIpAddress();
+        String resolution = row.getResolution();
 
-        try {
-            cn.hutool.json.JSONObject cfg = cn.hutool.json.JSONUtil.parseObj(configStr);
-            channelNo = cfg.getInt("channel");
-            sdkChannelName = cfg.getStr("channelName");
-
-            // 云台支持推断（逻辑与 syncNvrChannel 保持一致）
-            if (cfg.containsKey("ptzSupport")) {
-                Object ptzObj = cfg.get("ptzSupport");
-                if (ptzObj != null) {
-                    if (ptzObj instanceof Boolean) {
-                        ptzSupport = (Boolean) ptzObj;
-                    } else {
-                        ptzSupport = Boolean.parseBoolean(String.valueOf(ptzObj));
-                    }
-                }
+        // 云台支持推断（逻辑与历史 syncNvrChannel 保持一致）
+        boolean ptzSupport = Boolean.TRUE.equals(row.getPtzSupport());
+        if (!ptzSupport && deviceType != null) {
+            ptzSupport = isPtzDevice(deviceType);
+        }
+        if (!ptzSupport && sdkChannelName != null) {
+            String nameLower = sdkChannelName.toLowerCase();
+            if (nameLower.contains("ptz") || nameLower.contains("dome")
+                    || nameLower.contains("球机") || nameLower.contains("球")
+                    || nameLower.contains("ipc") || nameLower.contains("speed")) {
+                ptzSupport = true;
             }
-            if (!ptzSupport && cfg.containsKey("deviceType")) {
-                deviceType = cfg.getStr("deviceType");
-                if (deviceType != null) {
-                    ptzSupport = isPtzDevice(deviceType);
-                }
-            }
-            if (!ptzSupport) {
-                String deviceName = channelInfo.getDeviceName();
-                if (deviceName != null) {
-                    String nameLower = deviceName.toLowerCase();
-                    if (nameLower.contains("ptz") || nameLower.contains("dome")
-                            || nameLower.contains("球机") || nameLower.contains("球")
-                            || nameLower.contains("ipc") || nameLower.contains("speed")) {
-                        ptzSupport = true;
-                    }
-                }
-            }
-            if (!ptzSupport) {
-                cn.hutool.json.JSONObject cfg2 = cn.hutool.json.JSONUtil.parseObj(configStr);
-                String ipAddress = cfg2.getStr("ipAddress");
-                if (ipAddress != null && isPtzByIpPattern(ipAddress, nvrId)) {
-                    ptzSupport = true;
-                }
-            }
-
-            audioSupport = cfg.getBool("audioSupport", false);
-            resolution = cfg.getStr("resolution");
-        } catch (Exception e) {
-            log.warn("[通道同步] 解析通道配置失败: {}", e.getMessage());
-            return;
+        }
+        if (!ptzSupport && channelIp != null && isPtzByIpPattern(channelIp, nvrId)) {
+            ptzSupport = true;
         }
 
-        if (channelNo == null) {
-            return;
-        }
+        boolean audioSupport = Boolean.TRUE.equals(row.getAudioSupport());
 
         // 获取NVR配置信息（用于生成URL）— M2-D：直接消费 NetworkParams，去除 GenericDeviceConfig round-trip
         String nvrIp = StrUtil.blankToDefault(nvrNet.ip, "");
@@ -920,7 +664,7 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
         String streamUrlSub = generateStreamUrl(nvrIp, channelNo, "sub", username, password, rtspPort);
         String snapshotUrl = generateSnapshotUrl(nvrIp, channelNo, username, password, httpPort);
 
-        boolean online = channelInfo.getState() != null && channelInfo.getState() == 1;
+        boolean online = row.getState() != null && row.getState() == 1;
         String status = online ? "online" : "offline";
 
         // 查询是否已存在
@@ -952,7 +696,7 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
         newExtra.set("streamUrlSub", streamUrlSub);
         newExtra.set("snapshotUrl", snapshotUrl);
 
-        newExtra.set("targetIp", DeviceConfigHelper.getIpAddress(channelInfo));
+        newExtra.set("targetIp", channelIp);
         newExtra.set("targetChannelNo", 1);
 
         String channelSubType = deviceType != null ? deviceType : "IPC";
@@ -1012,7 +756,7 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
             ex.set("streamUrlMain", streamUrlMain);
             ex.set("streamUrlSub", streamUrlSub);
             ex.set("snapshotUrl", snapshotUrl);
-            ex.set("targetIp", DeviceConfigHelper.getIpAddress(channelInfo));
+            ex.set("targetIp", channelIp);
             ex.set("targetChannelNo", 1);
             ex.set("channelSubType", deviceType != null ? deviceType : ex.getStr("channelSubType"));
             ex.set("lastSyncTime", nowStr);
@@ -1568,33 +1312,42 @@ public class IotDeviceChannelServiceImpl implements IotDeviceChannelService {
 
             boolean exists = existingChannelMap.containsKey(channelNo);
 
-            IotDeviceDO channelDevice = new IotDeviceDO();
-            channelDevice.setDeviceName(StrUtil.blankToDefault(channelInfo.getChannelName(), "通道" + channelNo));
-            channelDevice.setState(Boolean.TRUE.equals(channelInfo.getOnline()) ? 1 : 2); // 1=在线,2=离线（与既有逻辑保持一致）
-
-            GenericDeviceConfig cfg = new GenericDeviceConfig();
-            cfg.set("channel", channelNo);
-            cfg.set("channelName", channelInfo.getChannelName());
-            cfg.set("online", channelInfo.getOnline());
-            cfg.set("recording", channelInfo.getRecording());
+            // 由 newgateway 返回的 NvrChannelSyncInfo 直接平铺到 NvrScannedChannelRow，避免再造伪 IotDeviceDO 壳
+            String rowChannelName = StrUtil.blankToDefault(channelInfo.getChannelName(), "通道" + channelNo);
+            Integer rowState = Boolean.TRUE.equals(channelInfo.getOnline()) ? 1 : 2; // 1=在线,2=离线（与既有逻辑保持一致）
+            String rowIpAddress = null;
+            Boolean rowPtzSupport = null;
+            String rowDeviceType = null;
             if (channelInfo.getCapabilities() != null) {
-                cfg.set("capabilities", channelInfo.getCapabilities());
                 Object ipObj = channelInfo.getCapabilities().getOrDefault("ipAddress", channelInfo.getCapabilities().get("ip"));
                 if (ipObj != null) {
-                    cfg.set("ipAddress", String.valueOf(ipObj));
+                    rowIpAddress = String.valueOf(ipObj);
                 }
                 Object ptzObj = channelInfo.getCapabilities().get("ptzSupport");
                 if (ptzObj != null) {
-                    cfg.set("ptzSupport", ptzObj);
+                    if (ptzObj instanceof Boolean) {
+                        rowPtzSupport = (Boolean) ptzObj;
+                    } else {
+                        rowPtzSupport = Boolean.parseBoolean(String.valueOf(ptzObj));
+                    }
                 }
                 Object devTypeObj = channelInfo.getCapabilities().get("deviceType");
                 if (devTypeObj != null) {
-                    cfg.set("deviceType", devTypeObj);
+                    rowDeviceType = String.valueOf(devTypeObj);
                 }
             }
-            channelDevice.setConfig(cfg);
 
-            syncNvrChannelToIbms(deviceId, ibmsNvr, nvrNet, channelDevice);
+            NvrScannedChannelRow row = NvrScannedChannelRow.builder()
+                    .syntheticId(deviceId * 1000L + channelNo)
+                    .channelNo(channelNo)
+                    .channelName(rowChannelName)
+                    .state(rowState)
+                    .ipAddress(rowIpAddress)
+                    .ptzSupport(rowPtzSupport)
+                    .deviceType(rowDeviceType)
+                    .build();
+
+            syncNvrChannelToIbms(deviceId, ibmsNvr, nvrNet, row);
 
             if (exists) {
                 updatedCount++;

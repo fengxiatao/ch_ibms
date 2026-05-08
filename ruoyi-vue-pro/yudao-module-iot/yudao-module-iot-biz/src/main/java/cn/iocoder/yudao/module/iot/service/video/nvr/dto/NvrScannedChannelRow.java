@@ -1,14 +1,15 @@
 package cn.iocoder.yudao.module.iot.service.video.nvr.dto;
 
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.config.GenericDeviceConfig;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * NVR 网关扫描后、自通道表组装的通道行（替代历史上 {@link IotDeviceDO} 伪子设备）。
+ * NVR 网关扫描后、自通道表组装的通道行。
+ *
+ * <p>替代历史上以 {@code IotDeviceDO} 伪子设备承载通道信息的写法，
+ * 直接作为 {@code syncNvrChannelToIbms} 等同步入参。</p>
  */
 @Data
 @Builder
@@ -36,36 +37,6 @@ public class NvrScannedChannelRow {
 
     private String resolution;
 
-    /**
-     * 转为仍依赖 {@link IotDeviceDO#config} 的 {@code syncNvrChannel} 入参形态。
-     */
-    public IotDeviceDO toLegacyChannelDeviceForSync(Long nvrId) {
-        IotDeviceDO d = new IotDeviceDO();
-        long sid = syntheticId != null ? syntheticId
-                : nvrId * 1000L + (channelNo != null ? channelNo : 0);
-        d.setId(sid);
-        d.setDeviceName(channelName);
-        d.setState(state);
-        d.setGatewayId(nvrId);
-        d.setProductId(productId);
-
-        GenericDeviceConfig cfg = new GenericDeviceConfig();
-        cfg.set("channel", channelNo);
-        cfg.set("channelName", channelName);
-        cfg.set("online", state != null && state == 1);
-        if (ipAddress != null) {
-            cfg.set("ipAddress", ipAddress);
-        }
-        if (ptzSupport != null) {
-            cfg.set("ptzSupport", ptzSupport);
-        }
-        if (audioSupport != null) {
-            cfg.set("audioSupport", audioSupport);
-        }
-        if (resolution != null) {
-            cfg.set("resolution", resolution);
-        }
-        d.setConfig(cfg);
-        return d;
-    }
+    /** 通道子类型/设备类型（如 IPC / PTZ / DOME，可空） */
+    private String deviceType;
 }

@@ -268,6 +268,9 @@ public final class IbmsDeviceConstants {
 | 3 - 轻量 Service | 7 | ✅ 完成（**event 链整体闭环死代码**：`DeviceEventProcessor.processEvent` 0 调用方 + 注释清理 2 文件） | `本批` |
 | 4 - handler/property + Mapper | 6+1xml | ✅ 完成（**property 链整体闭环死代码**：`saveDeviceProperty` 0 外部调用，含 `IotDevicePropertyMapper.insert` 签名 + XML OGNL `device.productId`→`device.ibmsProductId`） | `本批` |
 | 5 - rule scene action（端点） | 3 | ✅ 完成（仅 `DEVICE_ID_ALL` 切到 `IbmsDeviceConstants` + `IbmsDeviceConstants` 自身 JavaDoc）；rule 子树剩 `IotSceneRuleServiceImpl`/`IotDataRuleServiceImpl` 留 Batch 6 | `本批` |
-| 6 - 核心连锁（device service + support + 剩余 rule + channel + changhui） | 13 | ⏳ 待开始（`IotDeviceService` 24 处 + `ChanghuiDeviceServiceImpl` 16 + `IotDeviceChannelServiceImpl` 8 + `DeviceConfigHelper` 6 + 其他） | - |
-| 7 - 删除 `IotDeviceDO.java` | 1 | ⏳ 待开始（最后一步，所有调用方清完后） | - |
-| **总计** | **38** | **23 / 38 完成（60%），mvn compile 全通过** | - |
+| 6a - device 死接口 + rule 常量切换 | 1 删 + 2 改 | ✅ 完成（`IotDeviceService` 24 处闭环死接口直接删；`IotSceneRuleServiceImpl`/`IotDataRuleServiceImpl` 切 `IbmsDeviceConstants.DEVICE_ID_ALL`） | `4345ac7` |
+| 6b - handler/support 整链死代码清理 | 6 删 | ✅ 完成（`IotDeviceServiceHandler` + `AbstractDeviceServiceHandler` + `DynamicDeviceServiceInvoker` + `DeviceServiceRegistry` + `IotDeviceSpringCacheEvictor` + `IotLegacyIotDeviceSideEffects` 整链 0 调用方）-938 行 | `4345ac7` |
+| 6c-1 - channel 链单源化 + 死代码 | 3 改 | ✅ 完成（**channel 链 5 个 private 方法 0 调用方死代码删除**：`syncIpcChannelsViaOnvifToIbms`/`syncIpcChannelsViaOnvif`/`createDefaultChannelInfo`/`createDefaultChannel`/`convertDeviceType`，-180 行；`syncNvrChannelToIbms` 重构为接受 `NvrScannedChannelRow` 去除 IotDeviceDO 入参 + JSON round-trip；`NvrScannedChannelRow` 删 `toLegacyChannelDeviceForSync` 增 `deviceType` 字段；`DeviceConfigHelper` 删 5 个 IotDeviceDO 重载（`hasIpAddress`/`hasPort`/`getNetworkAddress` 全死）） | 本批 |
+| 6c-2 - 核心硬骨头剩余 | 2 改 | ⏳ 待开始（`ChanghuiDeviceServiceImpl` 16 + `DeviceCoordinateSyncService` 5） | - |
+| 7 - 删除 `IotDeviceDO.java` | 1 | ⏳ 待开始（最后一步，所有调用方清完后；含 `IotDeviceDO` 自身 2 处自引用） | - |
+| **总计** | **44** | **33 操作完成 / 44（75%），mvn compile 全通过；剩余 23 处 IotDeviceDO 命中（含自身 2）** | - |
