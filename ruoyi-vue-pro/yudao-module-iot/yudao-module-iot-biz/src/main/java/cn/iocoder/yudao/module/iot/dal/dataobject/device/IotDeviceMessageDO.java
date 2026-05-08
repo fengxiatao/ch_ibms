@@ -37,7 +37,7 @@ public class IotDeviceMessageDO {
     /**
      * 设备编号
      *
-     * 关联 {@link IotDeviceDO#getId()}
+     * 关联 {@link cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO#getId()}
      */
     private Long deviceId;
     /**

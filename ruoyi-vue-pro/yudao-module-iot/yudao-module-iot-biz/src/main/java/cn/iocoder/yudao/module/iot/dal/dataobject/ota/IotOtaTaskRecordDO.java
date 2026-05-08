@@ -1,7 +1,8 @@
 package cn.iocoder.yudao.module.iot.dal.dataobject.ota;
 
 import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
-import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceDO;
+import cn.iocoder.yudao.module.iot.dal.dataobject.ibms.IbmsDeviceRuntimeDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceMessageDO;
 import cn.iocoder.yudao.module.iot.enums.ota.IotOtaTaskRecordStatusEnum;
 import com.baomidou.mybatisplus.annotation.KeySequence;
@@ -51,13 +52,13 @@ public class IotOtaTaskRecordDO extends BaseDO {
     /**
      * 设备编号
      *
-     * 关联 {@link IotDeviceDO#getId()}
+     * 关联 {@link IbmsDeviceDO#getId()}
      */
     private Long deviceId;
     /**
      * 来源的固件编号
      *
-     * 关联 {@link IotDeviceDO#getFirmwareId()}
+     * 关联 {@link IbmsDeviceRuntimeDO#getFirmwareId()}
      */
     private Long fromFirmwareId;
 
