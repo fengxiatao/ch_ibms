@@ -17,6 +17,21 @@
 **非主项目（同目录下仅作参考，禁止改动）**：
 `dh/`、`anfang/`、`smart-factory/`、`wvp-GB28181-pro/`、`threejs-park-master/`、`parking-miniapp/`、`大华海康代码/` 等。
 
+### 1.1 全局硬规则：零 Mock（2026-05-08）
+
+- **所有前端页面 / 大屏 / API 必须走真实数据**
+- **禁用** `builtinData` / `Math.random()` 假数据 / 硬编码假数组 / fallback mock
+- **后端 stub 必须填实**，无数据返回空集合而非假数据
+- **测试数据用 SQL 种子文件补**（参考 `.tmp_sql/m2d_demo_seed.sql`），**禁止前端 mock**
+- 每个 M 阶段 DoD 必须包含「该阶段 0 mock 残留」一项
+- 详见主计划 `docs/ibms-unified-data-source-plan.md` §1.1
+
+### 1.2 本地端口（2026-05-08）
+
+- **后端 yudao-server**：`http://127.0.0.1:48888`（非默认 48080）
+- **前端 yudao-ui-admin-vue3**：`http://127.0.0.1:3000`（非 Vite 默认 5173）
+- 前端 `.env.dev` 中 `VITE_BASE_URL='http://127.0.0.1:48888'` 已对齐
+
 ---
 
 ## 2. 承接提示词（新会话三句话模板）

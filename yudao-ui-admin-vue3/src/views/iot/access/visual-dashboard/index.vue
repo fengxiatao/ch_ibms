@@ -27,247 +27,56 @@ interface ChartDataSet {
 const dateRange = ref<DateRangeKey>('today')
 const customStartDate = ref('')
 const customEndDate = ref('')
-const customData = ref<ChartDataSet | null>(null)
 
 const showAccess = ref(true)
 const showReject = ref(true)
 
-// === 真实数据（M2-A + M2-D：AccessDashboardController.statistics + trend）===
-// statistics 接口提供 4 metric 卡片 + 设备分布 + 通行类型分布。
-// trend 接口 today/week/month/year 全部走真实数据（同日 24 槽，跨日逐日槽）。
-// 告警分类饰图 / 告警趋势 / 公司排行 后端尚无聚合端点，保留 mock。
-// 详见 docs/ibms-bidirectional-gap.md GAP-001/GAP-007。
+// === 零 Mock：所有数据源自真实 API（M2-D-FOLLOWUP，2026-05-08）===
+// statistics 接口：4 metric 卡片 + 设备分布 + 通行类型分布
+// trend 接口：today/week/month/year/custom 全部走真实 SQL 聚合（同日 24 槽，跨日逐日槽）
+// 告警分类饼图 / 告警趋势 / 公司排行：后端聚合端点尚未提供 → 显示空态
+// 详见主计划 docs/ibms-unified-data-source-plan.md §1.1 零 Mock 全局硬规则
 const liveStats = ref<AccessDashboardStatisticsRespVO | null>(null)
 const liveTrendByRange = ref<Partial<Record<DateRangeKey, AccessTrendData>>>({})
 
 const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN').format(value)
-const sum = (arr: number[]) => arr.reduce((acc, cur) => acc + cur, 0)
 
-const builtinData: Record<Exclude<DateRangeKey, 'custom'>, ChartDataSet> = {
-  today: {
-    accessTrend: {
-      labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
-      accessData: [
-        12, 19, 15, 8, 5, 3, 2, 5, 18, 45, 89, 120, 156, 145, 130, 110, 95, 80, 65, 78, 90, 65, 40,
-        25
-      ],
-      rejectData: [2, 1, 3, 1, 0, 0, 1, 2, 5, 8, 12, 15, 18, 14, 10, 8, 5, 7, 4, 3, 2, 1, 1, 0]
-    },
-    alertCategory: {
-      labels: ['无效卡', '未授权访问', '门异常开启', '超时未关门', '胁迫开门', '其他'],
-      data: [18, 12, 8, 5, 3, 2]
-    },
-    alertTrend: {
-      labels: [
-        '0:00',
-        '2:00',
-        '4:00',
-        '6:00',
-        '8:00',
-        '10:00',
-        '12:00',
-        '14:00',
-        '16:00',
-        '18:00',
-        '20:00',
-        '22:00'
-      ],
-      data: [0, 1, 0, 2, 5, 8, 7, 6, 5, 4, 3, 2]
-    },
-    companyAccess: {
-      labels: [
-        '科技有限公司',
-        '金融服务公司',
-        '文化传媒公司',
-        '建筑工程公司',
-        '咨询顾问公司',
-        '电商平台公司',
-        '物流运输公司'
-      ],
-      data: [856, 628, 452, 389, 278, 215, 168]
-    }
-  },
-  week: {
-    accessTrend: {
-      labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-      accessData: [2150, 2380, 2450, 2280, 2560, 980, 850],
-      rejectData: [35, 42, 38, 45, 48, 15, 12]
-    },
-    alertCategory: {
-      labels: ['无效卡', '未授权访问', '门异常开启', '超时未关门', '胁迫开门', '其他'],
-      data: [95, 68, 42, 30, 18, 12]
-    },
-    alertTrend: {
-      labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-      data: [42, 48, 52, 45, 58, 20, 18]
-    },
-    companyAccess: {
-      labels: [
-        '科技有限公司',
-        '金融服务公司',
-        '文化传媒公司',
-        '建筑工程公司',
-        '咨询顾问公司',
-        '电商平台公司',
-        '物流运输公司'
-      ],
-      data: [5280, 3850, 2860, 2450, 1850, 1420, 1080]
-    }
-  },
-  month: {
-    accessTrend: {
-      labels: Array.from({ length: 30 }, (_, i) => `${i + 1}日`),
-      accessData: [
-        2150, 2380, 2450, 2280, 2560, 980, 850, 2280, 2450, 2520, 2380, 2650, 1050, 920, 2350, 2520,
-        2680, 2450, 2780, 1120, 980, 2420, 2580, 2750, 2620, 2850, 1250, 1050, 2380, 2550
-      ],
-      rejectData: [
-        35, 42, 38, 45, 48, 15, 12, 38, 45, 42, 48, 52, 18, 15, 42, 48, 52, 45, 58, 20, 18, 45, 52,
-        48, 55, 60, 22, 20, 40, 46
-      ]
-    },
-    alertCategory: {
-      labels: ['无效卡', '未授权访问', '门异常开启', '超时未关门', '胁迫开门', '其他'],
-      data: [420, 285, 185, 125, 75, 55]
-    },
-    alertTrend: {
-      labels: ['第1周', '第2周', '第3周', '第4周'],
-      data: [185, 205, 220, 210]
-    },
-    companyAccess: {
-      labels: [
-        '科技有限公司',
-        '金融服务公司',
-        '文化传媒公司',
-        '建筑工程公司',
-        '咨询顾问公司',
-        '电商平台公司',
-        '物流运输公司'
-      ],
-      data: [21500, 15800, 11800, 9850, 7850, 6200, 4850]
-    }
-  },
-  year: {
-    accessTrend: {
-      labels: [
-        '1月',
-        '2月',
-        '3月',
-        '4月',
-        '5月',
-        '6月',
-        '7月',
-        '8月',
-        '9月',
-        '10月',
-        '11月',
-        '12月'
-      ],
-      accessData: [
-        48500, 45200, 52800, 56500, 62800, 65500, 68200, 70500, 68800, 65200, 60800, 58500
-      ],
-      rejectData: [850, 780, 920, 980, 1050, 1120, 1180, 1250, 1180, 1080, 950, 880]
-    },
-    alertCategory: {
-      labels: ['无效卡', '未授权访问', '门异常开启', '超时未关门', '胁迫开门', '其他'],
-      data: [4850, 3250, 2150, 1450, 850, 650]
-    },
-    alertTrend: {
-      labels: [
-        '1月',
-        '2月',
-        '3月',
-        '4月',
-        '5月',
-        '6月',
-        '7月',
-        '8月',
-        '9月',
-        '10月',
-        '11月',
-        '12月'
-      ],
-      data: [850, 780, 920, 980, 1050, 1120, 1180, 1250, 1180, 1080, 950, 880]
-    },
-    companyAccess: {
-      labels: [
-        '科技有限公司',
-        '金融服务公司',
-        '文化传媒公司',
-        '建筑工程公司',
-        '咨询顾问公司',
-        '电商平台公司',
-        '物流运输公司'
-      ],
-      data: [258000, 185000, 142000, 115000, 92000, 75000, 58000]
-    }
-  }
+// 空数据骨架：所有图表在 API 无返回 / 失败时显示空态而非 mock fallback
+const EMPTY_DATA: ChartDataSet = {
+  accessTrend: { labels: [], accessData: [], rejectData: [] },
+  alertCategory: { labels: [], data: [] },
+  alertTrend: { labels: [], data: [] },
+  companyAccess: { labels: [], data: [] }
 }
 
-const buildCustomData = (startDate: string, endDate: string): ChartDataSet | null => {
-  if (!startDate || !endDate) return null
-  const start = dayjs(startDate).startOf('day')
-  const end = dayjs(endDate).startOf('day')
-  if (!start.isValid() || !end.isValid()) return null
-  const daysDiff = Math.max(1, end.diff(start, 'day') + 1)
+// === 历史 mock 常量 builtinData / buildCustomData 已于 M2-D-FOLLOWUP 删除（零 Mock 原则）===
+// 原静态对象（today/week/month/year 4 套约 160 行硬编码假数据）已全部移除
+// 原 buildCustomData 函数（Math.random 生成自定义日期范围假数据）已全部移除
+// 自定义日期范围现走 loadTrend('custom', dates) 真实接口
 
-  const labels = Array.from({ length: daysDiff }, (_, i) => start.add(i, 'day').format('M月D日'))
-  const accessData = Array.from({ length: daysDiff }, () => Math.floor(Math.random() * 2000 + 500))
-  const rejectData = Array.from({ length: daysDiff }, () => Math.floor(Math.random() * 50 + 5))
-  const alertTrendData = Array.from({ length: daysDiff }, () => Math.floor(Math.random() * 60 + 5))
 
-  return {
-    accessTrend: { labels, accessData, rejectData },
-    alertCategory: {
-      labels: ['无效卡', '未授权访问', '门异常开启', '超时未关门', '胁迫开门', '其他'],
-      data: [
-        Math.floor(Math.random() * 50 + 10),
-        Math.floor(Math.random() * 40 + 5),
-        Math.floor(Math.random() * 30 + 3),
-        Math.floor(Math.random() * 20 + 2),
-        Math.floor(Math.random() * 10 + 1),
-        Math.floor(Math.random() * 10 + 1)
-      ]
-    },
-    alertTrend: { labels, data: alertTrendData },
-    companyAccess: {
-      labels: [
-        '科技有限公司',
-        '金融服务公司',
-        '文化传媒公司',
-        '建筑工程公司',
-        '咨询顾问公司',
-        '电商平台公司',
-        '物流运输公司'
-      ],
-      data: Array.from({ length: 7 }, () => Math.floor(Math.random() * 5000 + 1000))
-    }
-  }
-}
 
+// === 真实数据驱动的 effectiveData / metrics / growth ===
 const effectiveData = computed<ChartDataSet>(() => {
-  if (dateRange.value === 'custom') {
-    return customData.value ?? (liveTrendByRange.value.today
-      ? { ...builtinData.today, accessTrend: liveTrendByRange.value.today }
-      : builtinData.today)
-  }
-  // 优先使用真实 trend 数据，没有时 fallback 到 mock
   const liveTrend = liveTrendByRange.value[dateRange.value]
-  const baseMock = builtinData[dateRange.value]
-  if (liveTrend) return { ...baseMock, accessTrend: liveTrend }
-  return baseMock
+  if (!liveTrend) return EMPTY_DATA
+  // 通行趋势走真实 trend 接口；告警分类/告警趋势/公司排行后端尚未提供聚合端点，保留空态
+  return {
+    accessTrend: liveTrend,
+    alertCategory: EMPTY_DATA.alertCategory,
+    alertTrend: EMPTY_DATA.alertTrend,
+    companyAccess: EMPTY_DATA.companyAccess
+  }
 })
 
 const metrics = computed(() => {
   const stats = liveStats.value
-  const accessTotal = stats?.todayAccessCount ?? sum(effectiveData.value.accessTrend.accessData)
-  // 在岗人员通行人次：后端暂未细分员工/访客/车辆，使用 accessTypeDistribution.employee 优先；
-  // 否则按 92% 估算（mock fallback）。
-  const staffAccessTotal =
-    stats?.accessTypeDistribution?.employee ?? Math.floor(accessTotal * 0.92)
-  const alertTotal = stats?.todayAlarmCount ?? 48
-  const devicesTotal = stats?.totalDeviceCount ?? 28
-  const devicesOnline = stats?.onlineDeviceCount ?? 26
+  // 全部字段直接来自后端 statistics 接口；接口未返回时显示 0（空态），不再 mock fallback
+  const accessTotal = stats?.todayAccessCount ?? 0
+  const staffAccessTotal = stats?.accessTypeDistribution?.employee ?? 0
+  const alertTotal = stats?.todayAlarmCount ?? 0
+  const devicesTotal = stats?.totalDeviceCount ?? 0
+  const devicesOnline = stats?.onlineDeviceCount ?? 0
   const devicesOffline = Math.max(0, devicesTotal - devicesOnline)
   return {
     accessTotal,
@@ -281,11 +90,12 @@ const metrics = computed(() => {
 
 const growth = computed(() => {
   const stats = liveStats.value
+  // 增长率字段全部走真实接口；接口未返回 → 显示 0%，不再硬编码默认值
   return {
-    total: stats?.accessCountGrowth ?? 12.8,
-    staff: stats?.visitorCountGrowth ?? 8.5,
-    alert: 15.3, // 后端暂无告警增长率字段
-    device: stats?.vehicleCountGrowth ?? 6.2
+    total: stats?.accessCountGrowth ?? 0,
+    staff: stats?.visitorCountGrowth ?? 0,
+    alert: 0, // 后端暂无 alarmCountGrowth 字段，待补
+    device: stats?.vehicleCountGrowth ?? 0
   }
 })
 
@@ -322,16 +132,20 @@ const loadStats = async () => {
   try {
     liveStats.value = await getAccessDashboardStatistics()
   } catch (err) {
-    console.warn('[AccessVisualDashboard] statistics 接口失败，回退至 mock 数据', err)
+    // 零 Mock：失败时不 fallback，liveStats 保持 null → metrics 全显示 0（空态）
+    console.error('[AccessVisualDashboard] statistics 接口失败，将显示空态', err)
   }
 }
 
-const loadTrend = async (range: DateRangeKey) => {
-  const dates = rangeToDates(range)
+const loadTrend = async (
+  range: DateRangeKey,
+  customDates?: { startTime: string; endTime: string }
+) => {
+  const dates = customDates ?? rangeToDates(range)
   if (!dates) return
   try {
     const trend = await getAccessTrend(dates)
-    if (trend && Array.isArray(trend.labels) && trend.labels.length > 0) {
+    if (trend && Array.isArray(trend.labels)) {
       liveTrendByRange.value = {
         ...liveTrendByRange.value,
         [range]: {
@@ -342,7 +156,8 @@ const loadTrend = async (range: DateRangeKey) => {
       }
     }
   } catch (err) {
-    console.warn(`[AccessVisualDashboard] trend(${range}) 接口失败，回退至 mock 数据`, err)
+    // 零 Mock：失败时不 fallback，liveTrendByRange 保持空 → effectiveData 走 EMPTY_DATA（空态）
+    console.error(`[AccessVisualDashboard] trend(${range}) 接口失败，将显示空态`, err)
   }
 }
 
@@ -495,14 +310,22 @@ const setDateRange = (range: DateRangeKey) => {
   if (range !== 'custom') {
     customStartDate.value = ''
     customEndDate.value = ''
-    customData.value = null
+    // 清空 custom 缓存，避免下次切回时显示旧数据
+    if (liveTrendByRange.value.custom) {
+      const next = { ...liveTrendByRange.value }
+      delete next.custom
+      liveTrendByRange.value = next
+    }
   }
 }
 
 const applyCustomDateRange = () => {
-  const data = buildCustomData(customStartDate.value, customEndDate.value)
-  if (!data) return
-  customData.value = data
+  if (!customStartDate.value || !customEndDate.value) return
+  // 自定义日期范围走真实 trend 接口（不再 Math.random 生成假数据）
+  loadTrend('custom', {
+    startTime: customStartDate.value,
+    endTime: customEndDate.value
+  })
 }
 
 const toggleDataDisplay = (key: 'access' | 'reject') => {
@@ -567,7 +390,7 @@ const toggleDataDisplay = (key: 'access' | 'reject') => {
           <div class="metric-body">
             <p class="metric-label">今日异常通行次数</p>
             <p class="metric-value">{{ formatNumber(metrics.alertTotal) }}</p>
-            <p class="metric-unit">告警: 8 | 拒绝: 40</p>
+            <p class="metric-unit">次</p>
           </div>
         </div>
 

@@ -8,10 +8,11 @@
 
 ## 当前推进状态
 
-- **当前活动阶段**：M2 推进中（M2-A ✅ + M1.7-Batch2 ✅ + M2-D ✅）→ 下一步候选 M2-B（access 单源化 GAP-011，建议新分支）/ M2-C（building-visual-dashboard 聚合 GAP-002）
-- **下一阶段建议**：M2-B（feature 分支）+ 用户侧 mvn 重打 + smoke 测试 M2-D 落地效果
-- **已完成阶段**：M0、M1、M1.5、M1.6、M2-A、M1.7-Batch2、M2-D
+- **当前活动阶段**：M2 推进中（M2-A ✅ + M1.7-Batch2 ✅ + M2-D ✅✅含验收）→ 下一步候选 M2-B（access 单源化 GAP-011）/ M2-C（building-visual-dashboard 聚合 GAP-002）
+- **下一阶段建议**：浏览器最终目视验收 visual-dashboard（http://localhost:5173 → 智慧通行 → 可视化大屏）→ 切 M2-B 或 M2-C
+- **已完成阶段**：M0、M1、M1.5、M1.6、M2-A、M1.7-Batch2、M2-D（代码 + SQL 验收 + 数据补全 ✅）
 - **阻塞决策点**：D-001（智慧能源前端保留方案）、D-002（物联模块隐藏方式）
+- **运行时环境**（2026-05-08）：yudao-server 在 **48888 端口**（PID 42016，含 0b62d00），前端 Vite 在 **5173**，`.env.dev` 已对齐；admin token 需重登拿（v14/v19 已过期）
 
 ---
 
@@ -29,6 +30,8 @@
 | 2026-05-06 | M2-A | `iot/access/visual-dashboard` 接入真实 statistics + hourly 端点（GAP-001） | commit `ed251c6`：新建 `src/api/iot/access/dashboard.ts`（6 端点 TS 客户端）+ 改 `views/iot/access/visual-dashboard/index.vue` | AI/主程 | 4 metric 卡片 + 24h 进入趋势改为实数据（onMounted 拉取 + 失败 fallback mock）；告警分类/趋势/公司排行后端 stub，保留 mock 待 M2 后期补；vue-tsc 0 相关错误；双远端已 push |
 | 2026-05-06 | M1.7-Batch2 | 删除 5 个未引用 api/fire/* 僵尸文件 | commit `3d9948f`：snapshot 分支 `pre-zombie-cleanup-20260506` 双远端预 push；`api/fire/{emergencyResponse,fireAlarm,fireSafety,fireSuppression,smokeControl}/index.ts` 删除 | AI/主程 | grep '@/api/fire/' 全工程 0 引用确认；`api/fire/index.ts` 是独立 barrel 不依赖被删文件；vue-tsc baseline 1692 删前后一致；Batch-1 (test 文件) 因被测 util 是 Z1 僵尸暂缓与 Batch-4 配套 |
 | 2026-05-06 | M2-D | AccessDashboard 6 端点全面对接真实表 `iot_access_event_log`（GAP-001 根因修复） | commit `0b62d00`：`IotAccessEventLogMapper` 加 7 SQL；`AccessDashboardServiceImpl` 完全重写；前端 `dashboard.ts` 补全 4 端点 RespVO 类型；`visual-dashboard/index.vue` 切到 trend 端点 | AI/主程 | **重大根因发现**：原实现注入 AccessRecordMapper/AccessAlarmMapper，DO 标注的 iot_access_record/iot_access_alarm 表在 DB 中不存在（M2-A 实际永远 fallback mock）；本次迁到真实表（56448 行真数据，时间跨度 2025-12-22~2026-04-20）；4 个 stub 端点全部落地；vue-tsc 0 相关错误；**待用户 mvn 重打 + 重启 smoke** |
+| 2026-05-08 | M2-D 验收 | mapper 7 SQL 直查验证 + 运行时 jar/进程定位 + 端口 smoke | 验证 `IotAccessEventLogMapper` 7 个聚合 SQL 全部跑通真实数据（countByTimeRange/countAlarmsByTimeRange/selectDailyTrend/selectHourlyTrend/selectHeatmap/selectEventTypeDistribution/selectAbnormalList）；定位运行时：yudao-server jar mtime=2026-05-08 10:09 已含 0b62d00，进程 PID 42016 跑在端口 **48888**（非默认 48080）健康（health=UP, swagger 1903B），前端 Vite dev 在 5173；`.env.dev` `VITE_BASE_URL=http://127.0.0.1:48888` 已对齐 | AI/主程 | **重大发现**：另有并行 IDE 会话在协作（不冲突）—10:09 重打 jar、10:51 启动新 yudao-server、配置前端联调链路均非本会话产物；HTTP 6 端点 smoke 因 v14/v19 token 过期暂未跑（SQL 层已 100% 覆盖核心语义） |
+| 2026-05-08 | M2-D 数据补全 | 补 718 行多类型种子数据修复展示偏差 | `.tmp_sql/m2d_gen_seed.ps1` 生成器 + `m2d_demo_seed.sql` (125KB/718 行) + 7 日批 `m2d_seed_2026050{2..8}.sql` + 合并 `m2d_seed_rest.sql`；mcp4 跑 5/2 (59 行) + mysql.exe 灌 5/3~5/8 (659 行) | AI/主程 | **修复展示偏差**：原 56448 行 direction 字段全 NULL、事件类型仅 DOOR_NOT_CLOSED 单一，visual-dashboard 即使切真数据也将"全趴底"；补完后 18 种事件类型全覆盖（CARD_SWIPE 207 / FACE_RECOGNIZE 182 / FINGERPRINT 56 等），direction 1/2 平衡（5/8: in 47, out 54），告警占比 14% 真实，周末低峰 + 工作日高峰 (59 vs 120) 显现；回滚 SQL 已落档 `DELETE WHERE event_time BETWEEN '2026-05-02' AND '2026-05-08' AND tenant_id=1` |
 
 ---
 
