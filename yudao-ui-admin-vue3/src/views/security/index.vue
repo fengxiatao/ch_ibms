@@ -366,7 +366,7 @@ import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { ContentWrap } from '@/components/ContentWrap'
 import SecurityMap from './components/SecurityMap.vue'
-import * as DeviceApi from '@/api/iot/device'
+import * as SecurityOverviewApi from '@/api/iot/security-overview'
 
 // 响应式数据
 const monitorView = ref('grid')
@@ -600,78 +600,40 @@ const getRouteStatusText = (status: string) => {
 // ============= 安防概览摄像头相关方法 =============
 
 /**
- * 加载安防概览摄像头列表
+ * 加载安防概览摄像头列表（GAP-015：走 IBMS 单源 /iot/security-overview/cameras）
+ *
+ * - 后端 IotSecurityOverviewServiceImpl 已基于 IbmsDeviceService（零 IotDeviceDO）
+ * - 服务端按"安防概览"产品菜单/设备菜单过滤，前端不再做 config.features 客户端过滤
+ * - includeSnapshot=false：第一阶段仅取列表，快照走 refreshSnapshots 异步补齐
  */
 const loadSecurityCameras = async () => {
   try {
     console.log('[安防概览] 开始加载摄像头列表...')
 
-    // 获取所有设备（包括在线和离线）
-    const res = await DeviceApi.getDeviceList({
+    const res = await SecurityOverviewApi.getSecurityOverviewCameras({
       pageNo: 1,
-      pageSize: 1000
+      pageSize: 1000,
+      includeSnapshot: false
     })
 
     console.log('[安防概览] 后端返回数据:', res)
 
-    if (res && res.data && res.data.list) {
-      // 筛选出产品配置中包含"安防概览"的设备
-      const filteredDevices = res.data.list.filter((device: any) => {
-        try {
-          // 检查设备配置中是否有"安防概览"标签
-          if (device.config) {
-            const config =
-              typeof device.config === 'string' ? JSON.parse(device.config) : device.config
+    const list = (res && (res as any).list) || []
+    securityCameras.value = list.map((camera: any) => ({
+      id: camera.id,
+      name: camera.nickname || camera.deviceName || `设备_${camera.id}`,
+      location: camera.location || '未知位置',
+      online: !!camera.online,
+      snapshotUrl: '',
+      streamUrl: '',
+      deviceKey: camera.deviceKey
+    }))
 
-            const hasFeature =
-              config.features?.includes('安防概览') || config.displayConfig?.includes('安防概览')
+    console.log(`[安防概览] 成功加载 ${securityCameras.value.length} 个摄像头`)
 
-            if (hasFeature) {
-              console.log('[安防概览] 找到设备:', device.deviceName || device.name)
-            }
-            return hasFeature
-          }
-          return false
-        } catch (e) {
-          console.warn('[安防概览] 解析设备配置失败:', device.id, e)
-          return false
-        }
-      })
-
-      securityCameras.value = filteredDevices
-        .map((device: any) => {
-          try {
-            const config = device.config
-              ? typeof device.config === 'string'
-                ? JSON.parse(device.config)
-                : device.config
-              : {}
-
-            return {
-              id: device.id,
-              name: device.deviceName || device.name || `设备_${device.id}`,
-              location: device.address || config.location || '未知位置',
-              online: device.state === 1 || device.status === 'online',
-              snapshotUrl: getSnapshotUrl(device),
-              streamUrl: config.streamUrl || '',
-              deviceKey: device.deviceKey
-            }
-          } catch (e) {
-            console.error('[安防概览] 转换设备数据失败:', device.id, e)
-            return null
-          }
-        })
-        .filter(Boolean)
-
-      console.log(`[安防概览] 成功加载 ${securityCameras.value.length} 个摄像头`)
-
-      // 更新统计数据
-      securityData.value.cameras.total = securityCameras.value.length
-      securityData.value.cameras.online = securityCameras.value.filter((c) => c.online).length
-    } else {
-      console.warn('[安防概览] 后端返回数据格式不正确')
-      securityCameras.value = []
-    }
+    // 更新统计数据
+    securityData.value.cameras.total = securityCameras.value.length
+    securityData.value.cameras.online = securityCameras.value.filter((c) => c.online).length
   } catch (error: any) {
     console.error('[安防概览] 加载摄像头失败:', error)
     ElMessage.error('加载摄像头列表失败: ' + (error?.message || '未知错误'))
@@ -680,28 +642,24 @@ const loadSecurityCameras = async () => {
 }
 
 /**
- * 获取设备抓图URL
+ * 刷新当前显示的摄像头抓图（异步逐个取 base64）
+ *
+ * 后端 /iot/security-overview/snapshot/{deviceId} 返回 data:image/jpeg;base64,xxx
  */
-const getSnapshotUrl = (device: any) => {
-  // ONVIF 标准抓图URL（通过后端API代理）
-  // 注意：实际使用时可能需要根据不同厂商调整URL格式
-  return `/admin-api/iot/device/snapshot/${device.id}?t=${Date.now()}`
-}
-
-/**
- * 刷新当前显示的摄像头抓图
- */
-const refreshSnapshots = () => {
-  displayCameras.value.forEach((camera) => {
-    if (camera.online) {
-      // 更新抓图URL，添加时间戳强制刷新
-      camera.snapshotUrl = getSnapshotUrl({
-        id: camera.id,
-        address: camera.location,
-        config: JSON.stringify({})
-      })
-    }
-  })
+const refreshSnapshots = async () => {
+  const targets = displayCameras.value.filter((c: any) => !c.isEmpty && c.online)
+  await Promise.allSettled(
+    targets.map(async (camera: any) => {
+      try {
+        const data = await SecurityOverviewApi.getDeviceSnapshot(camera.id)
+        if (data && typeof data === 'string' && data.startsWith('data:image')) {
+          camera.snapshotUrl = data
+        }
+      } catch (err: any) {
+        console.warn('[安防概览] 抓图失败:', camera.id, err?.message || err)
+      }
+    })
+  )
 }
 
 /**
@@ -795,8 +753,9 @@ onMounted(async () => {
     console.log('[安防概览] 摄像头不足7个，不启动自动切换')
   }
 
-  // 启动抓图刷新（每10秒）
+  // 启动抓图刷新（每10秒），并立即触发一次首屏抓图
   if (securityCameras.value.length > 0) {
+    refreshSnapshots()
     startSnapshotRefresh()
   }
 
