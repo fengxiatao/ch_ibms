@@ -54,7 +54,7 @@ INSERT INTO `ibms_env_data_record` (`sensor_id`, `sensor_code`, `temperature`, `
 INSERT INTO `ibms_env_alarm` (`sensor_id`, `sensor_code`, `sensor_name`, `alarm_type`, `alarm_level`, `alarm_content`, `alarm_value`, `threshold_value`, `alarm_time`, `recover_time`, `status`, `handler`, `handle_time`, `handle_remark`, `create_time`, `update_time`, `tenant_id`) VALUES
 (12, 'ENV-TH-005', '数据中心温湿度传感器', 1, 3, '数据中心温度过高，已超过告警阈值', '32.5', '30', DATE_SUB(NOW(), INTERVAL 30 MINUTE), NULL, 1, '张工', NOW(), '正在排查空调故障', NOW(), NOW(), 1),
 (6, 'ENV-PM-002', '地下停车场PM2.5传感器', 3, 2, '停车场PM2.5浓度偏高', '85', '75', DATE_SUB(NOW(), INTERVAL 2 HOUR), DATE_SUB(NOW(), INTERVAL 1 HOUR), 3, NULL, NULL, NULL, NOW(), NOW(), 1),
-(4, 'ENV-TH-004', '办公区温湿度传感器B', 6, 2, '设备离线超过2小时', NULL, NULL, DATE_SUB(NOW(), INTERVAL 2 HOUR), NULL, 0, NULL, NULL, NULL, NOW(), NOW(), 1);
+(4, 'ENV-TH-004', '办公区温湿度传感器B', 8, 2, '设备离线超过2小时', NULL, NULL, DATE_SUB(NOW(), INTERVAL 2 HOUR), NULL, 0, NULL, NULL, NULL, NOW(), NOW(), 1);
 
 -- =============================================
 -- 2. 智能照明数据

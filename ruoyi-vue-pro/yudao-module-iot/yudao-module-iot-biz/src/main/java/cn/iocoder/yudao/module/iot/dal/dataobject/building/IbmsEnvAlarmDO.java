@@ -40,7 +40,8 @@ public class IbmsEnvAlarmDO {
     private String sensorName;
 
     /**
-     * 告警类型：1-温度异常 2-湿度异常 3-PM2.5超标 4-PM10超标 5-CO2超标 6-设备离线
+     * 告警类型：1-温度 2-湿度 3-PM2.5 4-CO2 5-噪音 6-光照 7-气压 8-离线
+     * （与 RespVO @Schema 及前端 getAlarmTypeLabel 单源一致；GAP-014b 对齐）
      */
     private Integer alarmType;
 
