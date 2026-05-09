@@ -1,249 +1,333 @@
 <template>
   <div class="env-alarm-page">
-    <div class="alarm-layout">
-      <!-- 左侧设备分类树 -->
-      <div class="tree-panel">
-        <div class="tree-title">🗂️ 设备分类</div>
-        <el-input v-model="treeSearch" placeholder="搜索分类..." class="tree-search" />
-        <div
-          class="tree-node"
-          :class="{ 'is-active': selectedCategory === 'all' }"
-          @click="selectCategory('all')"
-        >
-          <span>📁</span>
-          <span>全部设备</span>
-          <span class="device-count">{{ statistics.totalCount || 45 }}</span>
-        </div>
-        <div
-          class="tree-node"
-          :class="{ 'is-active': selectedCategory === 'weather' }"
-          @click="selectCategory('weather')"
-          style="padding-left: 30px"
-        >
-          <span>🌡️</span>
-          <span>温湿度传感器</span>
-          <span class="device-count">{{ statistics.weatherCount || 25 }}</span>
-        </div>
-        <div
-          class="tree-node"
-          :class="{ 'is-active': selectedCategory === 'air' }"
-          @click="selectCategory('air')"
-          style="padding-left: 30px"
-        >
-          <span>🌫️</span>
-          <span>空气质量传感器</span>
-          <span class="device-count">{{ statistics.airCount || 20 }}</span>
-        </div>
-      </div>
+    <!-- 告警统计 -->
+    <el-row :gutter="16" class="mb-16px">
+      <el-col :span="6">
+        <el-card shadow="hover" class="stat-card danger">
+          <div class="stat-value">{{ statistics.unhandledAlarmCount || 0 }}</div>
+          <div class="stat-label">未处理告警</div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="hover" class="stat-card warning">
+          <div class="stat-value">{{ statistics.todayAlarmCount || 0 }}</div>
+          <div class="stat-label">今日告警</div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="hover" class="stat-card success">
+          <div class="stat-value">{{ statistics.onlineCount || 0 }}</div>
+          <div class="stat-label">在线传感器</div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="hover" class="stat-card info">
+          <div class="stat-value">{{ statistics.totalCount || 0 }}</div>
+          <div class="stat-label">传感器总数</div>
+        </el-card>
+      </el-col>
+    </el-row>
 
-      <!-- 右侧主内容 -->
-      <div class="main-content">
-        <!-- 统计卡片 -->
-        <el-row :gutter="20" class="mb-20px">
-          <el-col :span="8">
-            <el-card shadow="hover" class="stat-card success">
-              <div class="stat-label">正常设备</div>
-              <div class="stat-value">{{ statistics.normalCount || 42 }}</div>
-            </el-card>
-          </el-col>
-          <el-col :span="8">
-            <el-card shadow="hover" class="stat-card warning">
-              <div class="stat-label">告警设备</div>
-              <div class="stat-value">{{ statistics.alarmCount || 3 }}</div>
-            </el-card>
-          </el-col>
-          <el-col :span="8">
-            <el-card shadow="hover" class="stat-card danger">
-              <div class="stat-label">离线设备</div>
-              <div class="stat-value">{{ statistics.offlineCount || 0 }}</div>
-            </el-card>
-          </el-col>
-        </el-row>
+    <ContentWrap>
+      <!-- 筛选条件 -->
+      <el-form :inline="true" :model="queryParams" class="-mb-15px">
+        <el-form-item label="告警级别" prop="alarmLevel">
+          <el-select v-model="queryParams.alarmLevel" placeholder="全部级别" clearable class="!w-140px">
+            <el-option label="紧急" :value="3" />
+            <el-option label="重要" :value="2" />
+            <el-option label="一般" :value="1" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="告警类型" prop="alarmType">
+          <el-select v-model="queryParams.alarmType" placeholder="全部类型" clearable class="!w-140px">
+            <el-option label="温度" :value="1" />
+            <el-option label="湿度" :value="2" />
+            <el-option label="PM2.5" :value="3" />
+            <el-option label="CO2" :value="4" />
+            <el-option label="噪音" :value="5" />
+            <el-option label="光照" :value="6" />
+            <el-option label="气压" :value="7" />
+            <el-option label="离线" :value="8" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="处理状态" prop="status">
+          <el-select v-model="queryParams.status" placeholder="全部" clearable class="!w-120px">
+            <el-option label="未处理" :value="0" />
+            <el-option label="处理中" :value="1" />
+            <el-option label="已处理" :value="2" />
+            <el-option label="已忽略" :value="3" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="告警时间" prop="dateRange">
+          <el-date-picker
+            v-model="dateRange"
+            type="daterange"
+            range-separator="-"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            class="!w-260px"
+          />
+        </el-form-item>
+        <el-form-item label="传感器" prop="sensorName">
+          <el-input v-model="queryParams.sensorName" placeholder="搜索传感器名称" clearable class="!w-200px" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleQuery">
+            <Icon icon="ep:search" class="mr-5px" /> 查询
+          </el-button>
+          <el-button @click="resetQuery">
+            <Icon icon="ep:refresh" class="mr-5px" /> 重置
+          </el-button>
+        </el-form-item>
+      </el-form>
+    </ContentWrap>
 
-        <!-- 操作栏 -->
-        <div class="action-bar">
-          <div class="filter-tags">
-            <el-tag
-              v-for="tag in filterTags"
-              :key="tag.value"
-              :type="activeTag === tag.value ? '' : 'info'"
-              :effect="activeTag === tag.value ? 'dark' : 'plain'"
-              class="filter-tag"
-              @click="activeTag = tag.value"
-            >
-              {{ tag.label }}
+    <ContentWrap>
+      <el-table v-loading="loading" :data="list" stripe>
+        <el-table-column label="告警时间" prop="alarmTime" width="180">
+          <template #default="{ row }">{{ formatDate(row.alarmTime) }}</template>
+        </el-table-column>
+        <el-table-column label="告警级别" prop="alarmLevel" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getLevelType(row.alarmLevel)" size="small">
+              {{ getLevelLabel(row.alarmLevel) }}
             </el-tag>
-          </div>
-          <div class="action-buttons">
-            <el-button @click="refreshData">
-              <Icon icon="ep:refresh" class="mr-5px" /> 刷新数据
+          </template>
+        </el-table-column>
+        <el-table-column label="告警类型" prop="alarmType" width="100">
+          <template #default="{ row }">{{ getAlarmTypeLabel(row.alarmType) }}</template>
+        </el-table-column>
+        <el-table-column label="传感器名称" prop="sensorName" min-width="160" />
+        <el-table-column label="区域" prop="areaName" width="120">
+          <template #default="{ row }">{{ row.areaName || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="告警内容" prop="alarmContent" min-width="220" show-overflow-tooltip />
+        <el-table-column label="告警值" prop="alarmValue" width="120">
+          <template #default="{ row }">
+            <span v-if="row.alarmValue !== null && row.alarmValue !== undefined">{{ row.alarmValue }}</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="处理状态" prop="status" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusType(row.status)" size="small">
+              {{ getStatusLabel(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="160" fixed="right">
+          <template #default="{ row }">
+            <el-button v-if="row.status === 0 || row.status === 1" link type="warning" @click="handleAlarm(row)">
+              处理
             </el-button>
-            <el-button type="primary" @click="exportExcel">
-              <Icon icon="ep:download" class="mr-5px" /> 导出Excel
+            <el-button v-if="row.status === 0 || row.status === 1" link type="info" @click="ignoreAlarm(row)">
+              忽略
             </el-button>
-          </div>
-        </div>
+            <el-button link type="primary" @click="viewDetail(row)">详情</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
 
-        <!-- 数据表格 -->
-        <el-table v-loading="loading" :data="list" stripe>
-          <el-table-column label="区域位置" prop="areaName" width="120">
-            <template #default="{ row }"> 📍 {{ row.areaName }} </template>
-          </el-table-column>
-          <el-table-column label="设备信息" prop="sensorName" min-width="180">
-            <template #default="{ row }">
-              <div style="font-weight: 600">{{ row.sensorName }}</div>
-              <div style="color: #909399; font-size: 12px">
-                {{ row.sensorType === 'weather' ? '温湿度监测' : '空气质量监测' }}
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="设备ID" prop="sensorCode" width="120">
-            <template #default="{ row }">
-              <span style="font-family: monospace; color: #909399">{{ row.sensorCode }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="设备状态" prop="status" width="100">
-            <template #default="{ row }">
-              <el-tag :type="getStatusType(row.status)" size="small">
-                {{ getStatusLabel(row.status) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="实时数值" prop="value" width="150">
-            <template #default="{ row }">
-              <span v-if="row.status === 0" style="color: #909399">--</span>
-              <span v-else style="color: #409eff; font-weight: 600">
-                {{
-                  row.sensorType === 'weather'
-                    ? `${row.temperature}°C / ${row.humidity}%`
-                    : `PM2.5: ${row.pm25}μg/m³`
-                }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column label="最后更新时间" prop="lastUpdateTime" width="180">
-            <template #default="{ row }">
-              {{ formatDate(row.lastUpdateTime) }}
-            </template>
-          </el-table-column>
-        </el-table>
+      <Pagination
+        :total="total"
+        v-model:page="queryParams.pageNo"
+        v-model:limit="queryParams.pageSize"
+        @pagination="getList"
+      />
+    </ContentWrap>
 
-        <Pagination
-          :total="total"
-          v-model:page="queryParams.pageNo"
-          v-model:limit="queryParams.pageSize"
-          @pagination="getList"
-        />
-      </div>
-    </div>
+    <!-- 处理弹窗 -->
+    <el-dialog v-model="handleDialogVisible" :title="handleDialogTitle" width="500px">
+      <el-form :model="handleForm" label-width="100px">
+        <el-form-item label="告警内容">
+          <div class="text-gray-500">{{ currentAlarm?.alarmContent }}</div>
+        </el-form-item>
+        <el-form-item label="处理人">
+          <el-input v-model="handleForm.handler" placeholder="请输入处理人" />
+        </el-form-item>
+        <el-form-item label="处理备注">
+          <el-input v-model="handleForm.handleRemark" type="textarea" :rows="3" placeholder="请输入处理备注" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="handleDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitHandle">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 详情弹窗 -->
+    <el-dialog v-model="detailDialogVisible" title="告警详情" width="600px">
+      <el-descriptions v-if="currentAlarm" :column="2" border>
+        <el-descriptions-item label="传感器">{{ currentAlarm.sensorName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="传感器编码">{{ currentAlarm.sensorCode || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="告警级别">
+          <el-tag :type="getLevelType(currentAlarm.alarmLevel)" size="small">
+            {{ getLevelLabel(currentAlarm.alarmLevel) }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="告警类型">{{ getAlarmTypeLabel(currentAlarm.alarmType) }}</el-descriptions-item>
+        <el-descriptions-item label="告警时间" :span="2">{{ formatDate(currentAlarm.alarmTime) }}</el-descriptions-item>
+        <el-descriptions-item label="告警内容" :span="2">{{ currentAlarm.alarmContent || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="告警值">{{ currentAlarm.alarmValue ?? '-' }}</el-descriptions-item>
+        <el-descriptions-item label="阈值">
+          {{ currentAlarm.thresholdValue ?? '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="区域">{{ currentAlarm.areaName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="处理状态">
+          <el-tag :type="getStatusType(currentAlarm.status)" size="small">
+            {{ getStatusLabel(currentAlarm.status) }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="处理人">{{ currentAlarm.handler || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="处理时间">
+          {{ currentAlarm.handleTime ? formatDate(currentAlarm.handleTime) : '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="处理备注" :span="2">{{ currentAlarm.handleRemark || '-' }}</el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button @click="detailDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { formatDate } from '@/utils/formatTime'
+import * as EnvApi from '@/api/iot/building/env'
 
 defineOptions({ name: 'EnvAlarm' })
 
 const message = useMessage()
 const loading = ref(false)
-const list = ref<any[]>([])
+const list = ref<EnvApi.IbmsEnvAlarmVO[]>([])
 const total = ref(0)
-const treeSearch = ref('')
-const selectedCategory = ref('all')
-const activeTag = ref('all')
+const statistics = ref<EnvApi.IbmsEnvStatisticsVO>({})
 
-const statistics = ref({
-  totalCount: 45,
-  weatherCount: 25,
-  airCount: 20,
-  normalCount: 42,
-  alarmCount: 3,
-  offlineCount: 0
-})
-
-const filterTags = [
-  { label: '全部', value: 'all' },
-  { label: '在线', value: 'online' },
-  { label: '告警', value: 'alarm' },
-  { label: '离线', value: 'offline' }
-]
-
-const queryParams = reactive({
+const queryParams = reactive<EnvApi.IbmsEnvAlarmPageReqVO>({
   pageNo: 1,
   pageSize: 20,
-  category: 'all'
+  sensorName: undefined,
+  alarmType: undefined,
+  alarmLevel: undefined,
+  status: undefined,
+  startTime: undefined,
+  endTime: undefined
 })
 
-const getStatusType = (status: number) => {
-  const map: Record<number, string> = { 0: 'info', 1: 'success', 2: 'warning' }
-  return map[status] || 'info'
+const dateRange = ref<string[] | undefined>(undefined)
+
+const handleDialogVisible = ref(false)
+const detailDialogVisible = ref(false)
+const handleAction = ref<'handle' | 'ignore'>('handle')
+const handleDialogTitle = computed(() => (handleAction.value === 'handle' ? '处理告警' : '忽略告警'))
+const currentAlarm = ref<EnvApi.IbmsEnvAlarmVO | null>(null)
+const handleForm = reactive({ handler: '', handleRemark: '' })
+
+const getLevelType = (level?: number) => {
+  const map: Record<number, string> = { 3: 'danger', 2: 'warning', 1: 'info' }
+  return (level && map[level]) || 'info'
+}
+const getLevelLabel = (level?: number) => {
+  const map: Record<number, string> = { 3: '紧急', 2: '重要', 1: '一般' }
+  return (level && map[level]) || '未知'
+}
+const getStatusType = (status?: number) => {
+  const map: Record<number, string> = { 0: 'danger', 1: 'warning', 2: 'success', 3: 'info' }
+  return (status !== undefined && map[status]) || 'info'
+}
+const getStatusLabel = (status?: number) => {
+  const map: Record<number, string> = { 0: '未处理', 1: '处理中', 2: '已处理', 3: '已忽略' }
+  return (status !== undefined && map[status]) || '未知'
+}
+const getAlarmTypeLabel = (type?: number) => {
+  const map: Record<number, string> = {
+    1: '温度', 2: '湿度', 3: 'PM2.5', 4: 'CO2', 5: '噪音', 6: '光照', 7: '气压', 8: '离线'
+  }
+  return (type && map[type]) || '-'
 }
 
-const getStatusLabel = (status: number) => {
-  const map: Record<number, string> = { 0: '离线', 1: '在线', 2: '告警' }
-  return map[status] || '未知'
+const fetchStatistics = async () => {
+  try {
+    statistics.value = (await EnvApi.getEnvStatistics()) || {}
+  } catch (e) {
+    statistics.value = {}
+  }
 }
 
 const getList = async () => {
   loading.value = true
   try {
-    // 模拟数据
-    const weatherDevices = Array.from({ length: 15 }, (_, i) => ({
-      id: i + 1,
-      sensorCode: `WS-${String(i + 1).padStart(3, '0')}`,
-      sensorName: `温湿度传感器${String(i + 1).padStart(3, '0')}`,
-      areaName: i < 8 ? 'A区一层' : 'A区二层',
-      sensorType: 'weather',
-      temperature: 20 + Math.floor(Math.random() * 8),
-      humidity: 30 + Math.floor(Math.random() * 40),
-      status: i === 8 ? 2 : 1,
-      lastUpdateTime: new Date()
-    }))
-
-    const airDevices = Array.from({ length: 10 }, (_, i) => ({
-      id: 100 + i + 1,
-      sensorCode: `AQ-${String(i + 1).padStart(3, '0')}`,
-      sensorName: `空气质量传感器${String(i + 1).padStart(3, '0')}`,
-      areaName: i < 5 ? 'B区一层' : 'B区二层',
-      sensorType: 'air',
-      pm25: ['35', '28', '85', '42', '19'][Math.floor(Math.random() * 5)],
-      pm10: ['50', '45', '120', '60', '35'][Math.floor(Math.random() * 5)],
-      status: i === 2 ? 2 : 1,
-      lastUpdateTime: new Date()
-    }))
-
-    let filtered = [...weatherDevices, ...airDevices]
-    if (selectedCategory.value === 'weather') {
-      filtered = weatherDevices
-    } else if (selectedCategory.value === 'air') {
-      filtered = airDevices
+    if (dateRange.value && dateRange.value.length === 2) {
+      queryParams.startTime = (dateRange.value[0] + ' 00:00:00') as any
+      queryParams.endTime = (dateRange.value[1] + ' 23:59:59') as any
+    } else {
+      queryParams.startTime = undefined
+      queryParams.endTime = undefined
     }
-
-    list.value = filtered
-    total.value = filtered.length
+    const data = await EnvApi.getEnvAlarmPage(queryParams)
+    list.value = data?.list || []
+    total.value = data?.total || 0
   } finally {
     loading.value = false
   }
 }
 
-const selectCategory = (category: string) => {
-  selectedCategory.value = category
-  queryParams.category = category
+const handleQuery = () => {
   queryParams.pageNo = 1
   getList()
 }
 
-const refreshData = () => {
-  message.success('数据已刷新')
-  getList()
+const resetQuery = () => {
+  queryParams.alarmLevel = undefined
+  queryParams.alarmType = undefined
+  queryParams.status = undefined
+  queryParams.sensorName = undefined
+  dateRange.value = undefined
+  handleQuery()
 }
 
-const exportExcel = () => {
-  message.success('正在导出Excel报表...')
+const handleAlarm = (row: EnvApi.IbmsEnvAlarmVO) => {
+  currentAlarm.value = row
+  handleAction.value = 'handle'
+  handleForm.handler = ''
+  handleForm.handleRemark = ''
+  handleDialogVisible.value = true
+}
+
+const ignoreAlarm = (row: EnvApi.IbmsEnvAlarmVO) => {
+  currentAlarm.value = row
+  handleAction.value = 'ignore'
+  handleForm.handler = ''
+  handleForm.handleRemark = ''
+  handleDialogVisible.value = true
+}
+
+const submitHandle = async () => {
+  if (!handleForm.handler) {
+    message.warning('请输入处理人')
+    return
+  }
+  if (!currentAlarm.value?.id) return
+  if (handleAction.value === 'handle') {
+    await EnvApi.handleEnvAlarm(currentAlarm.value.id, handleForm.handler, handleForm.handleRemark)
+    message.success('处理成功')
+  } else {
+    await EnvApi.ignoreEnvAlarm(currentAlarm.value.id, handleForm.handler, handleForm.handleRemark)
+    message.success('已忽略')
+  }
+  handleDialogVisible.value = false
+  await Promise.all([getList(), fetchStatistics()])
+}
+
+const viewDetail = (row: EnvApi.IbmsEnvAlarmVO) => {
+  currentAlarm.value = row
+  detailDialogVisible.value = true
 }
 
 onMounted(() => {
+  fetchStatistics()
   getList()
 })
 </script>
@@ -252,123 +336,25 @@ onMounted(() => {
 .env-alarm-page {
   box-sizing: border-box;
   padding-top: max(0px, calc(var(--page-top-gap, 70px) - (var(--app-content-padding) + 10px)));
-  background: var(--el-bg-color-page, var(--el-bg-color));
-}
-
-.alarm-layout {
-  display: flex;
-  background: var(--el-bg-color);
-  border-radius: 4px;
-  min-height: calc(100vh - 200px);
-}
-
-.tree-panel {
-  width: 260px;
-  border-right: 1px solid var(--el-border-color-lighter);
-  padding: 20px;
-  background: var(--el-fill-color-light);
-
-  .tree-title {
-    font-weight: 600;
-    margin-bottom: 15px;
-    font-size: 16px;
-  }
-
-  .tree-search {
-    margin-bottom: 15px;
-  }
-
-  .tree-node {
-    padding: 10px;
-    cursor: pointer;
-    border-radius: 4px;
-    margin-bottom: 5px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--el-text-color-regular);
-    font-size: 14px;
-
-    &:hover {
-      background: rgba(var(--el-color-primary-rgb), 0.12);
-      color: var(--el-color-primary);
-    }
-
-    &.is-active {
-      background: var(--el-color-primary);
-      color: white;
-    }
-
-    .device-count {
-      margin-left: auto;
-      font-size: 12px;
-      background: var(--el-fill-color);
-      padding: 2px 8px;
-      border-radius: 10px;
-    }
-
-    &.is-active {
-      .device-count {
-        background: rgba(255, 255, 255, 0.22);
-      }
-    }
-  }
-}
-
-.main-content {
-  flex: 1;
-  padding: 20px;
 }
 
 .stat-card {
+  text-align: center;
   padding: 20px;
-  border-left: 4px solid;
 
-  &.success {
-    border-left-color: var(--el-color-success);
-  }
-
-  &.warning {
-    border-left-color: var(--el-color-warning);
-  }
-
-  &.danger {
-    border-left-color: var(--el-color-danger);
+  .stat-value {
+    font-size: 32px;
+    font-weight: bold;
   }
 
   .stat-label {
-    font-size: 12px;
     color: var(--el-text-color-secondary);
-    margin-bottom: 8px;
+    margin-top: 8px;
   }
 
-  .stat-value {
-    font-size: 28px;
-    font-weight: bold;
-    color: var(--el-text-color-primary);
-  }
-}
-
-.action-bar {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 20px;
-  align-items: center;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-
-  .filter-tags {
-    display: flex;
-    gap: 10px;
-
-    .filter-tag {
-      cursor: pointer;
-    }
-  }
-
-  .action-buttons {
-    display: flex;
-    gap: 10px;
-  }
+  &.danger .stat-value { color: var(--el-color-danger); }
+  &.warning .stat-value { color: var(--el-color-warning); }
+  &.info .stat-value { color: var(--el-color-primary); }
+  &.success .stat-value { color: var(--el-color-success); }
 }
 </style>
