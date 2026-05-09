@@ -3,7 +3,6 @@ package cn.iocoder.yudao.module.iot.controller.admin.building.vo.env;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Schema(description = "管理后台 - 环境告警记录 Response VO")
@@ -31,14 +30,11 @@ public class IbmsEnvAlarmRespVO {
     @Schema(description = "告警内容")
     private String alarmContent;
 
-    @Schema(description = "告警值")
-    private BigDecimal alarmValue;
+    @Schema(description = "告警值（与 DO 一致，可能含非数值如\"离线\"）")
+    private String alarmValue;
 
-    @Schema(description = "阈值下限")
-    private BigDecimal thresholdMin;
-
-    @Schema(description = "阈值上限")
-    private BigDecimal thresholdMax;
+    @Schema(description = "阈值（DO 单字段，例如 \"50\" 或 \"20-30\"）")
+    private String thresholdValue;
 
     @Schema(description = "告警时间")
     private LocalDateTime alarmTime;

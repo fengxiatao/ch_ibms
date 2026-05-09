@@ -113,9 +113,8 @@ export interface IbmsEnvAlarmVO {
   alarmType?: number
   alarmLevel?: number
   alarmContent?: string
-  alarmValue?: number
-  thresholdMin?: number
-  thresholdMax?: number
+  alarmValue?: string
+  thresholdValue?: string
   alarmTime?: Date
   status?: number
   handleTime?: Date
