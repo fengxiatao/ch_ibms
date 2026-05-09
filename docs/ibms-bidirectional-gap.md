@@ -199,7 +199,9 @@
 | GAP-011 | `iot/access/device` 单源化 | 后端 `IotAccessDeviceController` 仍混用 IotDeviceDO | 改为 `IbmsDeviceMapper` 单一数据源 + 出参换 `IbmsDeviceRespVO` | P0 | M2 |
 | GAP-012 | `iot/building/lighting/device` `/alarm` | 旧照明子页 mock | `IbmsLightingController` 缺 `device 列表 + alarm 聚合`（部分已有，需对齐前端字段） | P1 | M2 → M4 |
 | GAP-013 | `iot/building/newlight/*`（7 子页） | 新照明全套数据 | `IbmsLightingController` 已有底座，**新前端字段映射 / 大屏聚合端点缺** | P0/P1 | M2 → M4 |
-| GAP-014 | `iot/building/env/alarm`、`iot/building/bac/alarm` | 子模块告警 mock | 已有 ibms_env_alarm / ibms_bac_alarm 表 + 部分 controller，**缺前端列表 + 详情接口对齐** | P2 | M2 → M4 |
+| GAP-014 | `iot/building/env/alarm`、`iot/building/bac/alarm` | 子模块告警 mock | ✅ **已闭环**（commit `428e1f7` + `f1bbc8b`，2026-05-09 v37）。前端 mock→IbmsEnvApi/IbmsBacApi；浏览器端到端验收 12 行 bac + 4 行 env 真实数据全通 | ✅ Done | M6-A |
+| GAP-014a | `IbmsEnvAlarmRespVO` 字段类型对齐 DO | RespVO `alarmValue: BigDecimal`、`thresholdMin/Max: BigDecimal` 与 DO `String` / 单字段 `thresholdValue` 不一致，含"离线"等非数值时 `BeanUtils.toBean` 抛 NumberFormatException → `/alarm/page` 整页 500 | ✅ **已修**（commit `f1bbc8b`，v37）：alarmValue→String、thresholdMin/Max→thresholdValue:String，前端 IbmsEnvAlarmVO 同步 | ✅ Done | M6-A |
+| GAP-014b | `ibms_env_alarm.alarm_type` 字典三方偏移 | DO 注释 `6=设备离线`，但 `IbmsEnvAlarmRespVO @Schema` 与前端 `getAlarmTypeLabel` 都是 `6=光照`；种子数据按 DO 注释写入，导致前端 id=8 显示"光照"而内容是"设备离线" | 三方对齐字典：以何为准需产品定（建议沿用 RespVO+前端的 1-8 编码并改 DO 注释 + 种子数据） | P2 | M6-A 后续 |
 | GAP-015 | `views/security/index.vue` 入口 | 调 `@/api/iot/device`（老 API） | 走 `IbmsDeviceController` 重构 | P1 | M6 |
 | GAP-016 | `views/security/VideoSurveillance/{RealTimePreview,MultiScreenPreview,VideoPlayback}` | 视频流 + 空间分组 | 已有 ibms_channel + ibms_space，**前端切换 import 路径**即可（部分已通过 SnapshotRecord 验证） | P1 | M3/M6 |
 | GAP-017 | 专项扩展表外键 | `ibms_hvac_device` / `ibms_water_device` 是否有 `ibms_device_id` | DDL 校验 + 补外键迁移 | P1 | M2 |
@@ -211,9 +213,9 @@
 | 资产 | 类型 | 引用 | 处置建议 |
 |---|---|---|---|
 | `AccessDashboardController.{statistics,real-time,trend,device-status,heatmap,abnormal-events}` | API（6 端点） | ✅ 已被 `iot/access/visual-dashboard` 接入（commit `0b62d00`） | ~~M3 优先：直接接入~~ → 已完成（M2-A + M2-D） |
-| `IbmsBacController.*` | API | 仅 `bac/monitor`、`bac/ledger` 用 | M4 让 `bac/alarm`、`bac/log` 接入 |
+| `IbmsBacController.*` | API | `bac/monitor` `bac/ledger` `bac/alarm` 已用 | M4 让 `bac/log` 接入 |
 | `IbmsEnergyController.*` | API | `energy/Overview`、`Consumption` 等已用 | M5 让 `DeviceManagement`、`SystemSettings` 接入 |
-| `IbmsEnvController.*` | API | `env/overview/sensor` 已用 | M4 让 `env/alarm`、`env/settings` 接入 |
+| `IbmsEnvController.*` | API | `env/overview/sensor` `env/alarm` 已用 | M4 让 `env/settings` 接入 |
 | `IbmsLightingController.*` | API | `lighting/scene/control` 已用 | M4 让 `lighting/device/alarm`、`newlight/*` 全套接入 |
 | `IbmsDeviceDiscoveryController` | API | 仅 `iot/ibms/discovery` 运维页 | 保留为运维专用，正常 |
 | `IbmsBusinessMappingHelper`（groupCode/systemCode 字典） | 工具类 | 仅 AlarmHost / equipment 等少数页用 | **M3~M6 各业务页面查询时统一加 groupCode 过滤**（已写入主计划 §2.3） |
