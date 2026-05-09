@@ -49,10 +49,7 @@
                         @dragstart="handleDragStart($event, data)"
                         @dblclick="handleChannelDoubleClick(data)"
                       >
-                        <Icon v-if="data.type === 'building'" icon="ep:office-building" style="color: #409eff" />
-                        <Icon v-else-if="data.type === 'floor'" icon="ep:tickets" style="color: #67c23a" />
-                        <Icon v-else-if="data.type === 'area'" icon="ep:location" style="color: #e6a23c" />
-                        <Icon v-else-if="data.type === 'channels'" icon="ep:folder-opened" style="color: #909399" />
+                        <Icon v-if="data.type === 'space'" icon="ep:office-building" style="color: #409eff" />
                         <Icon v-else-if="data.type === 'channel'" icon="ep:video-camera" style="color: #f56c6c" />
                         <Icon v-else icon="ep:video-camera" style="color: #f56c6c" />
                         <span>{{ data.name }}</span>
@@ -162,10 +159,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { ContentWrap } from '@/components/ContentWrap'
 import { Icon } from '@/components/Icon'
-import { getBuildingList } from '@/api/iot/spatial/building'
-import { getFloorListByBuildingId } from '@/api/iot/spatial/floor'
-import { getAreaListByFloorId } from '@/api/iot/spatial/area'
-import { getChannelPage } from '@/api/iot/channel'
+import { getSpaceTree, type IbmsSpaceTreeNodeRespVO } from '@/api/iot/ibms/space'
+import { getChannelPage as getIbmsChannelPage } from '@/api/iot/ibms/channel'
 import { getLivePlayUrl, stopStream } from '@/api/iot/video/zlm'
 import mpegts from 'mpegts.js'
 
@@ -185,10 +180,12 @@ interface PaneType {
 const leftPanelActive = ref<string>('device')
 const deviceSearchKeyword = ref('')
 const cameraTreeData = ref<any[]>([])
-const treeProps = { 
-  children: 'children', 
-  label: 'name', 
-  isLeaf: (data: any) => data.type === 'device' || data.type === 'channel' 
+const spaceTreeChildrenMap = new Map<number, IbmsSpaceTreeNodeRespVO[]>()
+const MAX_PAGE_SIZE = 100
+const treeProps = {
+  children: 'children',
+  label: 'name',
+  isLeaf: (data: any) => data.type === 'channel'
 }
 
 const gridLayout = ref<number>(9)
@@ -279,60 +276,109 @@ const setPaneVideoRef = (el: any, idx: number) => {
   if (el && panes.value[idx]) panes.value[idx].videoEl = el as HTMLVideoElement
 }
 
+const mapChannelRow = (row: any) => {
+  const channelNo = row.channelNo
+  const channelName = row.name || `通道${channelNo}`
+  return {
+    id: `channel-${row.id}`,
+    name: channelName,
+    type: 'channel' as const,
+    channelId: row.id,
+    channel: {
+      id: row.id,
+      channelId: row.id,
+      channelNo,
+      channelName,
+      name: channelName
+    }
+  }
+}
+
+const mapSpaceNode = (space: IbmsSpaceTreeNodeRespVO): any => ({
+  id: `space-${space.id}`,
+  name: space.name,
+  type: 'space',
+  spaceId: space.id
+})
+
+const buildSpaceNodeIndex = (nodes: IbmsSpaceTreeNodeRespVO[]) => {
+  spaceTreeChildrenMap.clear()
+  const walk = (list: IbmsSpaceTreeNodeRespVO[]) => {
+    for (const item of list) {
+      spaceTreeChildrenMap.set(item.id, item.children || [])
+      if (item.children?.length) walk(item.children)
+    }
+  }
+  walk(nodes)
+}
+
 const loadSpaceTree = async () => {
   try {
-    const buildings = await getBuildingList()
-    cameraTreeData.value = buildings.map((b: any) => ({
-      id: `building-${b.id}`, name: b.name, type: 'building', buildingId: b.id
-    }))
+    const spaces = await getSpaceTree()
+    buildSpaceNodeIndex(spaces || [])
+    cameraTreeData.value = (spaces || []).map(mapSpaceNode)
   } catch (e: any) {
+    console.error('[空间树] 加载失败:', e)
     ElMessage.error('加载空间树失败')
   }
+}
+
+const loadChannelsBySpace = async (spaceId: number): Promise<any[]> => {
+  const channels: any[] = []
+  let pageNo = 1
+  let total = 0
+  do {
+    const res: any = await getIbmsChannelPage({
+      pageNo,
+      pageSize: MAX_PAGE_SIZE,
+      business: 'sa',
+      typeCode: 'VT',
+      spaceId
+    })
+    const page = (res && res.list) ? res : res?.data
+    const list = page?.list || []
+    total = Number(page?.total || 0)
+    channels.push(...list)
+    if (!list.length || channels.length >= total) break
+    pageNo += 1
+  } while (true)
+  return channels.map(mapChannelRow)
 }
 
 const loadTreeNode = async (node: any, resolve: Function) => {
   try {
     const data = node.data
-    let children: any[] = []
-    
-    if (data.type === 'building') {
-      children.push({ id: `channels-building-${data.buildingId}`, name: '通道', type: 'channels', buildingId: data.buildingId })
-      const floors = await getFloorListByBuildingId(data.buildingId)
-      children.push(...floors.map((f: any) => ({ id: `floor-${f.id}`, name: f.name, type: 'floor', floorId: f.id, buildingId: data.buildingId })))
-    } else if (data.type === 'floor') {
-      children.push({ id: `channels-floor-${data.floorId}`, name: '通道', type: 'channels', floorId: data.floorId, buildingId: data.buildingId })
-      const areas = await getAreaListByFloorId(data.floorId)
-      children.push(...areas.map((a: any) => ({ id: `area-${a.id}`, name: a.name, type: 'area', areaId: a.id, floorId: data.floorId })))
-    } else if (data.type === 'area') {
-      children.push({ id: `channels-area-${data.areaId}`, name: '通道', type: 'channels', areaId: data.areaId, floorId: data.floorId })
-    } else if (data.type === 'channels') {
-      const params: any = { pageNo: 1, pageSize: 100 }
-      if (data.buildingId) params.buildingId = data.buildingId
-      if (data.floorId) params.floorId = data.floorId
-      if (data.areaId) params.areaId = data.areaId
-      const channelsRes = await getChannelPage(params)
-      children = (channelsRes.list || []).map((ch: any) => ({
-        id: `channel-${ch.id}`, name: ch.channelName || `通道${ch.channelNo}`, type: 'channel', channelId: ch.id, channel: ch
-      }))
+    if (!data || data.type !== 'space' || !data.spaceId) {
+      resolve([])
+      return
     }
-    resolve(children)
-  } catch { resolve([]) }
+    const childSpaces = (spaceTreeChildrenMap.get(data.spaceId) || []).map(mapSpaceNode)
+    const channels = await loadChannelsBySpace(data.spaceId)
+    resolve([...childSpaces, ...channels])
+  } catch (e: any) {
+    console.error('[树节点] 加载失败:', e)
+    resolve([])
+  }
 }
 
 const handleChannelSearch = async () => {
   const keyword = deviceSearchKeyword.value.trim()
   if (!keyword) return
   try {
-    const result: any = await getChannelPage({ channelName: keyword, channelType: 'video', pageNo: 1, pageSize: 100 })
-    const list = result?.list || []
-    if (list.length > 0) {
-      cameraTreeData.value = list.map((ch: any) => ({
-        id: `channel-${ch.id}`, name: ch.channelName || `通道${ch.channelNo}`, type: 'channel', channelId: ch.id, channel: ch
-      }))
-    } else {
-      cameraTreeData.value = []
-    }
-  } catch {}
+    const res: any = await getIbmsChannelPage({
+      pageNo: 1,
+      pageSize: MAX_PAGE_SIZE,
+      business: 'sa',
+      typeCode: 'VT',
+      keyword
+    })
+    const page = (res && res.list) ? res : res?.data
+    const list = page?.list || []
+    cameraTreeData.value = list.map(mapChannelRow)
+  } catch (e: any) {
+    console.error('[通道搜索] 失败:', e)
+    cameraTreeData.value = []
+  }
 }
 
 const handleSearchClear = () => { deviceSearchKeyword.value = ''; loadSpaceTree() }
