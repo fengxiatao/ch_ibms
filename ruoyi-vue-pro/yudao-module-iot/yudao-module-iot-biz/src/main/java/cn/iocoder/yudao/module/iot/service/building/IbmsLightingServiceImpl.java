@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.iot.service.building;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.iot.controller.admin.building.vo.lighting.*;
 import cn.iocoder.yudao.module.iot.dal.dataobject.building.*;
 import cn.iocoder.yudao.module.iot.dal.mysql.building.*;
@@ -9,8 +10,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Objects;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.iot.enums.ErrorCodeConstants.*;
@@ -232,16 +237,50 @@ public class IbmsLightingServiceImpl implements IbmsLightingService {
 
         // 网关统计
         vo.setGatewayTotalCount(gatewayMapper.selectCount());
+        vo.setGatewayOnlineCount(gatewayMapper.selectCount(
+                new LambdaQueryWrapperX<IbmsLightingGatewayDO>().eq(IbmsLightingGatewayDO::getStatus, 1)));
 
         // 控制器统计
         vo.setControllerTotalCount(controllerMapper.selectCount());
+        vo.setControllerOnlineCount(controllerMapper.selectCount(
+                new LambdaQueryWrapperX<IbmsLightingControllerDO>().eq(IbmsLightingControllerDO::getStatus, 1)));
 
         // 告警统计
         vo.setUnhandledAlarmCount(alarmMapper.selectCountByStatus(0));
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime todayEnd = LocalDate.now().atTime(LocalTime.MAX);
+        vo.setTodayAlarmCount(alarmMapper.selectCount(
+                new LambdaQueryWrapperX<IbmsLightingAlarmDO>()
+                        .between(IbmsLightingAlarmDO::getAlarmTime, todayStart, todayEnd)));
 
-        // 功率统计（示例数据）
-        vo.setTotalPower(new BigDecimal("150.0"));
-        vo.setCurrentPower(new BigDecimal("85.5"));
+        // 灯具/功率统计：基于 ibms_lighting_circuit 实测数据
+        // - lightTotalCount：所有回路 light_count 之和
+        // - totalPower：所有回路 rated_power 之和（kW，DB 字段单位为 W，转 kW）
+        // - currentPower：状态=1（开启）的回路 rated_power * brightness/100 之和（kW）
+        List<IbmsLightingCircuitDO> circuits = circuitMapper.selectList();
+        long lightTotal = circuits.stream()
+                .map(IbmsLightingCircuitDO::getLightCount)
+                .filter(Objects::nonNull)
+                .mapToLong(Integer::longValue)
+                .sum();
+        vo.setLightTotalCount(lightTotal);
+
+        BigDecimal ratedSumW = circuits.stream()
+                .map(IbmsLightingCircuitDO::getRatedPower)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        vo.setTotalPower(ratedSumW.divide(BigDecimal.valueOf(1000), 2, RoundingMode.HALF_UP));
+
+        BigDecimal currentSumW = circuits.stream()
+                .filter(c -> Integer.valueOf(1).equals(c.getStatus()))
+                .filter(c -> c.getRatedPower() != null)
+                .map(c -> {
+                    int brightness = c.getBrightness() != null ? c.getBrightness() : 100;
+                    return c.getRatedPower().multiply(BigDecimal.valueOf(brightness))
+                            .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        vo.setCurrentPower(currentSumW.divide(BigDecimal.valueOf(1000), 2, RoundingMode.HALF_UP));
 
         return vo;
     }

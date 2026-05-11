@@ -17,10 +17,7 @@
               <div class="filter-bar">
                 <select v-model="filters.area" class="filter-select" @change="applyFilter">
                   <option value="all">全部区域</option>
-                  <option value="A1">A区一层</option>
-                  <option value="A2">A区二层</option>
-                  <option value="B1">B区展厅</option>
-                  <option value="public">公共区域</option>
+                  <option v-for="area in areaOptions" :key="area" :value="area">{{ area }}</option>
                 </select>
                 <select v-model="filters.status" class="filter-select" @change="applyFilter">
                   <option value="all">全部状态</option>
@@ -31,6 +28,7 @@
                 <input v-model.trim="filters.keyword" type="text" class="filter-input" placeholder="请输入回路名称或编号" />
                 <button class="filter-btn" @click="applyFilter">筛选</button>
                 <button class="reset-btn" @click="resetFilter">重置</button>
+                <span class="ml-auto text-xs text-slate-500">更新于 {{ refreshAtLabel }}</span>
               </div>
 
               <div class="group-tabs">
@@ -67,23 +65,23 @@
                   <div class="card-body">
                     <div class="info-row">
                       <span class="info-icon">📍</span>
-                      <span>所属区域：{{ getAreaName(device.area) }}</span>
+                      <span>所属区域：{{ device.area || '-' }}</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-icon">🔢</span>
+                      <span>编号：{{ device.code }}</span>
                     </div>
                     <div class="info-row">
                       <span class="info-icon">⚡</span>
-                      <span>功率：{{ device.power }}</span>
+                      <span>额定功率：{{ device.power }}</span>
                     </div>
                     <div class="info-row">
-                      <span class="info-icon">🔌</span>
-                      <span>电压：{{ device.voltage }}</span>
+                      <Icon icon="fa6-solid:lightbulb" class="info-icon" />
+                      <span>灯具数：{{ device.lightCount ?? '-' }} 盏</span>
                     </div>
-                    <div v-if="activeTab === 'normal'" class="info-row">
-                      <span class="info-icon">📊</span>
-                      <span>电流：{{ (device as NormalDevice).current }}</span>
-                    </div>
-                    <div v-else class="info-row">
-                      <span class="info-icon">💡</span>
-                      <span>亮度：{{ (device as DimmingDevice).brightness }}%</span>
+                    <div v-if="activeTab === 'dimming'" class="info-row">
+                      <Icon icon="fa6-solid:sun" class="info-icon" />
+                      <span>当前亮度：{{ device.brightness }}%</span>
                     </div>
                   </div>
 
@@ -119,14 +117,14 @@
                     <div v-if="activeTab === 'dimming'" class="slider-container">
                       <div class="slider-label">
                         <span>亮度调节</span>
-                        <span>{{ (device as DimmingDevice).brightness }}%</span>
+                        <span>{{ device.brightness }}%</span>
                       </div>
                       <input
                         class="range-slider"
                         type="range"
                         min="0"
                         max="100"
-                        :value="(device as DimmingDevice).brightness"
+                        :value="device.brightness"
                         :disabled="device.status === 'off'"
                         @input="onBrightnessInput(device.id, ($event.target as HTMLInputElement).value)"
                       />
@@ -145,44 +143,80 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import ProtoScaleContainer from '../ProtoScaleContainer.vue'
+import * as LightingApi from '@/api/iot/building/lighting'
+import { useUserStore } from '@/store/modules/user'
 
 defineOptions({ name: 'NewLightControl' })
 
 type DeviceStatus = 'on' | 'off' | 'fault'
-type AreaCode = 'A1' | 'A2' | 'B1' | 'public' | 'machine' | string
 
-type BaseDevice = {
+type CircuitDevice = {
   id: number
+  code: string
   name: string
-  area: AreaCode
+  area: string          // areaName
   status: DeviceStatus
-  power: string
-  voltage: string
+  rawStatus: number
+  power: string         // 显示用，如 "96 W"
+  brightness: number    // 0-100
+  lightCount?: number
+  circuitType: number   // 1-普通, 2-调光, 3-应急
 }
 
-type NormalDevice = BaseDevice & { current: string }
-type DimmingDevice = BaseDevice & { brightness: number }
+const circuits = ref<CircuitDevice[]>([])
+const loading = ref(false)
+const lastRefreshAt = ref<Date | null>(null)
+let refreshTimer: number | null = null
 
-const deviceData = reactive<{ normal: NormalDevice[]; dimming: DimmingDevice[] }>({
-  normal: [
-    { id: 1, name: 'A1-01 走廊照明', area: 'A1', status: 'on', power: '120W', voltage: '220V', current: '0.54A' },
-    { id: 2, name: 'A1-02 办公室照明', area: 'A1', status: 'off', power: '180W', voltage: '220V', current: '0.82A' },
-    { id: 3, name: 'A2-01 会议室照明', area: 'A2', status: 'on', power: '240W', voltage: '220V', current: '1.09A' },
-    { id: 4, name: 'B1-01 展厅主照明', area: 'B1', status: 'fault', power: '300W', voltage: '218V', current: '1.38A' },
-    { id: 5, name: 'public-01 楼梯间照明', area: 'public', status: 'on', power: '60W', voltage: '220V', current: '0.27A' },
-    { id: 6, name: 'A1-03 卫生间照明', area: 'A1', status: 'off', power: '80W', voltage: '220V', current: '0.36A' },
-    { id: 7, name: 'A2-02 茶水间照明', area: 'A2', status: 'on', power: '100W', voltage: '220V', current: '0.45A' },
-    { id: 8, name: 'B1-02 展厅辅助照明', area: 'B1', status: 'on', power: '200W', voltage: '220V', current: '0.91A' }
-  ],
-  dimming: [
-    { id: 101, name: 'B1-03 展厅氛围灯', area: 'B1', status: 'on', brightness: 75, power: '150W', voltage: '220V' },
-    { id: 102, name: 'A2-03 会议室调光灯', area: 'A2', status: 'on', brightness: 60, power: '200W', voltage: '220V' },
-    { id: 103, name: 'public-02 大厅主灯', area: 'public', status: 'off', brightness: 0, power: '300W', voltage: '220V' },
-    { id: 104, name: 'A1-04 接待区调光灯', area: 'A1', status: 'on', brightness: 85, power: '180W', voltage: '220V' }
-  ]
+const userStore = useUserStore()
+const operator = computed(() => {
+  const u = userStore.getUser as { username?: string; nickname?: string } | undefined
+  return u?.nickname || u?.username || 'admin'
 })
+
+const mapStatus = (s?: number): DeviceStatus =>
+  s === 1 ? 'on' : s === 2 ? 'fault' : 'off'
+
+const fmtRefreshAt = (d: Date | null) => {
+  if (!d) return '加载中…'
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`
+}
+
+const refreshData = async () => {
+  loading.value = true
+  try {
+    const res = await LightingApi.getCircuitPage({
+      pageNo: 1,
+      pageSize: 100
+    } as LightingApi.IbmsLightingCircuitPageReqVO)
+    const list = (res as { list?: LightingApi.IbmsLightingCircuitVO[] })?.list ?? []
+    circuits.value = list.map((c) => {
+      const rated = c.ratedPower != null ? Number(c.ratedPower) : null
+      return {
+        id: c.id ?? 0,
+        code: c.circuitCode ?? '-',
+        name: c.circuitName ?? '-',
+        area: c.areaName ?? '-',
+        status: mapStatus(c.status),
+        rawStatus: c.status ?? 0,
+        power: rated != null && Number.isFinite(rated) ? `${rated} W` : '-',
+        brightness: c.brightness ?? 0,
+        lightCount: c.lightCount,
+        circuitType: c.circuitType ?? 1
+      }
+    })
+    lastRefreshAt.value = new Date()
+  } finally {
+    loading.value = false
+  }
+}
 
 const activeTab = ref<'normal' | 'dimming'>('normal')
 
@@ -200,10 +234,6 @@ const toast = reactive({
 })
 let toastTimer: number | null = null
 
-/**
- * 显示提示信息
- * @param message 提示文本
- */
 const showToast = (message: string) => {
   toast.message = message
   toast.visible = true
@@ -213,31 +243,28 @@ const showToast = (message: string) => {
   }, 2000)
 }
 
-/**
- * 获取区域名称
- * @param code 区域编码
- * @returns 显示名称
- */
-const getAreaName = (code: string) => {
-  const areaMap: Record<string, string> = {
-    A1: 'A区一层',
-    A2: 'A区二层',
-    B1: 'B区展厅',
-    public: '公共区域',
-    machine: '机房/弱电间'
+// 区域选项动态生成
+const areaOptions = computed(() => {
+  const set = new Set<string>()
+  for (const c of circuits.value) {
+    if (c.area && c.area !== '-') set.add(c.area)
   }
-  return areaMap[code] || code
-}
+  return Array.from(set).sort()
+})
 
-const filteredDevices = computed<(NormalDevice | DimmingDevice)[]>(() => {
-  const devices = activeTab.value === 'normal' ? deviceData.normal : deviceData.dimming
-  return devices
-    .filter((d) => (filters.area === 'all' ? true : d.area === filters.area))
-    .filter((d) => (filters.status === 'all' ? true : d.status === filters.status))
-    .filter((d) => {
+const refreshAtLabel = computed(() => fmtRefreshAt(lastRefreshAt.value))
+
+// 普通照明：circuitType=1 或 3；调光：circuitType=2
+const filteredDevices = computed<CircuitDevice[]>(() => {
+  const wantDimming = activeTab.value === 'dimming'
+  return circuits.value
+    .filter((c) => (wantDimming ? c.circuitType === 2 : c.circuitType !== 2))
+    .filter((c) => (filters.area === 'all' ? true : c.area === filters.area))
+    .filter((c) => (filters.status === 'all' ? true : c.status === filters.status))
+    .filter((c) => {
       if (!filters.keyword) return true
       const kw = filters.keyword.toLowerCase()
-      return d.name.toLowerCase().includes(kw) || String(d.id).includes(kw)
+      return c.name.toLowerCase().includes(kw) || c.code.toLowerCase().includes(kw)
     })
 })
 
@@ -266,56 +293,70 @@ const closeControl = () => {
 }
 
 /**
- * 控制设备（开/关）
- * @param deviceId 设备ID
- * @param action 控制动作
+ * 控制回路（开/关）
  */
-const controlDevice = (deviceId: number, action: 'on' | 'off') => {
-  const devices = activeTab.value === 'normal' ? (deviceData.normal as BaseDevice[]) : (deviceData.dimming as BaseDevice[])
-  const target = devices.find((d) => d.id === deviceId) as (NormalDevice | DimmingDevice) | undefined
+const controlDevice = async (deviceId: number, action: 'on' | 'off') => {
+  const target = circuits.value.find((c) => c.id === deviceId)
   if (!target) return
-
-  if (action === 'on') {
-    target.status = 'on'
-    if (activeTab.value === 'dimming') {
-      const t = target as DimmingDevice
-      if (t.brightness === 0) t.brightness = 100
+  const targetStatus = action === 'on' ? 1 : 0
+  try {
+    await LightingApi.controlCircuit(deviceId, targetStatus, operator.value)
+    target.status = action
+    target.rawStatus = targetStatus
+    if (target.circuitType === 2 && action === 'on' && target.brightness === 0) {
+      target.brightness = 100
     }
-  } else {
-    target.status = 'off'
-    if (activeTab.value === 'dimming') {
-      ;(target as DimmingDevice).brightness = 0
+    if (target.circuitType === 2 && action === 'off') {
+      target.brightness = 0
     }
+    showToast(`已${action === 'on' ? '开启' : '关闭'}：${target.name}`)
+  } catch {
+    showToast(`操作失败：${target.name}`)
   }
-
-  showToast(`已${action === 'on' ? '开启' : '关闭'}设备：${target.name}`)
 }
 
 /**
- * 清除故障
- * @param deviceId 设备ID
+ * 故障复位（按"关闭"语义提交，让后端清除故障状态）
  */
-const clearFault = (deviceId: number) => {
-  const target = deviceData.normal.find((d) => d.id === deviceId)
+const clearFault = async (deviceId: number) => {
+  const target = circuits.value.find((c) => c.id === deviceId)
   if (!target) return
-  target.status = 'off'
-  showToast(`已清除设备【${target.name}】故障状态`)
+  try {
+    await LightingApi.controlCircuit(deviceId, 0, operator.value)
+    target.status = 'off'
+    target.rawStatus = 0
+    showToast(`已尝试复位：${target.name}`)
+  } catch {
+    showToast(`复位失败：${target.name}`)
+  }
 }
 
 /**
- * 调光亮度输入
- * @param deviceId 设备ID
- * @param value 亮度（0-100）
+ * 调光亮度输入（防抖：200ms 内连续滑动只发最后一次）
  */
+let dimDebounce: number | null = null
 const onBrightnessInput = (deviceId: number, value: string) => {
-  const target = deviceData.dimming.find((d) => d.id === deviceId)
+  const target = circuits.value.find((c) => c.id === deviceId)
   if (!target) return
-
   const v = Math.max(0, Math.min(100, Number.parseInt(value, 10) || 0))
   target.brightness = v
-  if (v > 0 && target.status === 'off') target.status = 'on'
-  if (v === 0 && target.status === 'on') target.status = 'off'
-  showToast(`已调整【${target.name}】亮度至${v}%`)
+  if (v > 0 && target.status === 'off') {
+    target.status = 'on'
+    target.rawStatus = 1
+  }
+  if (v === 0 && target.status === 'on') {
+    target.status = 'off'
+    target.rawStatus = 0
+  }
+  if (dimDebounce) window.clearTimeout(dimDebounce)
+  dimDebounce = window.setTimeout(async () => {
+    try {
+      await LightingApi.dimCircuit(deviceId, v, operator.value)
+      showToast(`已调整【${target.name}】亮度至 ${v}%`)
+    } catch {
+      showToast(`调光失败：${target.name}`)
+    }
+  }, 250)
 }
 
 watch(
@@ -324,6 +365,20 @@ watch(
     filters.status = 'all'
   }
 )
+
+onMounted(() => {
+  refreshData()
+  refreshTimer = window.setInterval(refreshData, 30_000)
+})
+
+onBeforeUnmount(() => {
+  if (refreshTimer) window.clearInterval(refreshTimer)
+  refreshTimer = null
+  if (toastTimer) window.clearTimeout(toastTimer)
+  toastTimer = null
+  if (dimDebounce) window.clearTimeout(dimDebounce)
+  dimDebounce = null
+})
 </script>
 
 <style scoped>

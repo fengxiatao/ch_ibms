@@ -103,6 +103,7 @@ CREATE TABLE `ibms_lighting_circuit` (
     `location` varchar(200) DEFAULT NULL COMMENT '详细位置',
     `load_desc` varchar(200) DEFAULT NULL COMMENT '负载描述',
     `rated_power` decimal(10,2) DEFAULT NULL COMMENT '额定功率(W)',
+    `light_count` int DEFAULT 0 COMMENT '灯具数量',
     `status` tinyint NOT NULL DEFAULT 0 COMMENT '状态：0-关闭 1-开启 2-故障',
     `brightness` tinyint DEFAULT 100 COMMENT '亮度(0-100)',
     `color_temp` int DEFAULT 4000 COMMENT '色温(K)',

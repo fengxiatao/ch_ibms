@@ -74,21 +74,21 @@ INSERT INTO `ibms_lighting_controller` (`controller_code`, `controller_name`, `c
 ('CTRL-B2-001', '照明执行控制器-B2', 'LC-8CH-20A', 'B区二层', 8, '8通道/20A', '55%', 2, 1, NOW(), NULL, '1', NOW(), '1', NOW(), 0, 1);
 
 -- 照明回路
-INSERT INTO `ibms_lighting_circuit` (`circuit_code`, `circuit_name`, `circuit_type`, `area_id`, `area_name`, `floor`, `location`, `load_desc`, `rated_power`, `status`, `brightness`, `color_temp`, `controller_id`, `gateway_id`, `last_operate_time`, `remark`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES
-('L-A1-01', '照明回路-01', 1, 1, 'A区一层', 'F1', '大堂东侧', 'LED灯具 x 8', 96, 1, 100, 4000, 1, 1, NOW(), NULL, '1', NOW(), '1', NOW(), 0, 1),
-('L-A1-02', '照明回路-02', 1, 1, 'A区一层', 'F1', '大堂西侧', 'LED灯具 x 6', 72, 1, 100, 4000, 1, 1, NOW(), NULL, '1', NOW(), '1', NOW(), 0, 1),
-('L-A1-03', '照明回路-03', 1, 1, 'A区一层', 'F1', '大堂中央', 'LED灯具 x 10', 120, 0, 0, 4000, 1, 1, DATE_SUB(NOW(), INTERVAL 2 HOUR), NULL, '1', NOW(), '1', NOW(), 0, 1),
-('L-A1-04', '照明回路-04', 1, 1, 'A区一层', 'F1', '走廊', 'LED灯具 x 12', 144, 1, 80, 4000, 1, 1, NOW(), NULL, '1', NOW(), '1', NOW(), 0, 1),
-('L-A2-01', '照明回路-05', 1, 2, 'A区二层', 'F2', '办公区东', 'LED灯具 x 8', 96, 1, 100, 4500, 2, 2, NOW(), NULL, '1', NOW(), '1', NOW(), 0, 1),
-('L-A2-02', '照明回路-06', 1, 2, 'A区二层', 'F2', '办公区西', 'LED灯具 x 8', 96, 1, 100, 4500, 2, 2, NOW(), NULL, '1', NOW(), '1', NOW(), 0, 1),
-('L-A2-03', '照明回路-07', 1, 2, 'A区二层', 'F2', '会议室A', 'LED灯具 x 4', 48, 0, 0, 4000, 2, 2, DATE_SUB(NOW(), INTERVAL 1 HOUR), NULL, '1', NOW(), '1', NOW(), 0, 1),
-('L-A2-04', '照明回路-08', 1, 2, 'A区二层', 'F2', '会议室B', 'LED灯具 x 4', 48, 1, 100, 4000, 2, 2, NOW(), NULL, '1', NOW(), '1', NOW(), 0, 1),
-('D-B1-001', '调光回路-01', 2, 3, 'B区展厅', 'F1', '展厅入口', '可调光LED射灯 x 6', 90, 1, 80, 3000, 3, 1, NOW(), '调光回路', '1', NOW(), '1', NOW(), 0, 1),
-('D-B1-002', '调光回路-02', 2, 3, 'B区展厅', 'F1', '展区A', '可调光LED射灯 x 8', 120, 1, 50, 4500, 3, 1, NOW(), '调光回路', '1', NOW(), '1', NOW(), 0, 1),
-('D-B1-003', '调光回路-03', 2, 3, 'B区展厅', 'F1', '展区B', '可调光LED射灯 x 8', 120, 1, 100, 5500, 3, 1, NOW(), '调光回路', '1', NOW(), '1', NOW(), 0, 1),
-('D-B1-004', '调光回路-04', 2, 3, 'B区展厅', 'F1', '展区C', '可调光LED射灯 x 6', 90, 0, 0, 4000, 3, 1, DATE_SUB(NOW(), INTERVAL 3 HOUR), '调光回路', '1', NOW(), '1', NOW(), 0, 1),
-('E-01', '应急照明-01', 3, 1, 'A区一层', 'F1', '消防通道', '应急灯 x 10', 50, 0, 0, 6500, 1, 1, NOW(), '应急照明回路', '1', NOW(), '1', NOW(), 0, 1),
-('E-02', '应急照明-02', 3, 2, 'A区二层', 'F2', '消防通道', '应急灯 x 10', 50, 0, 0, 6500, 2, 2, NOW(), '应急照明回路', '1', NOW(), '1', NOW(), 0, 1);
+INSERT INTO `ibms_lighting_circuit` (`circuit_code`, `circuit_name`, `circuit_type`, `area_id`, `area_name`, `floor`, `location`, `load_desc`, `rated_power`, `light_count`, `status`, `brightness`, `color_temp`, `controller_id`, `gateway_id`, `last_operate_time`, `remark`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES
+('L-A1-01', '照明回路-01', 1, 1, 'A区一层', 'F1', '大堂东侧', 'LED灯具 x 8', 96, 4, 1, 100, 4000, 1, 1, NOW(), NULL, '1', NOW(), '1', NOW(), 0, 1),
+('L-A1-02', '照明回路-02', 1, 1, 'A区一层', 'F1', '大堂西侧', 'LED灯具 x 6', 72, 3, 1, 100, 4000, 1, 1, NOW(), NULL, '1', NOW(), '1', NOW(), 0, 1),
+('L-A1-03', '照明回路-03', 1, 1, 'A区一层', 'F1', '大堂中央', 'LED灯具 x 10', 120, 5, 0, 0, 4000, 1, 1, DATE_SUB(NOW(), INTERVAL 2 HOUR), NULL, '1', NOW(), '1', NOW(), 0, 1),
+('L-A1-04', '照明回路-04', 1, 1, 'A区一层', 'F1', '走廊', 'LED灯具 x 12', 144, 6, 1, 80, 4000, 1, 1, NOW(), NULL, '1', NOW(), '1', NOW(), 0, 1),
+('L-A2-01', '照明回路-05', 1, 2, 'A区二层', 'F2', '办公区东', 'LED灯具 x 8', 96, 4, 1, 100, 4500, 2, 2, NOW(), NULL, '1', NOW(), '1', NOW(), 0, 1),
+('L-A2-02', '照明回路-06', 1, 2, 'A区二层', 'F2', '办公区西', 'LED灯具 x 8', 96, 4, 1, 100, 4500, 2, 2, NOW(), NULL, '1', NOW(), '1', NOW(), 0, 1),
+('L-A2-03', '照明回路-07', 1, 2, 'A区二层', 'F2', '会议室A', 'LED灯具 x 4', 48, 2, 0, 0, 4000, 2, 2, DATE_SUB(NOW(), INTERVAL 1 HOUR), NULL, '1', NOW(), '1', NOW(), 0, 1),
+('L-A2-04', '照明回路-08', 1, 2, 'A区二层', 'F2', '会议室B', 'LED灯具 x 4', 48, 2, 1, 100, 4000, 2, 2, NOW(), NULL, '1', NOW(), '1', NOW(), 0, 1),
+('D-B1-001', '调光回路-01', 2, 3, 'B区展厅', 'F1', '展厅入口', '可调光LED射灯 x 6', 90, 3, 1, 80, 3000, 3, 1, NOW(), '调光回路', '1', NOW(), '1', NOW(), 0, 1),
+('D-B1-002', '调光回路-02', 2, 3, 'B区展厅', 'F1', '展区A', '可调光LED射灯 x 8', 120, 4, 1, 50, 4500, 3, 1, NOW(), '调光回路', '1', NOW(), '1', NOW(), 0, 1),
+('D-B1-003', '调光回路-03', 2, 3, 'B区展厅', 'F1', '展区B', '可调光LED射灯 x 8', 120, 4, 1, 100, 5500, 3, 1, NOW(), '调光回路', '1', NOW(), '1', NOW(), 0, 1),
+('D-B1-004', '调光回路-04', 2, 3, 'B区展厅', 'F1', '展区C', '可调光LED射灯 x 6', 90, 3, 0, 0, 4000, 3, 1, DATE_SUB(NOW(), INTERVAL 3 HOUR), '调光回路', '1', NOW(), '1', NOW(), 0, 1),
+('E-01', '应急照明-01', 3, 1, 'A区一层', 'F1', '消防通道', '应急灯 x 10', 50, 5, 0, 0, 6500, 1, 1, NOW(), '应急照明回路', '1', NOW(), '1', NOW(), 0, 1),
+('E-02', '应急照明-02', 3, 2, 'A区二层', 'F2', '消防通道', '应急灯 x 10', 50, 5, 0, 0, 6500, 2, 2, NOW(), '应急照明回路', '1', NOW(), '1', NOW(), 0, 1);
 
 -- 照明场景
 INSERT INTO `ibms_lighting_scene` (`scene_code`, `scene_name`, `scene_icon`, `scene_desc`, `area_id`, `area_name`, `is_active`, `sort`, `remark`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES

@@ -73,6 +73,11 @@ public class IbmsLightingCircuitDO extends BaseDO {
     private BigDecimal ratedPower;
 
     /**
+     * 灯具数量
+     */
+    private Integer lightCount;
+
+    /**
      * 状态：0-关闭 1-开启 2-故障
      */
     private Integer status;

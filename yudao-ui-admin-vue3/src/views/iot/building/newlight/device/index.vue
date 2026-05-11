@@ -10,128 +10,69 @@
           <div class="flex justify-between items-center mb-4">
             <div>
               <h1 class="text-xl font-bold">设备管理</h1>
-              <p class="text-sm text-slate-500 mt-1">照明设备列表与规格参数</p>
+              <p class="text-sm text-slate-500 mt-1">智能网关与执行控制器列表</p>
             </div>
-            <div class="text-sm text-slate-500">{{ currentTime }}</div>
+            <div class="text-sm text-slate-500">更新于 {{ refreshAtLabel }}</div>
           </div>
 
           <div class="stats-bar">
             <div class="stats-grid">
               <div class="stat-card">
                 <div class="stat-label">设备总数</div>
-                <div class="stat-value">{{ stats.totalCount }}</div>
-                <div class="stat-desc">在线 {{ stats.onlineCount }} · 离线 {{ stats.offlineCount }}</div>
+                <div class="stat-value">{{ overviewStats.totalCount }}</div>
+                <div class="stat-desc">
+                  在线 {{ overviewStats.onlineCount }} · 离线 {{ overviewStats.offlineCount }}
+                </div>
               </div>
               <div class="stat-card">
                 <div class="stat-label">执行控制器</div>
-                <div class="stat-value">{{ stats.controllerCount }}</div>
-                <div class="stat-desc">管理 {{ stats.controlledCircuits }} 个回路</div>
+                <div class="stat-value">{{ overviewStats.controllerCount }}</div>
+                <div class="stat-desc">智能网关 {{ overviewStats.gatewayCount }} 台</div>
               </div>
               <div class="stat-card">
-                <div class="stat-label">今日总能耗</div>
+                <div class="stat-label">额定总功率</div>
                 <div class="stat-value">
-                  {{ stats.totalEnergy }}<span class="stat-unit">kWh</span>
+                  {{ overviewStats.totalPower }}<span class="stat-unit">kW</span>
                 </div>
-                <div class="stat-desc">预估电费 ¥{{ stats.totalCost }}</div>
+                <div class="stat-desc">基于回路 rated_power 之和</div>
               </div>
               <div class="stat-card">
-                <div class="stat-label">控制器平均使用率</div>
+                <div class="stat-label">实时负载功率</div>
                 <div class="stat-value">
-                  {{ stats.avgLoadRate }}<span class="stat-unit">%</span>
+                  {{ overviewStats.currentPower }}<span class="stat-unit">kW</span>
                 </div>
-                <div class="stat-desc">基于控制器容量</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="analysis-panel">
-            <div class="analysis-title">📊 执行控制器使用率分析</div>
-            <div class="analysis-grid">
-              <div class="analysis-item">
-                <div class="analysis-label">控制器总容量</div>
-                <div class="analysis-value">{{ stats.totalControllerCapacity }} W</div>
-                <div class="text-xs text-slate-500 mt-1">可带载 {{ stats.maxCircuits }} 个回路</div>
-              </div>
-              <div class="analysis-item">
-                <div class="analysis-label">当前总负载</div>
-                <div class="analysis-value">{{ stats.totalControllerLoad }} W</div>
-                <div class="text-xs text-slate-500 mt-1">已用容量 {{ stats.usedCapacityPercent }}%</div>
-              </div>
-              <div class="analysis-item">
-                <div class="analysis-label">剩余容量</div>
-                <div class="analysis-value">{{ stats.remainingCapacity }} W</div>
-                <div class="text-xs text-slate-500 mt-1">可新增 {{ stats.remainingCircuits }} 个回路</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="history-panel">
-            <div class="history-title">
-              <Icon icon="fa6-solid:clock-rotate-left" />
-              历史数据查询
-            </div>
-            <div class="query-section">
-              <div class="date-range">
-                <div class="date-input-group">
-                  <label>起始时间</label>
-                  <input v-model="history.startTime" type="datetime-local" class="date-input" />
-                </div>
-                <div class="date-input-group">
-                  <label>结束时间</label>
-                  <input v-model="history.endTime" type="datetime-local" class="date-input" />
+                <div class="stat-desc">
+                  共 {{ overviewStats.lightTotalCount }} 盏灯具
                 </div>
               </div>
-
-              <select v-model="history.dimension" class="dimension-select">
-                <option value="custom">自定义</option>
-                <option value="today">今日</option>
-                <option value="yesterday">昨日</option>
-                <option value="thisWeek">本周</option>
-                <option value="lastWeek">上周</option>
-                <option value="thisMonth">本月</option>
-                <option value="lastMonth">上月</option>
-              </select>
-
-              <select v-model="history.type" class="dimension-select">
-                <option value="all">全部设备</option>
-                <option value="light">普通照明</option>
-                <option value="dimmer">调光设备</option>
-                <option value="controller">执行控制器</option>
-              </select>
-
-              <button class="query-btn" @click="queryHistoryData">
-                <Icon icon="fa6-solid:magnifying-glass" />
-                查询历史
-              </button>
             </div>
           </div>
 
           <div class="filter-bar">
             <select v-model="filters.type" class="filter-select">
               <option value="all">全部设备类型</option>
-              <option value="light">普通照明</option>
-              <option value="dimmer">调光设备</option>
               <option value="gateway">智能网关</option>
               <option value="controller">执行控制器</option>
-              <option value="sensor">传感器</option>
             </select>
 
             <select v-model="filters.status" class="filter-select">
               <option value="all">全部状态</option>
               <option value="online">在线</option>
               <option value="offline">离线</option>
+              <option value="fault">故障</option>
             </select>
 
             <select v-model="filters.area" class="filter-select">
               <option value="all">全部区域</option>
-              <option value="A座1层">A座1层</option>
-              <option value="A座2层">A座2层</option>
-              <option value="B座1层">B座1层</option>
-              <option value="B座2层">B座2层</option>
-              <option value="C座1层">C座1层</option>
+              <option v-for="area in areaOptions" :key="area" :value="area">{{ area }}</option>
             </select>
 
-            <input v-model.trim="filters.keyword" type="text" class="filter-input" placeholder="搜索设备名称/编号/型号" />
+            <input
+              v-model.trim="filters.keyword"
+              type="text"
+              class="filter-input"
+              placeholder="搜索设备名称/编号/型号"
+            />
 
             <button class="filter-btn" @click="applyFilters">
               <Icon icon="fa6-solid:magnifying-glass" class="mr-2" />
@@ -142,11 +83,6 @@
               <Icon icon="fa6-solid:arrow-rotate-left" class="mr-2" />
               重置
             </button>
-
-            <button class="export-btn" @click="openExportModal">
-              <Icon icon="fa6-solid:file-export" class="mr-2" />
-              报表导出
-            </button>
           </div>
 
           <div class="table-container">
@@ -156,61 +92,59 @@
                   <th>设备编号</th>
                   <th>设备名称</th>
                   <th>设备类型</th>
-                  <th>规格参数</th>
+                  <th>品牌 / 型号</th>
+                  <th>规格 / 网络</th>
                   <th>所属区域</th>
                   <th>状态</th>
-                  <th>所属控制器</th>
-                  <th>功率(W)</th>
-                  <th>今日能耗(kWh)</th>
-                  <th>今日运行(h)</th>
-                  <th>累计运行(h)</th>
-                  <th>控制器使用率</th>
+                  <th>关联</th>
                   <th>最后通信</th>
                   <th>操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in pagedDevices" :key="row.id">
+                <tr v-if="pagedDevices.length === 0">
+                  <td colspan="10" class="empty-row">
+                    {{ loading ? '加载中…' : '暂无设备数据' }}
+                  </td>
+                </tr>
+                <tr v-for="row in pagedDevices" :key="`${row.type}-${row.id}`">
                   <td>{{ row.code }}</td>
                   <td>{{ row.name }}</td>
-                  <td><span class="type-tag">{{ row.typeName }}</span></td>
+                  <td>
+                    <span class="type-tag">{{ row.typeName }}</span>
+                  </td>
                   <td>
                     <div class="spec-container">
-                      <div v-if="row.specType === 'light'" class="light-spec">
-                        <div class="light-count">{{ row.lightCount }} 盏</div>
-                        <div class="light-power">{{ row.lightPower }}W</div>
+                      <div class="font-medium">{{ row.brand }}</div>
+                      <div class="text-xs text-slate-500">{{ row.model }}</div>
+                    </div>
+                  </td>
+                  <td>
+                    <div v-if="row.type === 'gateway'" class="spec-container">
+                      <div class="text-xs text-slate-500">协议：{{ row.protocol || '-' }}</div>
+                      <div class="text-xs text-slate-500">
+                        {{ row.ipAddress || '-' }}<span v-if="row.port">:{{ row.port }}</span>
                       </div>
-                      <div v-else-if="row.specType === 'dimmer'" class="dimmer-spec">
-                        <Icon icon="fa6-solid:sliders" />
-                        <div>{{ row.model }}</div>
-                      </div>
-                      <div v-else-if="row.specType === 'controller'" class="controller-spec">
-                        <div class="controller-model">{{ row.model }}</div>
-                        <div class="controller-params">
-                          <span>{{ row.capacity }}W</span>
-                          <span>{{ row.channels }}CH</span>
-                        </div>
-                      </div>
-                      <div v-else-if="row.specType === 'gateway'" class="gateway-spec">
-                        <div class="gateway-model">{{ row.model }}</div>
-                        <div class="text-xs text-slate-500">MQTT/Modbus</div>
-                      </div>
-                      <div v-else class="sensor-spec">
-                        <div class="sensor-model">{{ row.model }}</div>
-                        <div class="sensor-range">{{ row.range }}</div>
+                    </div>
+                    <div v-else class="spec-container">
+                      <div class="text-xs text-slate-500">通道数：{{ row.channelCount ?? '-' }}</div>
+                      <div class="text-xs text-slate-500">
+                        调光：{{ row.dimmable ? '支持' : '不支持' }}
                       </div>
                     </div>
                   </td>
                   <td>{{ row.area }}</td>
                   <td>
-                    <span class="status-badge" :class="row.status">{{ row.status === 'online' ? '在线' : '离线' }}</span>
+                    <span class="status-badge" :class="row.status">
+                      {{ row.status === 'online' ? '在线' : row.status === 'fault' ? '故障' : '离线' }}
+                    </span>
                   </td>
-                  <td>{{ row.controllerId || '-' }}</td>
-                  <td>{{ row.power }}</td>
-                  <td>{{ row.energy }}</td>
-                  <td>{{ row.runtimeToday }}</td>
-                  <td>{{ row.totalRuntime }}</td>
-                  <td>{{ row.loadRate }}%</td>
+                  <td>
+                    <span v-if="row.type === 'controller' && row.gatewayName">
+                      网关：{{ row.gatewayName }}
+                    </span>
+                    <span v-else>-</span>
+                  </td>
                   <td>{{ row.lastComm }}</td>
                   <td>
                     <span class="action-btn" @click="openDetail(row)">详情</span>
@@ -222,7 +156,8 @@
 
           <div class="pagination">
             <div class="pagination-info">
-              显示 <span>{{ startItem }}</span> - <span>{{ endItem }}</span> 条，共 <span>{{ totalItems }}</span> 条
+              显示 <span>{{ startItem }}</span> - <span>{{ endItem }}</span> 条，共
+              <span>{{ totalItems }}</span> 条
             </div>
             <div class="flex gap-2">
               <button class="pagination-btn" @click="goPage('first')">
@@ -242,11 +177,11 @@
           </div>
         </div>
 
-        <div class="modal" :class="{ active: detailModalVisible }" @click.self="closeModal('detail')">
+        <div class="modal" :class="{ active: detailModalVisible }" @click.self="closeDetail">
           <div class="modal-content">
             <div class="modal-header">
               <div class="modal-title">设备详情</div>
-              <div class="modal-close" @click="closeModal('detail')">
+              <div class="modal-close" @click="closeDetail">
                 <Icon icon="fa6-solid:xmark" />
               </div>
             </div>
@@ -260,73 +195,63 @@
                 <div class="detail-value">{{ detailRow.name }}</div>
               </div>
               <div class="detail-item">
+                <div class="detail-label">设备类型</div>
+                <div class="detail-value">{{ detailRow.typeName }}</div>
+              </div>
+              <div class="detail-item">
+                <div class="detail-label">品牌</div>
+                <div class="detail-value">{{ detailRow.brand }}</div>
+              </div>
+              <div class="detail-item">
+                <div class="detail-label">型号</div>
+                <div class="detail-value">{{ detailRow.model }}</div>
+              </div>
+              <div class="detail-item">
                 <div class="detail-label">所属区域</div>
                 <div class="detail-value">{{ detailRow.area }}</div>
+              </div>
+              <div class="detail-item">
+                <div class="detail-label">状态</div>
+                <div class="detail-value">
+                  {{
+                    detailRow.status === 'online'
+                      ? '在线'
+                      : detailRow.status === 'fault'
+                      ? '故障'
+                      : '离线'
+                  }}
+                </div>
               </div>
               <div class="detail-item">
                 <div class="detail-label">最后通信</div>
                 <div class="detail-value">{{ detailRow.lastComm }}</div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="modal" :class="{ active: exportModalVisible }" @click.self="closeModal('export')">
-          <div class="modal-content">
-            <div class="modal-header">
-              <div class="modal-title">导出报表</div>
-              <div class="modal-close" @click="closeModal('export')">
-                <Icon icon="fa6-solid:xmark" />
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium mb-3">选择导出内容</label>
-              <div class="checkbox-group">
-                <label class="checkbox-item">
-                  <input v-model="exportConfig.basic" type="checkbox" class="rounded border-slate-300" />
-                  <span class="text-sm">基础信息</span>
-                </label>
-                <label class="checkbox-item">
-                  <input v-model="exportConfig.spec" type="checkbox" class="rounded border-slate-300" />
-                  <span class="text-sm">规格参数</span>
-                </label>
-                <label class="checkbox-item">
-                  <input v-model="exportConfig.power" type="checkbox" class="rounded border-slate-300" />
-                  <span class="text-sm">功率数据</span>
-                </label>
-                <label class="checkbox-item">
-                  <input v-model="exportConfig.energy" type="checkbox" class="rounded border-slate-300" />
-                  <span class="text-sm">能耗数据</span>
-                </label>
-                <label class="checkbox-item">
-                  <input v-model="exportConfig.runtime" type="checkbox" class="rounded border-slate-300" />
-                  <span class="text-sm">运行数据</span>
-                </label>
-                <label class="checkbox-item">
-                  <input v-model="exportConfig.load" type="checkbox" class="rounded border-slate-300" />
-                  <span class="text-sm">负载数据</span>
-                </label>
-                <label class="checkbox-item">
-                  <input v-model="exportConfig.status" type="checkbox" class="rounded border-slate-300" />
-                  <span class="text-sm">状态信息</span>
-                </label>
-              </div>
-            </div>
-
-            <div class="mt-4">
-              <label class="block text-sm font-medium mb-2">导出格式</label>
-              <select v-model="exportConfig.format" class="filter-select w-full">
-                <option value="csv">CSV文件（Excel可打开）</option>
-              </select>
-            </div>
-
-            <div class="flex justify-end gap-3 mt-6">
-              <button class="px-4 py-2 border border-slate-200 rounded-lg" @click="closeModal('export')">取消</button>
-              <button class="px-4 py-2 bg-green-600 text-white rounded-lg" @click="exportReport">
-                <Icon icon="fa6-solid:download" class="mr-2" />
-                生成报表
-              </button>
+              <template v-if="detailRow.type === 'gateway'">
+                <div class="detail-item">
+                  <div class="detail-label">协议类型</div>
+                  <div class="detail-value">{{ detailRow.protocol || '-' }}</div>
+                </div>
+                <div class="detail-item">
+                  <div class="detail-label">IP / 端口</div>
+                  <div class="detail-value">
+                    {{ detailRow.ipAddress || '-' }}<span v-if="detailRow.port">:{{ detailRow.port }}</span>
+                  </div>
+                </div>
+              </template>
+              <template v-else>
+                <div class="detail-item">
+                  <div class="detail-label">通道数</div>
+                  <div class="detail-value">{{ detailRow.channelCount ?? '-' }}</div>
+                </div>
+                <div class="detail-item">
+                  <div class="detail-label">支持调光</div>
+                  <div class="detail-value">{{ detailRow.dimmable ? '是' : '否' }}</div>
+                </div>
+                <div class="detail-item">
+                  <div class="detail-label">所属网关</div>
+                  <div class="detail-value">{{ detailRow.gatewayName || '-' }}</div>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -338,41 +263,44 @@
 <script lang="ts" setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import ProtoScaleContainer from '../ProtoScaleContainer.vue'
+import * as LightingApi from '@/api/iot/building/lighting'
 
 defineOptions({ name: 'NewLightDevice' })
 
-type DeviceStatus = 'online' | 'offline'
-type DeviceType = 'light' | 'dimmer' | 'gateway' | 'controller' | 'sensor'
+type DeviceStatus = 'online' | 'offline' | 'fault'
+type DeviceType = 'gateway' | 'controller'
 
 type DeviceRow = {
-  id: string
+  id: number
   code: string
   name: string
   type: DeviceType
   typeName: string
   area: string
   status: DeviceStatus
-  controllerId?: string
-  power: number
-  energy: number
-  runtimeToday: number
-  totalRuntime: number
-  loadRate: number
-  lastComm: string
-  specType: 'light' | 'dimmer' | 'gateway' | 'controller' | 'sensor'
+  rawStatus: number
+  brand: string
   model: string
-  capacity?: number
-  channels?: number
-  lightCount?: number
-  lightPower?: number
-  range?: string
+  protocol?: string
+  ipAddress?: string
+  port?: number
+  channelCount?: number
+  dimmable?: boolean
+  gatewayId?: number
+  gatewayName?: string
+  lastComm: string
 }
 
-const now = ref<Date>(new Date())
-let timer: number | null = null
+const devices = ref<DeviceRow[]>([])
+const stats = ref<LightingApi.IbmsLightingStatisticsVO>({})
+const loading = ref(false)
+const lastRefreshAt = ref<Date | null>(null)
+let refreshTimer: number | null = null
 
-const currentTime = computed(() => {
-  const d = now.value
+const fmtTime = (t: unknown): string => {
+  if (!t) return '-'
+  const d = new Date(t as string | number | Date)
+  if (Number.isNaN(d.getTime())) return '-'
   const yyyy = d.getFullYear()
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
@@ -380,142 +308,88 @@ const currentTime = computed(() => {
   const mi = String(d.getMinutes()).padStart(2, '0')
   const ss = String(d.getSeconds()).padStart(2, '0')
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
-})
+}
 
-const devices = ref<DeviceRow[]>([
-  {
-    id: 'C001',
-    code: 'LT-001',
-    name: 'A1层走廊灯组',
-    type: 'light',
-    typeName: '普通照明',
-    area: 'A座1层',
-    status: 'online',
-    controllerId: 'CT001',
-    power: 76,
-    energy: 12.4,
-    runtimeToday: 8.5,
-    totalRuntime: 128,
-    loadRate: 42,
-    lastComm: '2026-03-04 14:25:30',
-    specType: 'light',
-    model: 'Philips',
-    lightCount: 6,
-    lightPower: 72
-  },
-  {
-    id: 'C002',
-    code: 'LT-002',
-    name: 'A1层会议室灯',
-    type: 'light',
-    typeName: '普通照明',
-    area: 'A座1层',
-    status: 'online',
-    controllerId: 'CT001',
-    power: 68,
-    energy: 8.8,
-    runtimeToday: 6.2,
-    totalRuntime: 96,
-    loadRate: 38,
-    lastComm: '2026-03-04 14:20:15',
-    specType: 'light',
-    model: 'Philips',
-    lightCount: 8,
-    lightPower: 96
-  },
-  {
-    id: 'D101',
-    code: 'DM-101',
-    name: 'B1展厅氛围灯',
-    type: 'dimmer',
-    typeName: '调光设备',
-    area: 'B座1层',
-    status: 'online',
-    controllerId: 'CT002',
-    power: 150,
-    energy: 10.1,
-    runtimeToday: 7.2,
-    totalRuntime: 210,
-    loadRate: 55,
-    lastComm: '2026-03-04 14:18:40',
-    specType: 'dimmer',
-    model: 'DMX-1CH'
-  },
-  {
-    id: 'GW01',
-    code: 'GW-001',
-    name: '智能网关-主机房',
-    type: 'gateway',
-    typeName: '智能网关',
-    area: 'C座1层',
-    status: 'offline',
-    power: 12,
-    energy: 0.2,
-    runtimeToday: 0.5,
-    totalRuntime: 520,
-    loadRate: 0,
-    lastComm: '2026-03-04 08:10:12',
-    specType: 'gateway',
-    model: 'GW-MQTT-01'
-  },
-  {
-    id: 'CT001',
-    code: 'CT-001',
-    name: 'A座执行控制器',
-    type: 'controller',
-    typeName: '执行控制器',
-    area: 'A座1层',
-    status: 'online',
-    power: 5,
-    energy: 0.6,
-    runtimeToday: 10.0,
-    totalRuntime: 980,
-    loadRate: 62,
-    lastComm: '2026-03-04 14:26:01',
-    specType: 'controller',
-    model: 'LC-8CH-20A',
-    capacity: 2000,
-    channels: 8
-  },
-  {
-    id: 'S01',
-    code: 'SN-001',
-    name: '照度传感器-大厅',
-    type: 'sensor',
-    typeName: '传感器',
-    area: 'B座1层',
-    status: 'online',
-    power: 1,
-    energy: 0.1,
-    runtimeToday: 10.0,
-    totalRuntime: 420,
-    loadRate: 0,
-    lastComm: '2026-03-04 14:25:55',
-    specType: 'sensor',
-    model: 'LUX-01',
-    range: '0-2000lx'
+const mapStatus = (s?: number): DeviceStatus => (s === 1 ? 'online' : s === 2 ? 'fault' : 'offline')
+
+const refreshData = async () => {
+  loading.value = true
+  try {
+    const [gw, ct, st] = await Promise.all([
+      LightingApi.getGatewayPage({ pageNo: 1, pageSize: 100 } as LightingApi.IbmsLightingDevicePageReqVO),
+      LightingApi.getControllerPage({ pageNo: 1, pageSize: 100 } as LightingApi.IbmsLightingDevicePageReqVO),
+      LightingApi.getStatistics()
+    ])
+    const gws = (gw as { list?: LightingApi.IbmsLightingGatewayVO[] })?.list ?? []
+    const cts = (ct as { list?: LightingApi.IbmsLightingControllerVO[] })?.list ?? []
+
+    const rows: DeviceRow[] = []
+    for (const g of gws) {
+      rows.push({
+        id: g.id ?? 0,
+        code: g.gatewayCode ?? '-',
+        name: g.gatewayName ?? '-',
+        type: 'gateway',
+        typeName: '智能网关',
+        area: g.installLocation ?? '-',
+        status: mapStatus(g.status),
+        rawStatus: g.status ?? 0,
+        brand: g.brand ?? '-',
+        model: g.model ?? '-',
+        protocol: g.protocolType ?? undefined,
+        ipAddress: g.ipAddress ?? undefined,
+        port: g.port ?? undefined,
+        lastComm: fmtTime(g.lastCommunicateTime)
+      })
+    }
+    for (const c of cts) {
+      rows.push({
+        id: c.id ?? 0,
+        code: c.controllerCode ?? '-',
+        name: c.controllerName ?? '-',
+        type: 'controller',
+        typeName: '执行控制器',
+        area: c.installLocation ?? '-',
+        status: mapStatus(c.status),
+        rawStatus: c.status ?? 0,
+        brand: c.brand ?? '-',
+        model: c.model ?? '-',
+        channelCount: c.channelCount ?? undefined,
+        dimmable: c.dimmable ?? undefined,
+        gatewayId: c.gatewayId ?? undefined,
+        gatewayName: c.gatewayName ?? undefined,
+        lastComm: fmtTime(c.lastCommunicateTime)
+      })
+    }
+    devices.value = rows
+    stats.value = (st ?? {}) as LightingApi.IbmsLightingStatisticsVO
+    lastRefreshAt.value = new Date()
+  } finally {
+    loading.value = false
   }
-])
+}
 
 const filters = reactive({
-  type: 'all',
-  status: 'all',
+  type: 'all' as 'all' | DeviceType,
+  status: 'all' as 'all' | DeviceStatus,
   area: 'all',
   keyword: ''
-})
-
-const history = reactive({
-  startTime: '2026-03-01T00:00',
-  endTime: '2026-03-04T23:59',
-  dimension: 'custom',
-  type: 'all'
 })
 
 const page = ref(1)
 const pageSize = 10
 
+// 区域选项动态生成
+const areaOptions = computed(() => {
+  const set = new Set<string>()
+  for (const d of devices.value) {
+    if (d.area && d.area !== '-') set.add(d.area)
+  }
+  return Array.from(set).sort()
+})
+
 const filteredDevices = computed(() => {
-  const list = devices.value
+  return devices.value
     .filter((d) => (filters.type === 'all' ? true : d.type === filters.type))
     .filter((d) => (filters.status === 'all' ? true : d.status === filters.status))
     .filter((d) => (filters.area === 'all' ? true : d.area === filters.area))
@@ -525,11 +399,9 @@ const filteredDevices = computed(() => {
       return (
         d.name.toLowerCase().includes(kw) ||
         d.code.toLowerCase().includes(kw) ||
-        d.model.toLowerCase().includes(kw) ||
-        d.id.toLowerCase().includes(kw)
+        d.model.toLowerCase().includes(kw)
       )
     })
-  return list
 })
 
 const totalItems = computed(() => filteredDevices.value.length)
@@ -542,46 +414,26 @@ const pagedDevices = computed(() => {
   return filteredDevices.value.slice(start, start + pageSize)
 })
 
-const stats = computed(() => {
-  const totalCount = devices.value.length
-  const onlineCount = devices.value.filter((d) => d.status === 'online').length
-  const offlineCount = totalCount - onlineCount
-  const controllerCount = devices.value.filter((d) => d.type === 'controller').length
-  const controlledCircuits = devices.value.filter((d) => d.controllerId).length
-  const totalEnergy = Number(
-    devices.value.reduce((sum, d) => sum + (Number.isFinite(d.energy) ? d.energy : 0), 0).toFixed(1)
-  )
-  const totalCost = Number((totalEnergy * 0.8).toFixed(1))
-
-  const controllers = devices.value.filter((d) => d.type === 'controller')
-  const totalControllerCapacity = controllers.reduce((sum, d) => sum + (d.capacity || 0), 0)
-  const totalControllerLoad = devices.value.filter((d) => d.controllerId).reduce((sum, d) => sum + d.power, 0)
-  const usedCapacityPercent = totalControllerCapacity
-    ? Math.round((totalControllerLoad / totalControllerCapacity) * 100)
-    : 0
-  const remainingCapacity = Math.max(0, totalControllerCapacity - totalControllerLoad)
-  const maxCircuits = Math.floor(totalControllerCapacity / 100)
-  const remainingCircuits = Math.floor(remainingCapacity / 100)
-  const avgLoadRate = controllers.length
-    ? Math.round(controllers.reduce((sum, d) => sum + d.loadRate, 0) / controllers.length)
-    : 0
-
+const overviewStats = computed(() => {
+  const totalCount = (stats.value.gatewayTotalCount ?? 0) + (stats.value.controllerTotalCount ?? 0)
+  const onlineCount = (stats.value.gatewayOnlineCount ?? 0) + (stats.value.controllerOnlineCount ?? 0)
+  const offlineCount = Math.max(0, totalCount - onlineCount)
   return {
     totalCount,
     onlineCount,
     offlineCount,
-    controllerCount,
-    controlledCircuits,
-    totalEnergy,
-    totalCost,
-    totalControllerCapacity,
-    totalControllerLoad,
-    usedCapacityPercent,
-    remainingCapacity,
-    maxCircuits,
-    remainingCircuits,
-    avgLoadRate
+    gatewayCount: stats.value.gatewayTotalCount ?? 0,
+    controllerCount: stats.value.controllerTotalCount ?? 0,
+    lightTotalCount: stats.value.lightTotalCount ?? 0,
+    totalPower: stats.value.totalPower ?? 0,
+    currentPower: stats.value.currentPower ?? 0
   }
+})
+
+const refreshAtLabel = computed(() => {
+  const d = lastRefreshAt.value
+  if (!d) return '加载中…'
+  return fmtTime(d)
 })
 
 const applyFilters = () => {
@@ -605,59 +457,25 @@ const goPage = (action: PageAction) => {
 }
 
 const detailModalVisible = ref(false)
-const exportModalVisible = ref(false)
 const detailRow = ref<DeviceRow | null>(null)
 
-const exportConfig = reactive({
-  basic: true,
-  spec: true,
-  power: true,
-  energy: true,
-  runtime: true,
-  load: true,
-  status: true,
-  format: 'csv'
-})
-
-/**
- * 打开详情弹窗
- * @param row 设备行数据
- */
 const openDetail = (row: DeviceRow) => {
   detailRow.value = row
   detailModalVisible.value = true
 }
 
-const openExportModal = () => {
-  exportModalVisible.value = true
-}
-
-/**
- * 关闭弹窗
- * @param which 弹窗标识
- */
-const closeModal = (which: 'detail' | 'export') => {
-  if (which === 'detail') detailModalVisible.value = false
-  if (which === 'export') exportModalVisible.value = false
-}
-
-const queryHistoryData = () => {
-  // 原型为静态展示，这里不做真实查询，仅保留按钮交互位
-}
-
-const exportReport = () => {
-  exportModalVisible.value = false
+const closeDetail = () => {
+  detailModalVisible.value = false
 }
 
 onMounted(() => {
-  timer = window.setInterval(() => {
-    now.value = new Date()
-  }, 1000)
+  refreshData()
+  refreshTimer = window.setInterval(refreshData, 30_000)
 })
 
 onBeforeUnmount(() => {
-  if (timer) window.clearInterval(timer)
-  timer = null
+  if (refreshTimer) window.clearInterval(refreshTimer)
+  refreshTimer = null
 })
 </script>
 
@@ -721,6 +539,12 @@ onBeforeUnmount(() => {
 
 .data-table tr:hover td {
   background: var(--fill-light);
+}
+
+.empty-row {
+  text-align: center;
+  padding: 32px 16px !important;
+  color: var(--text-light);
 }
 
 .status-badge {
