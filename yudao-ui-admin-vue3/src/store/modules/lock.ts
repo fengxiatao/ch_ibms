@@ -3,7 +3,6 @@ import { store } from '@/store'
 
 interface lockInfo {
   isLock?: boolean
-  password?: string
 }
 
 interface LockState {
@@ -30,14 +29,6 @@ export const useLockStore = defineStore('lock', {
     },
     resetLockInfo() {
       this.lockInfo = {}
-    },
-    unLock(password: string) {
-      if (this.lockInfo?.password === password) {
-        this.resetLockInfo()
-        return true
-      } else {
-        return false
-      }
     }
   },
   persist: true

@@ -70,6 +70,22 @@ Thumbs.db
 .flattened-pom.xml
 **/libs/
 
+# ===== CH 本地临时/验证产物 =====
+/.tmp_*
+/.tmp_sql/
+/.playwright-mcp/
+/tmp-check/
+/__MACOSX/
+/post_cleanup_sa_vt.json
+/natapp.exe
+/npx
+/run_natapp.bat
+/ruoyi-vue-pro/server-effective-pom.xml
+/ruoyi-vue-pro/yudao-server/bin/
+/ruoyi-vue-pro/yudao-server/src/main/resources/Untitled
+/ruoyi-vue-pro/yudao-module-ai/
+/yudao-ui-admin-vue3/public/park-twin/*.mp4
+
 # ===== 根目录排除的文件 =====
 # 证书文件（敏感）
 /1634295428_*/
@@ -95,6 +111,8 @@ Thumbs.db
 # ===== 不纳入主仓库的嵌套项目 =====
 /ibms-server/
 /ibms-ui-admin/
+/wvp-GB28181-pro/
+/大华海康代码/
 
 # Ignore large 3D assets (avoid GitHub 100MB limit)
 数字车间/*.glb

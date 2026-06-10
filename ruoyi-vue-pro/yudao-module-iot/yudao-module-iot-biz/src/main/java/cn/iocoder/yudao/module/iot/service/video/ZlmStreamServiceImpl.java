@@ -242,14 +242,21 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
             subtype = 0;
         }
 
-        // 优先使用通道 extra 中已配置的完整 RTSP（无需设备/通道 IP 拼模板；与类注释一致）
-        if (subtype == 1 && StrUtil.isNotBlank(channel.getStreamUrlSub())) {
+        // 优先使用通道 extra 中已配置的完整 RTSP；但历史数据里曾把 HTTP 80 端口误写成 RTSP 端口。
+        // 这种地址会导致 ZLM 从错误源拉流，必须回退到设备 rtspPort 动态拼接。
+        String configuredSubUrl = StrUtil.trim(channel.getStreamUrlSub());
+        String configuredMainUrl = StrUtil.trim(channel.getStreamUrlMain());
+        if (subtype == 1 && StrUtil.isNotBlank(configuredSubUrl) && !isInvalidRtspSourceUrl(configuredSubUrl)) {
             log.info("[ZLM] 使用通道配置的子码流 RTSP: channelId={}", channel.getId());
-            return StrUtil.trim(channel.getStreamUrlSub());
+            return configuredSubUrl;
         }
-        if (subtype == 0 && StrUtil.isNotBlank(channel.getStreamUrlMain())) {
+        if (subtype == 0 && StrUtil.isNotBlank(configuredMainUrl) && !isInvalidRtspSourceUrl(configuredMainUrl)) {
             log.info("[ZLM] 使用通道配置的主码流 RTSP: channelId={}", channel.getId());
-            return StrUtil.trim(channel.getStreamUrlMain());
+            return configuredMainUrl;
+        }
+        if ((subtype == 1 && StrUtil.isNotBlank(configuredSubUrl)) || (subtype == 0 && StrUtil.isNotBlank(configuredMainUrl))) {
+            log.warn("[ZLM] 忽略异常通道 RTSP 配置，改用设备参数动态拼接: channelId={}, subtype={}, main={}, sub={}",
+                    channel.getId(), subtype, maskCredential(configuredMainUrl), maskCredential(configuredSubUrl));
         }
 
         IbmsDeviceVideoNetworkResolver.NetworkParams net = IbmsDeviceVideoNetworkResolver.resolve(device, runtime);
@@ -454,6 +461,25 @@ public class ZlmStreamServiceImpl implements ZlmStreamService {
             }
         }
         return null;
+    }
+
+    private boolean isInvalidRtspSourceUrl(String rtspUrl) {
+        if (StrUtil.isBlank(rtspUrl)) {
+            return false;
+        }
+        try {
+            java.net.URI uri = java.net.URI.create(rtspUrl.trim());
+            return "rtsp".equalsIgnoreCase(uri.getScheme()) && uri.getPort() == 80;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private String maskCredential(String url) {
+        if (StrUtil.isBlank(url)) {
+            return url;
+        }
+        return url.replaceFirst("(?i)rtsp://([^:/@]+):([^@]+)@", "rtsp://$1:***@");
     }
 
     /**

@@ -37,8 +37,8 @@ const size = computed(() => appStore.getSize)
 // 布局
 const layout = computed(() => appStore.getLayout)
 
-// 多语言图标
-const locale = computed(() => appStore.getLocale)
+// 多语言图标：本项目只支持简体中文，关闭顶部语言切换入口
+const locale = computed(() => false)
 
 // 消息图标
 const message = computed(() => appStore.getMessage)

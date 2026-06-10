@@ -80,12 +80,10 @@
                 </div>
                 <div class="cam-body">
                   <template v-if="camera.deviceId || camera.channelId || camera.channelNo">
-                    <video
+                    <div
                       class="cam-video"
-                      muted
-                      playsinline
-                      :ref="(el) => setCameraVideoRef(camera, el as HTMLVideoElement | null)"
-                    ></video>
+                      :ref="(el) => setCameraVideoContainer(camera, el as HTMLElement | null)"
+                    ></div>
                     <div v-if="camera.isLoading" class="cam-video-overlay">
                       <Icon icon="mdi:loading" :size="36" class="cam-spin" />
                       <span>连接中…</span>
@@ -386,7 +384,8 @@ import * as SecurityOverviewApi from '@/api/iot/security-overview'
 import type { PlayUrlRespVO } from '@/api/iot/security-overview'
 import { getChannelPage as getIbmsChannelPage, getChannel as getIbmsChannel } from '@/api/iot/ibms/channel'
 import { getLivePlayUrl, stopStream } from '@/api/iot/video/zlm'
-import mpegts from 'mpegts.js'
+import { adaptStreamPlayUrls, getDefaultPreferWebrtc } from '@/composables/video/streamPlayUtils'
+import useZlmPlayer, { type ZlmPlayerInstance } from '@/composables/useZlmPlayer'
 
 defineOptions({ name: 'VideoSurveillanceVisualBoard' })
 
@@ -409,8 +408,8 @@ interface CameraItem {
   isLoading?: boolean
   isPlaying?: boolean
   streamError?: string | null
-  videoEl?: HTMLVideoElement | null
-  player?: mpegts.Player | null
+  container?: HTMLElement | null
+  zlmInstance?: ZlmPlayerInstance | null
   /** 用于卸载时是否调用 stopStream（仅 channel 拉流） */
   playSource?: 'device' | 'channel' | null
 }
@@ -448,6 +447,7 @@ interface AlertItem {
 }
 
 const clockText = ref('00:00:00')
+const { playLive, stopInstance } = useZlmPlayer()
 let clockTimer: number | null = null
 
 const updateClock = () => {
@@ -511,64 +511,6 @@ const toViewPaneCount = (view: ViewMenuItem | VideoViewDetail) => {
 const getViewSplitInfo = (view: ViewMenuItem) => `${toViewPaneCount(view)}分屏`
 
 const isFirefox = navigator.userAgent.toLowerCase().includes('firefox')
-
-const isIntranetAccess = (): boolean => {
-  const hostname = window.location.hostname
-  if (hostname === 'localhost' || hostname === '127.0.0.1') return true
-  if (hostname.startsWith('192.168.')) return true
-  if (hostname.startsWith('10.')) return true
-  if (hostname.startsWith('172.')) {
-    const secondOctet = parseInt(hostname.split('.')[1])
-    if (secondOctet >= 16 && secondOctet <= 31) return true
-  }
-  return false
-}
-
-const PUBLIC_ZLM = {
-  get host() {
-    return window.location.hostname
-  },
-  get httpPort() {
-    return window.location.port ? parseInt(window.location.port) : 80
-  }
-}
-
-const adaptPlayUrls = (urls: PlayUrlRespVO | null | undefined): PlayUrlRespVO | null => {
-  if (!urls) return null
-  if (isIntranetAccess()) return urls
-  const adapted: PlayUrlRespVO = { ...urls }
-  const publicHost = PUBLIC_ZLM.host
-  const publicPort = PUBLIC_ZLM.httpPort
-  const publicAddr = publicPort === 80 || publicPort === 443 ? publicHost : `${publicHost}:${publicPort}`
-  const isHttps = window.location.protocol === 'https:'
-  const httpProtocol = isHttps ? 'https' : 'http'
-  const wsProtocol = isHttps ? 'wss' : 'ws'
-  const replaceHttpUrl = (url: string): string => {
-    if (!url) return url
-    let newUrl = url.replace(/192\.168\.\d+\.\d+:\d+/g, publicAddr).replace(/192\.168\.\d+\.\d+/g, publicHost)
-    newUrl = newUrl.replace(/^http:/, `${httpProtocol}:`)
-    return newUrl
-  }
-  const replaceWsUrl = (url: string): string => {
-    if (!url) return url
-    let newUrl = url.replace(/192\.168\.\d+\.\d+:\d+/g, publicAddr).replace(/192\.168\.\d+\.\d+/g, publicHost)
-    newUrl = newUrl.replace(/^ws:/, `${wsProtocol}:`)
-    return newUrl
-  }
-  adapted.wsFlvUrl = urls.wsFlvUrl ? replaceWsUrl(urls.wsFlvUrl) : urls.wsFlvUrl
-  adapted.flvUrl = urls.flvUrl ? replaceHttpUrl(urls.flvUrl) : urls.flvUrl
-  adapted.hlsUrl = urls.hlsUrl ? replaceHttpUrl(urls.hlsUrl) : urls.hlsUrl
-  if (urls.webrtcUrl) adapted.webrtcUrl = replaceHttpUrl(urls.webrtcUrl)
-  return adapted
-}
-
-const pickFlvPlayUrl = (raw: PlayUrlRespVO | null | undefined): string | null => {
-  const urls = adaptPlayUrls(raw)
-  if (!urls) return null
-  if (urls.wsFlvUrl) return urls.wsFlvUrl
-  if (urls.flvUrl) return urls.flvUrl
-  return null
-}
 
 /** 后端分页校验：每页条数最大值 100 */
 const IBMS_CHANNEL_PAGE_MAX = 100
@@ -662,24 +604,12 @@ const resolveIbmsChannelIdForZlm = async (camera: CameraItem): Promise<number | 
 }
 
 const stopCameraStream = (camera: CameraItem) => {
-  if (camera.player) {
-    try {
-      camera.player.pause()
-      camera.player.unload()
-      camera.player.detachMediaElement()
-      camera.player.destroy()
-    } catch {
-      /* ignore */
-    }
-    camera.player = null
+  if (camera.zlmInstance) {
+    stopInstance(camera.zlmInstance)
+    camera.zlmInstance = null
   }
-  if (camera.videoEl) {
-    try {
-      camera.videoEl.srcObject = null
-      camera.videoEl.src = ''
-    } catch {
-      /* ignore */
-    }
+  if (camera.container) {
+    camera.container.innerHTML = ''
   }
   if (camera.playSource === 'channel') {
     const sid = camera.zlmIbmsChannelId ?? camera.channelId
@@ -691,87 +621,31 @@ const stopCameraStream = (camera: CameraItem) => {
   camera.playSource = null
 }
 
-const setCameraVideoRef = (camera: CameraItem, el: HTMLVideoElement | null) => {
+const setCameraVideoContainer = (camera: CameraItem, el: HTMLElement | null) => {
   if (el) {
-    camera.videoEl = el
-  } else if (camera.videoEl) {
-    camera.videoEl = null
+    camera.container = el
+  } else if (camera.container) {
+    camera.container = null
   }
 }
 
 const fetchPlayUrlForCamera = async (camera: CameraItem): Promise<PlayUrlRespVO> => {
-  if (camera.deviceId) {
-    return await SecurityOverviewApi.getPlayUrl(camera.deviceId)
-  }
-  if (camera.channelId || (camera.channelNo != null && camera.channelNo > 0)) {
-    const ibmsId = await resolveIbmsChannelIdForZlm(camera)
-    if (!ibmsId) {
-      throw new Error('无法解析 IBMS 视频通道（请检查视图绑定或通道是否存在）')
-    }
+  const ibmsId = await resolveIbmsChannelIdForZlm(camera)
+  if (ibmsId) {
     camera.zlmIbmsChannelId = ibmsId
     // 与实时预览默认一致：主码流 subtype=0（子码流 1 在未配置子流时会导致无法构建 RTSP）
     return await getLivePlayUrl(ibmsId, 0)
   }
-  throw new Error('未绑定设备或通道')
-}
 
-const attachFlvPlayer = (camera: CameraItem, playUrl: string): Promise<boolean> => {
-  return new Promise((resolve) => {
-    const videoEl = camera.videoEl
-    if (!videoEl || !mpegts.isSupported()) {
-      resolve(false)
-      return
-    }
-    try {
-      const player = mpegts.createPlayer(
-        {
-          type: 'flv',
-          url: playUrl,
-          isLive: true,
-          hasAudio: false,
-          hasVideo: true
-        },
-        {
-          enableWorker: false,
-          enableStashBuffer: true,
-          stashInitialSize: isFirefox ? 256 : 128,
-          lazyLoad: false,
-          // 与 useZlmPlayer 一致：部分 ZLM/FLV 直播时间戳会让 mpegts 算出负的 remove 区间，触发
-          // SourceBuffer.remove(end < start) 未捕获异常；关闭自动清理以稳定播放
-          autoCleanupSourceBuffer: false,
-          autoCleanupMaxBackwardDuration: isFirefox ? 5 : 3,
-          liveBufferLatencyChasing: true,
-          liveBufferLatencyMaxLatency: isFirefox ? 2.0 : 1.5,
-          liveSync: true
-        }
-      )
-      player.attachMediaElement(videoEl)
-      player.load()
-      player.on(mpegts.Events.ERROR, (errorType: any, errorDetail: any) => {
-        if (String(errorDetail || '').includes('SourceBuffer') || String(errorDetail || '').includes('MSEError')) {
-          return
-        }
-        camera.streamError = `播放错误: ${errorDetail || errorType}`
-        camera.isPlaying = false
-        camera.isLoading = false
-      })
-      const playDelay = isFirefox ? 500 : 100
-      setTimeout(async () => {
-        try {
-          await player.play()
-          camera.player = player
-          camera.isPlaying = true
-          camera.isLoading = false
-          camera.streamError = null
-          resolve(true)
-        } catch {
-          resolve(false)
-        }
-      }, playDelay)
-    } catch {
-      resolve(false)
-    }
-  })
+  if (camera.deviceId) {
+    return await SecurityOverviewApi.getPlayUrl(camera.deviceId)
+  }
+
+  if (camera.channelId || (camera.channelNo != null && camera.channelNo > 0)) {
+    throw new Error('无法解析 IBMS 视频通道（请检查视图绑定或通道是否存在）')
+  }
+
+  throw new Error('未绑定设备或通道')
 }
 
 const playOneCameraStream = async (camera: CameraItem) => {
@@ -784,18 +658,29 @@ const playOneCameraStream = async (camera: CameraItem) => {
   camera.isPlaying = false
   try {
     const raw = await fetchPlayUrlForCamera(camera)
-    const playUrl = pickFlvPlayUrl(raw)
-    if (!playUrl) {
-      throw new Error('未获取到 FLV 播放地址（需 wsFlv 或 http-flv）')
+    const playUrls = adaptStreamPlayUrls(raw)
+    if (!playUrls || (!playUrls.webrtcUrl && !playUrls.wsFlvUrl && !playUrls.flvUrl)) {
+      throw new Error('未获取到可用播放地址（需 WebRTC 或 FLV）')
     }
-    camera.playSource = camera.deviceId ? 'device' : 'channel'
-    for (let i = 0; i < 30 && !camera.videoEl; i++) {
+    camera.playSource = camera.zlmIbmsChannelId ? 'channel' : 'device'
+    for (let i = 0; i < 30 && !camera.container; i++) {
       await new Promise((r) => setTimeout(r, 50))
     }
-    const ok = await attachFlvPlayer(camera, playUrl)
-    if (!ok) {
-      throw new Error('浏览器不支持或播放器启动失败')
+    if (!camera.container) {
+      throw new Error('播放器容器不存在')
     }
+    camera.zlmInstance = await playLive({
+      container: camera.container,
+      urls: {
+        webrtcUrl: playUrls.webrtcUrl,
+        wsFlvUrl: playUrls.wsFlvUrl,
+        flvUrl: playUrls.flvUrl
+      },
+      preferWebrtc: getDefaultPreferWebrtc()
+    })
+    camera.isPlaying = true
+    camera.isLoading = false
+    camera.streamError = null
   } catch (e: any) {
     camera.streamError = e?.message || '取流失败'
     camera.isLoading = false
@@ -1066,14 +951,6 @@ const regionTotal = computed(() => regionDistribution.value.reduce((sum, item) =
 const regionTotalText = computed(() => `${regionTotal.value}路摄像头`)
 
 const storageHealthLedClass = computed(() => 'good')
-const storageHealthText = computed(() => '存储系统正常')
-const fpsStatusText = computed(() => '主码流 25fps')
-
-const lastAlertTimeText = computed(() => {
-  const latest = alertList.value[0]
-  if (!latest) return '最后报警 --:--'
-  return `最后报警 ${latest.time.slice(0, 5)}`
-})
 
 onMounted(() => {
   updateClock()

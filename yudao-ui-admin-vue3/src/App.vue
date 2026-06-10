@@ -54,6 +54,14 @@ body {
   }
 }
 
+html {
+  font-size: var(--app-font-size, 14px);
+}
+
+body {
+  font-size: var(--app-font-size, 14px);
+}
+
 .#{$prefix-cls}-grey-mode {
   filter: grayscale(100%);
 }

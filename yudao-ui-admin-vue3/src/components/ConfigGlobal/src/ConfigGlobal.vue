@@ -48,6 +48,24 @@ watch(
 const localeStore = useLocaleStore()
 
 const currentLocale = computed(() => localeStore.currentLocale)
+
+const sizeFontVars: Partial<Record<ComponentSize, string>> = {
+  small: '13px',
+  default: '14px',
+  large: '16px'
+}
+
+const applyGlobalSize = (size: ComponentSize) => {
+  const fontSize = sizeFontVars[size] || sizeFontVars.default
+  setCssVar('--app-font-size', fontSize)
+  setCssVar('--el-font-size-base', fontSize)
+}
+
+watch(
+  () => props.size,
+  (size) => applyGlobalSize(size),
+  { immediate: true }
+)
 </script>
 
 <template>

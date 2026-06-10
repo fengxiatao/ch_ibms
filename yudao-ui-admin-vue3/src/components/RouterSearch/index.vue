@@ -54,22 +54,50 @@ const showTopSearch = ref(false) // 是否显示顶部搜索框
 const value: Ref = ref('') // 用户输入的值
 
 const routers = router.getRoutes() // 路由对象
+
+const isSearchableRoute = (item: any) => {
+  const meta = item.meta || {}
+
+  // 只允许搜索真正的业务页面；目录/布局/重定向路由会把 Layout 套进内容区，形成“页面画中画”。
+  return (
+    item.path &&
+    item.name &&
+    meta.title &&
+    !item.redirect &&
+    (!item.children || item.children.length === 0) &&
+    (!meta.hidden || meta.canTo)
+  )
+}
+
 const options = computed(() => {
   // 提示选项
-  if (!value.value) {
+  const keyword = String(value.value || '').trim().toLowerCase()
+  if (!keyword) {
     return []
   }
-  const list = routers.filter((item: any) => {
-    if (item.meta.title?.indexOf(value.value) > -1 || item.path.indexOf(value.value) > -1) {
-      return true
+
+  const matchedRoutes = routers.filter((item: any) => {
+    if (!isSearchableRoute(item)) {
+      return false
     }
+
+    const title = String(item.meta.title || '').toLowerCase()
+    const path = String(item.path || '').toLowerCase()
+    return title.includes(keyword) || path.includes(keyword)
   })
-  return list.map((item) => {
-    return {
-      label: `${item.meta.title}${item.path}`,
+
+  const existed = new Set<string>()
+  return matchedRoutes.reduce<{ label: string; value: string }[]>((list, item: any) => {
+    if (existed.has(item.path)) {
+      return list
+    }
+    existed.add(item.path)
+    list.push({
+      label: `${item.meta.title} ${item.path}`,
       value: item.path
-    }
-  })
+    })
+    return list
+  }, [])
 })
 
 function remoteMethod(data) {

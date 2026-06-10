@@ -43,6 +43,7 @@ export interface PlaybackUrlRespVO {
   cameraId: number
   cameraName: string
   rtspUrl?: string
+  wsFlvUrl?: string
   flvUrl: string
   webrtcUrl?: string
   streamId?: string

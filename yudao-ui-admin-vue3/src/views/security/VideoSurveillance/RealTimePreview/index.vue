@@ -110,27 +110,15 @@ import ViewManager from './components/ViewManager.vue'
 import PatrolManager from './components/PatrolManager.vue'
 import CruiseManager from '@/views/security/VideoSurveillance/components/CruiseManager.vue'
 
-// 大华播放器 Composable
-import {
-  useDahuaPlayer,
-  DEFAULT_NVR_CONFIG,
-  type DahuaPlayerPane
-} from '@/composables/useDahuaPlayer'
-
 // API 导入
 import { uploadCameraSnapshot } from '@/api/iot/video'
 import { nvrPresetControl, nvrPtzControl, nvrAreaZoom } from '@/api/iot/video/nvr'
 
 // 类型导入
-import type { GridLayoutType, VideoView, PatrolScene, IbmsChannel } from './types'
+import type { GridLayoutType, VideoView, PatrolScene, IbmsChannel, PlayerPane } from './types'
 import type { ViewManagerProtocol, ViewSaveDialogPayload } from './viewProtocol'
 import { createVideoView, updateVideoView } from '@/api/iot/video/videoView'
-import {
-  isForceWebrtcEnabled,
-  isIntranetAccess
-} from '@/composables/video/streamPlayUtils'
 import { useZlmPanePlayback } from '@/composables/video/useZlmPanePlayback'
-import { useDahuaPanePlayback } from '@/composables/video/useDahuaPanePlayback'
 import { useRealtimePaneOrchestrator } from '@/composables/video/useRealtimePaneOrchestrator'
 import type { ZlmPlayerInstance } from '@/composables/useZlmPlayer'
 
@@ -142,26 +130,83 @@ const viewManagerRef = ref<{ protocol?: ViewManagerProtocol } | undefined>()
 const patrolManagerRef = ref()
 const cruiseManagerRef = ref()
 
-// ==================== 大华播放器 / ZLM 播放 ====================
-const {
-  createPanes,
-  startPreview,
-  stopPlayer,
-  stopAllPlayers,
-  capture,
-  captureWithData,
-  base64ToFile,
-  switchStream,
-  toggleRecord,
-  ptzMove,
-  ptzZoom,
-  gotoPreset,
-  setPreset,
-  clearPreset,
-  loginDevice,
-  areaZoom,
-  ptzReset
-} = useDahuaPlayer()
+// ==================== 播放器基础状态 / ZLM 播放 ====================
+const createEmptyPane = (index: number): ExtendedPane => ({
+  index,
+  ibmsChannel: null,
+  channelName: '',
+  config: null,
+  player: null,
+  container: null,
+  isPlaying: false,
+  isLoading: false,
+  isPaused: false,
+  isRecording: false,
+  isPlayback: false,
+  error: null,
+  streamType: 'sub',
+  muted: true,
+  zlmInstance: null,
+  zlmChannelId: null
+})
+
+const createPanes = (count: number): ExtendedPane[] => {
+  return Array.from({ length: count }, (_, index) => createEmptyPane(index))
+}
+
+const base64ToFile = (base64: string, fileName: string, mimeType: string): File => {
+  const base64Data = base64.replace(/^data:image\/\w+;base64,/, '')
+  const byteCharacters = atob(base64Data)
+  const byteNumbers = new Array(byteCharacters.length)
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i)
+  }
+  const byteArray = new Uint8Array(byteNumbers)
+  const blob = new Blob([byteArray], { type: mimeType })
+  return new File([blob], fileName, { type: mimeType })
+}
+
+const capturePaneImageData = (pane: ExtendedPane, type: 'jpg' | 'png' = 'jpg') => {
+  const container = pane.container
+  const source = container?.querySelector<HTMLCanvasElement | HTMLVideoElement>('canvas, video')
+  if (!source) {
+    return null
+  }
+
+  const width = source instanceof HTMLVideoElement ? source.videoWidth : source.width
+  const height = source instanceof HTMLVideoElement ? source.videoHeight : source.height
+  if (!width || !height) {
+    return null
+  }
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    return null
+  }
+
+  ctx.drawImage(source, 0, 0, width, height)
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+  const channelName = pane.channelName || pane.ibmsChannel?.channelName || `channel_${pane.config?.channelNo || 'unknown'}`
+  const mimeType = type === 'png' ? 'image/png' : 'image/jpeg'
+  const base64 = canvas.toDataURL(mimeType, 0.92)
+  return {
+    base64,
+    fileName: `snapshot_${channelName}_${timestamp}.${type}`,
+    mimeType
+  }
+}
+
+const saveSnapshotLocally = (base64: string, fileName: string) => {
+  const link = document.createElement('a')
+  link.href = base64
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
 
 const {
   stopPanePlayback: stopZlmPanePlayback,
@@ -170,13 +215,6 @@ const {
   retryPanePlayback,
   switchPaneStream: switchZlmPaneStream
 } = useZlmPanePlayback()
-const {
-  stopPanePlayback: stopDahuaPanePlayback,
-  stopAllPanes: stopAllDahuaPanes,
-  playPaneSource,
-  retryPanePlayback: retryDahuaPanePlayback,
-  switchPaneStream: switchDahuaPaneStream
-} = useDahuaPanePlayback()
 const {
   buildViewPayload,
   buildCurrentViewState,
@@ -188,12 +226,9 @@ const {
   stopPatrol
 } = useRealtimePaneOrchestrator()
 
-// 是否走「大华直连（内网 RPC2）」：仅当页面 host 是私网网段且未强制 WebRTC 时启用。
-// 线上公网域名一律走 ZLM 流媒体（外网模式），不再展示内网/外网切换。
-const isIntranet = isIntranetAccess() && !isForceWebrtcEnabled()
-
-// 播放器扩展状态（在 Dahua 窗格上附加 ZLM 播放信息）
-type ExtendedPane = DahuaPlayerPane & {
+// 播放器扩展状态（ZLM 实时预览窗格）
+type ExtendedPane = PlayerPane & {
+  index: number
   ibmsChannel?: IbmsChannel | null
   zlmInstance?: ZlmPlayerInstance | null
   zlmChannelId?: number | null
@@ -287,6 +322,14 @@ const ptzDisabledReason = computed<'no-playing' | 'no-ptz' | null>(() => {
 
 // ==================== 布局管理 ====================
 
+const getPreferredRealtimeStreamType = (): 'main' | 'sub' => {
+  return gridLayout.value === 1 ? 'main' : 'sub'
+}
+
+const applyDefaultPaneStreamType = (pane: ExtendedPane) => {
+  pane.streamType = getPreferredRealtimeStreamType()
+}
+
 const handleLayoutChange = async (newLayout: GridLayoutType) => {
   await resetPaneLayout({
     layout: newLayout,
@@ -313,13 +356,13 @@ const handlePaneRef = (paneIndex: number, el: HTMLElement | null) => {
   }
 }
 
-const resolvePaneContainer = async (paneIndex: number, pane: ExtendedPane) => {
+const resolvePaneContainer = async (paneIndex: number, pane: { container: HTMLElement | null }) => {
   if (pane.container) {
     return pane.container
   }
   await nextTick()
   const el = document.querySelector(
-    `.player-pane[data-index="${paneIndex}"] .player-container`
+    `.player-pane[data-index="${paneIndex}"] .player-container, .pane-video[data-index="${paneIndex}"]`
   ) as HTMLElement | null
   if (el) {
     pane.container = el
@@ -331,21 +374,10 @@ const resolvePaneContainer = async (paneIndex: number, pane: ExtendedPane) => {
 
 const stopPanePlayback = async (pane: ExtendedPane) => {
   if (!pane) return
-
-  if (isIntranet) {
-    await stopDahuaPanePlayback(pane, stopPlayer)
-    return
-  }
-
   await stopZlmPanePlayback(pane)
 }
 
 const stopAllPanes = async () => {
-  if (isIntranet) {
-    await stopAllDahuaPanes(panes.value, stopAllPlayers)
-    return
-  }
-
   await stopAllZlmPanes(panes.value)
 }
 
@@ -399,7 +431,7 @@ const handlePaneDrop = async (event: DragEvent, paneIndex: number) => {
   }
 }
 
-// 在指定窗格播放通道（根据模式选择大华直连或 ZLM 播放）
+// 在指定窗格播放通道（统一通过 ZLM 播放）
 const playChannelInPane = async (ibmsChannel: IbmsChannel, paneIndex: number) => {
   const pane = panes.value[paneIndex]
   if (!pane) return
@@ -409,32 +441,7 @@ const playChannelInPane = async (ibmsChannel: IbmsChannel, paneIndex: number) =>
 
   // 保存 IBMS 通道信息（用于截图上传等功能）
   pane.ibmsChannel = ibmsChannel
-
-  // 内网：大华直连
-  if (isIntranet) {
-    try {
-      await playPaneSource({
-        pane,
-        paneIndex,
-        source: {
-          channelNo: ibmsChannel.channelNo,
-          channelName: ibmsChannel.channelName,
-          username: ibmsChannel.username,
-          password: ibmsChannel.password,
-          ibmsChannel
-        },
-        resolvePaneContainer,
-        startPreview,
-        stopPlayer
-      })
-      ElMessage.success(`正在播放: ${ibmsChannel.channelName || `通道${ibmsChannel.channelNo}`}`)
-      return
-    } catch (error: any) {
-      console.error('[大华] 播放失败:', error)
-      ElMessage.warning(error?.message || '播放失败，请稍后重试')
-      return
-    }
-  }
+  applyDefaultPaneStreamType(pane)
 
   try {
     await replacePanePlayback({
@@ -491,22 +498,6 @@ const handleRetry = async (paneIndex: number) => {
   const pane = panes.value[paneIndex]
   if (!pane) return
 
-  if (isIntranet) {
-    try {
-      await retryDahuaPanePlayback({
-        pane,
-        paneIndex,
-        resolvePaneContainer,
-        startPreview,
-        stopPlayer
-      })
-    } catch (error: any) {
-      ElMessage.warning(error?.message || '当前窗口缺少通道信息，无法重试播放')
-    }
-    return
-  }
-
-  // 外网模式：按当前 ibmsChannel 重新通过 ZLM 播放
   try {
     await retryPanePlayback({
       pane,
@@ -526,56 +517,47 @@ const handleChannelDragStart = (_event: DragEvent, _channel: any) => {
 // ==================== 截图/录像/全屏 ====================
 
 const handleSnapshot = async (paneIndex: number) => {
-  const pane = panes.value[paneIndex] as any // 包含 ibmsChannel 扩展字段
+  const pane = panes.value[paneIndex]
   if (!pane || !pane.isPlaying) {
     ElMessage.warning('当前窗口没有正在播放的视频')
     return
   }
 
+  const captureData = capturePaneImageData(pane, 'jpg')
+  if (!captureData?.base64) {
+    ElMessage.warning('当前播放模式暂不支持截图')
+    return
+  }
+
+  const ibmsChannel = pane.ibmsChannel
+  if (!ibmsChannel?.id) {
+    saveSnapshotLocally(captureData.base64, captureData.fileName)
+    ElMessage.warning('未找到通道信息，截图已保存到本地')
+    return
+  }
+
   try {
-    // 获取截图数据
-    const { base64, fileName, mimeType } = captureWithData(pane, 'jpg', 1.0)
-    
-    if (!base64) {
-      // 如果获取不到数据，退回到本地截图
-      capture(pane, `snapshot_${pane.channelName}_${Date.now()}`)
-      return
-    }
-
-    // 转换为 File 对象
-    const file = base64ToFile(base64, fileName, mimeType)
-
-    // 获取通道ID（从 ibmsChannel 中获取数据库ID，而不是 NVR 通道号）
-    const ibmsChannel = pane.ibmsChannel
-    if (!ibmsChannel || !ibmsChannel.id) {
-      console.warn('[截图] 未找到通道信息，保存到本地')
-      capture(pane, `snapshot_${pane.channelName}_${Date.now()}`)
-      ElMessage.warning('未找到通道信息，截图已保存到本地')
-      return
-    }
-
-    const channelId = ibmsChannel.id // 使用数据库中的通道ID
-    
-    // 上传到服务器
+    const file = base64ToFile(captureData.base64, captureData.fileName, captureData.mimeType)
     ElMessage.info('正在上传截图...')
-    await uploadCameraSnapshot(channelId, file, 1) // snapshotType: 1 = 手动抓拍
-    
+    await uploadCameraSnapshot(ibmsChannel.id, file, 1)
     ElMessage.success('截图已保存到服务器')
-    console.log('[截图] 上传成功:', fileName, '通道ID:', channelId, '通道名称:', ibmsChannel.channelName)
+    console.log('[截图] 上传成功:', captureData.fileName, '通道ID:', ibmsChannel.id, '通道名称:', ibmsChannel.channelName)
   } catch (error: any) {
     console.error('[截图] 上传失败:', error)
-    // 上传失败时，保存到本地
-    capture(pane, `snapshot_${pane.channelName}_${Date.now()}`)
+    saveSnapshotLocally(captureData.base64, captureData.fileName)
     ElMessage.warning('上传失败，截图已保存到本地')
   }
 }
 
 // 录像操作
 const handleRecord = async (paneIndex: number) => {
-  const pane = panes.value[paneIndex] as DahuaPlayerPane
-  if (!pane) return
+  const pane = panes.value[paneIndex]
+  if (!pane?.isPlaying) {
+    ElMessage.warning('当前窗口没有正在播放的视频')
+    return
+  }
 
-  await toggleRecord(pane)
+  ElMessage.warning('ZLM 实时预览暂不支持前端本地录像，请使用平台录像/回放功能')
 }
 
 const handleFullscreen = (paneIndex: number) => {
@@ -596,24 +578,6 @@ const handleStreamSwitch = async (paneIndex: number, streamType: string) => {
   ElMessage.info(`正在切换到${streamType === 'main' ? '主' : '子'}码流...`)
 
   pane.streamType = streamType as 'main' | 'sub'
-
-  if (isIntranet) {
-    try {
-      await switchDahuaPaneStream({
-        pane,
-        paneIndex,
-        streamType: streamType as 'main' | 'sub',
-        resolvePaneContainer,
-        startPreview,
-        stopPlayer,
-        switchStream
-      })
-      ElMessage.success(`已切换到${streamType === 'main' ? '主' : '子'}码流`)
-    } catch (error: any) {
-      ElMessage.warning(error?.message || '当前窗口缺少通道信息，无法切换码流')
-    }
-    return
-  }
 
   try {
     await switchZlmPaneStream({
@@ -636,43 +600,6 @@ const handlePtzMove = async (command: string, speed: number) => {
     return
   }
 
-  // 内网：直接通过 RPC2 控制
-  if (isIntranet) {
-    // 先登录设备
-    await loginDevice(DEFAULT_NVR_CONFIG)
-
-    // 映射命令名称
-    const directionMap: Record<string, any> = {
-      up: 'Up',
-      down: 'Down',
-      left: 'Left',
-      right: 'Right',
-      upleft: 'LeftUp',
-      upright: 'RightUp',
-      downleft: 'LeftDown',
-      downright: 'RightDown',
-      zoomin: 'ZoomTele',
-      zoomout: 'ZoomWide',
-      focusin: 'FocusNear',
-      focusout: 'FocusFar'
-    }
-
-    const dahuaCommand = directionMap[command.toLowerCase()] || command
-
-    try {
-      if (['ZoomTele', 'ZoomWide', 'FocusNear', 'FocusFar'].includes(dahuaCommand)) {
-        await ptzZoom(channelNo, dahuaCommand, Math.ceil(speed / 30))
-      } else {
-        await ptzMove(channelNo, dahuaCommand, Math.ceil(speed / 30))
-      }
-    } catch (error: any) {
-      console.error('[云台] 控制失败:', error)
-      ElMessage.error('云台控制失败')
-    }
-    return
-  }
-
-  // 外网：通过后端 NVR PTZ 接口控制
   const nvrId = activeDeviceId.value
   if (!nvrId) {
     ElMessage.warning('无法获取 NVR 设备ID，云台控制不可用')
@@ -714,18 +641,6 @@ const handlePtzStop = async () => {
   const channelNo = activeChannelNo.value
   if (!channelNo) return
 
-  // 内网：调用 RPC2 停止
-  if (isIntranet) {
-    try {
-      // 停止所有方向
-      await ptzMove(channelNo, 'Up', 5, true)
-    } catch (error) {
-      console.error('[云台] 停止失败:', error)
-    }
-    return
-  }
-
-  // 外网：调用后端 PTZ 停止
   const nvrId = activeDeviceId.value
   if (!nvrId) return
 
@@ -744,18 +659,8 @@ const handlePtzStop = async () => {
 
 const handleGotoPreset = async (presetId: number) => {
   const channelNo = activeChannelNo.value
-  if (!channelNo) return
-
-  // 内网：通过 RPC2 调用预设位
-  if (isIntranet) {
-    await loginDevice(DEFAULT_NVR_CONFIG)
-    await gotoPreset(channelNo, presetId)
-    return
-  }
-
-  // 外网：通过后端 PTZ 接口
   const nvrId = activeDeviceId.value
-  if (!nvrId) return
+  if (!channelNo || !nvrId) return
 
   try {
     await nvrPresetControl(nvrId, {
@@ -772,47 +677,29 @@ const handleGotoPreset = async (presetId: number) => {
 const handleSetPreset = async (presetNo: number, presetName: string) => {
   const channelNo = activeChannelNo.value
   const deviceId = activeDeviceId.value
-  if (!channelNo) return
-
-  // 1) 设置预设点位置
-  if (isIntranet) {
-    await loginDevice(DEFAULT_NVR_CONFIG)
-    await setPreset(channelNo, presetNo)
+  if (!channelNo || !deviceId) {
+    console.warn('[云台] 无法获取设备ID，跳过预设点设置')
+    return
   }
 
-  // 2) 通过后端 API 设置预设点名称（内外网统一）
-  if (deviceId) {
-    try {
-      await nvrPresetControl(deviceId, {
-        channelNo,
-        presetNo,
-        action: 'SET',
-        presetName
-      })
-      console.log(`[云台] 预设点名称 "${presetName}" 已同步到设备 (deviceId=${deviceId})`)
-    } catch (error) {
-      console.error('[云台] 同步预设点名称失败:', error)
-      // 名称同步失败不影响预设点位置的保存，只记录日志
-    }
-  } else {
-    console.warn('[云台] 无法获取设备ID，跳过名称同步')
+  try {
+    await nvrPresetControl(deviceId, {
+      channelNo,
+      presetNo,
+      action: 'SET',
+      presetName
+    })
+    console.log(`[云台] 预设点 "${presetName}" 已同步到设备 (deviceId=${deviceId})`)
+  } catch (error) {
+    console.error('[云台] 同步预设点失败:', error)
+    ElMessage.error('设置预设位失败')
   }
 }
 
 const handleClearPreset = async (presetId: number) => {
   const channelNo = activeChannelNo.value
-  if (!channelNo) return
-
-  // 内网：通过 RPC2 删除预设位
-  if (isIntranet) {
-    await loginDevice(DEFAULT_NVR_CONFIG)
-    await clearPreset(channelNo, presetId)
-    return
-  }
-
-  // 外网：通过后端接口删除
   const nvrId = activeDeviceId.value
-  if (!nvrId) return
+  if (!channelNo || !nvrId) return
 
   try {
     await nvrPresetControl(nvrId, {
@@ -847,30 +734,6 @@ const handleAreaZoom = async (
     return
   }
 
-  const container = pane.container as HTMLElement
-
-  // 内网：通过 RPC2 的 3D 定位实现区域放大
-  if (isIntranet) {
-    try {
-      await loginDevice(DEFAULT_NVR_CONFIG)
-      await areaZoom(
-        channelNo, 
-        rect,
-        container?.clientWidth || 1920,
-        container?.clientHeight || 1080
-      )
-      ElMessage.success('区域放大执行成功')
-      
-      // 执行成功后自动退出区域放大模式
-      areaZoomActive.value = false
-    } catch (error: any) {
-      console.error('[云台] 区域放大失败:', error)
-      ElMessage.error('区域放大失败')
-    }
-    return
-  }
-
-  // 外网：通过后端 NVR 区域放大接口
   const nvrId = activeDeviceId.value
   if (!nvrId) return
 
@@ -903,21 +766,6 @@ const handlePtzReset = async () => {
     return
   }
 
-  // 内网：通过 RPC2 执行复位
-  if (isIntranet) {
-    try {
-      ElMessage.info('正在复位，请稍候...')
-      await loginDevice(DEFAULT_NVR_CONFIG)
-      await ptzReset(channelNo, 3000)  // 持续缩小3秒
-      ElMessage.success('云台复位完成')
-    } catch (error: any) {
-      console.error('[云台] 复位失败:', error)
-      ElMessage.error('云台复位失败')
-    }
-    return
-  }
-
-  // 外网：通过后端 PTZ 复位（使用持续 ZOOM_OUT 的方式由后端实现）
   const nvrId = activeDeviceId.value
   if (!nvrId) return
 
@@ -1074,6 +922,9 @@ const handleLoadView = async (view: VideoView) => {
           currentViewRef: currentView,
           syncCurrentViewSelection: syncViewManagerSelection
         }),
+      findIbmsChannelById: async (channelId) => {
+        return deviceTreeRef.value?.findIbmsChannelById(channelId)
+      },
       findIbmsChannelByChannelNo: async (channelNo) => {
         return deviceTreeRef.value?.findIbmsChannelByChannelNo(channelNo)
       },
@@ -1133,18 +984,17 @@ const handleExecuteScene = async (scene: PatrolScene) => {
       }
 
       try {
-        await playPaneSource({
-          pane,
-          paneIndex,
-          source: {
-            channelNo,
-            channelName
-          },
-          resolvePaneContainer,
-          startPreview,
-          stopPlayer
-        })
-        return true
+        const ibmsChannel =
+          (channel.channelId ? await deviceTreeRef.value?.findIbmsChannelById(channel.channelId) : null) ||
+          (channelNo ? await deviceTreeRef.value?.findIbmsChannelByChannelNo(channelNo) : null)
+
+        if (ibmsChannel) {
+          await playChannelInPane(ibmsChannel, paneIndex)
+          return true
+        }
+
+        console.warn('[轮巡] 未找到 IBMS 通道，跳过:', channel)
+        return false
       } catch (error) {
         console.warn('[轮巡] 格子播放失败:', error)
         return false
@@ -1156,16 +1006,7 @@ const handleExecuteScene = async (scene: PatrolScene) => {
 // ==================== 生命周期 ====================
 
 onMounted(async () => {
-  console.log('[实时预览] 页面加载 - 模式:', isIntranet ? '大华直连' : 'ZLMediaKit 流媒体')
-
-  if (isIntranet) {
-    // 尝试登录 NVR（用于云台控制）
-    try {
-      await loginDevice(DEFAULT_NVR_CONFIG)
-    } catch (e) {
-      console.warn('[实时预览] NVR 登录失败，云台控制可能不可用')
-    }
-  }
+  console.log('[实时预览] 页面加载 - 模式: ZLMediaKit 流媒体')
 })
 
 onUnmounted(async () => {

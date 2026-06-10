@@ -5,7 +5,6 @@ import avatarImg from '@/assets/imgs/avatar.gif'
 import { useDesign } from '@/hooks/web/useDesign'
 import { useTagsViewStore } from '@/store/modules/tagsView'
 import { useUserStore } from '@/store/modules/user'
-import LockDialog from './components/LockDialog.vue'
 import LockPage from './components/LockPage.vue'
 import { useLockStore } from '@/store/modules/lock'
 
@@ -29,9 +28,10 @@ const userName = computed(() => userStore.user.nickname ?? 'Admin')
 // 锁定屏幕
 const lockStore = useLockStore()
 const getIsLock = computed(() => lockStore.getLockInfo?.isLock ?? false)
-const dialogVisible = ref<boolean>(false)
 const lockScreen = () => {
-  dialogVisible.value = true
+  lockStore.setLockInfo({
+    isLock: true
+  })
 }
 
 const loginOut = async () => {
@@ -83,8 +83,6 @@ const toDocument = () => {
       </ElDropdownMenu>
     </template>
   </ElDropdown>
-
-  <LockDialog v-if="dialogVisible" v-model="dialogVisible" />
 
   <teleport to="body">
     <transition name="fade-bottom" mode="out-in">

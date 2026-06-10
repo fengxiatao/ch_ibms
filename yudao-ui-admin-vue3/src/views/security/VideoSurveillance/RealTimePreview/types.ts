@@ -1,6 +1,6 @@
 /**
  * 实时预览页面类型定义
- * 使用大华无插件 SDK
+ * 使用 ZLM 流媒体播放
  */
 
 // IBMS 本地通道信息
@@ -10,7 +10,7 @@ export interface IbmsChannel {
   channelNo: number           // NVR 通道号（1-16）
   channelName: string
   channelCode?: string
-  // 大华直连所需字段
+  // 流媒体播放配置字段
   targetIp?: string           // NVR/IPC 设备 IP
   targetPort?: number         // HTTP 端口（默认 80，用于 WebSocket）
   rtspPort?: number           // RTSP 端口（默认 554）
@@ -35,12 +35,17 @@ export interface IbmsChannel {
   gbDeviceId?: string
 }
 
-// 播放器窗格类型（大华 SDK）
+// 播放器窗格类型（ZLM/Jessibuca）
 export interface PlayerPane {
   // 基础信息
   ibmsChannel?: IbmsChannel | null
   channelName?: string
-  // 播放器实例（大华 SDK PlayerControl）
+  config?: {
+    channelNo?: number
+    channelName?: string
+    [key: string]: any
+  } | null
+  // 播放器实例（ZLM/Jessibuca）
   player: any | null
   // 容器元素
   container: HTMLElement | null

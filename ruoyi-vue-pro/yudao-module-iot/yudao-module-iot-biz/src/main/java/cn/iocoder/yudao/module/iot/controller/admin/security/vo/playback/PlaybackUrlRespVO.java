@@ -17,7 +17,10 @@ public class PlaybackUrlRespVO {
     @Schema(description = "rtsp 地址（可选）")
     private String rtspUrl;
 
-    @Schema(description = "http-flv 地址（前端会自行转换 ws-flv）")
+    @Schema(description = "WebSocket-FLV 地址")
+    private String wsFlvUrl;
+
+    @Schema(description = "HTTP-FLV 地址")
     private String flvUrl;
 
     @Schema(description = "webrtc API 地址")

@@ -206,8 +206,7 @@ const loadChannelsBySpace = async (spaceId: number) => {
     const res = await getIbmsChannelPage({
       pageNo,
       pageSize: MAX_PAGE_SIZE,
-      business: 'sa',
-      typeCode: 'VT',
+      systemType: 'VI',
       spaceId
     })
     const page = (res && (res as any).list) ? res : (res as any)?.data

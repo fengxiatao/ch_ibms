@@ -1,8 +1,51 @@
-import mpegts from 'mpegts.js'
+// Jessibuca 用于播放 ZLMediaKit 的 HTTP-FLV / WS-FLV，支持 H.265 WASM 解码
+
+declare global {
+  interface Window {
+    Jessibuca?: any
+  }
+}
+
+let jessibucaLoader: Promise<void> | null = null
+
+const ensureJessibucaLoaded = async () => {
+  if (typeof window === 'undefined') {
+    throw new Error('当前环境不支持视频播放')
+  }
+  if (window.Jessibuca) return
+
+  if (!jessibucaLoader) {
+    jessibucaLoader = new Promise<void>((resolve, reject) => {
+      const existing = document.querySelector<HTMLScriptElement>('script[data-jessibuca="true"]')
+      if (existing) {
+        existing.addEventListener('load', () => resolve(), { once: true })
+        existing.addEventListener('error', () => reject(new Error('Jessibuca 加载失败')), { once: true })
+        return
+      }
+
+      const script = document.createElement('script')
+      script.src = '/jessibuca/jessibuca.js'
+      script.async = true
+      script.dataset.jessibuca = 'true'
+      script.onload = () => resolve()
+      script.onerror = () => reject(new Error('Jessibuca 加载失败'))
+      document.head.appendChild(script)
+    })
+  }
+
+  await jessibucaLoader
+  if (!window.Jessibuca) {
+    throw new Error('Jessibuca 未初始化')
+  }
+}
 
 // ZLMediaKit 播放地址类型（与后端 PlayUrlRespVO 保持字段一致）
 export interface ZlmPlayUrls {
   wsFlvUrl?: string
+  flvUrl?: string
+  wsFmp4Url?: string
+  fmp4Url?: string
+  hlsUrl?: string
   /** ZLMediaKit WebRTC API 地址：http(s)://host:port/index/api/webrtc?app=live&stream=xxx&type=play，外网由后端/前端适配公网 host */
   webrtcUrl?: string
 }
@@ -11,7 +54,7 @@ export type ZlmPlayMode = 'flv' | 'webrtc'
 
 export interface ZlmPlayerInstance {
   mode: ZlmPlayMode
-  destroy: () => void
+  destroy: () => void | Promise<void>
 }
 
 interface PlayLiveParams {
@@ -20,104 +63,57 @@ interface PlayLiveParams {
   preferWebrtc?: boolean
 }
 
+const clearJessibucaContainerMark = (container: HTMLElement) => {
+  delete container.dataset.jessibuca
+  container.removeAttribute('data-jessibuca')
+}
+
 /**
  * ZLMediaKit 播放封装
- * - 目前优先尝试 WebRTC（预留接口），失败后回退到 ws-flv + mpegts.js
+ * - 默认使用 ws-flv/http-flv + Jessibuca WASM，兼容当前摄像机/NVR 的 H.265 流
+ * - WebRTC 仅作为显式调试模式；浏览器原生 WebRTC 通常无法播放 H.265
  */
 export function useZlmPlayer() {
-  const isFirefox = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('firefox')
-
-  // Firefox 的 MSE 并发限制，需要串行初始化播放器
-  let playQueue: Promise<void> = Promise.resolve()
-
   const createFlvPlayerCore = async (
     container: HTMLElement,
-    wsFlvUrl: string
+    flvUrl: string
   ): Promise<ZlmPlayerInstance> => {
-    if (!mpegts.isSupported()) {
-      throw new Error('当前浏览器不支持 MSE，无法播放 FLV 流')
-    }
+    await ensureJessibucaLoaded()
 
-    // 清空容器，创建 <video> 元素
+    clearJessibucaContainerMark(container)
     container.innerHTML = ''
-    const videoEl = document.createElement('video')
-    videoEl.style.width = '100%'
-    videoEl.style.height = '100%'
-    videoEl.autoplay = true
-    videoEl.muted = true
-    videoEl.playsInline = true
-    videoEl.setAttribute('playsinline', 'true')
-    container.appendChild(videoEl)
-
-    const player = mpegts.createPlayer(
-      {
-        type: 'flv',
-        url: wsFlvUrl,
-        isLive: true,
-        hasAudio: false,
-        hasVideo: true
+    const player = new window.Jessibuca({
+      container,
+      videoBuffer: 0.2,
+      isResize: true,
+      text: '',
+      loadingText: '加载中...',
+      useMSE: false,
+      useWCS: false,
+      debug: false,
+      hasAudio: false,
+      showBandwidth: false,
+      operateBtns: {
+        fullscreen: false,
+        screenshot: false,
+        play: false,
+        audio: false,
+        record: false
       },
-      {
-        enableWorker: false,
-        enableStashBuffer: true,
-        stashInitialSize: isFirefox ? 256 : 128,
-        lazyLoad: false,
-        // mpegts.js 在部分直播流时间戳场景会计算出负区间，触发 SourceBuffer.remove(-xxx, 0) 异常
-        // 关闭自动清理，交给浏览器/播放器自然滚动，优先保证稳定播放
-        autoCleanupSourceBuffer: false,
-        autoCleanupMaxBackwardDuration: isFirefox ? 5 : 3,
-        liveBufferLatencyChasing: true,
-        liveBufferLatencyMaxLatency: isFirefox ? 2.0 : 1.5,
-        liveSync: true
-      }
-    )
-
-    player.attachMediaElement(videoEl)
-    player.load()
-
-    player.on(mpegts.Events.ERROR, (_type: any, detail: any) => {
-      // 部分 MSE 错误在 Firefox 上较频繁，交给上层根据 isPlaying 状态兜底
-      if (String(detail || '').includes('SourceBuffer') || String(detail || '').includes('MSEError')) {
-        console.warn('[ZLM] MSE/SourceBuffer 警告:', detail)
-        return
-      }
-      console.error('[ZLM] 播放错误:', detail)
+      decoder: '/jessibuca/decoder.js'
     })
 
-    const playDelay = isFirefox ? 500 : 100
+    await player.play(flvUrl)
 
-    await new Promise<void>((resolve, reject) => {
-      setTimeout(async () => {
-        try {
-          await player.play()
-          resolve()
-        } catch (e) {
-          reject(e)
+    const destroy = async () => {
+      try {
+        const destroyResult = player.destroy()
+        if (destroyResult && typeof destroyResult.then === 'function') {
+          await destroyResult
         }
-      }, playDelay)
-    })
-
-    const destroy = () => {
-      try {
-        player.pause()
       } catch {}
-      try {
-        player.unload()
-      } catch {}
-      try {
-        player.detachMediaElement()
-      } catch {}
-      try {
-        player.destroy()
-      } catch {}
-
-      if (videoEl) {
-        try {
-          videoEl.srcObject = null
-          videoEl.src = ''
-        } catch {}
-      }
       container.innerHTML = ''
+      clearJessibucaContainerMark(container)
     }
 
     return {
@@ -126,24 +122,8 @@ export function useZlmPlayer() {
     }
   }
 
-  const playFlv = async (container: HTMLElement, wsFlvUrl: string): Promise<ZlmPlayerInstance> => {
-    if (isFirefox) {
-      // Firefox：串行播放，避免 MSE 并发问题
-      return new Promise<ZlmPlayerInstance>((resolve, reject) => {
-        playQueue = playQueue.then(async () => {
-          try {
-            const inst = await createFlvPlayerCore(container, wsFlvUrl)
-            // 稍作间隔，避免频繁创建销毁
-            await new Promise((r) => setTimeout(r, 300))
-            resolve(inst)
-          } catch (e) {
-            reject(e)
-          }
-        })
-      })
-    }
-
-    return createFlvPlayerCore(container, wsFlvUrl)
+  const playFlv = async (container: HTMLElement, flvUrl: string): Promise<ZlmPlayerInstance> => {
+    return createFlvPlayerCore(container, flvUrl)
   }
 
   /**
@@ -339,33 +319,29 @@ export function useZlmPlayer() {
   /**
    * 按优先级播放实时流
    * - 优先 WebRTC（若 webrtcUrl 存在且实现成功）
-   * - 失败或未提供 webrtcUrl 时回退到 ws-flv
+   * - preferWebrtc=false 时才使用 FLV（避免自动回退隐藏 WebRTC 问题）
    */
   const playLive = async (params: PlayLiveParams): Promise<ZlmPlayerInstance> => {
     const { container, urls, preferWebrtc = true } = params
 
-    let lastError: any = null
-
     if (preferWebrtc && urls.webrtcUrl) {
-      try {
-        return await playWebrtc(container, urls.webrtcUrl)
-      } catch (e) {
-        console.warn('[ZLM] WebRTC 播放失败，回退到 FLV:', e)
-        lastError = e
-      }
+      // 默认策略：优先 WebRTC，失败时不自动回退，直接抛异常让用户看到问题
+      return await playWebrtc(container, urls.webrtcUrl)
     }
 
-    if (urls.wsFlvUrl) {
-      return await playFlv(container, urls.wsFlvUrl)
+    // 显式禁用 WebRTC 或 webrtcUrl 为空时才走 FLV
+    const flvUrl = urls.wsFlvUrl || urls.flvUrl
+    if (flvUrl) {
+      return await playFlv(container, flvUrl)
     }
 
-    throw lastError || new Error('没有可用的播放地址')
+    throw new Error('没有可用的播放地址')
   }
 
-  const stopInstance = (instance: ZlmPlayerInstance | null | undefined) => {
+  const stopInstance = async (instance: ZlmPlayerInstance | null | undefined) => {
     if (!instance) return
     try {
-      instance.destroy()
+      await instance.destroy()
     } catch (e) {
       console.warn('[ZLM] 销毁播放器异常:', e)
     }

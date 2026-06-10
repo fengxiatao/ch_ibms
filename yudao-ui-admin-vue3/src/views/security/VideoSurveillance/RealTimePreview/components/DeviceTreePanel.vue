@@ -104,7 +104,7 @@ import { Refresh } from '@element-plus/icons-vue'
 import { Icon } from '@/components/Icon'
 import { syncAllNvrChannels } from '@/api/iot/channel'
 import { getSpaceTree, type IbmsSpaceTreeNodeRespVO } from '@/api/iot/ibms/space'
-import { getChannelPage as getIbmsChannelPage } from '@/api/iot/ibms/channel'
+import { getChannelPage as getIbmsChannelPage, getChannel as getIbmsChannel } from '@/api/iot/ibms/channel'
 import type { DeviceTreeNode, IbmsChannel } from '../types'
 
 // Props
@@ -149,6 +149,7 @@ const spaceTreeChildrenMap = new Map<number, IbmsSpaceTreeNodeRespVO[]>()
 
 // 通道缓存 (channelNo -> IbmsChannel)，用于视图加载时快速查找
 const channelCache = new Map<number, IbmsChannel>()
+const channelIdCache = new Map<number, IbmsChannel>()
 
 // 树配置
 const treeProps = {
@@ -227,7 +228,14 @@ const loadSpaceTree = async () => {
   try {
     const spaces = await getSpaceTree()
     buildSpaceNodeIndex(spaces || [])
-    deviceTreeData.value = (spaces || []).map(mapSpaceNode)
+    deviceTreeData.value = [
+      {
+        id: 'all-video-channels',
+        name: '全部视频通道',
+        type: 'channels'
+      },
+      ...(spaces || []).map(mapSpaceNode)
+    ]
     channelCache.clear()
   } catch (e: any) {
     console.error('[空间树] 加载失败:', e)
@@ -243,8 +251,7 @@ const loadChannelsBySpace = async (spaceId: number) => {
     const res = await getIbmsChannelPage({
       pageNo,
       pageSize: MAX_PAGE_SIZE,
-      business: 'sa',
-      typeCode: 'VT',
+      systemType: 'VI',
       spaceId
     })
     const page = (res && (res as any).list) ? res : (res as any)?.data
@@ -261,6 +268,9 @@ const loadChannelsBySpace = async (spaceId: number) => {
     const ibmsChannel = mapChannelRowToIbmsChannel(row)
     if (ibmsChannel.channelNo) {
       channelCache.set(ibmsChannel.channelNo, ibmsChannel)
+    }
+    if (ibmsChannel.id) {
+      channelIdCache.set(ibmsChannel.id, ibmsChannel)
     }
     return {
       id: `channel-${row.id}`,
@@ -329,7 +339,7 @@ const handleTreeDragStart = (e: DragEvent, data: DeviceTreeNode) => {
   
   e.dataTransfer!.effectAllowed = 'copy'
   
-  // 传递 IBMS 通道数据（用于大华直连模式）
+  // 传递 IBMS 通道数据（用于 ZLM 流媒体播放）
   if (data.ibmsChannel) {
     e.dataTransfer!.setData('ibmsChannel', JSON.stringify(data.ibmsChannel))
     emit('channel-drag-start', e, data.ibmsChannel)
@@ -378,12 +388,40 @@ const findIbmsChannelByChannelNo = async (channelNo: number | string): Promise<I
     if (channel) {
       const ibmsChannel = mapChannelRowToIbmsChannel(channel)
       channelCache.set(no, ibmsChannel)
+      if (ibmsChannel.id) {
+        channelIdCache.set(ibmsChannel.id, ibmsChannel)
+      }
       return ibmsChannel
     }
   } catch (e) {
     console.error('[通道查找] 查询失败:', e)
   }
   
+  return null
+}
+
+const findIbmsChannelById = async (channelId: number | string): Promise<IbmsChannel | null> => {
+  const id = typeof channelId === 'string' ? parseInt(channelId) : channelId
+  if (isNaN(id)) return null
+
+  if (channelIdCache.has(id)) {
+    return channelIdCache.get(id)!
+  }
+
+  try {
+    const channel = await getIbmsChannel(id)
+    if (channel) {
+      const ibmsChannel = mapChannelRowToIbmsChannel(channel as any)
+      channelIdCache.set(id, ibmsChannel)
+      if (ibmsChannel.channelNo) {
+        channelCache.set(ibmsChannel.channelNo, ibmsChannel)
+      }
+      return ibmsChannel
+    }
+  } catch (e) {
+    console.error('[通道查找] 按ID查询失败:', e)
+  }
+
   return null
 }
 
@@ -401,8 +439,10 @@ const loadBuildingTree = async () => {
 defineExpose({
   loadSpaceTree,
   loadBuildingTree,
+  findIbmsChannelById,
   findIbmsChannelByChannelNo,
-  channelCache
+  channelCache,
+  channelIdCache
 })
 </script>
 

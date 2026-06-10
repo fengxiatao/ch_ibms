@@ -15,10 +15,10 @@ iot:
       rtsp-port: 8554
       # RTMP 端口
       rtmp-port: 1935
-      # WebRTC 端口
-      rtc-port: 8000
+      # WebRTC 端口（ZLM config.ini: rtc.port / tcpPort，当前通过 NATAPP 映射 5000）
+      rtc-port: 5000
       # 公网访问配置（用于生成播放地址，让外网用户能访问）
-      public-host: ${ZLM_PUBLIC_HOST:}
+      public-host: ${ZLM_PUBLIC_HOST:ibms.gzchanghui.cn}
       public-http-port: ${ZLM_PUBLIC_HTTP_PORT:80}
       # 公网 WebRTC 信令端口（默认与 signaling-port 相同）
       public-signaling-port: ${ZLM_PUBLIC_SIGNALING_PORT:${ZLM_SIGNALING_PORT:3000}}
@@ -71,9 +71,9 @@ iot:
       # 公网访问配置（返回给前端的播放地址）
       public-host: ${ZLM_PUBLIC_HOST:ibms.gzchanghui.cn}
       public-http-port: ${ZLM_PUBLIC_HTTP_PORT:80}
-      # WebRTC 公网配置（通过 natapp UDP 隧道）
-      public-rtc-host: ${ZLM_PUBLIC_RTC_HOST:39.108.87.226}
-      public-rtc-port: ${ZLM_PUBLIC_RTC_PORT:48088}
+      # WebRTC 公网配置：ICE 候选由 ZLMediaKit 的 rtc.externIP/rtc.port 返回
+      # 当前 ZLM 侧配置为 externIP=5a80f2d26da91f80.natapp.cc、rtc.port=5000
+      # 注意：/index/api/webrtc 信令仍走 public-host/public-http-port，不要把 UDP 隧道域名写入 public-rtc-host
 
 
 

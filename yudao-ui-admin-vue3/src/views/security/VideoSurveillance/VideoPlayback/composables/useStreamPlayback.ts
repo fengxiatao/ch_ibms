@@ -16,6 +16,7 @@ export interface StreamPaneState {
   app?: string
   stream?: string
   flvUrl?: string
+  wsFlvUrl?: string
   webrtcUrl?: string
   streamStartTime?: number
   streamEndTime?: number
@@ -84,15 +85,21 @@ export function useStreamPlayback() {
       const vo = resp?.data ?? resp
 
       // 将后端返回的内网 IP 重写为页面公网域名，外网才能访问 ZLM
-      const adapted = adaptStreamPlayUrls<{ flvUrl?: string; webrtcUrl?: string }>({
+      const adapted = adaptStreamPlayUrls<{
+        flvUrl?: string
+        wsFlvUrl?: string
+        webrtcUrl?: string
+      }>({
         flvUrl: vo?.flvUrl,
+        wsFlvUrl: vo?.wsFlvUrl,
         webrtcUrl: vo?.webrtcUrl
-      }) || ({} as { flvUrl?: string; webrtcUrl?: string })
+      }) || ({} as { flvUrl?: string; wsFlvUrl?: string; webrtcUrl?: string })
 
       const st = getState(paneIndex)
       st.cameraId = cameraId
       st.cameraName = cameraName
       st.flvUrl = fixUrl(adapted.flvUrl)
+      st.wsFlvUrl = fixUrl(adapted.wsFlvUrl)
       st.webrtcUrl = fixUrl(adapted.webrtcUrl)
       st.streamId = vo?.streamId ?? vo?.stream
       st.app = vo?.app

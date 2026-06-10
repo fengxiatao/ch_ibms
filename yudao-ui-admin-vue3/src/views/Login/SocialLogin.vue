@@ -40,7 +40,6 @@
           </div>
           <div class="flex items-center justify-end space-x-10px h-48px">
             <ThemeSwitch />
-            <LocaleDropdown class="dark:text-white lt-xl:text-white" />
           </div>
         </div>
         <!-- 右边的登录界面 -->
@@ -162,7 +161,6 @@ import { usePermissionStore } from '@/store/modules/permission'
 import * as LoginApi from '@/api/login'
 import * as authUtil from '@/utils/auth'
 import { ThemeSwitch } from '@/layout/components/ThemeSwitch'
-import { LocaleDropdown } from '@/layout/components/LocaleDropdown'
 import { LoginStateEnum, useFormValid, useLoginState } from './components/useLogin'
 import LoginFormTitle from './components/LoginFormTitle.vue'
 import router from '@/router'

@@ -6,6 +6,8 @@ import { useNow } from '@/hooks/web/useNow'
 import { useDesign } from '@/hooks/web/useDesign'
 import { useTagsViewStore } from '@/store/modules/tagsView'
 import { useUserStore } from '@/store/modules/user'
+import { getUserProfile } from '@/api/system/user/profile'
+import { login } from '@/api/login'
 import avatarImg from '@/assets/imgs/avatar.gif'
 
 const tagsViewStore = useTagsViewStore()
@@ -36,11 +38,19 @@ async function unLock() {
   if (!password.value) {
     return
   }
-  let pwd = password.value
   try {
     loading.value = true
-    const res = await lockStore.unLock(pwd)
-    errMsg.value = !res
+    const profile = await getUserProfile()
+    await login({
+      username: profile.username,
+      password: password.value,
+      captchaVerification: ''
+    })
+    lockStore.resetLockInfo()
+    password.value = ''
+    errMsg.value = false
+  } catch (error) {
+    errMsg.value = true
   } finally {
     loading.value = false
   }
@@ -102,6 +112,7 @@ function handleShowForm(show = false) {
             :placeholder="t('lock.placeholder')"
             class="enter-x"
             v-model="password"
+            @keyup.enter="unLock()"
           />
           <span :class="`text-14px ${prefixCls}-entry__err-msg enter-x`" v-if="errMsg">
             {{ t('lock.message') }}

@@ -11,14 +11,15 @@ spring:
   # Redis 配置
   data:
     redis:
-      host: 127.0.0.1
+      host: 192.168.1.4
       port: 6379
       database: 0
       timeout: 30000ms
+      password: foobared # 密码，建议生产环境开启
 
 # ==================== 消息队列配置 ====================
 rocketmq:
-  name-server: 127.0.0.1:9876
+  name-server: 192.168.1.4:9876
   producer:
     group: ${spring.application.name}_PRODUCER
 
@@ -94,7 +95,7 @@ iot:
     # ==================== RPC（已废弃） ====================
     # 新建基线：网关不再通过 HTTP 调用 Biz；设备参数来自 DEVICE_PROFILE_CHANGED + 本地缓存，缺参走 Request-Reply。
     # rpc:
-    #   url: http://127.0.0.1:48888
+    #   url: http://192.168.1.4:48888
     #   connect-timeout: 30s
     #   read-timeout: 30s
 

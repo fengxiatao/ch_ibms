@@ -18,25 +18,19 @@ export interface HomeEntry {
 export const MODULE_ENTRIES: Record<'security' | 'access' | 'energy' | 'building', HomeEntry> = {
   security: {
     key: 'security',
-    permission: 'security:view',
-    menuName: '智慧安防',
-    fallbackPaths: ['/security/video-surveillance/realtime-preview', '/security/security-overview']
+    fallbackPaths: ['/security/video-surveillance/visual-board', '/security/security-overview']
   },
   access: {
     key: 'access',
-    fallbackPaths: [
-      '/smart-access/door/visual-dashboard',
-      '/smart-access/door/management',
-      '/iot/access/management'
-    ]
+    fallbackPaths: ['/smart-access/door/visual-dashboard', '/iot/access/visual-dashboard']
   },
   energy: {
     key: 'energy',
-    fallbackPaths: ['/energy/overview', '/building/newlight/overview', '/building/newlight/control']
+    fallbackPaths: ['/iot/building/newlight/overview', '/energy/overview', '/iot/building/newlight/control']
   },
   building: {
     key: 'building',
-    fallbackPaths: ['/building/visual-dashboard', '/iot/building/visual-dashboard', '/building/bac/monitor']
+    fallbackPaths: ['/building/visual-dashboard', '/iot/building/visual-dashboard']
   }
 }
 
@@ -49,8 +43,6 @@ export const SUB_ENTRIES: Record<string, HomeEntry> = {
   },
   ePatrol: {
     key: 'ePatrol',
-    permission: 'iot:epatrol-visualization:query',
-    menuName: '巡更可视化',
     fallbackPaths: ['/security/electronic-patrol/visualization-board']
   },
   door: {

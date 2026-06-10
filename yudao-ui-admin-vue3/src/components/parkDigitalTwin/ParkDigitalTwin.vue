@@ -18,7 +18,7 @@
           <p class="tools-name">场景重置</p>
         </li>
         <li class="tools-li" @click="autoRotateClick">
-          <p class="tools-name">{{ !autoRotate ? '自动旋转' : '停止选择' }}</p>
+          <p class="tools-name">{{ !autoRotate ? '自动旋转' : '停止旋转' }}</p>
         </li>
         <li class="tools-li" @click="billboardView">
           <p class="tools-name">视频视角</p>
@@ -83,6 +83,10 @@ export default {
   },
   beforeUnmount() {
     this._closeIbmsInlinePreview()
+    if (this._billboardAudioUnlockHandler) {
+      this.$el.removeEventListener('pointerdown', this._billboardAudioUnlockHandler)
+      this._billboardAudioUnlockHandler = null
+    }
     if (viewer && parkTwinIbmsCamMarkers.length) {
       parkTwinIbmsCamMarkers.forEach((m) => {
         if (m && m.parent) {
@@ -119,12 +123,34 @@ export default {
         wrap.style.display = 'none'
       }
     },
+    _startBillboardVideo() {
+      const video = this.$refs.videoRef
+      if (!video) {
+        return
+      }
+      video.loop = false
+      video.muted = false
+      video.removeAttribute('muted')
+      video.volume = 1
+      video.play().catch(() => {})
+    },
+    _stopBillboardVideo() {
+      const video = this.$refs.videoRef
+      if (!video) {
+        return
+      }
+      video.pause()
+      video.currentTime = 0
+    },
     //司机视角
     driverView() {
+      this._stopBillboardVideo()
       this.isDriver = !this.isDriver
     },
     //切换广告牌视角
     billboardView() {
+      this._closeIbmsInlinePreview()
+      this._startBillboardVideo()
       this.isDriver = false
       gsap.to(viewer.camera.position, {
         x: 4,
@@ -172,7 +198,10 @@ export default {
         ease: "power1.inOut",
       });
       this.isDriver = false
-      cheLable.visible = true
+      this._stopBillboardVideo()
+      if (cheLable) {
+        cheLable.visible = true
+      }
       viewer.scene.children[viewer.scene.children.findIndex(o => o.name == '快递车')].visible = true
       viewer.scene.children[viewer.scene.children.findIndex(o => o.name == '树')].visible = true
       viewer.scene.children[viewer.scene.children.findIndex(o => o.name == 'cityv1')].visible = true
@@ -403,6 +432,7 @@ export default {
     },
 
     _closeIbmsInlinePreview() {
+      this._stopBillboardVideo()
       const activeId = this._activeIbmsPreviewChannelId
       this._detachIbmsPreviewPortal()
       const els = this._officeCamPreviewEls
@@ -469,6 +499,7 @@ export default {
     },
 
     async openIbmsChannelPreview(channelId, anchorWrap) {
+      this._stopBillboardVideo()
       const els = this._officeCamPreviewEls
       if (!els || !els.panel) {
         return
@@ -529,9 +560,10 @@ export default {
       let modeloader = new modules.ModelLoder(viewer)
       const video = this.$refs.videoRef
       video.src = asset('bi.mp4')
-      video.autoplay = "autoplay"; //要设置播放
-      video.loop = "loop"; //要设置循环播放
-      video.muted = "muted"; //要设置静音
+      video.autoplay = false
+      video.loop = false
+      video.preload = 'metadata'
+      video.pause()
       let texture = new THREE.VideoTexture(video)
 
       //停车场栅栏

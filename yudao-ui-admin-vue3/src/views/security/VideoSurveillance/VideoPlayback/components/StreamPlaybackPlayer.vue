@@ -7,6 +7,7 @@ import { ref, watch, onBeforeUnmount, nextTick } from 'vue'
 import useZlmPlayer, { type ZlmPlayerInstance } from '@/composables/useZlmPlayer'
 
 const props = defineProps<{
+  wsFlvUrl?: string
   flvUrl?: string
   webrtcUrl?: string
   preferWebrtc?: boolean
@@ -17,19 +18,17 @@ const containerRef = ref<HTMLElement>()
 let instance: ZlmPlayerInstance | null = null
 const { playLive, stopInstance } = useZlmPlayer()
 
-function toWsFlvUrl(httpFlvUrl: string): string {
-  if (!httpFlvUrl) return ''
-  return httpFlvUrl.replace(/^http:\/\//, 'ws://').replace(/^https:\/\//, 'wss://')
-}
-
 async function play() {
-  if (!containerRef.value || (!props.flvUrl && !props.webrtcUrl)) return
+  if (!containerRef.value || (!props.wsFlvUrl && !props.flvUrl && !props.webrtcUrl)) return
   stop()
-  const wsFlvUrl = props.flvUrl ? toWsFlvUrl(props.flvUrl) : ''
   try {
     instance = await playLive({
       container: containerRef.value,
-      urls: { wsFlvUrl, webrtcUrl: props.webrtcUrl },
+      urls: {
+        wsFlvUrl: props.wsFlvUrl,
+        flvUrl: props.flvUrl,
+        webrtcUrl: props.webrtcUrl
+      },
       preferWebrtc: props.preferWebrtc ?? true
     })
   } catch (e: any) {
@@ -45,9 +44,9 @@ function stop() {
 }
 
 watch(
-  () => [props.flvUrl, props.webrtcUrl],
-  ([a, b]) => {
-    if (a || b) {
+  () => [props.wsFlvUrl, props.flvUrl, props.webrtcUrl],
+  ([a, b, c]) => {
+    if (a || b || c) {
       nextTick(() => play())
     } else {
       stop()

@@ -2,7 +2,7 @@
  * DXF到SVG转换工具
  * 使用dxf-parser库在前端直接解析DXF，无水印
  * 
- * @author 智慧建筑管理系统
+ * @author 智能化系统统一管理平台
  * @date 2025-11-03
  */
 

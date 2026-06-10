@@ -364,7 +364,7 @@ const incomeTrendOption = computed<EChartsOption>(() => {
 })
 
 const goPresent = async () => {
-  await router.push('/access/parking/present').catch(() => {
+  await router.push('/smart-access/parking/present').catch(() => {
     ElMessage.warning('未找到在场车辆监控路由，请检查后端菜单 path 配置')
   })
 }

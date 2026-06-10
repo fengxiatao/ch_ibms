@@ -602,8 +602,9 @@
         <el-button text type="primary" size="small" @click="refreshData">
           <Icon icon="ep:refresh" :size="14" />
         </el-button>
-        <el-button text type="primary" size="small" @click="toggleFullscreen">
-          <Icon :icon="isFullscreen ? 'ep:close' : 'ep:full-screen'" :size="14" />
+        <el-button text type="primary" size="small" class="fullscreen-action" @click="toggleFullscreen">
+          <Icon :icon="isFullscreen ? 'ep:close' : 'ep:full-screen'" :size="18" />
+          <span>{{ isFullscreen ? '退出全屏' : '全屏 F11' }}</span>
         </el-button>
       </div>
     </footer>
@@ -622,7 +623,6 @@ import ParkDigitalTwin from '@/components/parkDigitalTwin/ParkDigitalTwin.vue'
 import { getHomeScreenData, type HomeScreenVO } from '@/api/iot/dashboard'
 import { usePermissionStoreWithOut } from '@/store/modules/permission'
 import { findPathByPermission, findPathByMenuName, hasMenuByName } from '@/utils/menuLookup'
-import { isRouteRegistered } from '@/utils/menuResolver'
 import { checkPermi } from '@/utils/permission'
 import { MODULE_ENTRIES, SUB_ENTRIES, type HomeEntry } from './home-entries'
 
@@ -871,17 +871,55 @@ const handleFullscreenChange = () => {
   isFullscreen.value = !!document.fullscreenElement
 }
 
+const handleFullscreenShortcut = (event: KeyboardEvent) => {
+  if (event.key !== 'F11') {
+    return
+  }
+  event.preventDefault()
+  toggleFullscreen()
+}
+
 // ==================== 模块点击跳转（能力驱动：permission / 菜单名 / 兜底路径） ====================
 
 type ModuleKey = 'security' | 'access' | 'energy' | 'building'
 type SubModuleKey = 'alarmType' | 'ePatrol' | 'door' | 'visitor' | 'energy'
 
-const canNavigateHomeEntry = (entry: HomeEntry) => {
-  if (entry.permission) {
-    return checkPermi([entry.permission])
+const isFallback404Record = (record: any) => {
+  if (!record) return true
+  const recordName = String(record.name || '')
+  if (
+    record.path === '/:pathMatch(.*)*' ||
+    record.path === '/:path(.*)*' ||
+    recordName === '404Page' ||
+    recordName === 'NoFound'
+  ) {
+    return true
   }
-  if (entry.menuName) {
-    return hasMenuByName(entry.menuName, permissionStore.getRouters)
+  const routeComponent = record.components?.default || record.component
+  const componentText = typeof routeComponent === 'function' ? routeComponent.toString() : ''
+  return componentText.includes('Error/404.vue')
+}
+
+const hasRealRouteMatch = (path: string) => {
+  const resolved = router.resolve(path)
+  if (!resolved.matched.length) return false
+  const lastMatched = resolved.matched[resolved.matched.length - 1]
+  if (isFallback404Record(lastMatched)) return false
+  const meta = (resolved.meta ?? {}) as Record<string, any>
+  const needPerm = meta.permission as string | string[] | undefined
+  if (needPerm && String(meta.noPermCheck) !== 'true') {
+    const perms = Array.isArray(needPerm) ? needPerm : [needPerm]
+    if (!perms.some((p) => checkPermi([p]))) return false
+  }
+  return true
+}
+
+const canNavigateHomeEntry = (entry: HomeEntry) => {
+  if (entry.permission && checkPermi([entry.permission])) {
+    return true
+  }
+  if (entry.menuName && hasMenuByName(entry.menuName, permissionStore.getRouters)) {
+    return true
   }
   if (entry.routeName) {
     try {
@@ -892,8 +930,7 @@ const canNavigateHomeEntry = (entry: HomeEntry) => {
     }
   }
   if (entry.fallbackPaths?.length) {
-    // 兜底路径必须真实存在于当前用户路由树内，才允许点击
-    return entry.fallbackPaths.some((p) => isRouteRegistered(p))
+    return entry.fallbackPaths.some((p) => hasRealRouteMatch(p))
   }
   return false
 }
@@ -906,37 +943,6 @@ const resolveAndPush = async (candidates: {
   paths: string[]
   reloadIfNotMatched?: boolean
 }) => {
-  const isFallback404Record = (record: any) => {
-    if (!record) return true
-    const recordName = String(record.name || '')
-    if (
-      record.path === '/:pathMatch(.*)*' ||
-      record.path === '/:path(.*)*' ||
-      recordName === '404Page' ||
-      recordName === 'NoFound'
-    ) {
-      return true
-    }
-    const routeComponent = record.components?.default || record.component
-    const componentText = typeof routeComponent === 'function' ? routeComponent.toString() : ''
-    return componentText.includes('Error/404.vue')
-  }
-
-  const hasRealMatch = (path: string) => {
-    const resolved = router.resolve(path)
-    if (!resolved.matched.length) return false
-    const lastMatched = resolved.matched[resolved.matched.length - 1]
-    if (isFallback404Record(lastMatched)) return false
-    // 同时校验 meta.permission：即使路由已注册，若当前用户不具备权限也视为不可达
-    const meta = (resolved.meta ?? {}) as Record<string, any>
-    const needPerm = meta.permission as string | string[] | undefined
-    if (needPerm && String(meta.noPermCheck) !== 'true') {
-      const perms = Array.isArray(needPerm) ? needPerm : [needPerm]
-      if (!perms.some((p) => checkPermi([p]))) return false
-    }
-    return true
-  }
-
   if (candidates.name) {
     try {
       await router.push({ name: candidates.name as any })
@@ -946,7 +952,7 @@ const resolveAndPush = async (candidates: {
   }
 
   for (const path of candidates.paths) {
-    if (hasRealMatch(path)) {
+    if (hasRealRouteMatch(path)) {
       await router.push(path)
       return
     }
@@ -1155,6 +1161,7 @@ onMounted(() => {
   })
 
   document.addEventListener('fullscreenchange', handleFullscreenChange)
+  window.addEventListener('keydown', handleFullscreenShortcut)
   window.addEventListener('resize', handleResize)
 })
 
@@ -1163,6 +1170,7 @@ onUnmounted(() => {
   if (clockTimer) clearInterval(clockTimer)
 
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  window.removeEventListener('keydown', handleFullscreenShortcut)
   window.removeEventListener('resize', handleResize)
 
   // 销毁图表
@@ -2523,6 +2531,22 @@ $warning-gold: #faad14;
   gap: 12px;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.6);
+}
+
+.fullscreen-action {
+  height: 30px;
+  padding: 0 12px !important;
+  border: 1px solid rgba(0, 212, 255, 0.45) !important;
+  border-radius: 16px;
+  background: rgba(0, 212, 255, 0.12) !important;
+  color: $primary-blue !important;
+  font-weight: 600;
+
+  :deep(.el-button__text--expand) {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
 }
 
 // ==================== 动画 ====================

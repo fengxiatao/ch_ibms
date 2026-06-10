@@ -51,7 +51,7 @@ spring:
         master:
           url: jdbc:mysql://127.0.0.1:3306/ch_ibms?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true&useUnicode=true&characterEncoding=UTF-8 # MySQL Connector/J 8.X 连接的示例
           username: root
-          password: 123456
+          password: v/1PH3/8w-uU
         slave: # 模拟从库，可根据自己需要修改 # 模拟从库，可根据自己需要修改
           lazy: true # 开启懒加载，保证启动速度
           url: jdbc:mysql://127.0.0.1:3306/ch_ibms?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true&useUnicode=true&characterEncoding=UTF-8 # MySQL Connector/J 8.X 连接的示例

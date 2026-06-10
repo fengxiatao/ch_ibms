@@ -1,16 +1,10 @@
 import { defineStore } from 'pinia'
 import { store } from '../index'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
-import en from 'element-plus/es/locale/lang/en'
 import { CACHE_KEY, useCache } from '@/hooks/web/useCache'
 import { LocaleDropdownType } from '@/types/localeDropdown'
 
 const { wsCache } = useCache()
-
-const elLocaleMap = {
-  'zh-CN': zhCn,
-  en: en
-}
 interface LocaleState {
   currentLocale: LocaleDropdownType
   localeMap: LocaleDropdownType[]
@@ -20,18 +14,14 @@ export const useLocaleStore = defineStore('locales', {
   state: (): LocaleState => {
     return {
       currentLocale: {
-        lang: wsCache.get(CACHE_KEY.LANG) || 'zh-CN',
-        elLocale: elLocaleMap[wsCache.get(CACHE_KEY.LANG) || 'zh-CN']
+        lang: 'zh-CN',
+        elLocale: zhCn
       },
-      // 多语言
+      // 本项目只支持简体中文
       localeMap: [
         {
           lang: 'zh-CN',
           name: '简体中文'
-        },
-        {
-          lang: 'en',
-          name: 'English'
         }
       ]
     }
@@ -45,11 +35,11 @@ export const useLocaleStore = defineStore('locales', {
     }
   },
   actions: {
-    setCurrentLocale(localeMap: LocaleDropdownType) {
-      // this.locale = Object.assign(this.locale, localeMap)
-      this.currentLocale.lang = localeMap?.lang
-      this.currentLocale.elLocale = elLocaleMap[localeMap?.lang]
-      wsCache.set(CACHE_KEY.LANG, localeMap?.lang)
+    setCurrentLocale(_localeMap?: LocaleDropdownType) {
+      // 本项目禁用英文界面，任何语言切换都回落到简体中文
+      this.currentLocale.lang = 'zh-CN'
+      this.currentLocale.elLocale = zhCn
+      wsCache.set(CACHE_KEY.LANG, 'zh-CN')
     }
   }
 })

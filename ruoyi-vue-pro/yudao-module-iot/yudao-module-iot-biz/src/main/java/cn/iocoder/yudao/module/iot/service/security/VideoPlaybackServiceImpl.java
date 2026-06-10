@@ -68,6 +68,7 @@ public class VideoPlaybackServiceImpl implements VideoPlaybackService {
     private final DeviceCommandResponseManager responseManager;
 
     private static final String APP_PLAYBACK = "playback";
+    private static final int RECORD_SEARCH_TIMEOUT_SECONDS = 60;
 
     @Override
     public List<ChannelRecordingRespVO> queryRecordings(PlaybackQueryRecordingsReqVO reqVO) {
@@ -104,13 +105,18 @@ public class VideoPlaybackServiceImpl implements VideoPlaybackService {
         CompletableFuture<IotDeviceMessage> future = responseManager.registerRequest(requestId);
         IotDeviceMessage message = IotDeviceMessage.requestOf(requestId, NvrDeviceTypeConstants.COMMAND_SEARCH_RECORDS, params);
         message.setDeviceId(device.getId());
-        messageBus.post(IotMessageTopics.DEVICE_SERVICE_INVOKE, message);
+        try {
+            messageBus.post(IotMessageTopics.DEVICE_SERVICE_INVOKE, message);
+        } catch (Exception e) {
+            responseManager.cancelRequest(requestId);
+            throw e;
+        }
         log.info("[Playback] 已发送录像搜索命令: deviceId={}, channelId={}, channelNo={}, requestId={}",
                 device.getId(), channel.getId(), channel.getChannelNo(), requestId);
 
         IotDeviceMessage response;
         try {
-            response = responseManager.waitForResponse(requestId, future, 15);
+            response = responseManager.waitForResponse(requestId, future, RECORD_SEARCH_TIMEOUT_SECONDS);
         } catch (Exception e) {
             log.warn("[Playback] 等待录像搜索响应超时/失败: requestId={}, error={}", requestId, e.getMessage());
             ChannelRecordingRespVO vo = new ChannelRecordingRespVO();
@@ -213,11 +219,16 @@ public class VideoPlaybackServiceImpl implements VideoPlaybackService {
             CompletableFuture<IotDeviceMessage> future = responseManager.registerRequest(requestId);
             IotDeviceMessage message = IotDeviceMessage.requestOf(requestId, NvrDeviceTypeConstants.COMMAND_SEARCH_RECORDS_BATCH, params);
             message.setDeviceId(deviceId);
-            messageBus.post(IotMessageTopics.DEVICE_SERVICE_INVOKE, message);
+            try {
+                messageBus.post(IotMessageTopics.DEVICE_SERVICE_INVOKE, message);
+            } catch (Exception e) {
+                responseManager.cancelRequest(requestId);
+                throw e;
+            }
 
             IotDeviceMessage response;
             try {
-                response = responseManager.waitForResponse(requestId, future, 15);
+                response = responseManager.waitForResponse(requestId, future, RECORD_SEARCH_TIMEOUT_SECONDS);
             } catch (Exception e) {
                 log.warn("[Playback] 批量录像搜索响应超时/失败: requestId={}, deviceId={}, err={}",
                         requestId, deviceId, e.getMessage());
@@ -228,38 +239,7 @@ public class VideoPlaybackServiceImpl implements VideoPlaybackService {
             }
 
             // 3) 解析 filesByChannelNo: { channelNo -> [ {startTime,endTime,...}, ... ] }
-            Map<Integer, List<RecordingSegmentRespVO>> segsByChannelNo = new HashMap<>();
-            Object data = response != null ? response.getData() : null;
-            if (data instanceof Map) {
-                Object mapObj = ((Map<?, ?>) data).get("filesByChannelNo");
-                if (mapObj instanceof Map) {
-                    for (Map.Entry<?, ?> me : ((Map<?, ?>) mapObj).entrySet()) {
-                        Integer channelNo = null;
-                        try {
-                            channelNo = Integer.parseInt(String.valueOf(me.getKey()));
-                        } catch (Exception ignored) {}
-                        if (channelNo == null) continue;
-
-                        List<RecordingSegmentRespVO> segs = new ArrayList<>();
-                        Object filesObj = me.getValue();
-                        if (filesObj instanceof List) {
-                            for (Object f : (List<?>) filesObj) {
-                                if (!(f instanceof Map)) continue;
-                                Map<?, ?> file = (Map<?, ?>) f;
-                                String s = file.get("startTime") != null ? file.get("startTime").toString() : null;
-                                String e = file.get("endTime") != null ? file.get("endTime").toString() : null;
-                                if (StrUtil.isBlank(s) || StrUtil.isBlank(e)) continue;
-                                RecordingSegmentRespVO seg = new RecordingSegmentRespVO();
-                                seg.setStartTime(s);
-                                seg.setEndTime(e);
-                                seg.setHasRecording(true);
-                                segs.add(seg);
-                            }
-                        }
-                        segsByChannelNo.put(channelNo, segs);
-                    }
-                }
-            }
+            Map<Integer, List<RecordingSegmentRespVO>> segsByChannelNo = parseSegmentsByChannelNo(response);
 
             // 4) 按 channelId 回填
             for (IotDeviceChannelDO ch : channels) {
@@ -295,6 +275,7 @@ public class VideoPlaybackServiceImpl implements VideoPlaybackService {
                 .cameraId(channel.getId())
                 .cameraName(channel.getChannelName())
                 .rtspUrl(null)
+                .wsFlvUrl(playUrls.getWsFlvUrl())
                 .flvUrl(playUrls.getFlvUrl())
                 .webrtcUrl(playUrls.getWebrtcUrl())
                 .streamId(playUrls.getStreamKey())
@@ -342,6 +323,65 @@ public class VideoPlaybackServiceImpl implements VideoPlaybackService {
                 .channelNo(channel.getChannelNo())
                 .channelName(channel.getName())
                 .build();
+    }
+
+    private Map<Integer, List<RecordingSegmentRespVO>> parseSegmentsByChannelNo(IotDeviceMessage response) {
+        Map<Integer, List<RecordingSegmentRespVO>> result = new HashMap<>();
+        Object data = response != null ? response.getData() : null;
+        if (!(data instanceof Map<?, ?> dataMap)) {
+            return result;
+        }
+
+        Object mapObj = dataMap.get("filesByChannelNo");
+        if (!(mapObj instanceof Map<?, ?>)) {
+            mapObj = dataMap.get("recordsByChannel");
+        }
+        if (!(mapObj instanceof Map<?, ?> filesByChannelNo)) {
+            return result;
+        }
+
+        for (Map.Entry<?, ?> entry : filesByChannelNo.entrySet()) {
+            Integer channelNo = parseInteger(entry.getKey());
+            if (channelNo == null) {
+                continue;
+            }
+            result.put(channelNo, parseRecordingSegments(entry.getValue()));
+        }
+        return result;
+    }
+
+    private List<RecordingSegmentRespVO> parseRecordingSegments(Object filesObj) {
+        if (!(filesObj instanceof List<?> files)) {
+            return List.of();
+        }
+        List<RecordingSegmentRespVO> segments = new ArrayList<>();
+        for (Object item : files) {
+            if (!(item instanceof Map<?, ?> file)) {
+                continue;
+            }
+            String startTime = file.get("startTime") != null ? file.get("startTime").toString() : null;
+            String endTime = file.get("endTime") != null ? file.get("endTime").toString() : null;
+            if (StrUtil.isBlank(startTime) || StrUtil.isBlank(endTime)) {
+                continue;
+            }
+            RecordingSegmentRespVO segment = new RecordingSegmentRespVO();
+            segment.setStartTime(startTime);
+            segment.setEndTime(endTime);
+            segment.setHasRecording(true);
+            segments.add(segment);
+        }
+        return segments;
+    }
+
+    private Integer parseInteger(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(String.valueOf(value));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 }
 

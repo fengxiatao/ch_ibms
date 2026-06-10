@@ -41,7 +41,6 @@
           </div>
           <div class="flex items-center justify-end space-x-10px h-48px">
             <ThemeSwitch />
-            <LocaleDropdown />
           </div>
         </div>
         <!-- 右边的登录界面 -->
@@ -65,7 +64,6 @@ import { underlineToHump } from '@/utils'
 import { useDesign } from '@/hooks/web/useDesign'
 import { useAppStore } from '@/store/modules/app'
 import { ThemeSwitch } from '@/layout/components/ThemeSwitch'
-import { LocaleDropdown } from '@/layout/components/LocaleDropdown'
 
 import { LoginForm, ForgetPasswordForm } from './components'
 

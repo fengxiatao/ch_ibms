@@ -4,7 +4,6 @@ import cn.iocoder.yudao.module.iot.config.ZlmConfig;
 import cn.hutool.core.util.StrUtil;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +22,6 @@ import java.util.Map;
  *
  * @author IBMS
  */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ZlmApiClient {
@@ -298,6 +296,13 @@ public class ZlmApiClient {
 
     // ==================== 播放地址生成 ====================
 
+    private String playSecretQuerySuffix() {
+        if (StrUtil.isBlank(config.getSecret())) {
+            return "";
+        }
+        return "?secret=" + java.net.URLEncoder.encode(config.getSecret(), java.nio.charset.StandardCharsets.UTF_8);
+    }
+
     /**
      * 生成多协议播放地址
      * 
@@ -312,22 +317,24 @@ public class ZlmApiClient {
         int rtspPort = config.getRtspPort();
         int rtmpPort = config.getRtmpPort();
 
+        String playSecret = playSecretQuerySuffix();
+
         PlayUrlsVO urls = new PlayUrlsVO();
         
         // WebSocket-FLV (推荐，低延迟 ~500ms)
-        urls.setWsFlvUrl(String.format("ws://%s:%d/%s/%s.live.flv", serverIp, httpPort, app, stream));
+        urls.setWsFlvUrl(String.format("ws://%s:%d/%s/%s.live.flv%s", serverIp, httpPort, app, stream, playSecret));
         
         // HTTP-FLV (低延迟 ~500ms，但有并发限制)
-        urls.setFlvUrl(String.format("http://%s:%d/%s/%s.live.flv", serverIp, httpPort, app, stream));
+        urls.setFlvUrl(String.format("http://%s:%d/%s/%s.live.flv%s", serverIp, httpPort, app, stream, playSecret));
         
         // HLS (兼容性好，但延迟高 5-15秒)
-        urls.setHlsUrl(String.format("http://%s:%d/%s/%s/hls.m3u8", serverIp, httpPort, app, stream));
+        urls.setHlsUrl(String.format("http://%s:%d/%s/%s/hls.m3u8%s", serverIp, httpPort, app, stream, playSecret));
         
         // WebSocket-FMP4 (低延迟，无并发限制)
-        urls.setWsFmp4Url(String.format("ws://%s:%d/%s/%s.live.mp4", serverIp, httpPort, app, stream));
+        urls.setWsFmp4Url(String.format("ws://%s:%d/%s/%s.live.mp4%s", serverIp, httpPort, app, stream, playSecret));
         
         // HTTP-TS
-        urls.setTsUrl(String.format("http://%s:%d/%s/%s.live.ts", serverIp, httpPort, app, stream));
+        urls.setTsUrl(String.format("http://%s:%d/%s/%s.live.ts%s", serverIp, httpPort, app, stream, playSecret));
         
         // RTSP (需专用播放器)
         urls.setRtspUrl(String.format("rtsp://%s:%d/%s/%s", serverIp, rtspPort, app, stream));
@@ -335,11 +342,10 @@ public class ZlmApiClient {
         // RTMP (需专用播放器)
         urls.setRtmpUrl(String.format("rtmp://%s:%d/%s/%s", serverIp, rtmpPort, app, stream));
         
-        // WebRTC (极低延迟 ~200ms)，外网时使用 publicRtcHost（如 natapp 分配的域名）
-        String rtcHost = config.getRtcServerIp();
-        // 兼容旧版实现：/index/api/webrtc 属于 ZLM 的 HTTP API，通常监听在 httpPort（例如 80）
+        // WebRTC 信令走 ZLM HTTP API；RTC/UDP 公网地址由 ZLM 的 rtc.externIP/rtc.port 写入 SDP/ICE。
+        // 注意：不要把 UDP 隧道域名当成 HTTP 信令 host。
         String webrtcUrl = String.format("http://%s:%d/index/api/webrtc?app=%s&stream=%s&type=play",
-                rtcHost, httpPort, app, stream);
+                serverIp, httpPort, app, stream);
         // 若开启了 secret 校验，WebRTC 信令同样需要带上 secret
         if (StrUtil.isNotBlank(config.getSecret())) {
             webrtcUrl += "&secret=" + java.net.URLEncoder.encode(config.getSecret(), java.nio.charset.StandardCharsets.UTF_8);

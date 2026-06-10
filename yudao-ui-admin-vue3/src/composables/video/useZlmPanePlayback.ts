@@ -27,6 +27,10 @@ const resetPaneFlags = (pane: ZlmPanePlayback) => {
   pane.error = null
 }
 
+const waitForJessibucaRelease = async () => {
+  await new Promise<void>((resolve) => setTimeout(resolve, 100))
+}
+
 export const useZlmPanePlayback = () => {
   const { playLive, stopInstance } = useZlmPlayer()
 
@@ -36,11 +40,12 @@ export const useZlmPanePlayback = () => {
     }
 
     if (pane.zlmInstance) {
-      stopInstance(pane.zlmInstance)
+      await stopInstance(pane.zlmInstance)
       pane.zlmInstance = null
     }
 
     if (pane.container) {
+      await waitForJessibucaRelease()
       pane.container.innerHTML = ''
     }
 
@@ -67,7 +72,7 @@ export const useZlmPanePlayback = () => {
       const rawUrls = await getLivePlayUrl(channelId, pane.streamType === 'sub' ? 1 : 0)
       const playUrls = adaptStreamPlayUrls(rawUrls)
 
-      if (!playUrls || (!playUrls.wsFlvUrl && !playUrls.webrtcUrl && !playUrls.hlsUrl)) {
+      if (!playUrls || (!playUrls.wsFlvUrl && !playUrls.flvUrl && !playUrls.webrtcUrl)) {
         throw new Error('未获取到可用的播放地址')
       }
 
@@ -81,6 +86,7 @@ export const useZlmPanePlayback = () => {
         container,
         urls: {
           wsFlvUrl: playUrls.wsFlvUrl,
+          flvUrl: playUrls.flvUrl,
           webrtcUrl: playUrls.webrtcUrl
         },
         preferWebrtc: getDefaultPreferWebrtc()

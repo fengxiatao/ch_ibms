@@ -78,7 +78,7 @@
           <!-- 悬停工具栏（仅在播放时显示，轮巡时隐藏） -->
           <div v-if="pane.isPlaying && !isPatrolling && showPaneToolbar" class="pane-toolbar">
             <el-button size="small" @click.stop="emit('stop', idx)" title="停止播放" type="danger">
-              <Icon icon="ep:video-camera-filled" />
+              <Icon icon="ep:circle-close-filled" />
             </el-button>
 
             <el-button size="small" @click.stop="emit('snapshot', idx)" title="截图">
@@ -170,14 +170,6 @@
       </div>
 
       <div class="controls-right">
-        <!-- 大华直连模式标识 -->
-        <!-- <el-tag type="success" size="small">
-          <Icon icon="ep:monitor" style="margin-right: 4px" />
-          大华直连
-        </el-tag> -->
-
-        <!-- <el-divider direction="vertical" /> -->
-
         <!-- 停止所有 -->
         <el-button
           v-if="showStopAllControl"
@@ -187,7 +179,7 @@
           :disabled="!hasPlayingPanes"
           title="停止所有播放器"
         >
-          <Icon icon="ep:video-camera-filled" />
+          <Icon icon="ep:circle-close-filled" />
           停止全部
         </el-button>
 

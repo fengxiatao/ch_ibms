@@ -9,14 +9,15 @@ spring:
   # Redis 配置
   data:
     redis:
-      host: 127.0.0.1
+      host: 192.168.1.4
       port: 6379
       database: 0
       timeout: 30000ms
+      password: foobared
 
 # ==================== 消息队列配置 ====================
 rocketmq:
-  name-server: 192.168.1.126:9876
+  name-server: 192.168.1.4:9876
   producer:
     group: ${spring.application.name}_PRODUCER
 
@@ -54,10 +55,8 @@ iot:
       # 是否同步状态到数据库
       sync-state-to-db: true
       # 设备类型白名单（为空则不过滤）
-      # device-type-whitelist:
-      #   - NVR
-      #   - ACCESS_GEN1
-      #   - ACCESS_GEN2
+      device-type-whitelist:
+        - NVR
       # 设备类型黑名单（被动连接设备通常不需要主动初始化）
       device-type-blacklist:
         - ALARM
@@ -94,13 +93,13 @@ iot:
     # ==================== 插件配置 ====================
     plugins:
       # 插件启用/禁用配置
-      # ====== 调试模式：只启用 changhui 插件 ======
+      # ====== 调试模式：只启用 NVR 插件 ======
       enabled:
-        alarm: true          # 报警主机插件（调试时禁用）
-        changhui: false        # 长辉TCP插件（保持启用）
-        access-gen1: true    # 门禁一代插件（调试时禁用）
-        access-gen2: true    # 门禁二代插件（调试时禁用）
-        nvr: true            # NVR插件（调试时禁用）
+        alarm: false         # 报警主机插件（NVR录像链路验证时禁用）
+        changhui: false      # 长辉TCP插件（NVR录像链路验证时禁用）
+        access-gen1: false   # 门禁一代插件（避免加载门禁 SDK 依赖 DLL）
+        access-gen2: false   # 门禁二代插件（避免加载门禁 SDK 依赖 DLL）
+        nvr: true            # NVR插件（录像查询/回放链路）
         ipc: false           # IPC摄像头插件（独立IPC设备，默认关闭）
 
       # ---------- 报警主机插件配置 ----------
@@ -166,12 +165,12 @@ logging:
   level:
     cn.iocoder.yudao.module.iot.newgateway: INFO
     cn.iocoder.yudao.module.iot.newgateway.core: INFO
-    # ====== 调试 Changhui 时：只显示 changhui 日志，其他插件静音 ======
-    cn.iocoder.yudao.module.iot.newgateway.plugins: WARN
-    cn.iocoder.yudao.module.iot.newgateway.plugins.changhui: DEBUG
-    # 其他插件日志关闭（调试 changhui 时减少干扰）
+    # ====== 调试 NVR 录像链路：启用 NVR 插件日志 ======
+    cn.iocoder.yudao.module.iot.newgateway.plugins: INFO
+    cn.iocoder.yudao.module.iot.newgateway.plugins.changhui: WARN
+    # 其他插件日志关闭（调试 NVR 时减少干扰）
     cn.iocoder.yudao.module.iot.newgateway.plugins.alarm: WARN
-    cn.iocoder.yudao.module.iot.newgateway.plugins.nvr: WARN
+    cn.iocoder.yudao.module.iot.newgateway.plugins.nvr: DEBUG
     cn.iocoder.yudao.module.iot.newgateway.plugins.ipc: WARN
     cn.iocoder.yudao.module.iot.newgateway.plugins.access: WARN
     # 重要：命令消费者日志必须开启，否则看不到命令处理日志！

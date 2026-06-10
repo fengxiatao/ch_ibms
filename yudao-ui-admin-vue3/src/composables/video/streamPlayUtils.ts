@@ -14,18 +14,35 @@ const KNOWN_HOST_REWRITE: Record<string, string> = {
   'ibms.gzchanghu.cn': 'ibms.gzchanghui.cn'
 }
 
-export const isIntranetAccess = () => {
-  const hostname = window.location.hostname
+const resolveConfiguredBaseHostname = () => {
+  const rawBaseUrl = String(import.meta.env.VITE_BASE_URL || '').trim()
+  if (!rawBaseUrl) {
+    return ''
+  }
+  try {
+    return new URL(rawBaseUrl, window.location.origin).hostname
+  } catch {
+    return ''
+  }
+}
+
+const isPrivateHostname = (hostname: string) => {
   if (hostname === 'localhost' || hostname === '127.0.0.1') return true
   if (hostname.startsWith('192.168.')) return true
   if (hostname.startsWith('10.')) return true
   if (hostname.startsWith('172.')) {
     const secondOctet = parseInt(hostname.split('.')[1])
-    if (secondOctet >= 16 && secondOctet <= 31) {
-      return true
-    }
+    return secondOctet >= 16 && secondOctet <= 31
   }
   return false
+}
+
+export const isIntranetAccess = () => {
+  const configuredBaseHostname = resolveConfiguredBaseHostname()
+  if (configuredBaseHostname && !isPrivateHostname(configuredBaseHostname)) {
+    return false
+  }
+  return isPrivateHostname(window.location.hostname)
 }
 
 export const isForceWebrtcEnabled = () => {
@@ -37,9 +54,17 @@ export const isForceWebrtcEnabled = () => {
 }
 
 export const getDefaultPreferWebrtc = () => {
-  // 外网环境下 WebRTC 信令/UDP 经常无法穿透，统一关闭 WebRTC 优先，走 ws-flv。
-  // 仅当 URL 显式带 forceWebrtc=1 时才尝试 WebRTC（用于内部测试）。
-  return isForceWebrtcEnabled()
+  // 默认优先 WebRTC（已配置 NATAPP UDP 隧道）
+  // 若需回退 FLV 调试，可通过 forceFlv=1 显式禁用 WebRTC
+  return !isForceFlvEnabled()
+}
+
+export const isForceFlvEnabled = () => {
+  try {
+    return new URLSearchParams(window.location.search).get('forceFlv') === '1'
+  } catch {
+    return false
+  }
 }
 
 /** 计算拉流地址中的「公网 host[:port]」替换目标（私网 IP 段会被替换为此值） */

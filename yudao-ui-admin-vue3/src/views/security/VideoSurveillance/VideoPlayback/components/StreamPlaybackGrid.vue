@@ -17,9 +17,10 @@
           <StreamPlaybackPlayer
             v-if="win.playing && win.state?.streamId"
             :key="(win.state.stream || '') + '_' + (win.state.streamStartTime || 0)"
+            :ws-flv-url="win.state.wsFlvUrl"
             :flv-url="win.state.flvUrl"
             :webrtc-url="win.state.webrtcUrl"
-            :prefer-webrtc="false"
+            :prefer-webrtc="getDefaultPreferWebrtc()"
           />
           <div v-else class="video-placeholder">
             <Icon icon="ep:video-pause" class="placeholder-icon" />
@@ -45,6 +46,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Icon } from '@/components/Icon'
+import { getDefaultPreferWebrtc } from '@/composables/video/streamPlayUtils'
 import StreamPlaybackPlayer from './StreamPlaybackPlayer.vue'
 import type { GridLayoutType } from '../types'
 import type { StreamPaneState } from '../composables/useStreamPlayback'

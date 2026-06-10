@@ -47,10 +47,24 @@ public class VideoPlaybackController {
         return success(videoPlaybackService.queryRecordings(reqVO));
     }
 
+    @PostMapping("/general-recordings")
+    @Operation(summary = "查询录像片段（兼容旧前端路径）")
+    @PreAuthorize("@ss.hasPermission('iot:camera:query')")
+    public CommonResult<List<ChannelRecordingRespVO>> queryGeneralRecordings(@Valid @RequestBody PlaybackQueryRecordingsReqVO reqVO) {
+        return success(videoPlaybackService.queryRecordings(reqVO));
+    }
+
     @PostMapping("/query-recordings-batch")
     @Operation(summary = "批量查询录像片段")
     @PreAuthorize("@ss.hasPermission('iot:camera:query')")
     public CommonResult<List<ChannelRecordingRespVO>> queryRecordingsBatch(@Valid @RequestBody PlaybackQueryRecordingsBatchReqVO reqVO) {
+        return success(videoPlaybackService.queryRecordingsBatch(reqVO));
+    }
+
+    @PostMapping("/general-recordings-batch")
+    @Operation(summary = "批量查询录像片段（兼容旧前端路径）")
+    @PreAuthorize("@ss.hasPermission('iot:camera:query')")
+    public CommonResult<List<ChannelRecordingRespVO>> queryGeneralRecordingsBatch(@Valid @RequestBody PlaybackQueryRecordingsBatchReqVO reqVO) {
         return success(videoPlaybackService.queryRecordingsBatch(reqVO));
     }
 

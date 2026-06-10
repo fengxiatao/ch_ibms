@@ -48,7 +48,7 @@ export const useAppStore = defineStore('app', {
       userInfo: 'userInfo', // 登录信息存储字段-建议每个项目换一个字段，避免与其他项目冲突
       sizeMap: ['default', 'large', 'small'],
       mobile: false, // 是否是移动端
-      title: '智慧建筑管理系统', // 标题
+      title: '智能化系统统一管理平台', // 标题
       pageLoading: false, // 路由跳转loading
 
       breadcrumb: true, // 面包屑
@@ -73,7 +73,7 @@ export const useAppStore = defineStore('app', {
 
       layout: wsCache.get(CACHE_KEY.LAYOUT) || 'classic', // layout布局
       isDark: wsCache.get(CACHE_KEY.IS_DARK) ?? true, // 是否是暗黑模式（默认深色）
-      currentSize: wsCache.get('default') || 'default', // 组件尺寸
+      currentSize: wsCache.get('currentSize') || 'default', // 组件尺寸
       theme: wsCache.get(CACHE_KEY.THEME) || {
         // 主题色
         // 左侧菜单边框颜色

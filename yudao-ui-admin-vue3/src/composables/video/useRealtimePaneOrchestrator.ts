@@ -20,7 +20,8 @@ interface RestoreViewOptions {
   isPatrollingRef?: Ref<boolean>
   setCurrentView: (view: VideoView) => void
   clearCurrentView?: () => void
-  findIbmsChannelByChannelNo: (channelNo: number) => Promise<IbmsChannel | undefined>
+  findIbmsChannelById: (channelId: number) => Promise<IbmsChannel | undefined | null>
+  findIbmsChannelByChannelNo: (channelNo: number) => Promise<IbmsChannel | undefined | null>
   playChannelInPane: (channel: IbmsChannel, paneIndex: number) => Promise<void>
   syncCurrentViewSelection?: (viewId: number | null) => void
 }
@@ -65,12 +66,16 @@ const resolveGridLayout = (gridLayout: string | number, gridCount?: number) => {
 
 const collectViewPanes = (panes: PlayerPane[]): VideoViewPane[] => {
   return panes
-    .map((pane, index) => ({
-      paneIndex: index,
-      channelId: pane.config?.channelNo,
-      channelName: pane.channelName
-    }))
-    .filter((pane) => pane.channelId)
+    .map((pane, index) => {
+      const ibmsChannel = pane.ibmsChannel
+      return {
+        paneIndex: index,
+        channelId: ibmsChannel?.id ?? null,
+        channelNo: ibmsChannel?.channelNo ?? pane.config?.channelNo,
+        channelName: ibmsChannel?.channelName || pane.channelName
+      }
+    })
+    .filter((pane) => pane.channelId || pane.channelNo)
 }
 
 export const useRealtimePaneOrchestrator = () => {
@@ -136,12 +141,21 @@ export const useRealtimePaneOrchestrator = () => {
     if (options.view.panes?.length) {
       for (let i = 0; i < options.view.panes.length; i++) {
         const paneData = options.view.panes[i]
-        const channelNo = paneData.channelId
-        if (!channelNo || paneData.paneIndex >= options.panesRef.value.length) {
+        const channelId = paneData.channelId
+        const channelNo = paneData.channelNo
+        if ((!channelId && !channelNo) || paneData.paneIndex >= options.panesRef.value.length) {
           continue
         }
 
-        const ibmsChannel = await options.findIbmsChannelByChannelNo(channelNo)
+        let ibmsChannel: IbmsChannel | undefined | null = null
+        if (channelId) {
+          ibmsChannel = await options.findIbmsChannelById(channelId)
+          if (!ibmsChannel && !channelNo) {
+            ibmsChannel = await options.findIbmsChannelByChannelNo(channelId)
+          }
+        } else if (channelNo) {
+          ibmsChannel = await options.findIbmsChannelByChannelNo(channelNo)
+        }
         if (ibmsChannel) {
           window.setTimeout(() => {
             options.playChannelInPane(ibmsChannel, paneData.paneIndex)

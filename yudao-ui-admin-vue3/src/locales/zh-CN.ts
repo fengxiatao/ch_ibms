@@ -63,8 +63,8 @@ export default {
     unlock: '点击解锁',
     backToLogin: '返回登录',
     entrySystem: '进入系统',
-    placeholder: '请输入锁屏密码',
-    message: '锁屏密码错误'
+    placeholder: '请输入当前账户密码',
+    message: '当前账户密码错误'
   },
   error: {
     noPermission: `抱歉，您无权访问此页面。`,
@@ -115,7 +115,7 @@ export default {
   },
   login: {
     welcome: '欢迎使用本系统',
-    message: '智慧建筑管理系统',
+    message: '智能化系统统一管理平台',
     tenantname: '租户名称',
     username: '用户名',
     password: '密码',
@@ -372,7 +372,7 @@ export default {
       qrSignInFormTitle: '二维码登录',
       signUpFormTitle: '注册',
       forgetFormTitle: '重置密码',
-      signInTitle: '智慧建筑管理系统',
+      signInTitle: '智能化系统统一管理平台',
       signInDesc: '输入您的个人详细信息开始使用！',
       policy: '我同意xxx隐私政策',
       scanSign: `扫码后点击"确认"，即可完成登录`,

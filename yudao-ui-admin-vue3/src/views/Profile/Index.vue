@@ -1,6 +1,6 @@
 <template>
   <!-- TODO @长辉开发团队：可优化，对标 vben 版本 -->
-  <div class="flex">
+  <div class="profile-page flex">
     <el-card class="user w-1/3" shadow="hover">
       <template #header>
         <div class="card-header">
@@ -40,6 +40,11 @@ const handleBasicInfoSuccess = async () => {
 }
 </script>
 <style scoped>
+.profile-page {
+  padding-top: max(0px, calc(var(--page-top-gap, 70px) - (var(--app-content-padding) + 10px)));
+  box-sizing: border-box;
+}
+
 .user {
   max-height: 960px;
   padding: 15px 20px 20px;
